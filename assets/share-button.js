@@ -46,10 +46,11 @@ export class ShareButton extends BaseComponent {
   #timer = null;
 
   setup() {
-    // The sheet is only offered where the browser has one. Rendering the
-    // button and failing on click is worse than never showing it.
+    // The sheet is only offered where the browser has one, and where the
+    // merchant has not turned it off. Rendering the button and failing on click
+    // is worse than never showing it.
     if (this.refs.button) {
-      this.refs.button.toggleAttribute('hidden', !navigator.share);
+      this.refs.button.toggleAttribute('hidden', !this.canShareNatively);
       this.on(this.refs.button, 'click', () => this.shareNative());
     }
 
@@ -80,8 +81,17 @@ export class ShareButton extends BaseComponent {
     return this.dataset.url || window.location.href;
   }
 
+  /**
+   * The device sheet is used only when the browser supports it AND the merchant
+   * has left it enabled. `data-native-share` is absent on older markup, so the
+   * check is for the explicit opt-out string rather than for truthiness.
+   */
+  get canShareNatively() {
+    return Boolean(navigator.share) && this.dataset.nativeShare !== 'false';
+  }
+
   async shareNative() {
-    if (!navigator.share) return this.copy();
+    if (!this.canShareNatively) return this.copy();
 
     try {
       await navigator.share({ title: this.dataset.title || document.title, url: this.url });

@@ -1,17 +1,44 @@
 {% comment %}
-  blocks/_product-variant-picker.liquid — private.
+  blocks/variant-picker.liquid — private.
 
   Private because it owns variant state. Two pickers on one page would each
   dispatch `variant:change` and the gallery would follow whichever fired last.
+
+  ## Why the swatch settings are duplicated here
+
+  Swatch shape and type appear both in Theme settings › Product cards and again
+  on this block. That is deliberate, and the split is by surface, not by
+  accident: the theme setting governs swatches drawn on product *cards*, where
+  the merchant is styling a grid; this block governs the *product page*, where
+  the same option row is much larger and often wants a different shape. A single
+  shared value cannot serve both without one of the two looking wrong.
+
+  The block falls back to the theme setting when its own value is left unset, so
+  a merchant who only ever touches Theme settings still gets a consistent store.
 {% endcomment %}
 
 {%- liquid
   assign product = closest.product
+  unless product
+    break
+  endunless
 -%}
 
 {%- if product and product.has_only_default_variant == false -%}
-  <div {{ block.shopify_attributes }}>
-    {% render 'variant-picker', product: product, section: section %}
+  <div
+    class="product-variant-picker"
+    {% render 'alignment', horizontal: block.settings.alignment %}
+    {% render 'spacing', block: block.settings %}
+    {{ block.shopify_attributes }}
+  >
+    {% render 'variant-picker',
+       product: product,
+       section: section,
+       swatches_type: block.settings.swatches_type,
+       swatch_shape: block.settings.swatch_shape,
+       options_picker_type: block.settings.options_picker_type,
+       size_options_picker_type: block.settings.size_options_picker_type,
+       show_inventory: block.settings.show_inventory %}
   </div>
 {%- endif -%}
 
@@ -20,29 +47,35 @@
   "name": "t:blocks.product_variant_picker.name",
   "tag": null,
   "settings": [
-         {
+    {
       "type": "paragraph",
-      "content": "t:sections.all.common.displays_inventory_from_parent_product"
+      "content": "t:blocks.product_variant_picker.paragraphs.inventory_from_parent"
     },
     {
       "type": "text",
       "id": "title",
-      "label": "t:sections.variant_selector.settings.title.label",
-      "default": "Variant selector",
-      "info": "t:sections.variant_selector.settings.title.info"
+      "label": "t:blocks.product_variant_picker.settings.title.label",
+      "info": "t:blocks.product_variant_picker.settings.title.info",
+      "default": "Variant selector"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_inventory",
+      "label": "t:blocks.product_variant_picker.settings.show_inventory.label",
+      "default": true
     },
     {
       "type": "select",
       "id": "size_options_picker_type",
-      "label": "t:sections.variant_selector.settings.size_options_picker_type.label",
+      "label": "t:blocks.product_variant_picker.settings.size_options_picker_type.label",
       "options": [
         {
           "value": "dropdowns",
-          "label": "t:sections.variant_selector.settings.size_options_picker_type.options__1_dropdowns.label"
+          "label": "t:blocks.product_variant_picker.settings.size_options_picker_type.options__1.label"
         },
         {
           "value": "buttons",
-          "label": "t:sections.variant_selector.settings.size_options_picker_type.options__2_buttons.label"
+          "label": "t:blocks.product_variant_picker.settings.size_options_picker_type.options__2.label"
         }
       ],
       "default": "buttons"
@@ -50,73 +83,74 @@
     {
       "type": "select",
       "id": "options_picker_type",
-      "label": "t:sections.variant_selector.settings.variant_options_picker_type.label",
+      "label": "t:blocks.product_variant_picker.settings.options_picker_type.label",
       "options": [
         {
           "value": "dropdowns",
-          "label": "t:sections.variant_selector.settings.variant_options_picker_type.options__1_dropdowns.label"
+          "label": "t:blocks.product_variant_picker.settings.options_picker_type.options__1.label"
         },
         {
           "value": "buttons",
-          "label": "t:sections.variant_selector.settings.variant_options_picker_type.options__2_buttons.label"
+          "label": "t:blocks.product_variant_picker.settings.options_picker_type.options__2.label"
         }
       ],
       "default": "buttons"
     },
+    {
+      "type": "select",
+      "id": "swatches_type",
+      "label": "t:settings_schema.product_cards.settings.swatches_type.label",
+      "info": "t:blocks.product_variant_picker.settings.swatches_type.info",
+      "options": [
         {
-        "type": "select",
-        "id": "swatches_type",
-        "label": "t:settings_schema.product_cards.settings.swatches_type.label",
-        "options": [
-          {
-            "value": "theme",
-            "label": "t:settings_schema.product_cards.settings.swatches_type.options__1.label"
-          },
-          {
-            "value": "native",
-            "label": "t:settings_schema.product_cards.settings.swatches_type.options__2.label"
-          },
-          {
-            "value": "none",
-            "label": "t:settings_schema.product_cards.settings.swatches_type.options__3.label"
-          }
-        ],
-        "default": "theme"
-      },
-            {
-        "type": "select",
-        "id": "swatch_shape",
-        "label": "t:settings_schema.product_cards.settings.swatch_shape.label",
-        "options": [
-          {
-            "value": "circle",
-            "label": "t:settings_schema.product_cards.settings.swatch_shape.options__1.label"
-          },
-          {
-            "value": "round",
-            "label": "t:settings_schema.product_cards.settings.swatch_shape.options__2.label"
-          },
-          {
-            "value": "portrait",
-            "label": "t:settings_schema.product_cards.settings.swatch_shape.options__3.label"
-          }
-        ],
-        "default": "circle"
-      },
+          "value": "theme",
+          "label": "t:settings_schema.product_cards.settings.swatches_type.options__1.label"
+        },
+        {
+          "value": "native",
+          "label": "t:settings_schema.product_cards.settings.swatches_type.options__2.label"
+        },
+        {
+          "value": "none",
+          "label": "t:settings_schema.product_cards.settings.swatches_type.options__3.label"
+        }
+      ],
+      "default": "theme"
+    },
+    {
+      "type": "select",
+      "id": "swatch_shape",
+      "label": "t:settings_schema.product_cards.settings.swatch_shape.label",
+      "options": [
+        {
+          "value": "circle",
+          "label": "t:settings_schema.product_cards.settings.swatch_shape.options__1.label"
+        },
+        {
+          "value": "round",
+          "label": "t:settings_schema.product_cards.settings.swatch_shape.options__2.label"
+        },
+        {
+          "value": "portrait",
+          "label": "t:settings_schema.product_cards.settings.swatch_shape.options__3.label"
+        }
+      ],
+      "default": "circle"
+    },
     {
       "type": "text_alignment",
       "id": "alignment",
-      "label": "t:sections.all.common.alignment",
+      "label": "t:shared.alignment.label",
       "default": "left"
     },
     {
       "type": "header",
-      "content": "t:sections.all.padding.label"
+      "content": "t:shared.spacing.block_header"
     },
     {
       "type": "range",
       "id": "padding-block-start",
-      "label": "t:sections.all.spacing.top",
+      "label": "t:shared.spacing.padding_top.label",
       "min": 0,
       "max": 100,
       "step": 1,
@@ -126,7 +160,7 @@
     {
       "type": "range",
       "id": "padding-block-end",
-      "label": "t:sections.all.spacing.bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
       "min": 0,
       "max": 100,
       "step": 1,
@@ -136,7 +170,7 @@
     {
       "type": "range",
       "id": "padding-inline-start",
-      "label": "t:sections.all.spacing.left",
+      "label": "t:shared.spacing.padding_left.label",
       "min": 0,
       "max": 100,
       "step": 1,
@@ -146,7 +180,7 @@
     {
       "type": "range",
       "id": "padding-inline-end",
-      "label": "t:sections.all.spacing.right",
+      "label": "t:shared.spacing.padding_right.label",
       "min": 0,
       "max": 100,
       "step": 1,

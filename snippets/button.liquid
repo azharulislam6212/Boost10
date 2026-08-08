@@ -10,7 +10,11 @@
     label     (string, required)  Already translated
     href      (string, optional)  Renders an `<a>` when present, a `<button>` otherwise
     variant   (string, optional)  'primary' | 'secondary' | 'outline' | 'link'. Default primary
-    size      (string, optional)  'small' | 'medium' | 'large'. Default medium
+    size      (string, optional)  'small' | 'medium' | 'large' | 'custom'.
+                                  Default medium. Sizes are relative to Theme
+                                  settings > Buttons > Height, so raising that
+                                  scales all four
+    custom_height (number, optional) Pixels. Only read when size is 'custom'
     type      (string, optional)  Button type. Default 'button'
     name      (string, optional)  Form control name
     value     (string, optional)  Form control value
@@ -57,6 +61,17 @@
   if class != blank
     assign classes = classes | append: ' ' | append: class
   endif
+
+  comment
+    A custom height is one inline custom property, not an inline `height`. The
+    stylesheet still owns the rule; this only supplies the number, so hover,
+    focus and the responsive rules keep working. Nothing is emitted for the
+    other sizes, which keeps the markup clean on the common path.
+  endcomment
+  assign size_style = ''
+  if resolved_size == 'custom' and custom_height != blank
+    assign size_style = '--button-custom-height:' | append: custom_height | append: 'px;'
+  endif
 -%}
 
 {%- capture button_content -%}
@@ -84,6 +99,7 @@
   <a
     {% if id != blank %}id="{{ id }}"{% endif %}
     class="{{ classes }}"
+    {% if size_style != blank %}style="{{ size_style }}"{% endif %}
     href="{{ href }}"
     {% if icon_only %}aria-label="{{ accessible_name | escape }}"{% endif %}
     {% if new_tab %}target="_blank" rel="noopener"{% endif %}
@@ -99,6 +115,7 @@
   <button
     {% if id != blank %}id="{{ id }}"{% endif %}
     class="{{ classes }}"
+    {% if size_style != blank %}style="{{ size_style }}"{% endif %}
     type="{{ resolved_type }}"
     {% if name != blank %}name="{{ name }}"{% endif %}
     {% if value != blank %}value="{{ value | escape }}"{% endif %}

@@ -253,7 +253,13 @@
       </compare-trigger>
     {%- endif -%}
   
-    {%- if settings.show_card_swatches and swatch_option != blank -%}
+    {%- comment -%}
+      `swatches_type` is the theme-level control for cards. The product page has
+      its own copy on the variant picker block, because a card in a grid and a
+      full-width option row rarely want the same treatment.
+    {%- endcomment -%}
+    {%- assign card_swatch_type = settings.swatches_type | default: 'theme' -%}
+    {%- if card_swatch_type != 'none' and swatch_option != blank -%}
       {%- comment -%}
         Card swatches swap the image and the price; they do not add to a cart.
         `<variant-swatch>` exists for exactly that difference — a card has no
@@ -266,7 +272,20 @@
 
         <div class="swatch-group" role="group" aria-label="{{ 'accessibility.swatch_group' | t: option: swatch_option.name | escape }}">
           {%- for value in swatch_option.values limit: settings.swatch_max_visible -%}
-            {%- assign value_variant = product.variants | where: 'title', value | first -%}
+            {%- comment -%}
+              The variant is found by scanning options rather than by
+              `where: 'title', value`, which only ever matched single-option
+              products: on anything with a second option `variant.title` reads
+              "Red / Small", so the lookup returned nothing and every
+              image-backed swatch on a card fell back to its initials.
+            {%- endcomment -%}
+            {%- assign value_variant = nil -%}
+            {%- for variant in product.variants -%}
+              {%- if variant.options contains value -%}
+                {%- assign value_variant = variant -%}
+                {%- if variant.available -%}{%- break -%}{%- endif -%}
+              {%- endif -%}
+            {%- endfor -%}
             <button
               type="button"
               data-swatch-option
@@ -278,7 +297,8 @@
                  option_name: swatch_option.name,
                  option_value: value,
                  variant: value_variant,
-                 size: settings.swatch_size_card %}
+                 shape: settings.swatch_shape,
+                 size_px: settings.swatch_size %}
               <span class="visually-hidden">{{ value }}</span>
             </button>
           {%- endfor -%}

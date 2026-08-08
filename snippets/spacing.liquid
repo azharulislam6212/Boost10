@@ -1,0 +1,111 @@
+{% doc %}
+  Emits padding as custom properties, for a section or for a block.
+
+  The file was empty. Sixty-eight call sites rendered it and got nothing back,
+  so every padding control in the theme editor moved a slider that changed no
+  pixels. `base.css` was already reading these properties with `0px` fallbacks,
+  which is why the omission produced no error and no visible breakage — only
+  settings that quietly did nothing.
+
+  ## Two property sets, not one
+
+  A section pads block-start and block-end only, and takes an explicit mobile
+  override. A block pads all four sides and scales the desktop value down on
+  small screens by a percentage. They are different shapes, so they get
+  different property names, matching what `base.css` reads:
+
+      --section-padding-block-start / -end          (+ `-mobile` variants)
+      --block-padding-block-start / -end / -inline-start / -inline-end
+      --block-padding-scale-mobile
+
+  ## Why inline properties and not classes
+
+  Padding is a continuous range, so a class per value is not possible. Emitting
+  the `style` attribute here rather than at each call site keeps the property
+  names in one file: they have to match `base.css` exactly, and sixty-eight
+  hand-written copies is sixty-eight chances to misspell one.
+
+  ## Zero values are omitted
+
+  A declaration is only written when the value is non-zero. The fallbacks in
+  `base.css` already resolve to `0px`, so writing `--block-padding-block-end: 0px`
+  adds bytes to every block on the page to say what the stylesheet already says.
+
+  Left and right are spelled `inline-start` and `inline-end` so they follow the
+  text direction and flip automatically in right-to-left languages.
+
+  Parameters:
+    section  (object, optional)  A section settings object
+    block    (object, optional)  A block settings object
+    settings (object, optional)  Alias for `block`, for older call sites
+
+  @example
+    <div {% render 'spacing', block: block.settings %}>
+
+  @example
+    <section {% render 'spacing', section: section.settings %}>
+{% enddoc %}
+
+{%- liquid
+  assign s = section
+  assign b = block | default: settings
+
+  assign out = ''
+
+  if s != blank
+    if s.padding_top != blank and s.padding_top != 0
+      assign out = out | append: '--section-padding-block-start:' | append: s.padding_top | append: 'px;'
+    endif
+    if s.padding_bottom != blank and s.padding_bottom != 0
+      assign out = out | append: '--section-padding-block-end:' | append: s.padding_bottom | append: 'px;'
+    endif
+
+    comment
+      Mobile is only emitted when the merchant set it. Left at 0 the stylesheet
+      falls back to the desktop value, which is the documented behaviour of the
+      "Leave at 0 to use 60% of the desktop value" hint on those settings.
+    endcomment
+    if s.padding_top_mobile != blank and s.padding_top_mobile != 0
+      assign out = out | append: '--section-padding-block-start-mobile:' | append: s.padding_top_mobile | append: 'px;'
+    endif
+    if s.padding_bottom_mobile != blank and s.padding_bottom_mobile != 0
+      assign out = out | append: '--section-padding-block-end-mobile:' | append: s.padding_bottom_mobile | append: 'px;'
+    endif
+  endif
+
+  if b != blank
+    comment
+      Both spellings are accepted. Most blocks use `padding_top`; a few newer
+      ones use the CSS-shaped `padding-block-start`. Reading either means a
+      block does not have to be rewritten to gain working padding.
+    endcomment
+    assign b_top = b.padding_top | default: b['padding-block-start']
+    assign b_bottom = b.padding_bottom | default: b['padding-block-end']
+    assign b_left = b.padding_left | default: b['padding-inline-start']
+    assign b_right = b.padding_right | default: b['padding-inline-end']
+
+    if b_top != blank and b_top != 0
+      assign out = out | append: '--block-padding-block-start:' | append: b_top | append: 'px;'
+    endif
+    if b_bottom != blank and b_bottom != 0
+      assign out = out | append: '--block-padding-block-end:' | append: b_bottom | append: 'px;'
+    endif
+    if b_left != blank and b_left != 0
+      assign out = out | append: '--block-padding-inline-start:' | append: b_left | append: 'px;'
+    endif
+    if b_right != blank and b_right != 0
+      assign out = out | append: '--block-padding-inline-end:' | append: b_right | append: 'px;'
+    endif
+
+    comment
+      The setting is a percentage; the stylesheet multiplies by it, so it has to
+      arrive as a unitless fraction.
+    endcomment
+    if b.padding_scale_mobile != blank and b.padding_scale_mobile != 0
+      assign scale = b.padding_scale_mobile | divided_by: 100.0
+      assign out = out | append: '--block-padding-scale-mobile:' | append: scale | append: ';'
+    endif
+  endif
+-%}
+
+{%- if out != blank %}style="{{ out }}"{% endif -%}

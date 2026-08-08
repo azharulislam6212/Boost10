@@ -40,6 +40,7 @@
     option  (object, required)   From `product.options_with_values`
     section (object, required)
     max_visible (number, optional) 0 for no limit
+    form_id (string, optional)   The form the radios belong to
     shape, size (string, optional) Passed through
 
   @example
@@ -49,7 +50,7 @@
 {%- liquid
   assign limit = max_visible | default: settings.swatch_max_visible | default: 0
   assign shape = shape | default: settings.swatch_shape | default: 'circle'
-  assign size = size | default: settings.swatch_size_pdp | default: 'medium'
+  assign size = size | default: 'medium'
 -%}
 
 <variant-swatches
@@ -67,22 +68,34 @@
           Availability is evaluated against this value alone, which is enough for
           the row. `<variant-picker>` re-evaluates it against the other selected
           options as soon as it connects.
+
+          The same pass picks up a variant carrying this value, because the
+          swatch may need its image. `where: 'title'` cannot do this: on a
+          multi-option product `variant.title` is "Red / Small", so matching it
+          against "Red" returns nothing and every image-backed swatch silently
+          falls through to its initials.
         endcomment
         assign matching = false
+        assign variant_for_value = nil
         for variant in product.variants
-          if variant.options contains value and variant.available
-            assign matching = true
-            break
+          if variant.options contains value
+            if variant_for_value == nil
+              assign variant_for_value = variant
+            endif
+            if variant.available
+              assign matching = true
+              assign variant_for_value = variant
+              break
+            endif
           endif
         endfor
-
-        assign variant_for_value = product.variants | where: 'title', value | first
       -%}
 
       {% render 'swatch-input',
          value: value,
          option: option,
          section_id: section.id,
+         form_id: form_id,
          index: forloop.index,
          checked: option.selected_value == value,
          available: matching,
