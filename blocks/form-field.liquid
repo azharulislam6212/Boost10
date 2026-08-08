@@ -1,0 +1,154 @@
+{% comment %}
+  blocks/form-field.liquid
+
+  One field in the contact form.
+
+  Names are `contact[Label]`, which is how Shopify turns a field into a line in
+  the merchant's inbox. That means **the label is the field name**: renaming
+  "Order number" to "Order #" changes what arrives in the admin, and the schema
+  says so, because a merchant who renames a label and then cannot find the value
+  has no way to guess why.
+
+  Every field is a real input with a real `<label for>`. Placeholder-as-label is
+  the single most common accessibility failure in contact forms: it disappears
+  the moment someone types, so anyone who loses their place has to clear the
+  field to find out what it wanted.
+{% endcomment %}
+
+{%- liquid
+  assign field_id = 'ContactField-' | append: block.id
+  assign name = block.settings.label | default: 'Field'
+  assign required = block.settings.required
+-%}
+
+<div
+  class="form-field form-field--{{ block.settings.type }}{% if block.settings.width == 'half' %} form-field--half{% endif %}"
+  {% render 'spacing', block: block.settings %}
+  {{ block.shopify_attributes }}
+>
+  {%- if block.settings.type == 'checkbox' -%}
+    <label class="form-field__checkbox" for="{{ field_id }}">
+      <input
+        id="{{ field_id }}"
+        type="checkbox"
+        name="contact[{{ name | escape }}]"
+        value="{{ 'general.actions.yes' | t | escape }}"
+        {% if required %}required{% endif %}
+      >
+      <span>{{ block.settings.label }}{% if required %} *{% endif %}</span>
+    </label>
+  {%- else -%}
+    <label for="{{ field_id }}">
+      {{ block.settings.label }}{% if required %} *{% endif %}
+    </label>
+
+    {%- case block.settings.type -%}
+      {%- when 'textarea' -%}
+        <textarea
+          id="{{ field_id }}"
+          name="contact[{{ name | escape }}]"
+          rows="{{ block.settings.rows | default: 5 }}"
+          {% if block.settings.placeholder != blank %}placeholder="{{ block.settings.placeholder | escape }}"{% endif %}
+          {% if required %}required{% endif %}
+        ></textarea>
+
+      {%- when 'select' -%}
+        <select
+          id="{{ field_id }}"
+          name="contact[{{ name | escape }}]"
+          {% if required %}required{% endif %}
+        >
+          {%- comment -%}
+            An empty first option, so "required" actually means something. A
+            select that starts on a real value is a select nobody has chosen.
+          {%- endcomment -%}
+          <option value="">{{ 'general.actions.choose' | t }}</option>
+          {%- assign options = block.settings.options | newline_to_br | split: '<br />' -%}
+          {%- for option in options -%}
+            {%- assign clean = option | strip -%}
+            {%- if clean != blank -%}
+              <option value="{{ clean | escape }}">{{ clean }}</option>
+            {%- endif -%}
+          {%- endfor -%}
+        </select>
+
+      {%- when 'email' -%}
+        <input
+          id="{{ field_id }}"
+          type="email"
+          name="contact[email]"
+          autocomplete="email"
+          {% if block.settings.placeholder != blank %}placeholder="{{ block.settings.placeholder | escape }}"{% endif %}
+          {% if required %}required{% endif %}
+        >
+
+      {%- when 'phone' -%}
+        <input
+          id="{{ field_id }}"
+          type="tel"
+          name="contact[{{ name | escape }}]"
+          autocomplete="tel"
+          {% if block.settings.placeholder != blank %}placeholder="{{ block.settings.placeholder | escape }}"{% endif %}
+          {% if required %}required{% endif %}
+        >
+
+      {%- else -%}
+        <input
+          id="{{ field_id }}"
+          type="text"
+          name="contact[{{ name | escape }}]"
+          {% if block.settings.autocomplete != blank %}autocomplete="{{ block.settings.autocomplete }}"{% endif %}
+          {% if block.settings.placeholder != blank %}placeholder="{{ block.settings.placeholder | escape }}"{% endif %}
+          {% if required %}required{% endif %}
+        >
+    {%- endcase -%}
+  {%- endif -%}
+
+  {%- if block.settings.help != blank -%}
+    <p class="form-field__help">{{ block.settings.help }}</p>
+  {%- endif -%}
+</div>
+
+{% schema %}
+{
+  "name": "t:blocks.form_field.name",
+  "tag": null,
+  "settings": [
+    { "type": "paragraph", "content": "t:blocks.form_field.paragraph" },
+    {
+      "type": "select", "id": "type", "label": "t:blocks.form_field.settings.type.label",
+      "options": [
+        { "value": "text", "label": "t:blocks.form_field.settings.type.options__1.label" },
+        { "value": "email", "label": "t:blocks.form_field.settings.type.options__2.label" },
+        { "value": "phone", "label": "t:blocks.form_field.settings.type.options__3.label" },
+        { "value": "select", "label": "t:blocks.form_field.settings.type.options__4.label" },
+        { "value": "textarea", "label": "t:blocks.form_field.settings.type.options__5.label" },
+        { "value": "checkbox", "label": "t:blocks.form_field.settings.type.options__6.label" }
+      ],
+      "default": "text"
+    },
+    { "type": "text", "id": "label", "label": "t:blocks.form_field.settings.label.label", "info": "t:blocks.form_field.settings.label.info", "default": "Name" },
+    { "type": "text", "id": "placeholder", "label": "t:blocks.form_field.settings.placeholder.label", "info": "t:blocks.form_field.settings.placeholder.info" },
+    { "type": "textarea", "id": "options", "label": "t:blocks.form_field.settings.options.label", "info": "t:blocks.form_field.settings.options.info" },
+    { "type": "range", "id": "rows", "label": "t:blocks.form_field.settings.rows.label", "min": 3, "max": 12, "step": 1, "default": 5 },
+    { "type": "text", "id": "autocomplete", "label": "t:blocks.form_field.settings.autocomplete.label", "info": "t:blocks.form_field.settings.autocomplete.info" },
+    { "type": "text", "id": "help", "label": "t:blocks.form_field.settings.help.label" },
+    { "type": "checkbox", "id": "required", "label": "t:blocks.form_field.settings.required.label", "default": false },
+    {
+      "type": "select", "id": "width", "label": "t:blocks.form_field.settings.width.label",
+      "options": [
+        { "value": "full", "label": "t:blocks.group.settings.width.options__1.label" },
+        { "value": "half", "label": "t:blocks.form_field.settings.width.options__2.label" }
+      ],
+      "default": "full"
+    },
+    { "type": "header", "content": "t:shared.spacing.block_header" },
+    { "type": "range", "id": "padding_top", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_right", "label": "t:shared.spacing.padding_right.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_bottom", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_left", "label": "t:shared.spacing.padding_left.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_scale_mobile", "label": "t:shared.spacing.padding_scale_mobile.label", "info": "t:shared.spacing.padding_scale_mobile.info", "min": 25, "max": 100, "step": 5, "unit": "%", "default": 75 }
+  ],
+  "presets": [{ "name": "t:blocks.form_field.name" }]
+}
+{% endschema %}

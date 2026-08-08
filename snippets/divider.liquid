@@ -1,0 +1,64 @@
+{% doc %}
+  A horizontal rule between things.
+
+  Four styles, and the fourth is why this is a snippet rather than a CSS class:
+  a wave is an SVG, and an SVG needs its colour and height written into it at
+  render time.
+
+  ## Why the wave is inline SVG and not a background image
+
+  A `background-image: url("data:image/svg+xml,…")` cannot inherit `currentColor`,
+  so its colour has to be URL-encoded into the data URI — which means a merchant
+  changing the divider colour produces a completely new image the browser has to
+  parse again. Inline SVG takes `fill` from a custom property, so the same markup
+  recolours instantly and costs nothing.
+
+  It is `aria-hidden` and carries no `role`. A divider is a visual separator: a
+  screen reader announcing "separator" between every section is noise, and the
+  heading structure already tells someone where they are. When a divider is
+  genuinely semantic — the end of one topic and the start of another — the
+  section around it should be an `<hr>` or a landmark, not this.
+
+  Parameters:
+    style     (string, optional)  solid | dashed | dotted | wave. Default solid
+    color     (string, optional)  Defaults to the theme divider colour
+    thickness (number, optional)  Pixels. Ignored by the wave, which scales
+    width     (string, optional)  full | container | short. Default full
+    flip      (boolean, optional) Mirrors the wave vertically
+
+  @example
+    {% render 'divider', style: 'wave', color: settings.divider_color %}
+{% enddoc %}
+
+{%- liquid
+  assign divider_style = style | default: 'solid'
+  assign divider_color = color | default: settings.divider_color | default: '#e5e5e5'
+  assign divider_thickness = thickness | default: settings.divider_thickness | default: 1
+  assign divider_width = width | default: 'full'
+-%}
+
+<div
+  class="divider divider--{{ divider_style }} divider--{{ divider_width }}{% if flip %} divider--flip{% endif %}"
+  style="--divider-color: {{ divider_color }}; --divider-thickness: {{ divider_thickness }}px;"
+  aria-hidden="true"
+>
+  {%- if divider_style == 'wave' -%}
+    {%- comment -%}
+      `preserveAspectRatio="none"` lets the wave stretch to any width without
+      the browser letterboxing it, which is what makes one path work from a
+      320px phone to a 2560px display.
+    {%- endcomment -%}
+    <svg
+      class="divider__wave"
+      viewBox="0 0 1200 40"
+      preserveAspectRatio="none"
+      focusable="false"
+      aria-hidden="true"
+    >
+      <path
+        d="M0,20 C150,0 250,40 400,20 C550,0 650,40 800,20 C950,0 1050,40 1200,20 L1200,40 L0,40 Z"
+        fill="var(--divider-color)"
+      />
+    </svg>
+  {%- endif -%}
+</div>

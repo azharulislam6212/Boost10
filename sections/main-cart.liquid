@@ -1,0 +1,81 @@
+{% comment %}
+  sections/main-cart.liquid
+
+  The line items and the summary are private blocks. A merchant who can delete
+  the summary has a cart page with no checkout button.
+
+  What they can arrange is the region below the items: a returns promise, a
+  payment-security line, an app block. That is the flexibility merchants actually
+  ask for, and it costs nothing to give.
+{% endcomment %}
+
+{%- liquid
+  assign section_settings = section.settings
+-%}
+
+{% capture cart_page_more_blocks %}
+  {%- content_for 'blocks' -%}
+{% endcapture %}
+
+{%- capture cart_items_children -%}
+  <div
+    class="cart-section color-{{ section_settings.color_scheme }}"
+    role="region"
+    aria-label="{{ 'cart.general.title' | t | escape }}"
+    {% render 'spacing', section: section_settings %}
+  >
+    <div class="container">
+      <h1 class="cart-page__title">{{ 'cart.general.title' | t }}</h1>
+
+      <div class="cart-wrapper">
+        <div class="cart-page__items">
+          {%- content_for 'block', id: 'cart-page-items', type: '_cart-products' -%}
+
+          {%- if cart_page_more_blocks != blank -%}
+            <div class="cart-page__blocks">{{ cart_page_more_blocks }}</div>
+          {%- endif -%}
+        </div>
+
+        {%- unless cart.empty? -%}
+          <div class="cart-page__summary">
+            {%- content_for 'block', id: 'cart-page-summary', type: '_cart-summary' -%}
+          </div>
+        {%- endunless -%}
+      </div>
+
+      {%- if settings.enable_cart_upsells and cart.item_count > 0 -%}
+        <product-recommendations
+          class="cart-page__upsell"
+          data-product-id="{{ cart.items.first.product_id }}"
+          data-section-id="cart-upsell"
+          data-limit="{{ settings.cart_upsell_count | default: 4 }}"
+        >
+          <h2 class="cart-page__upsell-title" data-recommendations-heading hidden>
+            {{ 'cart.upsell.title' | t }}
+          </h2>
+          <div data-ref="content" data-recommendations-content></div>
+        </product-recommendations>
+      {%- endif -%}
+    </div>
+  </div>
+{%- endcapture -%}
+
+{%- render 'cart-items-component', children: cart_items_children, section_id: section.id -%}
+
+{% schema %}
+{
+  "name": "t:sections.main_cart.name",
+  "tag": "section",
+  "class": "section",
+  "blocks": [{ "type": "@theme" }, { "type": "@app" }],
+  "settings": [
+    { "type": "paragraph", "content": "t:sections.main_cart.paragraph" },
+    { "type": "color_scheme", "id": "color_scheme", "label": "t:shared.color_scheme.label", "default": "scheme-1" },
+    { "type": "header", "content": "t:shared.spacing.section_header" },
+    { "type": "range", "id": "padding_top", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 48 },
+    { "type": "range", "id": "padding_bottom", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 64 },
+    { "type": "range", "id": "padding_top_mobile", "label": "t:shared.spacing.padding_top_mobile.label", "info": "t:shared.spacing.padding_top_mobile.info", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_bottom_mobile", "label": "t:shared.spacing.padding_bottom_mobile.label", "info": "t:shared.spacing.padding_bottom_mobile.info", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 0 }
+  ]
+}
+{% endschema %}

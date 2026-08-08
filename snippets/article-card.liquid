@@ -1,0 +1,118 @@
+{% doc %}
+  Renders a blog article card.
+
+  Same structural rule as the product card: the card is not wrapped in a link.
+  The title is the link, stretched over the card in CSS, so the read-more button
+  and the tag list stay independently reachable and the accessible name of the
+  link is the article title rather than the whole card.
+
+  Dates use `<time datetime>` with a machine-readable value and a localised
+  display string, so the date is both readable and parseable.
+
+  Parameters:
+    article  (article, required)
+    index    (number, optional)   Position in the grid. Drives the reveal delay
+    sizes    (string, optional)
+    priority (boolean, optional)
+    show_excerpt (boolean, optional) Default true
+    show_date    (boolean, optional) Default true
+    show_author  (boolean, optional) Default false
+    show_tags    (boolean, optional) Default false
+    class    (string, optional)
+    section  (object, optional)   `section.settings`, for the animation cascade
+    block    (object, optional)   `block.settings`, for the animation cascade
+
+  @example
+    {%- for article in blog.articles -%}
+      {% render 'article-card', article: article, index: forloop.index0, priority: forloop.first %}
+    {%- endfor -%}
+{% enddoc %}
+
+{%- liquid
+  assign excerpt_visible = true
+  if show_excerpt == false
+    assign excerpt_visible = false
+  endif
+
+  assign date_visible = true
+  if show_date == false
+    assign date_visible = false
+  endif
+
+  assign card_delay = 0
+  if index != blank
+    assign card_delay = index | modulo: 3 | times: 80
+  endif
+
+  assign summary = article.excerpt_or_content | strip_html | truncatewords: 24
+  assign words = article.content | strip_html | split: ' ' | size
+  assign read_minutes = words | divided_by: 200 | at_least: 1
+-%}
+
+<motion-effect
+  {% render 'motion-attrs',
+     kind: 'image',
+     block: block,
+     section: section,
+     target: '.article-card__media',
+     delay: card_delay %}
+  class="article-card {{ class }}"
+  data-morph-key="article-{{ article.id }}"
+>
+  {%- if article.image != blank -%}
+    <a class="article-card__media-link" href="{{ article.url }}" tabindex="-1" aria-hidden="true">
+      <div class="article-card__media">
+        {% render 'image',
+           image: article.image,
+           ratio: 'landscape',
+           sizes: sizes,
+           priority: priority,
+           class: 'article-card__image' %}
+      </div>
+    </a>
+  {%- endif -%}
+
+  <div class="article-card__info">
+    {%- if article.tags.size > 0 and show_tags -%}
+      <ul class="article-card__tags" role="list">
+        {%- for tag in article.tags limit: 2 -%}
+          <li class="article-card__tag">{{ tag }}</li>
+        {%- endfor -%}
+      </ul>
+    {%- endif -%}
+
+    <h3 class="article-card__title">
+      <a class="article-card__link" href="{{ article.url }}">{{ article.title | escape }}</a>
+    </h3>
+
+    {%- if excerpt_visible and summary != blank -%}
+      <p class="article-card__excerpt">{{ summary }}</p>
+    {%- endif -%}
+
+    <div class="article-card__meta">
+      {%- if date_visible -%}
+        <time class="article-card__date" datetime="{{ article.published_at | date: '%Y-%m-%d' }}">
+          {{- article.published_at | date: format: 'date' -}}
+        </time>
+      {%- endif -%}
+
+      {%- if show_author and article.author != blank -%}
+        <span class="article-card__author">
+          {{- 'blogs.article.by_author_html' | t: author: article.author -}}
+        </span>
+      {%- endif -%}
+
+      <span class="article-card__read-time">
+        {{- 'blogs.article.read_time' | t: minutes: read_minutes -}}
+      </span>
+    </div>
+
+    <a class="article-card__more" href="{{ article.url }}">
+      {{ 'blogs.article.read_more' | t }}
+      <span class="visually-hidden">
+        {{- 'blogs.article.read_more_title' | t: title: article.title -}}
+      </span>
+      {% render 'icon', icon: 'arrow-right', class: 'article-card__more-icon' %}
+    </a>
+  </div>
+</motion-effect>

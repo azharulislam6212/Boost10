@@ -1,0 +1,146 @@
+{% doc %}
+  One responsive layout for every section that can be a grid or a carousel.
+
+  ## The problem this replaces
+
+  `featured-collection`, `multicolumn` and `testimonials` each contained an
+  `{% if layout == 'carousel' %}` branch and an `{% else %}` branch, with the
+  wrapper, the grid classes and the column style duplicated between them. The
+  arrows, the pause button and the live region existed only inside the carousel
+  branch, so the grid branch quietly had no accessibility affordances at all —
+  and every fix had to be applied twice, which is why they had drifted.
+
+  Here there is one structure. `<swiper-carousel>` is always the element;
+  `data-layout` says how it should behave, and CSS decides whether the track is
+  a CSS grid or a scroll-snapping row.
+
+  ## Why the carousel element wraps the grid too
+
+  It looks wasteful to render a carousel component around markup that will be
+  laid out as a static grid. It is not, for two reasons.
+
+  `SwiperCarousel` already asks whether its track actually scrolls before doing
+  anything — `scrollable` is checked before indicators appear and before
+  autoplay starts. A grid track does not overflow, so the component costs one
+  measurement and then stays inert. Nothing initialises, nothing animates.
+
+  More importantly, this is what makes the responsive case work at all. A
+  section set to grid on desktop and carousel on mobile needs the *same* nodes
+  to be a grid at one width and a track at another. Two branches cannot do
+  that; they can only ship both and hide one, which is exactly the duplicated
+  DOM this refactor exists to remove.
+
+  ## Parameters
+
+    children      (string, required)  Captured slide/grid items
+    layout        (string)  'grid' | 'carousel'  — desktop behaviour, default 'grid'
+    layout_mobile (string)  'grid' | 'carousel'  — default 'carousel'
+    tag           (string)  'ul' or 'div' for the track. Default 'div'.
+                            Use 'ul' when children are `<li>`.
+    label         (string, required)  Accessible name for the track
+    classes       (string)  Extra classes for the outer element
+    track_classes (string)  Extra classes for the track
+    columns_desktop (number)  default 4
+    columns_tablet  (number)  default 2
+    columns_mobile  (number)  default 1
+    settings      (object, required)  Section settings, for carousel options
+
+  @example
+    {% render 'carousel-shell',
+       children: children,
+       layout: section.settings.layout,
+       layout_mobile: section.settings.layout_mobile,
+       tag: 'ul',
+       label: collection.title,
+       settings: section.settings %}
+{% enddoc %}
+
+{%- liquid
+  assign layout_desktop = layout | default: 'grid'
+  assign layout_mob = layout_mobile | default: 'carousel'
+  assign track_tag = tag | default: 'div'
+  assign cols_desktop = columns_desktop | default: 4
+  assign cols_tablet = columns_tablet | default: 2
+  assign cols_mobile = columns_mobile | default: 1
+
+  assign nav = settings.carousel_navigation
+  if nav == blank
+    assign nav = true
+  endif
+
+  assign pagination = settings.carousel_pagination | default: 'none'
+
+  # Arrows and pagination are only ever reachable when at least one breakpoint
+  # is actually a carousel. Rendering them for a grid-at-every-width section
+  # would put focusable buttons in the tab order that do nothing.
+  assign is_carousel = false
+  if layout_desktop == 'carousel' or layout_mob == 'carousel'
+    assign is_carousel = true
+  endif
+-%}
+
+<swiper-carousel
+  class="carousel-shell {{ classes }}"
+  data-layout="{{ layout_desktop }}"
+  data-layout-mobile="{{ layout_mob }}"
+  {% render 'carousel-attrs', settings: settings %}
+  style="--columns-desktop: {{ cols_desktop }}; --columns-tablet: {{ cols_tablet }}; --columns-mobile: {{ cols_mobile }};"
+>
+  <{{ track_tag }}
+    class="carousel-shell__track {{ track_classes }}"
+    data-ref="track"
+    {% if track_tag == 'ul' %}role="list"{% endif %}
+    {%- if is_carousel %}
+      tabindex="0"
+      aria-label="{{ label | escape }}"
+    {% endif -%}
+  >
+    {{ children }}
+  </{{ track_tag }}>
+
+  {%- if is_carousel and nav -%}
+    <button
+      type="button"
+      class="carousel-shell__arrow carousel-shell__arrow--previous"
+      data-ref="previous"
+      aria-label="{{ 'accessibility.previous_slide' | t }}"
+    >
+      {% render 'icon', icon: 'chevron-left', size: 16 %}
+    </button>
+
+    <button
+      type="button"
+      class="carousel-shell__arrow carousel-shell__arrow--next"
+      data-ref="next"
+      aria-label="{{ 'accessibility.next_slide' | t }}"
+    >
+      {% render 'icon', icon: 'chevron-right', size: 16 %}
+    </button>
+  {%- endif -%}
+
+  {%- if is_carousel and pagination != 'none' -%}
+    {% render 'carousel-pagination', style: pagination, settings: settings %}
+  {%- endif -%}
+
+  {%- if is_carousel -%}
+    {%- comment -%}
+      Rendered whenever autoplay is available rather than only when it is on,
+      because the component reveals it the moment autoplay starts and a control
+      that appears late is a control a keyboard user has already tabbed past.
+    {%- endcomment -%}
+    {%- if settings.carousel_autoplay -%}
+      <button
+        type="button"
+        class="carousel-shell__pause"
+        data-ref="pause"
+        aria-pressed="false"
+        hidden
+      >
+        {% render 'icon', icon: 'pause', size: 14 %}
+        <span class="visually-hidden">{{ 'accessibility.pause_slideshow' | t }}</span>
+      </button>
+    {%- endif -%}
+
+    <p class="visually-hidden" data-ref="status" role="status"></p>
+  {%- endif -%}
+</swiper-carousel>

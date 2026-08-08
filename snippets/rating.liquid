@@ -1,0 +1,68 @@
+{% doc %}
+  Renders a product rating from Shopify's standard rating metafield.
+
+  Reads `product.metafields.reviews.rating` and `rating_count`, which is the
+  shape every major review app writes to. Nothing is fetched and nothing is
+  stored: a theme that collected its own reviews would be doing an app's job,
+  which the Theme Store rejects.
+
+  The stars are decorative. The rating is announced as a translated sentence
+  through visually hidden text, because five star glyphs read aloud are five
+  identical words with no number attached.
+
+  Renders nothing when the metafield is missing, so a store without a review app
+  gets no empty row rather than "0 out of 5".
+
+  Parameters:
+    product (product, required)
+    show_count (boolean, optional) Appends the review count. Default true
+    class   (string, optional)
+
+  @example
+    {% if settings.show_rating %}
+      {% render 'rating', product: product %}
+    {% endif %}
+{% enddoc %}
+
+{%- liquid
+  assign rating = product.metafields.reviews.rating.value
+  assign count = product.metafields.reviews.rating_count.value | default: 0
+  assign show_the_count = true
+  if show_count == false
+    assign show_the_count = false
+  endif
+-%}
+
+{%- if rating != blank and rating.rating != blank and count > 0 -%}
+  {%- liquid
+    assign scale_max = rating.scale_max | default: 5
+    assign value = rating.rating | times: 1.0
+    assign rounded = value | round: 1
+  -%}
+
+  <div class="rating {{ class }}" data-rating="{{ rounded }}">
+    <div class="rating__stars" aria-hidden="true">
+      {%- for index in (1..scale_max) -%}
+        {%- liquid
+          assign threshold = index | minus: 0.5
+        -%}
+        {%- if value >= index -%}
+          {% render 'icon', icon: 'star', class: 'rating__star rating__star--full' %}
+        {%- elsif value >= threshold -%}
+          {% render 'icon', icon: 'star-half', class: 'rating__star rating__star--half' %}
+        {%- else -%}
+          {% render 'icon', icon: 'star', class: 'rating__star rating__star--empty' %}
+        {%- endif -%}
+      {%- endfor -%}
+    </div>
+
+    <span class="visually-hidden">
+      {{- 'products.product.rating_html' | t: rating: rounded, max: scale_max -}}
+    </span>
+
+    {%- if show_the_count -%}
+      <span class="rating__count" aria-hidden="true">({{ count }})</span>
+      <span class="visually-hidden">{{ 'products.product.rating_count' | t: count: count }}</span>
+    {%- endif -%}
+  </div>
+{%- endif -%}

@@ -1,0 +1,188 @@
+{% doc %}
+  Back-to-top control.
+
+  Rendered once per document from layout/theme.liquid, immediately before the
+  live regions. It is a real `<button>` inside a `<scroll-to-top>` element, so
+  the control exists and is operable before assets/scrollbar.js runs.
+
+  Behaviour lives in `<scroll-to-top>` (assets/scrollbar.js), which:
+    - stays `inert` and `aria-hidden` until the customer scrolls past the
+      threshold, so it is never an invisible tab stop,
+    - calls `<smooth-scrollbar>.scrollTo(0)` directly, falling back to
+      `window.scrollTo` when smoothing is off,
+    - returns keyboard focus to the skip-to-content link afterwards, because
+      scrolling the viewport does not move the focus caret.
+
+  Settings consumed:
+    settings.enable_scroll_to_top     Renders nothing when off
+    settings.scroll_to_top_position   left | right (start | end in logical terms)
+    settings.scroll_to_top_offset     Pixels scrolled before it appears
+    settings.scroll_to_top_progress   Show the scroll progress ring
+
+  The progress ring is decorative: it is driven entirely by the
+  `--scroll-progress` custom property and carries `aria-hidden`.
+
+  @example
+    {% render 'scroll-to-top' %}
+{% enddoc %}
+
+{%- if settings.enable_scroll_to_top -%}
+  {%- liquid
+    assign position = settings.scroll_to_top_position | default: 'right'
+    assign offset = settings.scroll_to_top_offset | default: 600
+    assign show_progress = settings.scroll_to_top_progress
+  -%}
+
+  <scroll-to-top
+    class="scroll-to-top scroll-to-top--{{ position }}{% if show_progress %} scroll-to-top--progress{% endif %}"
+    data-offset="{{ offset }}"
+    aria-hidden="true"
+    inert
+  >
+    <button
+      type="button"
+      class="scroll-to-top__button"
+      data-ref="button"
+      aria-label="{{ 'general.actions.back_to_top' | t | escape }}"
+    >
+      {%- if show_progress -%}
+        <svg
+          class="scroll-to-top__ring"
+          viewBox="0 0 44 44"
+          fill="none"
+          aria-hidden="true"
+          focusable="false"
+        >
+          <circle class="scroll-to-top__ring-track" cx="22" cy="22" r="20" stroke-width="2" />
+          <circle class="scroll-to-top__ring-progress" cx="22" cy="22" r="20" stroke-width="2" />
+        </svg>
+      {%- endif -%}
+
+      <svg
+        class="scroll-to-top__icon"
+        viewBox="0 0 16 16"
+        fill="none"
+        aria-hidden="true"
+        focusable="false"
+      >
+        <path
+          d="M8 13V3M8 3L3.5 7.5M8 3l4.5 4.5"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
+
+      <span class="visually-hidden">{{ 'general.actions.back_to_top' | t }}</span>
+    </button>
+  </scroll-to-top>
+
+  {% style %}
+    @layer components {
+      .scroll-to-top {
+        position: fixed;
+        inset-block-end: calc(2rem + env(safe-area-inset-bottom, 0px));
+        z-index: var(--z-sticky);
+        display: block;
+        opacity: 0;
+        transform: translate3d(0, 1rem, 0);
+        visibility: hidden;
+        transition:
+          opacity var(--duration-base) var(--ease-out-expo),
+          transform var(--duration-base) var(--ease-out-expo),
+          visibility 0s linear var(--duration-base);
+      }
+
+      .scroll-to-top--right {
+        inset-inline-end: calc(2rem + env(safe-area-inset-right, 0px));
+      }
+
+      .scroll-to-top--left {
+        inset-inline-start: calc(2rem + env(safe-area-inset-left, 0px));
+      }
+
+      .scroll-to-top[data-visible] {
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+        visibility: visible;
+        transition-delay: 0s;
+      }
+
+      .scroll-to-top__button {
+        position: relative;
+        display: grid;
+        place-items: center;
+        inline-size: 4.4rem;
+        block-size: 4.4rem;
+        padding: 0;
+        border: 1px solid var(--color-border);
+        border-radius: 50%;
+        background-color: var(--color-background);
+        color: var(--color-text);
+        box-shadow: 0 2px 12px rgb(var(--color-shadow-rgb, 0 0 0) / 0.12);
+        transition:
+          background-color var(--duration-fast) var(--ease-out-expo),
+          color var(--duration-fast) var(--ease-out-expo),
+          border-color var(--duration-fast) var(--ease-out-expo);
+      }
+
+      .scroll-to-top__button:hover {
+        background-color: var(--color-primary-button-background);
+        border-color: var(--color-primary-button-background);
+        color: var(--color-primary-button-text);
+      }
+
+      .scroll-to-top__icon {
+        inline-size: 1.6rem;
+        block-size: 1.6rem;
+      }
+
+      .scroll-to-top__ring {
+        position: absolute;
+        inset: -1px;
+        inline-size: calc(100% + 2px);
+        block-size: calc(100% + 2px);
+        transform: rotate(-90deg);
+        pointer-events: none;
+      }
+
+      .scroll-to-top__ring-track {
+        stroke: var(--color-border);
+      }
+
+      .scroll-to-top__ring-progress {
+        stroke: var(--color-primary-button-background);
+        stroke-linecap: round;
+        stroke-dasharray: 125.6;
+        stroke-dashoffset: calc(125.6 - (125.6 * var(--scroll-progress, 0)));
+      }
+
+      @media screen and (max-width: 749px) {
+        .scroll-to-top {
+          inset-block-end: calc(1.6rem + env(safe-area-inset-bottom, 0px));
+        }
+
+        .scroll-to-top--right {
+          inset-inline-end: 1.6rem;
+        }
+
+        .scroll-to-top--left {
+          inset-inline-start: 1.6rem;
+        }
+
+        .scroll-to-top__button {
+          inline-size: 4rem;
+          block-size: 4rem;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .scroll-to-top {
+          transition-duration: 0.01ms;
+          transform: none;
+        }
+      }
+    }
+  {% endstyle %}
+{%- endif -%}

@@ -1,0 +1,131 @@
+{% doc %}
+  Resolves animation settings into `<motion-effect>` attributes.
+
+  Animations are configured at three levels, and the narrowest wins:
+
+      block setting  ›  section setting  ›  theme setting
+
+  Every section and block setting offers an `inherit` option, which is the
+  default. A merchant who never opens those settings gets whatever the theme
+  preset chose, and a merchant who wants one banner to behave differently
+  changes one setting without touching anything else.
+
+  `settings.animations_reveal_on_scroll` is the master switch. When it is off,
+  this snippet emits `data-effect="none"` and `<motion-effect>` marks itself
+  revealed without animating — the markup stays identical either way, so no
+  section needs an if/else around its content.
+
+  Parameters:
+    kind     (string, required)  'text' or 'image'. Chooses which setting family
+                                 and which theme-level default to fall back to.
+    block    (object, optional)  `block.settings`
+    section  (object, optional)  `section.settings`
+    effect   (string, optional)  Hard override. Skips the cascade entirely.
+    duration (number, optional)  Milliseconds
+    delay    (number, optional)  Milliseconds
+    stagger  (number, optional)  Milliseconds between targets
+    target   (string, optional)  Selector for descendants to animate
+    children (boolean, optional) Animate direct children, staggered
+    once     (boolean, optional) Defaults to true
+
+  Setting ids read from `block` and `section`:
+    animation_text, animation_image, animation_delay, animation_duration,
+    animation_stagger
+
+  @example
+    <motion-effect {% render 'motion-attrs', kind: 'text', section: section.settings %}>
+      <h2>{{ section.settings.heading }}</h2>
+    </motion-effect>
+
+  @example
+    <motion-effect {% render 'motion-attrs', kind: 'image', block: block.settings, section: section.settings, target: 'img' %}>
+      {% render 'image', image: block.settings.image %}
+    </motion-effect>
+
+  @example
+    <motion-effect {% render 'motion-attrs', kind: 'text', section: section.settings, children: true, stagger: 90 %}>
+      {%- for block in section.blocks -%}<div>…</div>{%- endfor -%}
+    </motion-effect>
+{% enddoc %}
+
+{%- liquid
+  # ---- which family are we resolving -------------------------------------
+  if kind == 'image'
+    assign setting_key = 'animation_image'
+    assign theme_default = settings.motion_effect
+  else
+    assign setting_key = 'animation_text'
+    assign theme_default = settings.animation_style
+  endif
+
+  # ---- cascade: block › section › theme ----------------------------------
+  assign resolved = 'inherit'
+
+  if effect != blank
+    assign resolved = effect
+  endif
+
+  if resolved == 'inherit' and block != blank
+    assign block_value = block[setting_key]
+    if block_value != blank and block_value != 'inherit'
+      assign resolved = block_value
+    endif
+  endif
+
+  if resolved == 'inherit' and section != blank
+    assign section_value = section[setting_key]
+    if section_value != blank and section_value != 'inherit'
+      assign resolved = section_value
+    endif
+  endif
+
+  if resolved == 'inherit'
+    assign resolved = theme_default
+  endif
+
+  # An empty theme-level image setting means "no image animation".
+  if resolved == blank
+    assign resolved = 'none'
+  endif
+
+  # Master switch always wins.
+  unless settings.animations_reveal_on_scroll
+    assign resolved = 'none'
+  endunless
+
+  # ---- timing: explicit argument › block › section › preset default ------
+  assign resolved_duration = duration
+  if resolved_duration == blank and block != blank
+    assign resolved_duration = block.animation_duration
+  endif
+  if resolved_duration == blank and section != blank
+    assign resolved_duration = section.animation_duration
+  endif
+
+  assign resolved_delay = delay
+  if resolved_delay == blank and block != blank
+    assign resolved_delay = block.animation_delay
+  endif
+  if resolved_delay == blank and section != blank
+    assign resolved_delay = section.animation_delay
+  endif
+
+  assign resolved_stagger = stagger
+  if resolved_stagger == blank and block != blank
+    assign resolved_stagger = block.animation_stagger
+  endif
+  if resolved_stagger == blank and section != blank
+    assign resolved_stagger = section.animation_stagger
+  endif
+-%}
+
+data-effect="{{ resolved | escape }}"
+{%- if target != blank %} data-target="{{ target | escape }}"{% endif -%}
+{%- if children %} data-children{% endif -%}
+{%- if resolved_duration != blank and resolved_duration > 0 %} data-duration="{{ resolved_duration }}"{% endif -%}
+{%- if resolved_delay != blank and resolved_delay > 0 %} data-delay="{{ resolved_delay }}"{% endif -%}
+{%- if resolved_stagger != blank and resolved_stagger > 0 %} data-stagger="{{ resolved_stagger }}"{% endif -%}
+{%- if once == false %} data-once="false"{% endif -%}
+{%- if speed != blank %} data-speed="{{ speed }}"{% endif -%}
+{%- if direction != blank %} data-direction="{{ direction | escape }}"{% endif -%}
+{%- if axis != blank %} data-axis="{{ axis | escape }}"{% endif -%}

@@ -1,0 +1,55 @@
+{% doc %}
+  Emits border and radius custom properties from a block's settings.
+
+  ## Why a snippet
+
+  The spec asks for border controls on Product Details, Subscription blocks,
+  the Sticky Buy Bar, Image blocks and Group blocks. That is five places with
+  the same four settings, and five chances for one of them to name its property
+  `--border-width` while the rest use `--border-thickness`.
+
+  ## Nothing is emitted at zero thickness
+
+  A border of 0 still costs a declaration, and `border: 0 solid transparent`
+  overrides a border a stylesheet set for that component. Emitting nothing
+  leaves the component's own CSS in charge, which is the behaviour a merchant
+  who never touched the setting expects.
+
+  Radius is independent — a card can be rounded without being outlined — so it
+  is emitted on its own terms.
+
+  Parameters:
+    settings (object, required)  A block or section settings object
+
+  @example
+    <div class="product-details" {% render 'block-border', settings: block.settings %}>
+{% enddoc %}
+
+{%- liquid
+  assign thickness = settings.border_thickness | default: 0 | plus: 0
+  assign radius = settings.border_radius | default: 0 | plus: 0
+
+  assign declarations = ''
+
+  if thickness > 0
+    assign style = settings.border_style | default: 'solid'
+
+    # `currentColor` rather than a hardcoded fallback: a merchant who sets a
+    # thickness but no colour gets a border that matches the text of whatever
+    # colour scheme the section is using, instead of a black line on a dark
+    # background.
+    assign color = settings.border_color | default: 'currentColor'
+
+    assign declarations = declarations | append: '--block-border-width: ' | append: thickness | append: 'px;'
+    assign declarations = declarations | append: '--block-border-style: ' | append: style | append: ';'
+    assign declarations = declarations | append: '--block-border-color: ' | append: color | append: ';'
+  endif
+
+  if radius > 0
+    assign declarations = declarations | append: '--block-border-radius: ' | append: radius | append: 'px;'
+  endif
+-%}
+
+{%- if declarations != blank -%}
+  style="{{ declarations }}" data-has-border
+{%- endif -%}

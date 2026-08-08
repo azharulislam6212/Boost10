@@ -1,0 +1,282 @@
+{% comment %}
+  sections/main-order.liquid
+
+  One order, in full.
+
+  Tracking numbers link to the carrier when Shopify gives us a URL and render as
+  plain text when it does not. A tracking number that looks like a link and goes
+  nowhere is worse than one that never pretended.
+
+  Cancelled orders say so at the top, before the line items, because that is the
+  fact the customer opened the page to check.
+
+  Every money row comes from Shopify's own totals. Recomputing a subtotal from
+  line items looks harmless until duties, tips or a partial refund exist, and
+  then the theme quietly disagrees with the receipt.
+{% endcomment %}
+
+{%- liquid
+  assign section_settings = section.settings
+-%}
+
+<div
+  class="customer customer--order color-{{ section_settings.color_scheme }}"
+  {% render 'spacing', section: section_settings %}
+>
+  <div class="container">
+    <header class="order__header">
+      <div>
+        <h1 class="order__title">{{ 'customer.order.title' | t: name: order.name }}</h1>
+        <p class="order__date">
+          <time datetime="{{ order.created_at | date: '%Y-%m-%d' }}">
+            {{ 'customer.order.date' | t: date: order.created_at | date: format: 'date' }}
+          </time>
+        </p>
+      </div>
+
+      <a class="button button--link" href="{{ routes.account_url }}">
+        {{ 'customer.order.back_to_account' | t }}
+      </a>
+    </header>
+
+    {%- if order.cancelled -%}
+      <div class="order__cancelled" role="status">
+        <p class="order__cancelled-title">
+          {{ 'customer.order.canceled' | t: date: order.cancelled_at | date: format: 'date' }}
+        </p>
+        {%- if order.cancel_reason != blank -%}
+          <p>{{ 'customer.order.canceled_reason' | t: reason: order.cancel_reason_label }}</p>
+        {%- endif -%}
+      </div>
+    {%- endif -%}
+
+    <div class="order__statuses">
+      <p><span>{{ 'customer.order.payment_status' | t }}</span> {{ order.financial_status_label }}</p>
+      <p><span>{{ 'customer.order.fulfillment_status' | t }}</span> {{ order.fulfillment_status_label }}</p>
+    </div>
+
+    {%- if order.fulfillments.size > 0 -%}
+      <section class="order__tracking">
+        <h2 class="order__section-title">{{ 'customer.order.tracking' | t }}</h2>
+
+        <ul class="order__tracking-list" role="list">
+          {%- for fulfillment in order.fulfillments -%}
+            <li class="order__tracking-item">
+              <p class="order__tracking-company">{{ fulfillment.tracking_company }}</p>
+
+              {%- if fulfillment.tracking_number != blank -%}
+                {%- if fulfillment.tracking_url != blank -%}
+                  <a href="{{ fulfillment.tracking_url }}" target="_blank" rel="noopener">
+                    {{ fulfillment.tracking_number }}
+                    <span class="visually-hidden">{{ 'accessibility.new_window' | t }}</span>
+                  </a>
+                {%- else -%}
+                  <span>{{ fulfillment.tracking_number }}</span>
+                {%- endif -%}
+              {%- endif -%}
+
+              <p class="order__tracking-date">
+                {{ 'customer.order.shipped_on' | t: date: fulfillment.created_at | date: format: 'date' }}
+              </p>
+            </li>
+          {%- endfor -%}
+        </ul>
+      </section>
+    {%- endif -%}
+
+    <div class="order__layout">
+      <div class="order__items">
+        <table class="order-table order-table--items">
+          <caption class="visually-hidden">{{ 'customer.order.items' | t }}</caption>
+          <thead>
+            <tr>
+              <th scope="col">{{ 'customer.order.product' | t }}</th>
+              <th scope="col">{{ 'customer.order.price' | t }}</th>
+              <th scope="col">{{ 'customer.order.quantity' | t }}</th>
+              <th scope="col">{{ 'customer.order.total' | t }}</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {%- for line in order.line_items -%}
+              <tr>
+                <td data-label="{{ 'customer.order.product' | t | escape }}">
+                  <div class="order-line">
+                    {%- if line.image != blank -%}
+                      {% render 'image', image: line.image, alt: '', ratio: 'square', sizes: '64px', wrapper_class: 'order-line__media' %}
+                    {%- endif -%}
+
+                    <div>
+                      {%- if line.product.url != blank -%}
+                        <a class="order-line__title" href="{{ line.product.url }}">{{ line.title }}</a>
+                      {%- else -%}
+                        <span class="order-line__title">{{ line.title }}</span>
+                      {%- endif -%}
+
+                      {%- if line.variant.title != blank and line.product.has_only_default_variant == false -%}
+                        <p class="order-line__variant">{{ line.variant.title }}</p>
+                      {%- endif -%}
+
+                      {%- if line.sku != blank -%}
+                        <p class="order-line__sku">{{ 'products.product.sku' | t }}: {{ line.sku }}</p>
+                      {%- endif -%}
+
+                      {%- for property in line.properties -%}
+                        {%- if property.last != blank and property.first.first != '_' -%}
+                          <p class="order-line__property">{{ property.first }}: {{ property.last }}</p>
+                        {%- endif -%}
+                      {%- endfor -%}
+
+                      {%- for discount in line.discount_allocations -%}
+                        <p class="order-line__discount">
+                          {{ discount.discount_application.title }}
+                          (&minus;{{ discount.amount | money }})
+                        </p>
+                      {%- endfor -%}
+
+                      {%- if line.fulfillment != blank -%}
+                        <p class="order-line__fulfilled">
+                          {{ 'customer.order.fulfilled_on' | t: date: line.fulfillment.created_at | date: format: 'date' }}
+                        </p>
+                      {%- endif -%}
+                    </div>
+                  </div>
+                </td>
+
+                <td data-label="{{ 'customer.order.price' | t | escape }}">
+                  {{ line.original_price | money }}
+                  {%- if line.unit_price_measurement -%}
+                    <span class="order-line__unit">{{ line.unit_price | money }}</span>
+                  {%- endif -%}
+                </td>
+
+                <td data-label="{{ 'customer.order.quantity' | t | escape }}">{{ line.quantity }}</td>
+
+                <td data-label="{{ 'customer.order.total' | t | escape }}">
+                  {%- if line.original_line_price != line.final_line_price -%}
+                    <s>{{ line.original_line_price | money }}</s>
+                    {{ line.final_line_price | money }}
+                  {%- else -%}
+                    {{ line.original_line_price | money }}
+                  {%- endif -%}
+                </td>
+              </tr>
+            {%- endfor -%}
+          </tbody>
+        </table>
+
+        {%- if section_settings.show_reorder and order.cancelled == false -%}
+          {%- capture reorder_items -%}
+            [
+              {%- for line in order.line_items -%}
+                {%- if line.variant != blank -%}
+                  {"id": {{ line.variant.id }}, "quantity": {{ line.quantity }}}
+                  {%- unless forloop.last -%},{%- endunless -%}
+                {%- endif -%}
+              {%- endfor -%}
+            ]
+          {%- endcapture -%}
+
+          <customer-order-history class="order__reorder">
+            <button
+              type="button"
+              class="button button--secondary"
+              data-reorder
+              data-items='{{ reorder_items | strip_newlines | strip }}'
+            >
+              {{ 'customer.order.reorder_all' | t }}
+            </button>
+          </customer-order-history>
+        {%- endif -%}
+      </div>
+
+      <aside class="order__summary" aria-label="{{ 'customer.order.summary' | t }}">
+        <h2 class="order__section-title">{{ 'customer.order.summary' | t }}</h2>
+
+        <dl class="order__totals">
+          <div class="order__total-row">
+            <dt>{{ 'customer.order.subtotal' | t }}</dt>
+            <dd>{{ order.line_items_subtotal_price | money }}</dd>
+          </div>
+
+          {%- for discount in order.cart_level_discount_applications -%}
+            <div class="order__total-row order__total-row--discount">
+              <dt>{{ discount.title }}</dt>
+              <dd>&minus;{{ discount.total_allocated_amount | money }}</dd>
+            </div>
+          {%- endfor -%}
+
+          {%- for shipping in order.shipping_methods -%}
+            <div class="order__total-row">
+              <dt>{{ shipping.title }}</dt>
+              <dd>{{ shipping.price | money }}</dd>
+            </div>
+          {%- endfor -%}
+
+          {%- for tax in order.tax_lines -%}
+            <div class="order__total-row">
+              <dt>{{ tax.title }} ({{ tax.rate_percentage }}%)</dt>
+              <dd>{{ tax.price | money }}</dd>
+            </div>
+          {%- endfor -%}
+
+          {%- if order.total_duties -%}
+            <div class="order__total-row">
+              <dt>{{ 'customer.order.duties' | t }}</dt>
+              <dd>{{ order.total_duties | money }}</dd>
+            </div>
+          {%- endif -%}
+
+          {%- if order.total_refunded_amount > 0 -%}
+            <div class="order__total-row order__total-row--discount">
+              <dt>{{ 'customer.order.refunded' | t }}</dt>
+              <dd>&minus;{{ order.total_refunded_amount | money }}</dd>
+            </div>
+          {%- endif -%}
+
+          <div class="order__total-row order__total-row--grand">
+            <dt>{{ 'customer.order.total' | t }}</dt>
+            <dd>{{ order.total_net_amount | money }}</dd>
+          </div>
+        </dl>
+
+        <div class="order__addresses">
+          <div>
+            <h3 class="order__address-title">{{ 'customer.order.shipping_address' | t }}</h3>
+            {%- if order.shipping_address != blank -%}
+              <address>{{ order.shipping_address | format_address }}</address>
+            {%- else -%}
+              <p class="order__address-empty">{{ 'customer.order.no_shipping_address' | t }}</p>
+            {%- endif -%}
+          </div>
+
+          <div>
+            <h3 class="order__address-title">{{ 'customer.order.billing_address' | t }}</h3>
+            {%- if order.billing_address != blank -%}
+              <address>{{ order.billing_address | format_address }}</address>
+            {%- else -%}
+              <p class="order__address-empty">{{ 'customer.order.no_billing_address' | t }}</p>
+            {%- endif -%}
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "t:sections.main_order.name",
+  "tag": "section",
+  "class": "section",
+  "settings": [
+    { "type": "checkbox", "id": "show_reorder", "label": "t:sections.main_account.settings.show_reorder.label", "info": "t:sections.main_account.settings.show_reorder.info", "default": true },
+    { "type": "color_scheme", "id": "color_scheme", "label": "t:shared.color_scheme.label", "default": "scheme-1" },
+    { "type": "header", "content": "t:shared.spacing.section_header" },
+    { "type": "range", "id": "padding_top", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 48 },
+    { "type": "range", "id": "padding_bottom", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 64 },
+    { "type": "range", "id": "padding_top_mobile", "label": "t:shared.spacing.padding_top_mobile.label", "info": "t:shared.spacing.padding_top_mobile.info", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_bottom_mobile", "label": "t:shared.spacing.padding_bottom_mobile.label", "info": "t:shared.spacing.padding_bottom_mobile.info", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 0 }
+  ]
+}
+{% endschema %}

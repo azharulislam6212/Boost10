@@ -1,0 +1,172 @@
+{% comment %}
+  sections/about-brand.liquid
+
+  Brand storytelling: a lead, a timeline, a team grid and an optional video.
+
+  Three presentations of the same block region rather than three sections,
+  because a merchant telling their story wants one place to do it and the
+  difference between "timeline" and "grid" is a layout decision, not a different
+  kind of content.
+
+  The video is deferred: a poster image and a play button, with the iframe only
+  created when someone asks for it. An autoplaying embed on an about page costs
+  every visitor a megabyte and a third-party connection to watch nothing.
+{% endcomment %}
+
+{%- liquid
+  assign section_settings = section.settings
+  assign timeline = section.blocks | where: 'type', 'timeline-item'
+  assign team = section.blocks | where: 'type', 'team-member'
+-%}
+
+<div
+  class="about color-{{ section_settings.color_scheme }}"
+  {% render 'spacing', section: section_settings %}
+>
+  <div class="container">
+    {%- comment -%} ---- lead ---- {%- endcomment -%}
+    <div class="about__lead about__lead--{{ section_settings.alignment }}">
+      {%- if section_settings.heading != blank -%}
+        <motion-effect {% render 'motion-attrs', kind: 'text', section: section_settings %}>
+          <h2 class="about__heading">{{ section_settings.heading }}</h2>
+        </motion-effect>
+      {%- endif -%}
+
+      {%- if section_settings.text != blank -%}
+        <div class="about__text rte">{{ section_settings.text }}</div>
+      {%- endif -%}
+    </div>
+
+    {%- comment -%} ---- media ---- {%- endcomment -%}
+    {%- if section_settings.video_url != blank -%}
+      <deferred-media class="about__video">
+        <button
+          type="button"
+          class="about__video-poster"
+          data-ref="poster"
+          aria-label="{{ 'accessibility.play_video' | t }}"
+        >
+          {% render 'image',
+             image: section_settings.video_poster,
+             alt: '',
+             ratio: 'wide',
+             sizes: '100vw' %}
+          {% render 'icon', icon: 'play', size: 40, class: 'about__video-play' %}
+        </button>
+
+        <template data-ref="template">
+          {{ section_settings.video_url | external_video_tag: loading: 'lazy' }}
+        </template>
+      </deferred-media>
+    {%- elsif section_settings.image != blank -%}
+      {% render 'image',
+         image: section_settings.image,
+         mobile_image: section_settings.image_mobile,
+         alt: '',
+         ratio: 'wide',
+         mobile_ratio: 'landscape',
+         sizes: '100vw',
+         wrapper_class: 'about__image' %}
+    {%- endif -%}
+
+    {%- comment -%} ---- timeline ---- {%- endcomment -%}
+    {%- if timeline.size > 0 -%}
+      <ol class="about__timeline about__timeline--{{ section_settings.timeline_layout }}" role="list">
+        {%- for block in timeline -%}
+          {% render block %}
+        {%- endfor -%}
+      </ol>
+    {%- endif -%}
+
+    {%- comment -%} ---- team ---- {%- endcomment -%}
+    {%- if team.size > 0 -%}
+      {%- if section_settings.team_heading != blank -%}
+        <h3 class="about__team-heading">{{ section_settings.team_heading }}</h3>
+      {%- endif -%}
+
+      <div class="about__team" style="--columns-desktop: {{ section_settings.team_columns }};">
+        {%- for block in team -%}
+          {% render block %}
+        {%- endfor -%}
+      </div>
+    {%- endif -%}
+
+    {%- comment -%}
+      Anything else the merchant added — a rich text note, a button, an app block.
+    {%- endcomment -%}
+    <div class="about__extra">
+      {%- for block in section.blocks -%}
+        {%- unless block.type == 'timeline-item' or block.type == 'team-member' -%}
+          {% render block %}
+        {%- endunless -%}
+      {%- endfor -%}
+    </div>
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "t:sections.about_brand.name",
+  "tag": "section",
+  "class": "section",
+  "blocks": [{ "type": "@theme" }, { "type": "@app" }],
+  "settings": [
+    { "type": "text", "id": "heading", "label": "t:shared.heading.label", "default": "Our story" },
+    { "type": "richtext", "id": "text", "label": "t:shared.text.label" },
+    {
+      "type": "select", "id": "alignment", "label": "t:blocks.group.settings.alignment.label",
+      "options": [
+        { "value": "start", "label": "t:blocks.group.settings.alignment.options__1.label" },
+        { "value": "center", "label": "t:blocks.group.settings.alignment.options__2.label" },
+        { "value": "end", "label": "t:blocks.group.settings.alignment.options__3.label" }
+      ],
+      "default": "center"
+    },
+    { "type": "header", "content": "t:sections.about_brand.headers.media" },
+    { "type": "image_picker", "id": "image", "label": "t:shared.image.label" },
+    { "type": "image_picker", "id": "image_mobile", "label": "t:shared.image_mobile.label", "info": "t:shared.image_mobile.info" },
+    { "type": "video_url", "id": "video_url", "label": "t:sections.about_brand.settings.video_url.label", "info": "t:sections.about_brand.settings.video_url.info", "accept": ["youtube", "vimeo"] },
+    { "type": "image_picker", "id": "video_poster", "label": "t:sections.about_brand.settings.video_poster.label" },
+    { "type": "header", "content": "t:sections.about_brand.headers.timeline" },
+    {
+      "type": "select", "id": "timeline_layout", "label": "t:sections.about_brand.settings.timeline_layout.label",
+      "options": [
+        { "value": "vertical", "label": "t:sections.about_brand.settings.timeline_layout.options__1.label" },
+        { "value": "horizontal", "label": "t:sections.about_brand.settings.timeline_layout.options__2.label" }
+      ],
+      "default": "vertical"
+    },
+    { "type": "header", "content": "t:sections.about_brand.headers.team" },
+    { "type": "text", "id": "team_heading", "label": "t:sections.about_brand.settings.team_heading.label", "default": "The people behind it" },
+    { "type": "range", "id": "team_columns", "label": "t:shared.columns.desktop.label", "min": 2, "max": 5, "step": 1, "default": 4 },
+    { "type": "header", "content": "t:shared.animation.header" },
+    {
+      "type": "select", "id": "animation_text", "label": "t:shared.animation.animation_text.label",
+      "options": [
+        { "value": "inherit", "label": "t:shared.animation.animation_text.options__1.label" },
+        { "value": "none", "label": "t:shared.animation.animation_text.options__2.label" },
+        { "value": "fade-up", "label": "t:shared.animation.animation_text.options__4.label" },
+        { "value": "words-slide-up", "label": "t:shared.animation.animation_text.options__9.label" }
+      ],
+      "default": "inherit"
+    },
+    { "type": "color_scheme", "id": "color_scheme", "label": "t:shared.color_scheme.label", "default": "scheme-1" },
+    { "type": "header", "content": "t:shared.spacing.section_header" },
+    { "type": "range", "id": "padding_top", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 48 },
+    { "type": "range", "id": "padding_bottom", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 48 },
+    { "type": "range", "id": "padding_top_mobile", "label": "t:shared.spacing.padding_top_mobile.label", "info": "t:shared.spacing.padding_top_mobile.info", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_bottom_mobile", "label": "t:shared.spacing.padding_bottom_mobile.label", "info": "t:shared.spacing.padding_bottom_mobile.info", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 0 }
+  ],
+  "presets": [
+    {
+      "name": "t:sections.about_brand.name",
+      "blocks": [
+        { "type": "timeline-item" },
+        { "type": "timeline-item" },
+        { "type": "team-member" },
+        { "type": "team-member" }
+      ]
+    }
+  ]
+}
+{% endschema %}

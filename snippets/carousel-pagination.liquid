@@ -1,0 +1,65 @@
+{% doc %}
+  Pagination for `<swiper-carousel>`: dots, a slide counter, or a progress bar.
+
+  ## Dots are markup, the other two are computed
+
+  Dots use `data-ref="indicators"` and `data-indicator`, which `SwiperCarousel`
+  already owns — it wires the clicks, tracks the current one and hides the whole
+  group when the track does not scroll. Nothing new is needed for them.
+
+  Numbers and the progress bar cannot be Liquid, because Liquid does not know
+  how many slides fit in the viewport and therefore cannot know how many pages
+  there are. `<carousel-pagination>` computes that at runtime from the parent
+  carousel.
+
+  It is a sibling component rather than a change to `SwiperCarousel` so that
+  the carousel keeps working untouched when pagination is set to None, which is
+  the default and by far the common case.
+
+  Parameters:
+    style    (string, required)  'dots' | 'numbers' | 'progress'
+    settings (object)
+
+  @example
+    {% render 'carousel-pagination', style: 'dots', settings: section.settings %}
+{% enddoc %}
+
+{%- liquid
+  assign style = style | default: 'none'
+-%}
+
+{%- case style -%}
+  {%- when 'dots' -%}
+    {%- comment -%}
+      One dot per slide. The component hides any that turn out to be
+      unreachable once it has measured the track, so an over-count here is
+      corrected rather than left dangling.
+    {%- endcomment -%}
+    <div class="carousel-shell__dots" data-ref="indicators">
+      {%- for i in (1..slide_count) -%}
+        <button
+          type="button"
+          class="carousel-shell__dot"
+          data-indicator
+          aria-label="{{ 'accessibility.go_to_slide' | t: index: forloop.index }}"
+        ></button>
+      {%- endfor -%}
+    </div>
+
+  {%- when 'numbers' -%}
+    <carousel-pagination class="carousel-shell__counter" data-style="numbers">
+      <span class="carousel-shell__counter-current" data-ref="current">1</span>
+      <span class="carousel-shell__counter-separator" aria-hidden="true">/</span>
+      <span class="carousel-shell__counter-total" data-ref="total">1</span>
+    </carousel-pagination>
+
+  {%- when 'progress' -%}
+    <carousel-pagination class="carousel-shell__progress" data-style="progress">
+      {%- comment -%}
+        Presentational only. The slide position is already announced through the
+        carousel's `role="status"` region, and a second announcement of the same
+        change is noise, not redundancy.
+      {%- endcomment -%}
+      <span class="carousel-shell__progress-bar" data-ref="bar" aria-hidden="true"></span>
+    </carousel-pagination>
+{%- endcase -%}

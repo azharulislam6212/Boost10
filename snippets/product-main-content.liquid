@@ -1,0 +1,59 @@
+{% doc %}
+  Lays out the product page.
+
+  The section captures the blocks and hands them here as strings. This snippet
+  owns the markup and knows nothing about which blocks produced it, which is what
+  lets quick view reuse the same two-column arrangement with a different set.
+
+  Parameters:
+    section_id      (string, required)
+    section_settings (object, required) `section.settings`. Named this way because a
+                                       parameter called `settings` would shadow the global
+                                       theme settings inside this snippet
+    media_gallery   (string, required)  Captured `_product-media-gallery`
+    product_details (string, required)  Captured `_product-details`
+    additional_blocks (string, optional) Captured `{% content_for 'blocks' %}`
+    media_count     (number, optional)  Used to pick a sensible gallery column width
+    class           (string, optional)
+
+  @example
+    {% render 'product-main-content',
+       section_id: section.id, section_settings: section.settings,
+       media_gallery: media_gallery, product_details: product_details %}
+{% enddoc %}
+
+{%- liquid
+  comment
+    A product with one image does not need half the page for it. The gallery
+    column narrows, which keeps the buy button closer to the top of the fold.
+  endcomment
+  assign media_column = '1fr'
+  if media_count == 1
+    assign media_column = '0.9fr'
+  endif
+-%}
+
+<div
+  class="main-product color-{{ section_settings.color_scheme }} {{ class }}"
+  data-section-id="{{ section_id }}"
+  data-product-root
+  {% render 'spacing', section: section_settings %}
+>
+  <div class="container">
+    <div class="main-product__layout" style="--media-column: {{ media_column }};">
+      <div class="main-product__media">
+        {{ media_gallery }}
+      </div>
+
+      <div class="main-product__info">
+        {{ product_details }}
+      </div>
+    </div>
+
+    {%- if additional_blocks != blank -%}
+      <div class="main-product__blocks">
+        {{ additional_blocks }}
+      </div>
+    {%- endif -%}
+  </div>
+</div>

@@ -1,0 +1,254 @@
+{% doc %}
+  Renders a responsive image, optionally with a different image on mobile.
+
+  Every image in the theme goes through this snippet, so the rules that keep
+  Lighthouse happy are enforced in one place rather than remembered in forty:
+
+    - `width` and `height` are always present, so the browser reserves space and
+      cumulative layout shift stays at zero.
+    - `srcset` is capped at the source image's real width. Asking Shopify for a
+      2000px variant of a 600px upload wastes bytes and returns nothing sharper.
+    - `loading="lazy"` and `decoding="async"` are the default. The one image that
+      should not be lazy — the hero — passes `priority: true`, which is also the
+      only way `fetchpriority="high"` is ever set.
+    - The wrapper is `<responsive-image>`, an autonomous custom element, not
+      `is="responsive-image"`. Safari has never supported customized built-ins.
+
+  ## Mobile art direction
+
+  Pass `mobile_image` and the snippet renders a `<picture>` with a `<source>` for
+  small screens. This is art direction, not resizing: a wide banner cropped to a
+  tall one, or a lifestyle shot swapped for a product cut-out.
+
+  `<picture>` is used rather than two `<img>` elements toggled with CSS, because
+  CSS cannot stop the browser downloading both. `display: none` on an `<img>`
+  still fetches it, so the "hide one, show the other" approach ships two images
+  to every visitor and is slower than shipping one.
+
+  The ratio can differ per breakpoint too: `mobile_ratio` sets its own aspect on
+  the wrapper, so a 16:9 desktop banner can be 9:16 on a phone without the box
+  jumping when the source swaps.
+
+  ## Ratios
+
+    adapt      the image's own ratio
+    square     1:1
+    portrait   3:4
+    landscape  4:3
+    wide       16:9
+    tall       2:3
+    long       9:16
+    <number>   any custom value, e.g. 1.5 or "5 / 4"
+
+  Parameters:
+    image         (image, required)   Shopify image or media preview
+    mobile_image  (image, optional)   Shown at 767px and below
+    alt           (string, optional)  Overrides the image's own alt text
+    class         (string, optional)  Classes for the `<img>`
+    wrapper_class (string, optional)  Classes for `<responsive-image>`
+    sizes         (string, optional)  Defaults to a full-width hint
+    mobile_sizes  (string, optional)  Defaults to 100vw
+    widths        (string, optional)  Comma separated. Defaults to a standard ladder
+    ratio         (string, optional)  See above. Default: adapt
+    mobile_ratio  (string, optional)  Defaults to `ratio`
+    priority      (boolean, optional) Eager load, high fetch priority. Hero images only
+    preload       (boolean, optional) Emits a preload hint. Requires `priority`
+    id            (string, optional)  id for the `<img>`
+
+  @example
+    {% render 'image', image: section.settings.image, ratio: 'wide',
+       mobile_image: section.settings.image_mobile, mobile_ratio: 'long',
+       priority: true, preload: true %}
+
+  @example
+    {% render 'image', image: product.featured_media.preview_image,
+       ratio: settings.card_image_ratio,
+       sizes: '(min-width: 990px) 25vw, 50vw' %}
+{% enddoc %}
+
+{%- liquid
+  assign default_widths = '160,240,320,420,540,640,840,1080,1280,1540,1920'
+  assign width_list = widths | default: default_widths | split: ','
+
+  # ---- desktop srcset, capped at the source width --------------------------
+  assign source_width = image.width | default: 1920
+  assign usable = ''
+
+  for candidate in width_list
+    assign candidate_width = candidate | strip | times: 1
+    if candidate_width <= source_width
+      assign usable = usable | append: candidate_width | append: ','
+    endif
+  endfor
+
+  comment
+    An upload smaller than the first rung would produce an empty srcset, so fall
+    back to the image's own width.
+  endcomment
+  if usable == blank
+    assign usable = source_width | append: ','
+  endif
+
+  assign usable = usable | split: ','
+  assign largest = usable | last
+
+  # ---- mobile srcset -------------------------------------------------------
+  if mobile_image != blank
+    assign mobile_source_width = mobile_image.width | default: 1080
+    assign mobile_usable = ''
+
+    for candidate in width_list
+      assign candidate_width = candidate | strip | times: 1
+      if candidate_width <= mobile_source_width and candidate_width <= 1080
+        assign mobile_usable = mobile_usable | append: candidate_width | append: ','
+      endif
+    endfor
+
+    if mobile_usable == blank
+      assign mobile_usable = mobile_source_width | append: ','
+    endif
+
+    assign mobile_usable = mobile_usable | split: ','
+  endif
+
+  assign resolved_sizes = sizes | default: '(min-width: 1440px) 1440px, 100vw'
+  assign resolved_mobile_sizes = mobile_sizes | default: '100vw'
+  assign resolved_alt = alt | default: image.alt | escape
+
+  # ---- aspect ratios -------------------------------------------------------
+  assign ratio_key = ratio | default: 'adapt'
+
+  case ratio_key
+    when 'square'
+      assign aspect = '1 / 1'
+    when 'portrait'
+      assign aspect = '3 / 4'
+    when 'landscape'
+      assign aspect = '4 / 3'
+    when 'wide'
+      assign aspect = '16 / 9'
+    when 'tall'
+      assign aspect = '2 / 3'
+    when 'long'
+      assign aspect = '9 / 16'
+    when 'adapt'
+      assign aspect = image.aspect_ratio | default: 1
+    else
+      assign aspect = ratio_key
+  endcase
+
+  assign mobile_ratio_key = mobile_ratio | default: ratio_key
+
+  case mobile_ratio_key
+    when 'square'
+      assign mobile_aspect = '1 / 1'
+    when 'portrait'
+      assign mobile_aspect = '3 / 4'
+    when 'landscape'
+      assign mobile_aspect = '4 / 3'
+    when 'wide'
+      assign mobile_aspect = '16 / 9'
+    when 'tall'
+      assign mobile_aspect = '2 / 3'
+    when 'long'
+      assign mobile_aspect = '9 / 16'
+    when 'adapt'
+      assign fallback_mobile = mobile_image.aspect_ratio | default: image.aspect_ratio | default: 1
+      assign mobile_aspect = fallback_mobile
+    else
+      assign mobile_aspect = mobile_ratio_key
+  endcase
+
+  assign loading_attr = 'lazy'
+  assign decoding_attr = 'async'
+  if priority
+    assign loading_attr = 'eager'
+    assign decoding_attr = 'sync'
+  endif
+-%}
+
+{%- if image == blank -%}
+  {%- comment -%}
+    A placeholder still reserves its box, or the layout jumps when the merchant
+    adds the real image.
+  {%- endcomment -%}
+  <responsive-image
+    class="responsive-image responsive-image--placeholder {{ wrapper_class }}"
+    style="--aspect-ratio: {{ aspect }}; --aspect-ratio-mobile: {{ mobile_aspect }};"
+    data-loaded
+  >
+    {{ 'image' | placeholder_svg_tag: 'responsive-image__placeholder' }}
+  </responsive-image>
+{%- else -%}
+  {%- if preload and priority -%}
+    <link
+      rel="preload"
+      as="image"
+      href="{{ image | image_url: width: largest }}"
+      imagesrcset="
+        {%- for w in usable -%}
+          {{ image | image_url: width: w }} {{ w }}w{%- unless forloop.last -%},{%- endunless -%}
+        {%- endfor -%}"
+      imagesizes="{{ resolved_sizes }}"
+      fetchpriority="high"
+      {% if mobile_image != blank %}media="(min-width: 768px)"{% endif %}
+    >
+    {%- if mobile_image != blank -%}
+      <link
+        rel="preload"
+        as="image"
+        href="{{ mobile_image | image_url: width: mobile_usable | last }}"
+        imagesrcset="
+          {%- for w in mobile_usable -%}
+            {{ mobile_image | image_url: width: w }} {{ w }}w{%- unless forloop.last -%},{%- endunless -%}
+          {%- endfor -%}"
+        imagesizes="{{ resolved_mobile_sizes }}"
+        fetchpriority="high"
+        media="(max-width: 767px)"
+      >
+    {%- endif -%}
+  {%- endif -%}
+
+  <responsive-image
+    class="responsive-image {{ wrapper_class }}"
+    style="--aspect-ratio: {{ aspect }}; --aspect-ratio-mobile: {{ mobile_aspect }};"
+    {% if mobile_image != blank %}data-art-directed{% endif %}
+  >
+    <picture class="responsive-image__picture">
+      {%- if mobile_image != blank -%}
+        {%- comment -%}
+          The mobile source comes first: a browser takes the first matching
+          `<source>`, so ordering it after the default would never match.
+        {%- endcomment -%}
+        <source
+          media="(max-width: 767px)"
+          srcset="
+            {%- for w in mobile_usable -%}
+              {{ mobile_image | image_url: width: w }} {{ w }}w
+              {%- unless forloop.last -%},{%- endunless -%}
+            {%- endfor -%}"
+          sizes="{{ resolved_mobile_sizes }}"
+          width="{{ mobile_image.width }}"
+          height="{{ mobile_image.height }}"
+        >
+      {%- endif -%}
+
+      <img
+        {% if id != blank %}id="{{ id }}"{% endif %}
+        src="{{ image | image_url: width: largest }}"
+        srcset="
+          {%- for w in usable -%}
+            {{ image | image_url: width: w }} {{ w }}w{%- unless forloop.last -%},{%- endunless -%}
+          {%- endfor -%}"
+        sizes="{{ resolved_sizes }}"
+        alt="{{ resolved_alt }}"
+        width="{{ image.width }}"
+        height="{{ image.height }}"
+        loading="{{ loading_attr }}"
+        decoding="{{ decoding_attr }}"
+        {% if priority %}fetchpriority="high"{% endif %}
+        class="responsive-image__img {{ class }}"
+      >
+    </picture>
+  </responsive-image>
+{%- endif -%}

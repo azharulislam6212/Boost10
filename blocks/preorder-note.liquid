@@ -1,0 +1,80 @@
+{% comment %}
+  blocks/preorder-note.liquid
+
+  The shipping promise on a pre-order product.
+
+  A pre-order is a promise about a date, and the single thing that turns a
+  pre-order from a conversion into a chargeback is a customer who did not know
+  they were waiting. So this block only appears when the variant is genuinely on
+  pre-order — continue-selling with no stock on hand — and it says when, not just
+  that.
+
+  The date is a merchant setting rather than a metafield so a store can start
+  taking pre-orders without an app, and it is rendered as a real `<time>` element
+  so it is machine readable.
+{% endcomment %}
+
+{%- liquid
+  assign product = closest.product
+  assign variant = product.selected_or_first_available_variant
+
+  assign is_preorder = false
+  if variant.inventory_management != blank and variant.inventory_policy == 'continue' and variant.inventory_quantity <= 0
+    assign is_preorder = true
+  endif
+
+  comment
+    A merchant can also mark a whole product by tag, for stores that manage
+    pre-orders without inventory tracking.
+  endcomment
+  if settings.preorder_tag != blank and product.tags contains settings.preorder_tag
+    assign is_preorder = true
+  endif
+-%}
+
+{%- if product and is_preorder -%}
+  <div
+    class="preorder-note"
+    data-preorder-note
+    {% render 'spacing', block: block.settings %}
+    {{ block.shopify_attributes }}
+  >
+    {% render 'icon', icon: 'truck', size: 18, class: 'preorder-note__icon' %}
+
+    <div class="preorder-note__body">
+      <p class="preorder-note__heading">{{ 'products.preorder.heading' | t }}</p>
+
+      {%- if block.settings.ship_date != blank -%}
+        <p class="preorder-note__date">
+          {{ 'products.preorder.ships_on_html' | t: date: block.settings.ship_date }}
+        </p>
+      {%- else -%}
+        <p class="preorder-note__date">{{ 'products.preorder.ships_soon' | t }}</p>
+      {%- endif -%}
+
+      {%- if block.settings.text != blank -%}
+        <div class="preorder-note__text rte">{{ block.settings.text }}</div>
+      {%- endif -%}
+    </div>
+  </div>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "t:blocks.preorder_note.name",
+  "tag": null,
+  "settings": [
+    { "type": "paragraph", "content": "t:blocks.preorder_note.paragraph" },
+    { "type": "text", "id": "ship_date", "label": "t:blocks.preorder_note.settings.ship_date.label", "info": "t:blocks.preorder_note.settings.ship_date.info" },
+    { "type": "richtext", "id": "text", "label": "t:shared.text.label" },
+    { "type": "header", "content": "t:shared.spacing.block_header" },
+    { "type": "range", "id": "padding_top", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_right", "label": "t:shared.spacing.padding_right.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_bottom", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_left", "label": "t:shared.spacing.padding_left.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_scale_mobile", "label": "t:shared.spacing.padding_scale_mobile.label", "info": "t:shared.spacing.padding_scale_mobile.info", "min": 25, "max": 100, "step": 5, "unit": "%", "default": 75 }
+  ],
+  "presets": [{ "name": "t:blocks.preorder_note.name" }]
+}
+{% endschema %}
+

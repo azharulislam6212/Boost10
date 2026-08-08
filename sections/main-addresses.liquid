@@ -1,0 +1,147 @@
+{% comment %}
+  sections/main-addresses.liquid
+
+  The address book.
+
+  Shopify's address forms are ordinary POSTs with _method overrides, not a JSON
+  API, so nothing here is intercepted: the form posts, the page reloads, and
+  Shopify's own validation and flash messages survive. <customer-address-form>
+  adds the province dropdowns, the show and hide, and the delete confirmation on
+  top of markup that already works without it.
+
+  Province lists come from Shopify's own country_option_tags, read from the
+  selected option rather than fetched. A theme that shipped its own list of
+  provinces would be wrong somewhere in the world within a year.
+{% endcomment %}
+
+{%- liquid
+  assign section_settings = section.settings
+-%}
+
+<div
+  class="customer customer--addresses color-{{ section_settings.color_scheme }}"
+  {% render 'spacing', section: section_settings %}
+>
+  <div class="container">
+    <customer-address-form class="address-book" data-modal="false">
+      <header class="address-book__header">
+        <div>
+          <h1 class="account__title">{{ 'customer.addresses.title' | t }}</h1>
+          <p class="address-book__count">
+            {{ 'customer.addresses.count' | t: count: customer.addresses_count }}
+          </p>
+        </div>
+
+        <div class="address-book__actions">
+          <button
+            type="button"
+            class="button button--primary"
+            data-ref="newTrigger"
+            data-address-open="new"
+            aria-expanded="false"
+          >
+            {{ 'customer.addresses.add_new' | t }}
+          </button>
+
+          <a class="button button--link" href="{{ routes.account_url }}">
+            {{ 'customer.order.back_to_account' | t }}
+          </a>
+        </div>
+      </header>
+
+      {%- comment -%} ---------- new address ---------- {%- endcomment -%}
+      <div class="address-book__form" data-address-form="new" hidden>
+        <h2 class="address-book__form-title">{{ 'customer.addresses.add_new' | t }}</h2>
+
+        {%- form 'customer_address', customer.new_address, class: 'address-form' -%}
+          {% render 'address-fields', form: form, address: customer.new_address, id: 'new' %}
+
+          <div class="address-form__actions">
+            <button type="submit" class="button button--primary">
+              {{ 'customer.addresses.add' | t }}
+            </button>
+
+            <button type="button" class="button button--link" data-address-cancel>
+              {{ 'customer.addresses.cancel' | t }}
+            </button>
+          </div>
+        {%- endform -%}
+      </div>
+
+      {%- comment -%} ---------- existing addresses ---------- {%- endcomment -%}
+      {%- if customer.addresses_count > 0 -%}
+        <ul class="address-book__list" role="list">
+          {%- paginate customer.addresses by 6 -%}
+            {%- for address in customer.addresses -%}
+              <li class="address-card" data-address-item>
+                {%- if address == customer.default_address -%}
+                  <span class="address-card__badge">{{ 'customer.addresses.default' | t }}</span>
+                {%- endif -%}
+
+                <address class="address-card__body">
+                  {{ address | format_address }}
+                </address>
+
+                <div class="address-card__actions">
+                  <button
+                    type="button"
+                    class="button button--secondary button--small"
+                    data-address-open="{{ address.id }}"
+                    aria-expanded="false"
+                  >
+                    {{ 'customer.addresses.edit' | t }}
+                  </button>
+
+                  <form method="post" action="/account/addresses/{{ address.id }}" data-address-delete data-address-label="{{ address | format_address | strip_newlines | escape }}">
+                    <input type="hidden" name="_method" value="delete">
+                    <button type="submit" class="button button--link button--small" data-address-delete-trigger>
+                      {{ 'customer.addresses.delete' | t }}
+                    </button>
+                  </form>
+                </div>
+
+                <div class="address-book__form" data-address-form="{{ address.id }}" hidden>
+                  <h2 class="address-book__form-title">{{ 'customer.addresses.edit_address' | t }}</h2>
+
+                  {%- form 'customer_address', address, class: 'address-form' -%}
+                    {% render 'address-fields', form: form, address: address, id: address.id %}
+
+                    <div class="address-form__actions">
+                      <button type="submit" class="button button--primary">
+                        {{ 'customer.addresses.update' | t }}
+                      </button>
+
+                      <button type="button" class="button button--link" data-address-cancel>
+                        {{ 'customer.addresses.cancel' | t }}
+                      </button>
+                    </div>
+                  {%- endform -%}
+                </div>
+              </li>
+            {%- endfor -%}
+
+            {% render 'pagination', paginate: paginate, type: 'paginate' %}
+          {%- endpaginate -%}
+        </ul>
+      {%- else -%}
+        <p class="account__empty">{{ 'customer.addresses.none' | t }}</p>
+      {%- endif -%}
+    </customer-address-form>
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "t:sections.main_addresses.name",
+  "tag": "section",
+  "class": "section",
+  "settings": [
+    { "type": "color_scheme", "id": "color_scheme", "label": "t:shared.color_scheme.label", "default": "scheme-1" },
+    { "type": "header", "content": "t:shared.spacing.section_header" },
+    { "type": "range", "id": "padding_top", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 48 },
+    { "type": "range", "id": "padding_bottom", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 64 },
+    { "type": "range", "id": "padding_top_mobile", "label": "t:shared.spacing.padding_top_mobile.label", "info": "t:shared.spacing.padding_top_mobile.info", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_bottom_mobile", "label": "t:shared.spacing.padding_bottom_mobile.label", "info": "t:shared.spacing.padding_bottom_mobile.info", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 0 }
+  ]
+}
+{% endschema %}

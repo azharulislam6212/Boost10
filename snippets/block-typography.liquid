@@ -1,0 +1,156 @@
+{% doc %}
+  Resolves block-level typography and colour settings into CSS custom properties.
+
+  ## Why this is a snippet and not copy-pasted into each block
+
+  `heading` and `text` need the same override machinery, and any block added
+  later (`_product-title`, `announcement`, `testimonial`) will need it too.
+  Duplicating twenty lines of `case` statements per block is how the keyword
+  mappings drift apart — a "loose" line height meaning 1.9 in one block and 1.8
+  in another is the kind of bug nobody reports and everybody notices.
+
+  ## The override contract
+
+  Every property is emitted **only when the merchant overrode it**. A block that
+  leaves `type_preset` on `inherit` emits nothing at all, so the element falls
+  through to the global type scale from `css-variables.liquid`. That is the
+  point: theme settings stay the single source of truth, and a block override is
+  a deliberate exception rather than a silent shadow copy.
+
+  This is also why the values are custom properties rather than direct
+  declarations. `font-size: 2.4rem` inline beats every stylesheet including the
+  mobile media query; `--block-font-size: 2.4rem` is read by a rule in
+  `base.css` that can still swap it out below 750px.
+
+  ## Colour and gradient are mutually exclusive
+
+  Gradient text needs `background-image` plus `color: transparent` set together —
+  one without the other is invisible text. So when a gradient is chosen the
+  solid colour is not emitted at all, and the `text-gradient` class in
+  `base.css` owns both halves. The schema enforces the same thing with
+  `visible_if`, but a merchant who set a colour *before* switching to gradient
+  still has that value stored, and this guard is what stops it applying.
+
+  Parameters:
+    block    (object, required)  `block.settings`
+    fallback (string, optional)  CSS var name for the unoverridden size,
+                                 e.g. 'var(--font-size-h2)'. Emitted as
+                                 `--block-font-size` only when no override.
+
+  Setting ids read:
+    type_preset, font_family, font_weight, font_size, font_size_mobile,
+    line_height, letter_spacing, text_transform, text_color, gradient
+
+  Returns: a semicolon-terminated declaration list, no `style=` wrapper, so the
+  caller can concatenate it with its own properties.
+
+  @example
+    <h2 class="block-heading__text"
+        style="{% render 'block-typography', block: block.settings %}">
+{% enddoc %}
+
+{%- liquid
+  assign out = ''
+
+  # ---- Typography overrides ------------------------------------------------
+  # Gated as a group. A merchant on `inherit` gets nothing emitted, which is
+  # what lets the global scale keep working.
+
+  if block.type_preset == 'custom'
+
+    case block.font_family
+      when 'heading'
+        assign out = out | append: '--block-font-family:var(--font-heading-family);'
+      when 'accent'
+        assign out = out | append: '--block-font-family:var(--font-accent-family);'
+      when 'body'
+        assign out = out | append: '--block-font-family:var(--font-body-family);'
+    endcase
+
+    if block.font_weight != blank and block.font_weight != 'inherit'
+      assign out = out | append: '--block-font-weight:' | append: block.font_weight | append: ';'
+    endif
+
+    comment
+      Sizes are stored in px because that is what a merchant thinks in, and
+      emitted in rem against the 62.5% root so a customer who enlarged their
+      browser text keeps that preference. Same conversion as css-variables.
+    endcomment
+    if block.font_size != blank
+      assign size_rem = block.font_size | divided_by: 10.0
+      assign out = out | append: '--block-font-size:' | append: size_rem | append: 'rem;'
+    endif
+
+    comment
+      Mobile falls back to the desktop value rather than to the global scale.
+      A merchant who set 72px desktop and left mobile alone wants 72px, not the
+      theme's h2 — surprising them with a third value is worse than being large.
+    endcomment
+    if block.font_size_mobile != blank
+      assign size_mobile_rem = block.font_size_mobile | divided_by: 10.0
+      assign out = out | append: '--block-font-size-mobile:' | append: size_mobile_rem | append: 'rem;'
+    elsif block.font_size != blank
+      assign out = out | append: '--block-font-size-mobile:' | append: size_rem | append: 'rem;'
+    endif
+
+    comment
+      Keyword to number, matching the maps in css-variables.liquid exactly.
+      If those change, change these in the same commit.
+    endcomment
+    case block.line_height
+      when 'tight'
+        assign out = out | append: '--block-line-height:1.15;'
+      when 'normal'
+        assign out = out | append: '--block-line-height:1.6;'
+      when 'loose'
+        assign out = out | append: '--block-line-height:1.9;'
+    endcase
+
+    case block.letter_spacing
+      when 'tight'
+        assign out = out | append: '--block-letter-spacing:-0.02em;'
+      when 'normal'
+        assign out = out | append: '--block-letter-spacing:0em;'
+      when 'wide'
+        assign out = out | append: '--block-letter-spacing:0.06em;'
+    endcase
+
+    if block.text_transform != blank and block.text_transform != 'inherit'
+      assign out = out | append: '--block-text-transform:' | append: block.text_transform | append: ';'
+    endif
+  endif
+
+  # ---- Colour --------------------------------------------------------------
+  # Deliberately outside the `type_preset` gate. Wanting one heading in the
+  # accent colour is a common, reasonable ask that should not require opting
+  # into a full typography override first.
+
+  assign gradient = block.gradient | default: 'none'
+
+  if gradient == 'none' or gradient == blank
+    case block.text_color
+      when 'text'
+        assign out = out | append: '--block-text-color:var(--color-text);'
+      when 'subtext'
+        assign out = out | append: '--block-text-color:var(--color-subtext);'
+      when 'heading'
+        assign out = out | append: '--block-text-color:var(--color-heading);'
+      when 'accent'
+        assign out = out | append: '--block-text-color:var(--color-accent-text);'
+      when 'sale'
+        assign out = out | append: '--block-text-color:var(--color-sale-price);'
+    endcase
+  endif
+
+  # ---- Unoverridden size fallback ------------------------------------------
+  # So base.css can read one property instead of nesting three var() fallbacks.
+
+  if block.type_preset != 'custom' or block.font_size == blank
+    if fallback != blank
+      assign out = out | append: '--block-font-size:' | append: fallback | append: ';'
+      assign out = out | append: '--block-font-size-mobile:' | append: fallback | append: ';'
+    endif
+  endif
+-%}
+
+{{- out -}}

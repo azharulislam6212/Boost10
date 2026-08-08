@@ -1,0 +1,49 @@
+{% comment %}
+  blocks/product-inventory.liquid
+
+  Stock state and, at or below the threshold, a progress bar.
+
+  The bar deliberately only appears when stock is low. A bar reading nearly full
+  is scarcity pointing the wrong way — it tells a customer there is plenty of
+  time. Above the threshold the block says "in stock" and nothing more.
+
+  Nothing at all is shown when Shopify is not tracking inventory. A store with
+  tracking off has no number to report, and inventing "only a few left" is the
+  kind of claim that ends up in front of a consumer protection regulator.
+
+  `<inventory-status>` re-renders this on every variant change; the markup here
+  is the server-rendered first paint, so the line is right before any script runs.
+{% endcomment %}
+
+{%- liquid
+  assign product = closest.product
+  assign variant = product.selected_or_first_available_variant
+  assign threshold = block.settings.threshold | default: settings.low_stock_threshold | default: 10
+-%}
+
+{%- if product -%}
+  <div class="product-inventory" {% render 'spacing', block: block.settings %} {{ block.shopify_attributes }}>
+    {% render 'stock-indicator',
+       variant: variant,
+       threshold: threshold,
+       show_bar: block.settings.show_bar %}
+  </div>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "t:blocks.product_inventory.name",
+  "tag": null,
+  "settings": [
+    { "type": "checkbox", "id": "show_bar", "label": "t:blocks.product_inventory.settings.show_bar.label", "info": "t:blocks.product_inventory.settings.show_bar.info", "default": true },
+    { "type": "range", "id": "threshold", "label": "t:blocks.product_inventory.settings.threshold.label", "info": "t:blocks.product_inventory.settings.threshold.info", "min": 1, "max": 50, "step": 1, "default": 10 },
+    { "type": "header", "content": "t:shared.spacing.block_header" },
+    { "type": "range", "id": "padding_top", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_right", "label": "t:shared.spacing.padding_right.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_bottom", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_left", "label": "t:shared.spacing.padding_left.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_scale_mobile", "label": "t:shared.spacing.padding_scale_mobile.label", "info": "t:shared.spacing.padding_scale_mobile.info", "min": 25, "max": 100, "step": 5, "unit": "%", "default": 75 }
+  ],
+  "presets": [{ "name": "t:blocks.product_inventory.name" }]
+}
+{% endschema %}

@@ -1,0 +1,98 @@
+{% comment %}
+  sections/multicolumn.liquid
+
+  Repeatable content columns — features, steps, services.
+
+  ## What changed in Phase 3
+
+  The old `mobile_layout` select chose between a stacked grid and a carousel by
+  rendering two entirely separate wrappers around the same captured blocks. That
+  made mobile the only breakpoint with a choice: desktop was always a grid, and
+  the two branches had drifted apart on arrows and labelling.
+
+  It is now the shared shell, which means desktop can be a carousel too — a
+  reasonable thing to want for eight service columns — and there is one wrapper.
+
+  ## Migration
+
+  `mobile_layout` becomes `layout_mobile`, with the same two values under
+  different names ('stack' → 'grid'). The Liquid below translates the old value
+  so an installed store keeps its layout without the merchant reopening the
+  editor. Remove the fallback a release after the settings have been re-saved.
+{% endcomment %}
+
+{%- liquid
+  assign layout_mob = section.settings.layout_mobile
+
+  if layout_mob == blank
+    assign legacy = section.settings.mobile_layout
+    if legacy == 'stack'
+      assign layout_mob = 'grid'
+    elsif legacy == 'carousel'
+      assign layout_mob = 'carousel'
+    else
+      assign layout_mob = 'grid'
+    endif
+  endif
+-%}
+
+<div
+  class="multicolumn color-{{ section.settings.color_scheme }}"
+  {% render 'spacing', section: section.settings %}
+>
+  <div class="container">
+    {%- capture children -%}
+      {% content_for 'blocks' %}
+    {%- endcapture -%}
+
+    {% render 'carousel-shell',
+       children: children,
+       layout: section.settings.layout,
+       layout_mobile: layout_mob,
+       tag: 'div',
+       label: 'accessibility.carousel' | t,
+       classes: 'multicolumn__carousel',
+       track_classes: 'multicolumn__grid',
+       columns_desktop: section.settings.columns_desktop,
+       columns_tablet: section.settings.columns_tablet,
+       columns_mobile: section.settings.columns_mobile,
+       settings: section.settings %}
+  </div>
+</div>
+
+
+{% schema %}
+{
+  "name": "t:sections.multicolumn.name",
+  "tag": "section",
+  "class": "section",
+  "blocks": [{ "type": "@theme" }, { "type": "@app" }],
+  "settings": [
+    { "type": "range", "id": "columns_desktop", "label": "t:shared.columns.desktop.label", "min": 2, "max": 6, "step": 1, "default": 3 },
+    {
+      "type": "select", "id": "mobile_layout", "label": "t:sections.multicolumn.settings.mobile_layout.label",
+      "options": [
+        { "value": "stack", "label": "t:sections.multicolumn.settings.mobile_layout.options__1.label" },
+        { "value": "carousel", "label": "t:sections.multicolumn.settings.mobile_layout.options__2.label" }
+      ],
+      "default": "stack"
+    },
+    { "type": "color_scheme", "id": "color_scheme", "label": "t:shared.color_scheme.label", "default": "scheme-1" },
+    { "type": "header", "content": "t:shared.spacing.section_header" },
+    { "type": "range", "id": "padding_top", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 48 },
+    { "type": "range", "id": "padding_bottom", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 48 },
+    { "type": "range", "id": "padding_top_mobile", "label": "t:shared.spacing.padding_top_mobile.label", "info": "t:shared.spacing.padding_top_mobile.info", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_bottom_mobile", "label": "t:shared.spacing.padding_bottom_mobile.label", "info": "t:shared.spacing.padding_bottom_mobile.info", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 0 }
+  ],
+  "presets": [
+    {
+      "name": "t:sections.multicolumn.name",
+      "blocks": [
+        { "type": "icon-with-text" },
+        { "type": "icon-with-text" },
+        { "type": "icon-with-text" }
+      ]
+    }
+  ]
+}
+{% endschema %}

@@ -1,0 +1,128 @@
+ {% comment %}
+  sections/featured-collection.liquid
+
+  Products from one collection, as a grid or a carousel.
+
+  ## What changed in Phase 3
+
+  There used to be an `{% if layout == 'carousel' %}` / `{% else %}` pair here
+  that duplicated the wrapper, the grid classes and the column style, and put
+  the arrows and the live region in only one of the two branches. The grid
+  branch therefore had no accessible carousel affordances at all, and every
+  change had to be made twice.
+
+  Both branches are now `{% render 'carousel-shell' %}`. The layout is a data
+  attribute and CSS; the markup is rendered once.
+
+  The card capture stays, because a block cannot be rendered twice from one
+  loop and `{% content_for %}` cannot be inspected — only output.
+{% endcomment %}
+
+{%- liquid
+  assign featured = section.settings.collection
+  assign limit = section.settings.products_to_show
+  assign desktop = section.settings.columns_desktop | default: 4
+
+  # `sizes` has to reflect the widest each card can be, which is the desktop
+  # column count. Getting this wrong is the single most common cause of a
+  # product grid downloading images two or three times larger than it paints.
+  assign card_width = 100 | divided_by: desktop
+  assign card_sizes = '(min-width: 990px) ' | append: card_width | append: 'vw, (min-width: 750px) 33vw, 60vw'
+-%}
+
+<div
+  class="featured-collection color-{{ section.settings.color_scheme }}"
+  {% render 'spacing', section: section.settings %}
+>
+  <div class="container">
+    <div class="featured-collection__header featured-collection__header--{{ section.settings.alignment }}">
+      {% content_for 'blocks' %}
+    </div>
+
+    {%- if featured.products.size > 0 -%}
+      {%- capture children -%}
+        {%- for product in featured.products limit: limit -%}
+          <li class="product-grid__item carousel-shell__item" data-product-id="{{ product.id }}">
+            {% content_for 'block',
+              type: '_product-card',
+              id: 'product-card',
+              product: product,
+              index: forloop.index0,
+              sizes: card_sizes
+            %}
+          </li>
+        {%- endfor -%}
+      {%- endcapture -%}
+
+      {% render 'carousel-shell',
+         children: children,
+         layout: section.settings.layout,
+         layout_mobile: section.settings.layout_mobile,
+         tag: 'ul',
+         label: featured.title,
+         classes: 'featured-collection__carousel',
+         track_classes: 'product-grid',
+         columns_desktop: section.settings.columns_desktop,
+         columns_tablet: section.settings.columns_tablet,
+         columns_mobile: section.settings.columns_mobile,
+         settings: section.settings %}
+
+      {%- if section.settings.show_view_all and featured.all_products_count > limit -%}
+        <div class="featured-collection__footer">
+          {% render 'button',
+             label: 'general.actions.view_all' | t,
+             href: featured.url,
+             variant: 'secondary' %}
+        </div>
+      {%- endif -%}
+    {%- else -%}
+      <p class="featured-collection__empty">{{ 'products.facets.no_results' | t }}</p>
+    {%- endif -%}
+  </div>
+</div>
+
+
+{% schema %}
+{
+  "name": "t:sections.featured_collection.name",
+  "tag": "section",
+  "class": "section",
+  "blocks": [{ "type": "@theme" }, { "type": "@app" }],
+  "settings": [
+    { "type": "collection", "id": "collection", "label": "t:sections.featured_collection.settings.collection.label" },
+    { "type": "range", "id": "products_to_show", "label": "t:sections.featured_collection.settings.products_to_show.label", "min": 2, "max": 16, "step": 1, "default": 8 },
+    { "type": "range", "id": "columns_desktop", "label": "t:shared.columns.desktop.label", "min": 2, "max": 6, "step": 1, "default": 4 },
+    {
+      "type": "select", "id": "layout", "label": "t:sections.featured_collection.settings.layout.label",
+      "options": [
+        { "value": "grid", "label": "t:sections.featured_collection.settings.layout.options__1.label" },
+        { "value": "carousel", "label": "t:sections.featured_collection.settings.layout.options__2.label" }
+      ],
+      "default": "carousel"
+    },
+    { "type": "checkbox", "id": "show_view_all", "label": "t:sections.featured_collection.settings.show_view_all.label", "default": true },
+    {
+      "type": "select", "id": "alignment", "label": "t:blocks.group.settings.alignment.label",
+      "options": [
+        { "value": "start", "label": "t:blocks.group.settings.alignment.options__1.label" },
+        { "value": "center", "label": "t:blocks.group.settings.alignment.options__2.label" },
+        { "value": "end", "label": "t:blocks.group.settings.alignment.options__3.label" }
+      ],
+      "default": "start"
+    },
+    { "type": "color_scheme", "id": "color_scheme", "label": "t:shared.color_scheme.label", "default": "scheme-1" },
+    { "type": "header", "content": "t:shared.spacing.section_header" },
+    { "type": "range", "id": "padding_top", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 48 },
+    { "type": "range", "id": "padding_bottom", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 48 },
+    { "type": "range", "id": "padding_top_mobile", "label": "t:shared.spacing.padding_top_mobile.label", "info": "t:shared.spacing.padding_top_mobile.info", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_bottom_mobile", "label": "t:shared.spacing.padding_bottom_mobile.label", "info": "t:shared.spacing.padding_bottom_mobile.info", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 0 }
+  ],
+  "presets": [
+    {
+      "name": "t:sections.featured_collection.name",
+       "category": "Collections",
+      "blocks": [{ "type": "heading" }]
+    }
+  ]
+}
+{% endschema %}

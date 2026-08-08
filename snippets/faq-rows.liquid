@@ -1,0 +1,65 @@
+{% doc %}
+  Turns a category block's rich text into disclosure rows.
+
+  The merchant writes alternating paragraphs — question, answer, question,
+  answer — in one rich text field rather than adding a block per question. Forty
+  questions as forty blocks is forty entries in the editor sidebar to scroll
+  through, and Shopify caps blocks per section anyway.
+
+  Odd paragraphs become questions, even ones answers. If the count is odd the
+  last question is rendered with an empty answer rather than dropped, so the
+  merchant can see what they left unfinished.
+
+  Parameters:
+    block (object, required)  A `faq-category` block
+
+  @example
+    {% render 'faq-rows', block: block %}
+{% enddoc %}
+
+{%- liquid
+  assign source = block.settings.questions
+  if block.settings.page != blank
+    assign source = source | append: block.settings.page.content
+  endif
+
+  assign parts = source | split: '</p>'
+-%}
+
+<accordion-element
+  class="faq-rows"
+  {% if section.settings.single_open %}data-single{% endif %}
+>
+  {%- for part in parts -%}
+    {%- liquid
+      assign text = part | replace: '<p>', '' | strip
+      if text == blank
+        continue
+      endif
+
+      assign position = forloop.index0 | modulo: 2
+    -%}
+
+    {%- if position == 0 -%}
+      {%- assign answer_raw = parts[forloop.index] | default: '' -%}
+      {%- assign answer = answer_raw | replace: '<p>', '' | strip -%}
+
+      <details
+        class="faq-row"
+        data-faq-row
+        {% if block.settings.open_first and forloop.first %}open data-default-open{% endif %}
+      >
+        <summary class="faq-row__summary">
+          <span class="faq-row__question">{{ text }}</span>
+          {% render 'icon', icon: 'chevron-down', size: 14, class: 'faq-row__chevron' %}
+        </summary>
+
+        <div class="faq-row__answer rte">
+          {%- if answer != blank -%}
+            <p>{{ answer }}</p>
+          {%- endif -%}
+        </div>
+      </details>
+    {%- endif -%}
+  {%- endfor -%}
+</accordion-element>

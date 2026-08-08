@@ -1,0 +1,72 @@
+{% doc %}
+  The grid container, its empty state and its pagination.
+
+  Takes pre-built children rather than looping itself, so it never learns what an
+  item is. The collection page, search, recommendations and the bundle picker all
+  use it unchanged — one place to fix a grid bug.
+
+  The heading is visually hidden but present: an AJAX-updated region with no
+  accessible name is a region a screen reader cannot find again after it changes.
+
+  Parameters:
+    children      (string, required)  Rendered `<li>` items
+    paginate      (object, required)
+    section       (object, required)
+    total         (number, optional)  Across all pages, never this page's count
+    item_selector (string, optional)  Default `[data-product-id]`
+    id            (string, optional)  Grid id, for `<facet-filters data-results>`
+    empty_url     (string, optional)  Where "clear filters" should point
+
+  @example
+    {% capture children %}…{% endcapture %}
+    {% render 'product-grid', children: children, paginate: paginate,
+       section: section, total: collection.products_count %}
+{% enddoc %}
+
+{%- liquid
+  assign mode = section.settings.pagination_type | default: settings.pagination_type | default: 'paginate'
+  assign resolved_total = total | default: paginate.items
+  assign grid_id = id | default: 'ProductGrid-' | append: section.id
+  assign desktop = section.settings.columns_desktop | default: 4
+  assign tablet = section.settings.columns_tablet | default: 3
+  assign mobile = section.settings.columns_mobile | default: 2
+-%}
+
+<div class="product-grid-wrapper">
+  <h2 class="visually-hidden">{{ 'products.facets.title' | t }}</h2>
+
+  {%- if paginate.previous and mode != 'paginate' -%}
+    <button
+      type="button"
+      class="button button--secondary results-list__load-previous"
+      data-ref="loadPrevious"
+      data-prev-url="{{ paginate.previous.url }}"
+      hidden
+    >
+      {{ 'general.pagination.load_previous' | t }}
+    </button>
+  {%- endif -%}
+
+  <ul
+    class="product-grid"
+    id="{{ grid_id }}"
+    data-ref="grid"
+    role="list"
+    style="--columns-desktop: {{ desktop }}; --columns-tablet: {{ tablet }}; --columns-mobile: {{ mobile }};"
+  >
+    {{ children }}
+  </ul>
+
+  <div class="product-grid__empty" data-ref="empty" {% if resolved_total > 0 %}hidden{% endif %}>
+    <p class="product-grid__empty-title">{{ 'products.facets.no_results' | t }}</p>
+    {%- if empty_url != blank -%}
+      <a class="button button--link" href="{{ empty_url }}">{{ 'products.facets.clear_all' | t }}</a>
+    {%- endif -%}
+  </div>
+
+  <div class="product-grid__pagination">
+    {% render 'pagination', paginate: paginate, type: mode %}
+  </div>
+
+  <p class="visually-hidden" data-ref="status" role="status"></p>
+</div>

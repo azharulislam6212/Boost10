@@ -1,0 +1,191 @@
+{% comment %}
+  sections/main-faq.liquid
+
+  Questions grouped into categories, with live filtering.
+
+  Two presentations of the same markup. **Accordion groups** keep every category
+  on the page, which is what a customer scanning for a word wants and what a
+  search engine indexes. **Tabs** hide all but one, which suits a long FAQ where
+  the categories are genuinely separate.
+
+  Search is the reason tabs are not the default: filtering across categories only
+  makes sense when the customer can see the matches, and `<faq-search>` switches
+  the section to the accordion presentation while a term is active. A search that
+  finds four answers you cannot see is not a search.
+
+  Every row is a `<details>`, so the page is readable without JavaScript and
+  every answer is findable with the browser's own in-page search.
+{% endcomment %}
+
+{%- liquid
+  assign section_settings = section.settings
+  assign categories = section.blocks | where: 'type', 'faq-category'
+-%}
+
+
+<div
+  class="main-faq color-{{ section_settings.color_scheme }}"
+  data-faq-root
+  {% render 'spacing', section: section_settings %}
+>
+  <div class="container">
+    <div class="main-faq__head main-faq__head--{{ section_settings.alignment }}">
+      {%- if section_settings.heading != blank -%}
+        <motion-effect {% render 'motion-attrs', kind: 'text', section: section_settings %}>
+          <h1 class="main-faq__heading">{{ section_settings.heading }}</h1>
+        </motion-effect>
+      {%- endif -%}
+
+      {%- if section_settings.text != blank -%}
+        <div class="main-faq__text rte">{{ section_settings.text }}</div>
+      {%- endif -%}
+
+      {%- if section_settings.enable_search -%}
+        <faq-search class="faq-search">
+          <label class="visually-hidden" for="FaqSearch-{{ section.id }}">
+            {{ 'sections.faq.search_label' | t }}
+          </label>
+
+          <div class="faq-search__field">
+            {% render 'icon', icon: 'search', size: 16 %}
+            <input
+              id="FaqSearch-{{ section.id }}"
+              type="search"
+              data-ref="input"
+              autocomplete="off"
+              placeholder="{{ 'sections.faq.search_placeholder' | t | escape }}"
+            >
+          </div>
+
+          <p class="visually-hidden" data-ref="status" role="status"></p>
+        </faq-search>
+      {%- endif -%}
+    </div>
+
+    {%- if section_settings.layout == 'tabs' and categories.size > 1 -%}
+      <tabs-element class="main-faq__tabs">
+        <div role="tablist" aria-label="{{ 'sections.faq.categories' | t }}">
+          {%- for block in categories -%}
+            <button
+              type="button"
+              role="tab"
+              id="FaqTab-{{ block.id }}"
+              aria-controls="FaqPanel-{{ block.id }}"
+              aria-selected="{% if forloop.first %}true{% else %}false{% endif %}"
+              tabindex="{% if forloop.first %}0{% else %}-1{% endif %}"
+              {{ block.shopify_attributes }}
+            >
+              {{ block.settings.title }}
+            </button>
+          {%- endfor -%}
+        </div>
+
+        {%- for block in categories -%}
+          <div
+            role="tabpanel"
+            id="FaqPanel-{{ block.id }}"
+            aria-labelledby="FaqTab-{{ block.id }}"
+            tabindex="0"
+            data-faq-group
+            {% unless forloop.first %}hidden{% endunless %}
+          >
+            {% render 'faq-rows', block: block %}
+          </div>
+        {%- endfor -%}
+      </tabs-element>
+    {%- else -%}
+      {%- for block in categories -%}
+        <section class="main-faq__group" data-faq-group {{ block.shopify_attributes }}>
+          {%- if block.settings.title != blank -%}
+            <h2 class="main-faq__group-title">{{ block.settings.title }}</h2>
+          {%- endif -%}
+
+          {% render 'faq-rows', block: block %}
+        </section>
+      {%- endfor -%}
+    {%- endif -%}
+
+    {%- comment -%}
+      Blocks that are not categories — a rich text note, a contact button, an app
+      block — render after the questions.
+    {%- endcomment -%}
+    <div class="main-faq__extra">
+      {%- for block in section.blocks -%}
+        {%- unless block.type == 'faq-category' -%}
+          {% render block %}
+        {%- endunless -%}
+      {%- endfor -%}
+    </div>
+
+    <p class="main-faq__empty" data-faq-empty hidden>
+      {{ 'sections.faq.no_results' | t }}
+    </p>
+  </div>
+</div>
+
+
+
+{% schema %}
+{
+  "name": "t:sections.faq.name",
+  "tag": "section",
+  "class": "section",
+  "blocks": [
+    {
+      "type": "faq-category",
+      "name": "t:sections.faq.blocks.category.name",
+      "settings": [
+        { "type": "text", "id": "title", "label": "t:sections.faq.blocks.category.settings.title.label", "default": "Shipping" },
+        { "type": "richtext", "id": "questions", "label": "t:sections.faq.blocks.category.settings.questions.label", "info": "t:sections.faq.blocks.category.settings.questions.info", "default": "<p>How long does delivery take?</p><p>Orders ship within two working days.</p>" },
+        { "type": "page", "id": "page", "label": "t:sections.faq.blocks.category.settings.page.label", "info": "t:sections.faq.blocks.category.settings.page.info" },
+        { "type": "checkbox", "id": "open_first", "label": "t:sections.faq.blocks.category.settings.open_first.label", "default": false }
+      ]
+    }
+  ],
+  "settings": [
+    { "type": "text", "id": "heading", "label": "t:shared.heading.label", "default": "Frequently asked questions" },
+    { "type": "richtext", "id": "text", "label": "t:shared.text.label" },
+    { "type": "checkbox", "id": "enable_search", "label": "t:sections.faq.settings.enable_search.label", "info": "t:sections.faq.settings.enable_search.info", "default": true },
+    {
+      "type": "select", "id": "layout", "label": "t:sections.faq.settings.presentation.label", "info": "t:sections.faq.settings.presentation.info",
+      "options": [
+        { "value": "accordion", "label": "t:sections.faq.settings.presentation.options__1.label" },
+        { "value": "tabs", "label": "t:sections.faq.settings.presentation.options__2.label" }
+      ],
+      "default": "accordion"
+    },
+    { "type": "checkbox", "id": "single_open", "label": "t:sections.faq.settings.single_open.label", "info": "t:sections.faq.settings.single_open.info", "default": false },
+    {
+      "type": "select", "id": "alignment", "label": "t:blocks.group.settings.alignment.label",
+      "options": [
+        { "value": "start", "label": "t:blocks.group.settings.alignment.options__1.label" },
+        { "value": "center", "label": "t:blocks.group.settings.alignment.options__2.label" },
+        { "value": "end", "label": "t:blocks.group.settings.alignment.options__3.label" }
+      ],
+      "default": "center"
+    },
+    { "type": "header", "content": "t:shared.animation.header" },
+    {
+      "type": "select", "id": "animation_text", "label": "t:shared.animation.animation_text.label",
+      "options": [
+        { "value": "inherit", "label": "t:shared.animation.animation_text.options__1.label" },
+        { "value": "none", "label": "t:shared.animation.animation_text.options__2.label" },
+        { "value": "fade-up", "label": "t:shared.animation.animation_text.options__4.label" }
+      ],
+      "default": "inherit"
+    },
+    { "type": "color_scheme", "id": "color_scheme", "label": "t:shared.color_scheme.label", "default": "scheme-1" },
+    { "type": "header", "content": "t:shared.spacing.section_header" },
+    { "type": "range", "id": "padding_top", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 48 },
+    { "type": "range", "id": "padding_bottom", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 48 },
+    { "type": "range", "id": "padding_top_mobile", "label": "t:shared.spacing.padding_top_mobile.label", "info": "t:shared.spacing.padding_top_mobile.info", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_bottom_mobile", "label": "t:shared.spacing.padding_bottom_mobile.label", "info": "t:shared.spacing.padding_bottom_mobile.info", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 0 }
+  ],
+  "presets": [
+    {
+      "name": "t:sections.faq.name",
+      "blocks": [{ "type": "faq-category" }, { "type": "faq-category" }]
+    }
+  ]
+}
+{% endschema %}

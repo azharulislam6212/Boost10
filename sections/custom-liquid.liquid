@@ -1,0 +1,65 @@
+{% comment %}
+  sections/custom-liquid.liquid
+
+  Raw Liquid, entered in the Theme Editor and rendered on the storefront.
+
+  This is the escape hatch. Every theme needs one, because no theme anticipates
+  every store, and the alternative is a merchant editing theme files — which
+  breaks their upgrade path permanently.
+
+  Two things it deliberately does not do:
+
+  **It does not sanitise the output.** It cannot: the whole point is that the
+  merchant writes markup. That is their own input from their own admin, the same
+  trust boundary Shopify's native Custom Liquid section uses.
+
+  **It does not catch Liquid errors.** Liquid has no try/catch, and a syntax
+  error here takes the section down with a visible error. That is the correct
+  behaviour in a theme editor — a silent failure would leave the merchant
+  wondering why nothing appeared.
+
+  Full colour scheme and spacing support, so custom content sits in the page
+  rather than on top of it.
+{% endcomment %}
+
+{%- liquid
+  assign section_settings = section.settings
+-%}
+
+<div
+  class="custom-liquid-section color-{{ section_settings.color_scheme }}"
+  {% render 'spacing', section: section_settings %}
+>
+  {%- if section_settings.full_width -%}
+    <div class="custom-liquid-section__content">
+      {{ section_settings.custom_liquid }}
+    </div>
+  {%- else -%}
+    <div class="container">
+      <div class="custom-liquid-section__content" style="--content-width: {{ section_settings.max_width }}px;">
+        {{ section_settings.custom_liquid }}
+      </div>
+    </div>
+  {%- endif -%}
+</div>
+
+{% schema %}
+{
+  "name": "t:sections.custom_liquid.name",
+  "tag": "section",
+  "class": "section",
+  "settings": [
+    { "type": "paragraph", "content": "t:sections.custom_liquid.paragraph" },
+    { "type": "liquid", "id": "custom_liquid", "label": "t:sections.custom_liquid.settings.custom_liquid.label", "info": "t:sections.custom_liquid.settings.custom_liquid.info" },
+    { "type": "checkbox", "id": "full_width", "label": "t:sections.custom_liquid.settings.full_width.label", "default": false },
+    { "type": "range", "id": "max_width", "label": "t:blocks.group.settings.max_width.label", "min": 400, "max": 1600, "step": 40, "default": 1200 },
+    { "type": "color_scheme", "id": "color_scheme", "label": "t:shared.color_scheme.label", "default": "scheme-1" },
+    { "type": "header", "content": "t:shared.spacing.section_header" },
+    { "type": "range", "id": "padding_top", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 32 },
+    { "type": "range", "id": "padding_bottom", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 32 },
+    { "type": "range", "id": "padding_top_mobile", "label": "t:shared.spacing.padding_top_mobile.label", "info": "t:shared.spacing.padding_top_mobile.info", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_bottom_mobile", "label": "t:shared.spacing.padding_bottom_mobile.label", "info": "t:shared.spacing.padding_bottom_mobile.info", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 0 }
+  ],
+  "presets": [{ "name": "t:sections.custom_liquid.name" }]
+}
+{% endschema %}

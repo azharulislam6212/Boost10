@@ -1,0 +1,796 @@
+<!doctype html>
+
+{%- liquid
+  # --- Text direction -------------------------------------------------------
+  assign rtl_locales = 'ar,arc,ckb,dv,fa,ha,he,khw,ks,ku,ps,sd,ur,uz-AF,yi' | split: ','
+  assign locale_root = request.locale.iso_code | split: '-' | first
+  assign text_direction = 'ltr'
+  if rtl_locales contains request.locale.iso_code or rtl_locales contains locale_root
+    assign text_direction = 'rtl'
+  endif
+
+  # --- Feature flags used by the shell --------------------------------------
+  assign use_smooth_scroll = settings.enable_smooth_scroll | default: false
+  assign use_page_transitions = settings.enable_page_transitions | default: false
+  assign use_cart_drawer = false
+  if settings.cart_type == 'drawer'
+    assign use_cart_drawer = true
+  endif
+
+  # --- Body classes ---------------------------------------------------------
+  assign body_classes = 'template-' | append: template.name
+  if template.suffix != blank
+    assign body_classes = body_classes | append: ' template-suffix-' | append: template.suffix
+  endif
+  if settings.animations_reveal_on_scroll
+    assign body_classes = body_classes | append: ' scroll-reveal-enabled'
+  endif
+-%}
+
+<html
+  class="no-js"
+  lang="{{ request.locale.iso_code }}"
+  dir="{{ text_direction }}"
+  data-template="{{ template.name }}"
+  {% if template.suffix != blank %}data-template-suffix="{{ template.suffix }}"{% endif %}
+  data-direction="{{ text_direction }}"
+>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="color-scheme" content="light dark">
+    <meta name="format-detection" content="telephone=no">
+
+    {%- if settings.browser_theme_color != blank -%}
+      <meta name="theme-color" content="{{ settings.browser_theme_color }}">
+    {%- endif -%}
+
+    <link rel="canonical" href="{{ canonical_url }}">
+    <link rel="preconnect" href="https://cdn.shopify.com" crossorigin>
+
+    {%- comment -%} ---------- Favicons ---------- {%- endcomment -%}
+    {%- if settings.favicon != blank -%}
+      <link rel="icon" type="image/png" href="{{ settings.favicon | image_url: width: 32, height: 32 }}">
+      <link rel="apple-touch-icon" href="{{ settings.favicon | image_url: width: 180, height: 180 }}">
+    {%- endif -%}
+
+    {%- comment -%} ---------- Title & description ---------- {%- endcomment -%}
+    <title>
+      {{- page_title -}}
+      {%- if current_tags %} &ndash; {{ 'general.meta.tags' | t: tags: current_tags | join: ', ' }}{% endif -%}
+      {%- if current_page != 1 %} &ndash; {{ 'general.meta.page' | t: page: current_page }}{% endif -%}
+      {%- unless page_title contains shop.name %} &ndash; {{ shop.name }}{% endunless -%}
+    </title>
+
+    {%- if page_description -%}
+      <meta name="description" content="{{ page_description | escape }}">
+    {%- endif -%}
+
+    {%- comment -%} ---------- Pagination rel links ---------- {%- endcomment -%}
+    {%- if paginate.previous -%}
+      <link rel="prev" href="{{ paginate.previous.url }}">
+    {%- endif -%}
+    {%- if paginate.next -%}
+      <link rel="next" href="{{ paginate.next.url }}">
+    {%- endif -%}
+
+
+    {%- if shop.published_locales.size > 1 -%}
+      {%- liquid
+        assign path_without_locale = request.path
+        unless request.locale.root_url == '/'
+          assign path_without_locale = request.path | remove_first: request.locale.root_url
+        endunless
+      -%}
+      {%- for locale in shop.published_locales -%}
+        {%- liquid
+          if locale.root_url == '/'
+            assign localized_path = path_without_locale
+          else
+            assign localized_path = locale.root_url | append: path_without_locale
+          endif
+        -%}
+        <link rel="alternate" hreflang="{{ locale.iso_code }}" href="{{ request.origin }}{{ localized_path }}">
+      {%- endfor -%}
+      <link rel="alternate" hreflang="x-default" href="{{ request.origin }}{{ path_without_locale }}">
+    {%- endif -%}
+
+    {%- comment -%} ---------- Social metadata and structured data ---------- {%- endcomment -%}
+    {% render 'social-meta-tags' %}
+    {% render 'structured-data' %}
+    
+
+    {%- comment -%} ---------- Fonts ---------- {%- endcomment -%}
+    {%- liquid
+      assign body_font = settings.type_body_font
+      assign body_font_bold = body_font | font_modify: 'weight', 'bold'
+      assign body_font_italic = body_font | font_modify: 'style', 'italic'
+      assign body_font_bold_italic = body_font_bold | font_modify: 'style', 'italic'
+      assign heading_font = settings.type_header_font
+      assign heading_font_bold = heading_font | font_modify: 'weight', 'bold'
+    -%}
+
+    <link rel="preload" as="font" href="{{ body_font | font_url }}" type="font/woff2" crossorigin>
+    <link rel="preload" as="font" href="{{ heading_font | font_url }}" type="font/woff2" crossorigin>
+
+    {% style %}
+      {{ body_font | font_face: font_display: 'swap' }}
+      {{ body_font_bold | font_face: font_display: 'swap' }}
+      {{ body_font_italic | font_face: font_display: 'swap' }}
+      {{ body_font_bold_italic | font_face: font_display: 'swap' }}
+      {{ heading_font | font_face: font_display: 'swap' }}
+      {{ heading_font_bold | font_face: font_display: 'swap' }}
+    {% endstyle %}
+
+ 
+    {% render 'color-schemes' %}
+    {% render 'css-variables' %}
+
+ 
+    {% style %}
+      @layer reset, tokens, base, layout, components, utilities;
+
+      @layer tokens {
+        :root {
+          --container-max: {{ settings.page_width | default: 1440 }}px;
+          --container-gutter: {{ settings.container_gutter | default: 20 }}px;
+          --container-gutter-desktop: {{ settings.container_gutter_desktop | default: 40 }}px;
+
+          --radius-button: {{ settings.buttons_radius | default: 4 }}px;
+          --radius-input: {{ settings.inputs_radius | default: 4 }}px;
+          --radius-card: {{ settings.card_radius | default: 8 }}px;
+          --radius-media: {{ settings.media_radius | default: 0 }}px;
+          --radius-badge: {{ settings.badge_radius | default: 40 }}px;
+          --radius-drawer: {{ settings.drawer_radius | default: 0 }}px;
+
+          --duration-fast: 150ms;
+          --duration-base: 250ms;
+          --duration-slow: 450ms;
+          --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+          --ease-in-out-quart: cubic-bezier(0.76, 0, 0.24, 1);
+
+          --z-base: 0;
+          --z-sticky: 100;
+          --z-header: 200;
+          --z-backdrop: 300;
+          --z-drawer: 400;
+          --z-modal: 500;
+          --z-zoom: 600;
+          --z-toast: 700;
+          --z-skip-link: 900;
+
+          --header-height: 0px;
+          --announcement-height: 0px;
+          --scrollbar-width: 0px;
+          --viewport-height: 100vh;
+        }
+
+        @supports (height: 100dvh) {
+          :root { --viewport-height: 100dvh; }
+        }
+      }
+
+      @layer reset {
+        *,
+        *::before,
+        *::after { box-sizing: border-box; }
+
+        html {
+          font-size: 62.5%;
+          -webkit-text-size-adjust: 100%;
+          text-size-adjust: 100%;
+          scroll-behavior: smooth;
+        }
+
+        body,
+        h1, h2, h3, h4, h5, h6,
+        p, figure, blockquote, dl, dd { margin: 0; }
+
+        ul[role='list'],
+        ol[role='list'] { list-style: none; margin: 0; padding: 0; }
+
+        img, picture, video, canvas, svg {
+          display: block;
+          max-width: 100%;
+        }
+
+        img { height: auto; }
+
+        input, button, textarea, select {
+          font: inherit;
+          color: inherit;
+        }
+
+        button { background: none; border: 0; cursor: pointer; }
+
+        a { color: inherit; }
+
+        summary { cursor: pointer; list-style: none; }
+        summary::-webkit-details-marker { display: none; }
+
+        :focus-visible {
+          outline: 2px solid var(--color-link, currentColor);
+          outline-offset: 3px;
+          border-radius: 2px;
+        }
+
+        :focus:not(:focus-visible) { outline: none; }
+
+        /* Lenis structural requirements. Without these the library cannot
+           take over the document scroller. */
+        html.lenis,
+        html.lenis body { height: auto; }
+
+        .lenis.lenis-smooth { scroll-behavior: auto !important; }
+        .lenis.lenis-smooth [data-lenis-prevent] { overscroll-behavior: contain; }
+        .lenis.lenis-stopped { overflow: hidden; }
+        .lenis.lenis-smooth iframe { pointer-events: none; }
+
+        @media (prefers-reduced-motion: reduce) {
+          html { scroll-behavior: auto; }
+          *,
+          *::before,
+          *::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+            scroll-behavior: auto !important;
+          }
+        }
+      }
+
+      @layer base {
+        body {
+          margin: 0;
+          min-height: var(--viewport-height);
+          display: flex;
+          flex-direction: column;
+          font-family: var(--font-body-family);
+          font-style: var(--font-body-style);
+          font-weight: var(--font-body-weight);
+          font-size: var(--font-size-base);
+          line-height: 1.6;
+          color: var(--color-text);
+          background-color: var(--color-background);
+          background-image: var(--gradient-background);
+          -webkit-font-smoothing: antialiased;
+          overflow-wrap: break-word;
+        }
+
+        /* Custom elements are inline by default, which would collapse any
+           layout wrapper built on one. */
+        motion-effect,
+        smooth-scrollbar,
+        page-transition { display: block; }
+
+        smooth-scrollbar[data-disabled] { display: none; }
+        motion-effect[data-effect='marquee'] { overflow: hidden; }
+
+        /* Accordion groups that only collapse below a breakpoint. Above it the
+           summary is decoration: no marker, no pointer, no hover affordance. */
+        accordion-element[data-static] summary,
+        summary[data-static] {
+          cursor: default;
+          pointer-events: none;
+          list-style: none;
+        }
+
+        accordion-element[data-static] summary::-webkit-details-marker,
+        summary[data-static]::-webkit-details-marker { display: none; }
+
+        accordion-element[data-static] .footer__summary-icon { display: none; }
+
+        /* Responsive image boxes. The ratio is reserved before the image loads,
+           and art-directed images can change shape at the breakpoint without the
+           box jumping when the source swaps. */
+        responsive-image {
+          display: block;
+          position: relative;
+          aspect-ratio: var(--aspect-ratio, 1);
+          overflow: hidden;
+        }
+
+        responsive-image__picture,
+        responsive-image .responsive-image__picture { display: contents; }
+
+        responsive-image img {
+          inline-size: 100%;
+          block-size: 100%;
+          object-fit: cover;
+          opacity: 0;
+          transition: opacity var(--duration-base) var(--ease-out-expo);
+        }
+
+        responsive-image[data-loaded] img,
+        html.no-js responsive-image img { opacity: 1; }
+
+        @media screen and (max-width: 767px) {
+          responsive-image { aspect-ratio: var(--aspect-ratio-mobile, var(--aspect-ratio, 1)); }
+        }
+
+        h1, h2, h3, h4, h5, h6 {
+          font-family: var(--font-heading-family);
+          font-style: var(--font-heading-style);
+          font-weight: var(--font-heading-weight);
+          color: var(--color-heading);
+          line-height: 1.2;
+          text-wrap: balance;
+        }
+      }
+
+      @layer layout {
+        .layout__main {
+          flex: 1 0 auto;
+          display: block;
+        }
+
+        .container {
+          width: 100%;
+          max-width: var(--container-max);
+          margin-inline: auto;
+          padding-inline: var(--container-gutter);
+        }
+
+        @media screen and (min-width: 990px) {
+          .container { padding-inline: var(--container-gutter-desktop); }
+        }
+
+        /* Section and block spacing.
+           Values arrive as custom properties from snippets/spacing.liquid. The
+           media query reads a different property rather than a different rule,
+           so one inline style drives both breakpoints. */
+        [data-section-spacing] {
+          padding-block-start: var(--section-padding-block-start, 0px);
+          padding-block-end: var(--section-padding-block-end, 0px);
+        }
+
+        [data-block-spacing] {
+          padding-block-start: var(--block-padding-block-start, 0px);
+          padding-inline-end: var(--block-padding-inline-end, 0px);
+          padding-block-end: var(--block-padding-block-end, 0px);
+          padding-inline-start: var(--block-padding-inline-start, 0px);
+        }
+
+        @media screen and (max-width: 749px) {
+          [data-section-spacing] {
+            padding-block-start: var(--section-padding-block-start-mobile, var(--section-padding-block-start, 0px));
+            padding-block-end: var(--section-padding-block-end-mobile, var(--section-padding-block-end, 0px));
+          }
+
+          [data-block-spacing] {
+            padding-block-start: calc(var(--block-padding-block-start, 0px) * var(--block-padding-scale-mobile, 0.75));
+            padding-inline-end: calc(var(--block-padding-inline-end, 0px) * var(--block-padding-scale-mobile, 0.75));
+            padding-block-end: calc(var(--block-padding-block-end, 0px) * var(--block-padding-scale-mobile, 0.75));
+            padding-inline-start: calc(var(--block-padding-inline-start, 0px) * var(--block-padding-scale-mobile, 0.75));
+          }
+        }
+      }
+
+      @layer components {
+        .skip-to-content-link {
+          position: absolute;
+          inset-block-start: 0;
+          inset-inline-start: 0;
+          z-index: var(--z-skip-link);
+          display: inline-block;
+          padding: 1.2rem 2rem;
+          background-color: var(--color-primary-button-background);
+          color: var(--color-primary-button-text);
+          text-decoration: none;
+          transform: translateY(-101%);
+        }
+
+        .skip-to-content-link:focus {
+          transform: translateY(0);
+        }
+
+        .media-loader {
+          position: absolute;
+          inset: 0;
+          background-color: rgba(var(--color-text-rgb, 0 0 0) / 0.04);
+          pointer-events: none;
+          opacity: 1;
+          transition: opacity var(--duration-base) var(--ease-out-expo);
+        }
+      }
+
+      @layer utilities {
+        .visually-hidden {
+          position: absolute !important;
+          width: 1px;
+          height: 1px;
+          padding: 0;
+          margin: -1px;
+          overflow: hidden;
+          clip: rect(0 0 0 0);
+          clip-path: inset(50%);
+          white-space: nowrap;
+          border: 0;
+        }
+
+        .visually-hidden:focus-within,
+        .visually-hidden.is-revealed {
+          position: static !important;
+          width: auto;
+          height: auto;
+          margin: 0;
+          overflow: visible;
+          clip: auto;
+          clip-path: none;
+          white-space: normal;
+        }
+
+        html.no-js .no-js-hidden { display: none !important; }
+        html:not(.no-js) .js-hidden { display: none !important; }
+        [hidden] { display: none !important; }
+      }
+    {% endstyle %}
+
+    {{ 'base.css' | asset_url | stylesheet_tag: preload: true }}
+
+
+    {%- comment -%}
+      ---------- ES module importmap ----------
+      Exactly one importmap per document, declared before any module script.
+      Mapping is resolution only — nothing is fetched until it is imported.
+    {%- endcomment -%}
+    <script type="importmap">
+      {
+        "imports": {
+          "@theme/component":                "{{ 'component.js' | asset_url }}",
+          "@theme/shadow-component":         "{{ 'shadow-component.js' | asset_url }}",
+          "@theme/utilities":                "{{ 'utilities.js' | asset_url }}",
+          "@theme/events":                   "{{ 'events.js' | asset_url }}",
+          "@theme/morph":                    "{{ 'morph.js' | asset_url }}",
+          "@theme/section-renderer":         "{{ 'section-renderer.js' | asset_url }}",
+
+       "@theme/facet-dropdown": "{{ 'facet-dropdown.js' | asset_url }}",
+        "@theme/carousel-pagination": "{{ 'carousel-pagination.js' | asset_url }}",
+        "@theme/collection-tabs": "{{ 'collection-tabs.js' | asset_url }}",
+        "@theme/announcement-bar": "{{ 'announcement-bar.js' | asset_url }}",
+
+          "@theme/dialog":                   "{{ 'dialog.js' | asset_url }}",
+          "@theme/toast":                    "{{ 'toast.js' | asset_url }}",
+          "@theme/modules":                  "{{ 'modules.js' | asset_url }}",
+          "@theme/form-validation":          "{{ 'form-validation.js' | asset_url }}",
+          "@theme/motion-engine":            "{{ 'motion-engine.js' | asset_url }}",
+          "@theme/motion-effect":            "{{ 'motion-effect.js' | asset_url }}",
+          "@theme/scrollbar":                "{{ 'scrollbar.js' | asset_url }}",
+          "@theme/lenis":                    "{{ 'lenis.js' | asset_url }}",
+          "@theme/page-transition":          "{{ 'page-transition.js' | asset_url }}",
+
+          "@theme/search":                   "{{ 'search.js' | asset_url }}",
+          "@theme/results-list":             "{{ 'results-list.js' | asset_url }}",
+          "@theme/localization":             "{{ 'localization.js' | asset_url }}",
+          "@theme/facets":                   "{{ 'facets.js' | asset_url }}",
+
+          "@theme/cart-drawer":              "{{ 'cart-drawer.js' | asset_url }}",
+          "@theme/cart-items":               "{{ 'cart-items.js' | asset_url }}",
+          "@theme/promo-code":            "{{ 'promo-code.js' | asset_url }}",
+          "@theme/cart-selling-plans":       "{{ 'cart-selling-plans.js' | asset_url }}",
+          "@theme/cart-shipping":            "{{ 'cart-shipping.js' | asset_url }}",
+          "@theme/free-shipping-bar":        "{{ 'free-shipping-bar.js' | asset_url }}",
+
+          "@theme/product-form":             "{{ 'product-form.js' | asset_url }}",
+          "@theme/sticky-add-to-cart":       "{{ 'sticky-add-to-cart.js' | asset_url }}",
+        "@theme/bundle-builder": "{{ 'bundle-builder.js' | asset_url }}",
+          "@theme/variant-picker":           "{{ 'variant-picker.js' | asset_url }}",
+          "@theme/variant-swatch":           "{{ 'variant-swatch.js' | asset_url }}",
+        "@theme/back-in-stock": "{{ 'back-in-stock.js' | asset_url }}",
+          "@theme/product-selling-plans":    "{{ 'product-selling-plans.js' | asset_url }}",
+          "@theme/quantity-selector":        "{{ 'quantity-selector.js' | asset_url }}",
+          "@theme/product-recommendations":  "{{ 'product-recommendations.js' | asset_url }}",
+          "@theme/gift-card-recipient-form": "{{ 'gift-card-recipient-form.js' | asset_url }}",
+          "@theme/carousel":                 "{{ 'carousel.js' | asset_url }}",
+          "@theme/media-gallery":            "{{ 'media-gallery.js' | asset_url }}",
+          "@theme/media-coordinator":        "{{ 'media-coordinator.js' | asset_url }}",
+          "@theme/media-zoom":               "{{ 'media-zoom.js' | asset_url }}",
+
+          "@theme/customer-addresses":       "{{ 'customer-addresses.js' | asset_url }}",
+          "@theme/customer-orders":          "{{ 'customer-orders.js' | asset_url }}",
+
+          "@theme/compare":                  "{{ 'compare.js' | asset_url }}",
+          "@theme/recently-viewed":          "{{ 'recently-viewed.js' | asset_url }}",
+          "@theme/promo-popup":              "{{ 'promo-popup.js' | asset_url }}",
+          "@theme/store-locator":            "{{ 'store-locator.js' | asset_url }}"
+        }
+      }
+    </script>
+
+    {%- comment -%}
+      ---------- Runtime contract ----------
+      The single permitted global. Mutable by design: sections extend
+      Theme.settings and Theme.strings at render time, and cart modules cache
+      state on it during a navigation. Never frozen.
+    {%- endcomment -%}
+    <script>
+      document.documentElement.classList.remove('no-js');
+      document.documentElement.classList.add('js');
+
+      window.Theme = window.Theme || {};
+
+      window.Theme.routes = {
+        root: {{ routes.root_url | json }},
+        account: {{ routes.account_url | json }},
+        accountLogin: {{ routes.account_login_url | json }},
+        accountLogout: {{ routes.account_logout_url | json }},
+        accountRegister: {{ routes.account_register_url | json }},
+        accountAddresses: {{ routes.account_addresses_url | json }},
+        cart: {{ routes.cart_url | json }},
+        cartAdd: {{ routes.cart_add_url | json }},
+        cartChange: {{ routes.cart_change_url | json }},
+        cartUpdate: {{ routes.cart_update_url | json }},
+        cartClear: {{ routes.cart_clear_url | json }},
+        collections: {{ routes.collections_url | json }},
+        allProducts: {{ routes.all_products_collection_url | json }},
+        search: {{ routes.search_url | json }},
+        predictiveSearch: {{ routes.predictive_search_url | json }},
+        productRecommendations: {{ routes.product_recommendations_url | json }}
+      };
+
+      window.Theme.shop = {
+        id: {{ shop.id | json }},
+        domain: {{ shop.permanent_domain | json }},
+        name: {{ shop.name | json }},
+        moneyFormat: {{ shop.money_format | json }},
+        moneyWithCurrencyFormat: {{ shop.money_with_currency_format | json }},
+        currency: {{ cart.currency.iso_code | json }},
+        locale: {{ request.locale.iso_code | json }},
+        direction: {{ text_direction | json }},
+        cartCount: {{ cart.item_count | json }}
+      };
+
+      window.Theme.template = {
+        name: {{ template.name | json }},
+        suffix: {{ template.suffix | json }},
+        pageType: {{ request.page_type | json }},
+        designMode: {{ request.design_mode | json }}
+      };
+
+      window.Theme.settings = {
+        cartType: {{ settings.cart_type | default: 'drawer' | json }},
+        smoothScroll: {{ use_smooth_scroll | json }},
+        pageTransitions: {{ use_page_transitions | json }},
+        predictiveSearch: {{ settings.predictive_search_enabled | default: true | json }},
+        predictiveSearchProducts: {{ settings.predictive_search_show_products | default: true | json }},
+        predictiveSearchCollections: {{ settings.predictive_search_show_collections | default: true | json }},
+        predictiveSearchArticles: {{ settings.predictive_search_show_articles | default: false | json }},
+        predictiveSearchPages: {{ settings.predictive_search_show_pages | default: false | json }},
+        predictiveSearchLimit: {{ settings.predictive_search_results_limit | default: 6 | json }},
+        facetsLayout: {{ settings.facets_layout | default: 'sidebar' | json }},
+        paginationType: {{ settings.pagination_type | default: 'load-more' | json }},
+        quickView: {{ settings.enable_quick_view | default: true | json }},
+        compare: {{ settings.enable_compare | default: false | json }},
+        recentlyViewed: {{ settings.enable_recently_viewed | default: true | json }},
+        freeShippingEnabled: {{ settings.free_shipping_enabled | default: false | json }},
+        freeShippingThreshold: {{ settings.free_shipping_threshold | default: 0 | times: 100 | json }},
+        showVendor: {{ settings.show_vendor | default: false | json }},
+        swatchTrigger: {{ settings.swatch_trigger | default: 'click' | json }},
+        preorderEnabled: {{ settings.enable_preorder | default: false | json }},
+        filterImages: {{ settings.enable_filter_images | default: false | json }},
+        filterImagesStrict: {{ settings.filter_images_strict | default: false | json }}
+      };
+
+      window.Theme.strings = {
+        addToCart: {{ 'products.product.add_to_cart' | t | json }},
+        soldOut: {{ 'products.product.sold_out' | t | json }},
+        unavailable: {{ 'products.product.unavailable' | t | json }},
+        unavailableWithOption: {{ 'products.product.value_unavailable' | t: option_value: '[value]' | json }},
+        preorder: {{ 'products.product.preorder' | t | json }},
+        variantSelected: {{ 'products.variants.selected_announcement' | t: variant: '[variant]' | json }},
+        swatchSelected: {{ 'accessibility.swatch_selected' | t: value: '[value]' | json }},
+        swatchesMore: {{ 'products.variants.show_more_swatches' | t: count: '[count]' | json }},
+        inStock: {{ 'products.inventory.in_stock' | t | json }},
+        backordered: {{ 'products.inventory.backordered' | t | json }},
+        lowStockCount: {{ 'products.inventory.low_stock_count' | t: count: '[count]' | json }},
+        oneTimePurchase: {{ 'products.selling_plans.one_time_summary' | t | json }},
+        backInStockBody: {{ 'products.back_in_stock.body' | t: product: '[product]', variant: '[variant]' | json }},
+        backInStockSuccess: {{ 'products.back_in_stock.success' | t | json }},
+        backInStockError: {{ 'products.back_in_stock.error' | t | json }},
+        giftCardSending: {{ 'gift_cards.recipient.sending' | t | json }},
+        giftCardSelf: {{ 'gift_cards.recipient.self' | t | json }},
+        giftCardCharacters: {{ 'gift_cards.recipient.characters_left' | t: max: '[max]' | json }},
+        giftCardEmailRequired: {{ 'gift_cards.recipient.email_required' | t | json }},
+        shareCopied: {{ 'general.share.copied' | t | json }},
+        shareLink: {{ 'general.share.link' | t | json }},
+        shareCopyManually: {{ 'general.share.copy_manually' | t | json }},
+        formRequired: {{ 'general.forms.required' | t: field: '[field]' | json }},
+        formEmail: {{ 'general.forms.email' | t | json }},
+        formPhone: {{ 'general.forms.phone' | t | json }},
+        formUrl: {{ 'general.forms.url' | t | json }},
+        formTooShort: {{ 'general.forms.too_short' | t: min: '[min]' | json }},
+        formTooLong: {{ 'general.forms.too_long' | t: max: '[max]' | json }},
+        formMin: {{ 'general.forms.min' | t: min: '[min]' | json }},
+        formMax: {{ 'general.forms.max' | t: max: '[max]' | json }},
+        formPattern: {{ 'general.forms.pattern' | t | json }},
+        formInvalid: {{ 'general.forms.invalid' | t | json }},
+        formError: {{ 'general.forms.error_summary' | t | json }},
+        viewGrid: {{ 'collections.view.grid_selected' | t | json }},
+        viewList: {{ 'collections.view.list_selected' | t | json }},
+        addedToCart: {{ 'cart.general.added_to_cart' | t | json }},
+        viewCart: {{ 'cart.general.view_cart' | t | json }},
+        freeGiftEarned: {{ 'cart.free_gift.earned' | t | json }},
+        freeGiftRemaining: {{ 'cart.free_gift.remaining_html' | t: amount: '[amount]' | json }},
+        freeGiftClaimed: {{ 'cart.free_gift.claimed' | t | json }},
+        bundleFull: {{ 'products.bundle.full' | t: count: '[count]' | json }},
+        bundleAdd: {{ 'products.bundle.add' | t | json }},
+        bundleRemove: {{ 'products.bundle.remove' | t | json }},
+        bundleAdded: {{ 'products.bundle.added' | t: product: '[product]', count: '[count]', total: '[total]' | json }},
+        bundleRemoved: {{ 'products.bundle.removed' | t: product: '[product]' | json }},
+        bundleRemoveLabel: {{ 'products.bundle.remove_label' | t: product: '[product]', index: '[index]' | json }},
+        bundleAddedToCart: {{ 'products.bundle.added_to_cart' | t | json }},
+        bundleIncomplete: {{ 'products.bundle.incomplete' | t: count: '[count]' | json }},
+        bundleStart: {{ 'products.bundle.start_html' | t: count: '[count]' | json }},
+        bundleSavedWithPercent: {{ 'products.bundle.saved_with_percent' | t: amount: '[amount]', percent: '[percent]' | json }},
+        bundleProperty: {{ 'products.bundle.property_name' | t | json }},
+        discountFailed: {{ 'cart.promo.failed' | t | json }},
+        bundleProgress: {{ 'products.bundle.progress_html' | t: count: '[count]', percent: '[percent]' | json }},
+        bundleUnlocked: {{ 'products.bundle.tier_unlocked_html' | t: percent: '[percent]' | json }},
+        bundleSaved: {{ 'products.bundle.total_saved' | t: amount: '[amount]' | json }},
+        bundleSlotEmpty: {{ 'products.bundle.slot_empty' | t: index: '[index]' | json }},
+        bundleSlotFilled: {{ 'products.bundle.slot_filled' | t: index: '[index]', product: '[product]' | json }},
+        quantityError: {{ 'products.product.quantity_error_html' | t: quantity: '[quantity]' | json }},
+        quantityMinimum: {{ 'products.product.quantity_minimum_html' | t: quantity: '[quantity]' | json }},
+        quantityMaximum: {{ 'products.product.quantity_maximum_html' | t: quantity: '[quantity]' | json }},
+        cartError: {{ 'cart.errors.general' | t | json }},
+        cartQuantityError: {{ 'cart.errors.quantity_html' | t: quantity: '[quantity]' | json }},
+        itemAdded: {{ 'cart.notifications.item_added' | t | json }},
+        itemRemoved: {{ 'cart.notifications.item_removed' | t | json }},
+        cartUpdated: {{ 'cart.notifications.cart_updated' | t | json }},
+        planUpdated: {{ 'cart.notifications.plan_updated' | t | json }},
+        noteSaved: {{ 'cart.note.saved' | t | json }},
+        giftWrapAdded: {{ 'cart.gift_wrap.added' | t | json }},
+        giftWrapRemoved: {{ 'cart.gift_wrap.removed' | t | json }},
+        discountCheckoutNotice: {{ 'cart.discount.checkout_notice' | t | json }},
+        discountRemove: {{ 'cart.promo.remove' | t: code: '[code]' | json }},
+        discountSavingHtml: {{ 'cart.discount.savings_html' | t: amount: '[amount]' | json }},
+        shippingError: {{ 'cart.shipping_calculator.error' | t | json }},
+        shippingNoRates: {{ 'cart.shipping_calculator.no_rates' | t | json }},
+        shippingRatesFound: {{ 'cart.shipping_calculator.rates_found_html' | t: count: '[count]', address: '[address]' | json }},
+        discountApplied: {{ 'cart.promo.applied' | t | json }},
+        discountInvalid: {{ 'cart.discount.invalid' | t | json }},
+        freeShippingRemaining: {{ 'cart.free_shipping.remaining_html' | t: amount: '[amount]' | json }},
+        freeShippingUnlocked: {{ 'cart.free_shipping.unlocked' | t | json }},
+        searchNoResults: {{ 'search.no_results' | t | json }},
+        searchResultsAvailable: {{ 'search.predictive.results_available' | t | json }},
+        localizationNoResults: {{ 'localization.no_country_results' | t | json }},
+        searchResultsCount: {{ 'search.results_count' | t: count: '[count]' | json }},
+        filtersActive: {{ 'products.facets.active_count' | t: count: '[count]' | json }},
+        facetsNoResults: {{ 'products.facets.no_results' | t | json }},
+        facetsPriceRange: {{ 'products.facets.price_range_html' | t: min: '[min]', max: '[max]' | json }},
+        facetsSortedBy: {{ 'products.facets.sorted_by_html' | t: sort: '[sort]' | json }},
+        paginationShowing: {{ 'general.pagination.showing_count' | t: shown: '[shown]', total: '[total]' | json }},
+        loading: {{ 'accessibility.loading' | t | json }},
+        close: {{ 'accessibility.close' | t | json }},
+        carouselPosition: {{ 'accessibility.of_count' | t: index: '[index]', count: '[count]' | json }},
+        mediaPosition: {{ 'accessibility.of_count' | t: index: '[index]', count: '[count]' | json }},
+        zoomLevel: {{ 'accessibility.zoom_level' | t: level: '[level]' | json }},
+        copied: {{ 'general.share.copied' | t | json }},
+        backToTop: {{ 'general.actions.back_to_top' | t | json }},
+        networkError: {{ 'general.errors.network' | t | json }},
+        faqResults: {{ 'sections.faq.results' | t: count: '[count]' | json }},
+        storesFound: {{ 'sections.store_locator.found' | t: count: '[count]' | json }},
+        storesNoResults: {{ 'sections.store_locator.no_results' | t | json }},
+        storesLocationDenied: {{ 'sections.store_locator.location_denied' | t | json }},
+        storesLocationUnavailable: {{ 'sections.store_locator.location_unavailable' | t | json }},
+        storeSelected: {{ 'sections.store_locator.selected' | t: name: '[name]' | json }},
+        storeDistance: {{ 'sections.store_locator.distance' | t: distance: '[distance]', unit: '[unit]' | json }},
+        storeMapTitle: {{ 'sections.store_locator.store_map_title' | t: name: '[name]' | json }},
+        compareLimit: {{ 'compare.limit_reached' | t: count: '[count]' | json }},
+        compareAdded: {{ 'compare.added' | t | json }},
+        compareRemoved: {{ 'compare.removed' | t | json }},
+        compareAddLabel: {{ 'compare.add_label' | t | json }},
+        compareRemoveLabel: {{ 'compare.remove_label' | t | json }},
+        compareTriggerCount: {{ 'products.compare.trigger_count' | t: count: '[count]' | json }},
+        subscriptionSave: {{ 'products.selling_plans.save_percent' | t: percent: '[percent]' | json }},
+        subscriptionUnavailable: {{ 'products.selling_plans.unavailable' | t | json }},
+        giftCardDatePast: {{ 'gift_cards.recipient.date_past' | t | json }},
+        ordersShowing: {{ 'customer.orders.showing_on_page' | t: shown: '[shown]', total: '[total]' | json }},
+        reorderSuccess: {{ 'customer.orders.reorder_success' | t | json }},
+        reorderPartial: {{ 'customer.orders.reorder_partial' | t | json }},
+        reorderFailed: {{ 'customer.orders.reorder_failed' | t | json }},
+        addressDeleteConfirm: {{ 'customer.addresses.delete_confirm_named' | t: address: '[address]' | json }}
+      };
+
+      window.Theme.storageKey = 'boost10:{{ shop.permanent_domain }}';
+    </script>
+
+    {%- comment -%}
+      ---------- Conditional modulepreload ----------
+      Sections import what they need; these hints only parallelise the fetch
+      so module resolution does not wait for section HTML to parse.
+    {%- endcomment -%}
+    <link rel="modulepreload" href="{{ 'global.js' | asset_url }}">
+    <link rel="modulepreload" href="{{ 'component.js' | asset_url }}">
+    <link rel="modulepreload" href="{{ 'utilities.js' | asset_url }}">
+    <link rel="modulepreload" href="{{ 'events.js' | asset_url }}">
+
+    {%- if use_smooth_scroll -%}
+      <link rel="modulepreload" href="{{ 'scrollbar.js' | asset_url }}">
+      <link rel="modulepreload" href="{{ 'lenis.js' | asset_url }}">
+    {%- endif -%}
+
+    {%- if use_cart_drawer -%}
+      <link rel="modulepreload" href="{{ 'cart-drawer.js' | asset_url }}">
+    {%- endif -%}
+
+    {%- case template.name -%}
+      {%- when 'product' -%}
+        <link rel="modulepreload" href="{{ 'product-form.js' | asset_url }}">
+        <link rel="modulepreload" href="{{ 'variant-picker.js' | asset_url }}">
+        <link rel="modulepreload" href="{{ 'media-gallery.js' | asset_url }}">
+        <link rel="modulepreload" href="{{ 'media-coordinator.js' | asset_url }}">
+      {%- when 'collection', 'search' -%}
+        <link rel="modulepreload" href="{{ 'facets.js' | asset_url }}">
+      {%- when 'cart' -%}
+        <link rel="modulepreload" href="{{ 'cart-items.js' | asset_url }}">
+        <link rel="modulepreload" href="{{ 'quantity-selector.js' | asset_url }}">
+      {%- when 'customers/account', 'customers/order' -%}
+        <link rel="modulepreload" href="{{ 'customer-orders.js' | asset_url }}">
+      {%- when 'customers/addresses' -%}
+        <link rel="modulepreload" href="{{ 'customer-addresses.js' | asset_url }}">
+    {%- endcase -%}
+
+    <script type="module" src="{{ 'global.js' | asset_url }}"></script>
+
+    {{ content_for_header }}
+
+    {%- comment -%}
+      ---------- Merchant custom CSS ----------
+      Deliberately UNLAYERED. Unlayered styles outrank every layered style, so
+      merchant overrides always win without needing !important.
+    {%- endcomment -%}
+    {%- if settings.custom_css != blank -%}
+      {% style %}
+        {{ settings.custom_css }}
+      {% endstyle %}
+    {%- endif -%}
+  </head>
+
+  <body class="{{ body_classes }}">
+    {% render 'skip-to-content' %}
+
+    {%- if use_smooth_scroll -%}
+      <smooth-scrollbar
+        data-lerp="{{ settings.smooth_scroll_lerp | default: 8 | divided_by: 100.0 }}"
+        data-wheel-multiplier="{{ settings.smooth_scroll_wheel_multiplier | default: 10 | divided_by: 10.0 }}"
+        data-touch-multiplier="{{ settings.smooth_scroll_touch_multiplier | default: 15 | divided_by: 10.0 }}"
+      ></smooth-scrollbar>
+    {%- endif -%}
+
+    {%- if use_page_transitions -%}
+      <page-transition
+        data-mode="{{ settings.page_transition_style | default: 'fade' }}"
+        aria-hidden="true"
+      ></page-transition>
+    {%- endif -%}
+
+    {% sections 'header-group' %}
+
+    <main
+      id="MainContent"
+      class="layout__main"
+      role="main"
+      tabindex="-1"
+      data-page-type="{{ request.page_type }}"
+    >
+      {{ content_for_layout }}
+    </main>
+
+    {% sections 'footer-group' %}
+
+    {% sections 'overlay-group' %}
+
+    {% render 'scroll-to-top' %}
+
+    {% render 'live-region' %}
+
+    {%- comment -%}
+      Country / province data required by <customer-address-form>. Loaded only
+      where an address form can exist, and only as data — no behaviour.
+    {%- endcomment -%}
+    {%- if request.page_type == 'customers/addresses' -%}
+      <script src="{{ 'country_option_tags.liquid' | shopify_asset_url }}" defer></script>
+    {%- endif -%}
+  </body>
+</html>

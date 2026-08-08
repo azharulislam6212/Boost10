@@ -1,0 +1,113 @@
+{% comment %}
+  blocks/store-location.liquid
+
+  One shop.
+
+  Open or closed is deliberately **not** computed. Doing it properly means the
+  store's timezone, public holidays, half-day closures and the customer's own
+  clock; doing it badly sends someone across a city to a locked door. The block
+  shows the hours the merchant wrote and lets the customer read them, which is
+  both honest and what they would check anyway. A merchant who wants a badge can
+  set the status manually and change it when it changes.
+
+  Coordinates are optional. Without them the store still lists, searches and
+  links to directions — it just cannot be sorted by distance, which is better
+  than being dropped.
+{% endcomment %}
+
+{%- liquid
+  assign query = block.settings.map_query
+  if query == blank
+    assign query = block.settings.address | strip_newlines
+  endif
+-%}
+
+<li
+  class="store-card"
+  data-store
+  data-name="{{ block.settings.name | escape }}"
+  data-address="{{ block.settings.address | strip_newlines | escape }}"
+  data-query="{{ query | escape }}"
+  {% if block.settings.latitude != blank %}data-latitude="{{ block.settings.latitude }}"{% endif %}
+  {% if block.settings.longitude != blank %}data-longitude="{{ block.settings.longitude }}"{% endif %}
+  {{ block.shopify_attributes }}
+>
+  <div class="store-card__head">
+    <h3 class="store-card__name">{{ block.settings.name }}</h3>
+
+    {%- if block.settings.status != 'none' -%}
+      <span class="store-card__status" data-status="{{ block.settings.status }}">
+        {%- if block.settings.status == 'open' -%}
+          {{ 'sections.store_locator.open' | t }}
+        {%- else -%}
+          {{ 'sections.store_locator.closed' | t }}
+        {%- endif -%}
+      </span>
+    {%- endif -%}
+  </div>
+
+  <p class="store-card__distance" data-store-distance hidden></p>
+
+  {%- if block.settings.address != blank -%}
+    <address class="store-card__address">{{ block.settings.address | newline_to_br }}</address>
+  {%- endif -%}
+
+  {%- if block.settings.hours != blank -%}
+    <div class="store-card__hours rte">{{ block.settings.hours }}</div>
+  {%- endif -%}
+
+  <div class="store-card__actions">
+    <button type="button" class="button button--secondary button--small" data-store-select aria-pressed="false">
+      {{ 'sections.store_locator.show_on_map' | t }}
+    </button>
+
+    {%- if query != blank -%}
+      {%- comment -%}
+        A plain maps URL rather than an SDK call: it opens the app the customer
+        already uses, works with no key, and is one link rather than a dependency.
+      {%- endcomment -%}
+      <a
+        class="button button--link button--small"
+        href="https://www.google.com/maps/dir/?api=1&destination={{ query | url_encode }}"
+        target="_blank"
+        rel="noopener"
+      >
+        {{ 'sections.store_locator.directions' | t }}
+        <span class="visually-hidden">{{ 'accessibility.new_window' | t }}</span>
+      </a>
+    {%- endif -%}
+
+    {%- if block.settings.phone != blank -%}
+      <a class="button button--link button--small" href="tel:{{ block.settings.phone | remove: ' ' }}">
+        {{ block.settings.phone }}
+      </a>
+    {%- endif -%}
+  </div>
+</li>
+
+{% schema %}
+{
+  "name": "t:blocks.store_location.name",
+  "tag": null,
+  "settings": [
+    { "type": "text", "id": "name", "label": "t:blocks.store_location.settings.name.label", "default": "Flagship store" },
+    { "type": "textarea", "id": "address", "label": "t:blocks.store_location.settings.address.label" },
+    { "type": "richtext", "id": "hours", "label": "t:blocks.store_location.settings.hours.label", "info": "t:blocks.store_location.settings.hours.info" },
+    { "type": "text", "id": "phone", "label": "t:blocks.store_location.settings.phone.label" },
+    {
+      "type": "select", "id": "status", "label": "t:blocks.store_location.settings.status.label", "info": "t:blocks.store_location.settings.status.info",
+      "options": [
+        { "value": "none", "label": "t:blocks.store_location.settings.status.options__1.label" },
+        { "value": "open", "label": "t:blocks.store_location.settings.status.options__2.label" },
+        { "value": "closed", "label": "t:blocks.store_location.settings.status.options__3.label" }
+      ],
+      "default": "none"
+    },
+    { "type": "header", "content": "t:blocks.store_location.headers.location" },
+    { "type": "text", "id": "map_query", "label": "t:blocks.store_location.settings.map_query.label", "info": "t:blocks.store_location.settings.map_query.info" },
+    { "type": "text", "id": "latitude", "label": "t:blocks.store_location.settings.latitude.label", "info": "t:blocks.store_location.settings.latitude.info" },
+    { "type": "text", "id": "longitude", "label": "t:blocks.store_location.settings.longitude.label" }
+  ],
+  "presets": [{ "name": "t:blocks.store_location.name" }]
+}
+{% endschema %}

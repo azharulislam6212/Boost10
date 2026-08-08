@@ -1,0 +1,106 @@
+{% comment %}
+  sections/testimonials.liquid
+
+  Customer quotes, as a grid or a carousel.
+
+  ## What changed in Phase 3
+
+  Same duplication as the other two: a carousel branch carrying the arrows, the
+  pause button and the live region, and a grid branch carrying none of them.
+
+  The pause button matters here more than anywhere else in the theme. Autoplay
+  is genuinely useful for testimonials and merchants switch it on, and moving
+  content that cannot be stopped is a WCAG 2.2.2 failure. In the old markup the
+  control existed only in one branch; the shell renders it whenever autoplay is
+  available, so it cannot go missing by choosing the other layout.
+{% endcomment %}
+
+<div
+  class="testimonials color-{{ section.settings.color_scheme }}"
+  {% render 'spacing', section: section.settings %}
+>
+  <div class="container">
+    {%- if section.settings.heading != blank -%}
+      <div class="testimonials__header testimonials__header--{{ section.settings.alignment }}">
+        <h2 class="testimonials__heading">{{ section.settings.heading | escape }}</h2>
+      </div>
+    {%- endif -%}
+
+    {%- capture children -%}
+      {% content_for 'blocks' %}
+    {%- endcapture -%}
+
+    {% render 'carousel-shell',
+       children: children,
+       layout: section.settings.layout,
+       layout_mobile: section.settings.layout_mobile,
+       tag: 'div',
+       label: 'sections.testimonials.carousel_label' | t,
+       classes: 'testimonials__carousel',
+       track_classes: 'testimonials__grid',
+       columns_desktop: section.settings.columns_desktop,
+       columns_tablet: section.settings.columns_tablet,
+       columns_mobile: section.settings.columns_mobile,
+       settings: section.settings %}
+  </div>
+</div>
+
+
+{% schema %}
+{
+  "name": "t:sections.testimonials.name",
+  "tag": "section",
+  "class": "section",
+  "blocks": [{ "type": "@theme" }, { "type": "@app" }],
+  "settings": [
+    { "type": "text", "id": "heading", "label": "t:shared.heading.label", "default": "What customers say" },
+    { "type": "range", "id": "columns_desktop", "label": "t:shared.columns.desktop.label", "min": 1, "max": 4, "step": 1, "default": 3 },
+    {
+      "type": "select", "id": "layout", "label": "t:sections.featured_collection.settings.layout.label",
+      "options": [
+        { "value": "grid", "label": "t:sections.featured_collection.settings.layout.options__1.label" },
+        { "value": "carousel", "label": "t:sections.featured_collection.settings.layout.options__2.label" }
+      ],
+      "default": "grid"
+    },
+    { "type": "checkbox", "id": "autoplay", "label": "t:sections.announcement_bar.settings.autoplay.label", "info": "t:sections.testimonials.settings.autoplay.info", "default": false },
+    { "type": "range", "id": "autoplay_speed", "label": "t:sections.announcement_bar.settings.autoplay_speed.label", "min": 4, "max": 15, "step": 1, "unit": "s", "default": 7 },
+    {
+      "type": "select", "id": "alignment", "label": "t:blocks.group.settings.alignment.label",
+      "options": [
+        { "value": "start", "label": "t:blocks.group.settings.alignment.options__1.label" },
+        { "value": "center", "label": "t:blocks.group.settings.alignment.options__2.label" },
+        { "value": "end", "label": "t:blocks.group.settings.alignment.options__3.label" }
+      ],
+      "default": "center"
+    },
+    { "type": "header", "content": "t:shared.animation.header" },
+    {
+      "type": "select", "id": "animation_text", "label": "t:shared.animation.animation_text.label",
+      "options": [
+        { "value": "inherit", "label": "t:shared.animation.animation_text.options__1.label" },
+        { "value": "none", "label": "t:shared.animation.animation_text.options__2.label" },
+        { "value": "fade-up", "label": "t:shared.animation.animation_text.options__4.label" },
+        { "value": "words-slide-up", "label": "t:shared.animation.animation_text.options__9.label" }
+      ],
+      "default": "inherit"
+    },
+    { "type": "color_scheme", "id": "color_scheme", "label": "t:shared.color_scheme.label", "default": "scheme-2" },
+    { "type": "header", "content": "t:shared.spacing.section_header" },
+    { "type": "range", "id": "padding_top", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 48 },
+    { "type": "range", "id": "padding_bottom", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 48 },
+    { "type": "range", "id": "padding_top_mobile", "label": "t:shared.spacing.padding_top_mobile.label", "info": "t:shared.spacing.padding_top_mobile.info", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_bottom_mobile", "label": "t:shared.spacing.padding_bottom_mobile.label", "info": "t:shared.spacing.padding_bottom_mobile.info", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 0 }
+  ],
+  "presets": [
+    {
+      "name": "t:sections.testimonials.name",
+      "blocks": [
+        { "type": "testimonial" },
+        { "type": "testimonial" },
+        { "type": "testimonial" }
+      ]
+    }
+  ]
+}
+{% endschema %}

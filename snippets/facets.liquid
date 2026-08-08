@@ -1,0 +1,187 @@
+{% doc %}
+  Renders the filter and sort form.
+
+  One form for both layouts: the sidebar on desktop and the drawer on mobile
+  render the same markup, and `<facet-filters>` keeps whichever one is not
+  visible in step after a filter change.
+
+  Everything is a real input inside a real `<form method="get">`, with the names
+  Shopify's filtering expects. With JavaScript disabled the Apply button submits
+  and the server filters — which is not a fallback so much as the source of
+  truth, since the module reads the same form the server would have received.
+
+  Parameters:
+    results (object, required)  `collection` or `search`
+    section (object, required)
+    context (string, optional)  'sidebar' | 'drawer'. Default sidebar
+
+  @example
+    {% render 'facets', results: collection, section: section %}
+{% enddoc %}
+
+{%- liquid
+  assign layout = context | default: 'sidebar'
+  assign sort_options = results.sort_options
+  assign current_sort = results.sort_by | default: results.default_sort_by
+-%}
+
+<facet-filters
+  class="facets facets--{{ layout }}"
+  data-section-id="{{ section.id }}"
+  data-results="ProductGrid-{{ section.id }}"
+>
+  <form data-ref="form" class="facets__form">
+    {%- comment -%}
+      Search keeps its query and type across a filter change, or filtering a
+      search result silently turns it into a browse of the whole catalogue.
+    {%- endcomment -%}
+    {%- if results.terms -%}
+      <input type="hidden" name="q" value="{{ results.terms | escape }}">
+      <input type="hidden" name="options[prefix]" value="last">
+      <input type="hidden" name="type" value="product">
+    {%- endif -%}
+
+    {%- if section.settings.enable_sorting and sort_options.size > 0 -%}
+      <sort-by class="facets__sort">
+        <label class="facets__label" for="SortBy-{{ layout }}-{{ section.id }}">
+          {{ 'products.facets.sort_by_label' | t }}
+        </label>
+        <select id="SortBy-{{ layout }}-{{ section.id }}" name="sort_by" data-ref="select">
+          {%- for option in sort_options -%}
+            <option value="{{ option.value }}" {% if option.value == current_sort %}selected{% endif %}>
+              {{ option.name }}
+            </option>
+          {%- endfor -%}
+        </select>
+      </sort-by>
+    {%- endif -%}
+
+    {%- if section.settings.enable_filtering -%}
+      <accordion-element class="facets__groups" data-collapse-below="{% if layout == 'drawer' %}0{% else %}750{% endif %}">
+        {%- for filter in results.filters -%}
+          <details class="facets__group" data-default-open {% if filter.active_values.size > 0 %}open{% endif %}>
+            <summary class="facets__summary">
+              <span class="facets__group-label">{{ filter.label }}</span>
+              {%- if filter.active_values.size > 0 -%}
+                <span class="facets__group-count">{{ filter.active_values.size }}</span>
+              {%- endif -%}
+              {% render 'icon', icon: 'chevron-down', size: 14 %}
+            </summary>
+
+            <div class="facets__group-content">
+              {%- case filter.type -%}
+                {%- when 'price_range' -%}
+                  <price-range
+                    class="price-range"
+                    data-min="0"
+                    data-max="{{ filter.range_max }}"
+                  >
+                    <div class="price-range__inputs">
+                      <label class="visually-hidden" for="{{ filter.min_value.param_name }}-{{ layout }}">
+                        {{ 'products.facets.price_from' | t }}
+                      </label>
+                      <input
+                        id="{{ filter.min_value.param_name }}-{{ layout }}"
+                        data-ref="min"
+                        type="number"
+                        name="{{ filter.min_value.param_name }}"
+                        value="{{ filter.min_value.value | money_without_currency | replace: ',', '' }}"
+                        min="0"
+                        max="{{ filter.range_max | money_without_currency | replace: ',', '' }}"
+                        inputmode="numeric"
+                        placeholder="0"
+                      >
+
+                      <label class="visually-hidden" for="{{ filter.max_value.param_name }}-{{ layout }}">
+                        {{ 'products.facets.price_to' | t }}
+                      </label>
+                      <input
+                        id="{{ filter.max_value.param_name }}-{{ layout }}"
+                        data-ref="max"
+                        type="number"
+                        name="{{ filter.max_value.param_name }}"
+                        value="{{ filter.max_value.value | money_without_currency | replace: ',', '' }}"
+                        min="0"
+                        max="{{ filter.range_max | money_without_currency | replace: ',', '' }}"
+                        inputmode="numeric"
+                        placeholder="{{ filter.range_max | money_without_currency | replace: ',', '' }}"
+                      >
+                    </div>
+
+                    <div class="price-range__track" data-ref="track" aria-hidden="true">
+                      <span class="price-range__fill" data-ref="fill"></span>
+                    </div>
+
+                    <output class="price-range__output" data-ref="output"></output>
+                    <p class="price-range__max">
+                      {{ 'products.facets.max_price_html' | t: price: filter.range_max | money }}
+                    </p>
+                  </price-range>
+
+                {%- else -%}
+                  <ul class="facets__values" role="list">
+                    {%- for value in filter.values -%}
+                      <li class="facets__value">
+                        <label class="facets__checkbox">
+                          <input
+                            type="checkbox"
+                            name="{{ value.param_name }}"
+                            value="{{ value.value }}"
+                            {% if value.active %}checked{% endif %}
+                            {% if value.count == 0 and value.active == false %}disabled{% endif %}
+                          >
+
+                          {%- if filter.presentation == 'swatch' -%}
+                            {% render 'swatch',
+                               value: value.label,
+                               option_name: filter.label,
+                               option_value: value,
+                               size: 'small' %}
+                          {%- else -%}
+                            <span class="facets__value-label">{{ value.label }}</span>
+                          {%- endif -%}
+
+                          <span class="facets__value-count">({{ value.count }})</span>
+                        </label>
+                      </li>
+                    {%- endfor -%}
+                  </ul>
+              {%- endcase -%}
+            </div>
+          </details>
+        {%- endfor -%}
+      </accordion-element>
+    {%- endif -%}
+
+    {%- comment -%}
+      The submit button is the no-JavaScript path. It is hidden once the script
+      runs, because filters then apply on change and a stale Apply button implies
+      nothing happened until it is pressed.
+    {%- endcomment -%}
+    <noscript>
+      <button type="submit" class="button button--primary">{{ 'products.facets.apply' | t }}</button>
+    </noscript>
+  </form>
+
+  <div class="facets__active" data-ref="active">
+    {%- for filter in results.filters -%}
+      {%- for value in filter.active_values -%}
+        <button
+          type="button"
+          class="facets__pill"
+          data-remove-filter
+          data-filter-name="{{ value.param_name }}"
+          data-filter-value="{{ value.value | escape }}"
+        >
+          {{ filter.label }}: {{ value.label }}
+          <span class="visually-hidden">{{ 'products.facets.remove_filter' | t: filter: value.label }}</span>
+          {% render 'icon', icon: 'close', size: 12 %}
+        </button>
+      {%- endfor -%}
+    {%- endfor -%}
+  </div>
+
+  <button type="button" class="facets__clear" data-ref="clear" hidden>
+    {{ 'products.facets.clear_all' | t }}
+  </button>
+</facet-filters>

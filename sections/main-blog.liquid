@@ -1,0 +1,157 @@
+{% comment %}
+  sections/main-blog.liquid
+
+  The article list.
+
+  Tag filtering is real links, not a script. Shopify already serves
+  blog.url + /tagged/handle, so each tag is crawlable, shareable and works with
+  the Back button — none of which is true of a filter that only exists in memory.
+
+  The grid reuses product-grid for its pagination, so load-more and infinite
+  scroll behave exactly as they do on a collection. data-item-selector points at
+  articles instead of products, which is the only difference.
+{% endcomment %}
+
+{%- liquid
+  assign section_settings = section.settings
+  assign per_page = section_settings.posts_per_page | default: 12
+-%}
+
+<div
+  class="main-blog color-{{ section_settings.color_scheme }}"
+  {% render 'spacing', section: section_settings %}
+>
+  <div class="container">
+    <div class="main-blog__head main-blog__head--{{ section_settings.alignment }}">
+      {%- if section_settings.show_title -%}
+        <motion-effect {% render 'motion-attrs', kind: 'text', section: section_settings %}>
+          <h1 class="main-blog__title">{{ blog.title }}</h1>
+        </motion-effect>
+      {%- endif -%}
+
+      {%- if section_settings.show_tags and blog.all_tags.size > 0 -%}
+        <nav class="main-blog__tags" aria-label="{{ 'blogs.article.tags' | t }}">
+          <ul class="main-blog__tag-list" role="list">
+            <li>
+              <a
+                class="main-blog__tag"
+                href="{{ blog.url }}"
+                {% if current_tags == empty %}aria-current="page"{% endif %}
+              >
+                {{ 'blogs.article.all_topics' | t }}
+              </a>
+            </li>
+
+            {%- for tag in blog.all_tags -%}
+              <li>
+                <a
+                  class="main-blog__tag"
+                  href="{{ blog.url }}/tagged/{{ tag | handle }}"
+                  {% if current_tags contains tag %}aria-current="page"{% endif %}
+                >
+                  {{ tag }}
+                </a>
+              </li>
+            {%- endfor -%}
+          </ul>
+        </nav>
+      {%- endif -%}
+    </div>
+
+    {%- if blog.articles_count > 0 -%}
+      {% paginate blog.articles by per_page %}
+        {%- capture children -%}
+          {%- for article in blog.articles -%}
+            <li class="product-grid__item" data-article-id="{{ article.id }}">
+              {% render 'article-card',
+                 article: article,
+                 index: forloop.index0,
+                 priority: forloop.first,
+                 show_image: section_settings.show_image,
+                 show_excerpt: section_settings.show_excerpt,
+                 show_date: section_settings.show_date,
+                 show_author: section_settings.show_author %}
+            </li>
+          {%- endfor -%}
+        {%- endcapture -%}
+
+        {% render 'product-grid',
+           children: children,
+           paginate: paginate,
+           section: section,
+           total: blog.articles_count,
+           item_selector: '[data-article-id]',
+           id: 'ArticleGrid-' | append: section.id %}
+      {% endpaginate %}
+    {%- else -%}
+      <p class="main-blog__empty">{{ 'blogs.article.no_articles' | t }}</p>
+    {%- endif -%}
+
+    <div class="main-blog__blocks">
+      {% content_for 'blocks' %}
+    </div>
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "t:sections.main_blog.name",
+  "tag": "section",
+  "class": "section",
+  "blocks": [{ "type": "@theme" }, { "type": "@app" }],
+  "settings": [
+    { "type": "checkbox", "id": "show_title", "label": "t:sections.main_blog.settings.show_title.label", "default": true },
+    { "type": "checkbox", "id": "show_tags", "label": "t:sections.main_blog.settings.show_tags.label", "info": "t:sections.main_blog.settings.show_tags.info", "default": true },
+    { "type": "range", "id": "posts_per_page", "label": "t:sections.main_blog.settings.posts_per_page.label", "min": 4, "max": 24, "step": 2, "default": 12 },
+    { "type": "range", "id": "columns_desktop", "label": "t:shared.columns.desktop.label", "min": 2, "max": 4, "step": 1, "default": 3 },
+    { "type": "range", "id": "columns_tablet", "label": "t:shared.columns.tablet.label", "min": 2, "max": 4, "step": 1, "default": 2 },
+    {
+      "type": "select", "id": "columns_mobile", "label": "t:shared.columns.mobile.label",
+      "options": [
+        { "value": "1", "label": "1" },
+        { "value": "2", "label": "2" }
+      ],
+      "default": "1"
+    },
+    {
+      "type": "select", "id": "pagination_type", "label": "t:shared.pagination.label", "info": "t:shared.pagination.info",
+      "options": [
+        { "value": "paginate", "label": "t:shared.pagination.options__1.label" },
+        { "value": "load-more", "label": "t:shared.pagination.options__2.label" },
+        { "value": "infinite", "label": "t:shared.pagination.options__3.label" }
+      ],
+      "default": "paginate"
+    },
+    { "type": "header", "content": "t:sections.main_blog.headers.cards" },
+    { "type": "checkbox", "id": "show_image", "label": "t:sections.main_blog.settings.show_image.label", "default": true },
+    { "type": "checkbox", "id": "show_excerpt", "label": "t:sections.main_blog.settings.show_excerpt.label", "default": true },
+    { "type": "checkbox", "id": "show_date", "label": "t:sections.main_blog.settings.show_date.label", "default": true },
+    { "type": "checkbox", "id": "show_author", "label": "t:sections.main_blog.settings.show_author.label", "default": false },
+    {
+      "type": "select", "id": "alignment", "label": "t:blocks.group.settings.alignment.label",
+      "options": [
+        { "value": "start", "label": "t:blocks.group.settings.alignment.options__1.label" },
+        { "value": "center", "label": "t:blocks.group.settings.alignment.options__2.label" },
+        { "value": "end", "label": "t:blocks.group.settings.alignment.options__3.label" }
+      ],
+      "default": "center"
+    },
+    { "type": "header", "content": "t:shared.animation.header" },
+    {
+      "type": "select", "id": "animation_text", "label": "t:shared.animation.animation_text.label",
+      "options": [
+        { "value": "inherit", "label": "t:shared.animation.animation_text.options__1.label" },
+        { "value": "none", "label": "t:shared.animation.animation_text.options__2.label" },
+        { "value": "fade-up", "label": "t:shared.animation.animation_text.options__4.label" }
+      ],
+      "default": "inherit"
+    },
+    { "type": "color_scheme", "id": "color_scheme", "label": "t:shared.color_scheme.label", "default": "scheme-1" },
+    { "type": "header", "content": "t:shared.spacing.section_header" },
+    { "type": "range", "id": "padding_top", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 48 },
+    { "type": "range", "id": "padding_bottom", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 64 },
+    { "type": "range", "id": "padding_top_mobile", "label": "t:shared.spacing.padding_top_mobile.label", "info": "t:shared.spacing.padding_top_mobile.info", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_bottom_mobile", "label": "t:shared.spacing.padding_bottom_mobile.label", "info": "t:shared.spacing.padding_bottom_mobile.info", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 0 }
+  ]
+}
+{% endschema %}

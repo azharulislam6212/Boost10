@@ -1,0 +1,206 @@
+{% comment %}
+  sections/main-collection-category.liquid
+
+  A parent collection: sub-category pills, a curated feature row, then the grid.
+
+  Assigned as an alternate template, so a merchant picks it per collection. That
+  matters because "parent collection" is not something Shopify models — there is
+  no field that says one collection contains others. The merchant expresses the
+  relationship in a menu, which is a thing they already know how to edit, and
+  this section reads that menu.
+
+  Everything below the pills is the ordinary collection experience: the same
+  filters block, the same _product-card, the same three pagination modes. A
+  category page that behaved differently from a collection page would be a second
+  set of bugs.
+
+  The feature row is a separate collection the merchant chooses. It sits above
+  the grid and outside the paginated region, so appending a page never re-renders
+  it and a customer scrolling through four hundred products does not drag the
+  feature row's images along with them.
+{% endcomment %}
+
+{%- liquid
+  assign section_settings = section.settings
+  assign per_page = section_settings.products_per_page | default: 24
+  assign desktop = section_settings.columns_desktop | default: 4
+  assign card_sizes = '(min-width: 990px) ' | append: 100 | divided_by: desktop | append: 'vw, (min-width: 750px) 33vw, 50vw'
+-%}
+
+<results-list
+  class="collection-category collection-results color-{{ section_settings.color_scheme }}"
+  data-section-id="{{ section.id }}"
+  data-pagination="{{ section_settings.pagination_type }}"
+  data-item-selector="[data-product-id]"
+  data-page="{{ paginate.current_page | default: 1 }}"
+  data-total="{{ collection.products_count }}"
+  role="region"
+  aria-label="{{ collection.title | escape }}"
+  {% render 'spacing', section: section_settings %}
+>
+  <a class="skip-to-content-link visually-hidden" href="#MainContent">
+    {{ 'accessibility.skip_to_content' | t }}
+  </a>
+
+  <div class="container">
+    {%- comment -%} ---------- category header ---------- {%- endcomment -%}
+    <header class="collection-category__header collection-category__header--{{ section_settings.alignment }}">
+      {%- if section_settings.show_breadcrumbs -%}
+        {% render 'breadcrumbs' %}
+      {%- endif -%}
+
+      {%- if section_settings.show_title -%}
+        <motion-effect {% render 'motion-attrs', kind: 'text', section: section_settings %}>
+          <h1 class="collection-category__title">{{ collection.title }}</h1>
+        </motion-effect>
+      {%- endif -%}
+
+      {%- if section_settings.show_description and collection.description != blank -%}
+        <div class="collection-category__description rte">{{ collection.description }}</div>
+      {%- endif -%}
+    </header>
+
+    {%- comment -%}
+      Sub-category pills. Built from a menu, because Shopify has no parent-child
+      relationship between collections and a merchant already knows how to edit a
+      menu.
+    {%- endcomment -%}
+    {%- if section_settings.menu != blank -%}
+      {% render 'sub-collections', menu: linklists[section_settings.menu], current: collection %}
+    {%- endif -%}
+
+    {%- comment -%} ---------- curated feature row ---------- {%- endcomment -%}
+    {%- if section_settings.featured_collection != blank and section_settings.featured_collection.products.size > 0 -%}
+      <section class="collection-category__featured" aria-label="{{ section_settings.featured_heading | default: 'collections.category.featured' | t | escape }}">
+        <h2 class="collection-category__featured-title">
+          {{ section_settings.featured_heading | default: 'collections.category.featured' | t }}
+        </h2>
+
+        <ul class="product-grid product-grid--carousel" role="list" style="--columns-desktop: {{ section_settings.featured_columns }};">
+          {%- for product in section_settings.featured_collection.products limit: section_settings.featured_count -%}
+            <li class="product-grid__item" data-featured-product-id="{{ product.id }}">
+              {% content_for 'block',
+                type: '_product-card',
+                id: 'product-card',
+                product: product,
+                index: forloop.index0,
+                sizes: '(min-width: 990px) 25vw, 60vw'
+              %}
+            </li>
+          {%- endfor -%}
+        </ul>
+      </section>
+    {%- endif -%}
+
+    {%- comment -%} ---------- filters and grid ---------- {%- endcomment -%}
+    {% paginate collection.products by per_page %}
+      {% content_for 'block',
+        type: 'filters',
+        id: 'filters',
+        results: collection,
+        results_size: collection.products_count,
+        paginate: paginate
+      %}
+
+      {%- capture children -%}
+        {%- for product in collection.products -%}
+          <li
+            id="{{ section.id }}-{{ product.id }}"
+            class="product-grid__item"
+            data-page="{{ paginate.current_page }}"
+            data-product-id="{{ product.id }}"
+          >
+            {% content_for 'block',
+              type: '_product-card',
+              id: 'product-card',
+              product: product,
+              index: forloop.index0,
+              priority: forloop.first,
+              sizes: card_sizes
+            %}
+          </li>
+        {%- endfor -%}
+      {%- endcapture -%}
+
+      {% render 'product-grid',
+         children: children,
+         paginate: paginate,
+         section: section,
+         total: collection.products_count,
+         empty_url: collection.url %}
+    {% endpaginate %}
+
+    <div class="collection-results__blocks">
+      {% content_for 'blocks' %}
+    </div>
+  </div>
+</results-list>
+
+{% schema %}
+{
+  "name": "t:sections.main_collection_category.name",
+  "tag": "section",
+  "class": "section",
+  "blocks": [{ "type": "@theme" }, { "type": "@app" }],
+  "settings": [
+    { "type": "paragraph", "content": "t:sections.main_collection_category.paragraph" },
+    { "type": "checkbox", "id": "show_title", "label": "t:sections.collection_banner.settings.show_title.label", "default": true },
+    { "type": "checkbox", "id": "show_description", "label": "t:sections.collection_banner.settings.show_description.label", "default": true },
+    { "type": "checkbox", "id": "show_breadcrumbs", "label": "t:sections.collection_banner.settings.show_breadcrumbs.label", "default": true },
+    { "type": "link_list", "id": "menu", "label": "t:sections.main_collection_category.settings.menu.label", "info": "t:sections.main_collection_category.settings.menu.info" },
+    { "type": "header", "content": "t:sections.main_collection_category.headers.featured" },
+    { "type": "text", "id": "featured_heading", "label": "t:shared.heading.label" },
+    { "type": "collection", "id": "featured_collection", "label": "t:sections.main_collection_category.settings.featured_collection.label", "info": "t:sections.main_collection_category.settings.featured_collection.info" },
+    { "type": "range", "id": "featured_count", "label": "t:sections.featured_collection.settings.products_to_show.label", "min": 2, "max": 12, "step": 1, "default": 4 },
+    { "type": "range", "id": "featured_columns", "label": "t:shared.columns.desktop.label", "min": 2, "max": 6, "step": 1, "default": 4 },
+    { "type": "header", "content": "t:sections.main_collection_category.headers.grid" },
+    { "type": "range", "id": "products_per_page", "label": "t:sections.main_collection.settings.products_per_page.label", "min": 8, "max": 48, "step": 4, "default": 24 },
+    { "type": "range", "id": "columns_desktop", "label": "t:shared.columns.desktop.label", "min": 2, "max": 5, "step": 1, "default": 4 },
+    { "type": "range", "id": "columns_tablet", "label": "t:shared.columns.tablet.label", "min": 2, "max": 4, "step": 1, "default": 3 },
+     {
+      "type": "select", "id": "columns_mobile", "label": "t:shared.columns.mobile.label",
+      "options": [
+        { "value": "1", "label": "1" },
+        { "value": "2", "label": "2" }
+      ],
+      "default": "2"
+    },
+    {
+      "type": "select", "id": "pagination_type", "label": "t:shared.pagination.label", "info": "t:shared.pagination.info",
+      "options": [
+        { "value": "paginate", "label": "t:shared.pagination.options__1.label" },
+        { "value": "load-more", "label": "t:shared.pagination.options__2.label" },
+        { "value": "infinite", "label": "t:shared.pagination.options__3.label" }
+      ],
+      "default": "paginate"
+    },
+    { "type": "checkbox", "id": "enable_sorting", "label": "t:sections.main_collection.settings.enable_sorting.label", "default": true },
+    { "type": "checkbox", "id": "enable_filtering", "label": "t:sections.main_collection.settings.enable_filtering.label", "info": "t:sections.main_collection.settings.enable_filtering.info", "default": true },
+    {
+      "type": "select", "id": "alignment", "label": "t:blocks.group.settings.alignment.label",
+      "options": [
+        { "value": "start", "label": "t:blocks.group.settings.alignment.options__1.label" },
+        { "value": "center", "label": "t:blocks.group.settings.alignment.options__2.label" },
+        { "value": "end", "label": "t:blocks.group.settings.alignment.options__3.label" }
+      ],
+      "default": "start"
+    },
+    { "type": "header", "content": "t:shared.animation.header" },
+    {
+      "type": "select", "id": "animation_text", "label": "t:shared.animation.animation_text.label",
+      "options": [
+        { "value": "inherit", "label": "t:shared.animation.animation_text.options__1.label" },
+        { "value": "none", "label": "t:shared.animation.animation_text.options__2.label" },
+        { "value": "fade-up", "label": "t:shared.animation.animation_text.options__4.label" }
+      ],
+      "default": "inherit"
+    },
+    { "type": "color_scheme", "id": "color_scheme", "label": "t:shared.color_scheme.label", "default": "scheme-1" },
+    { "type": "header", "content": "t:shared.spacing.section_header" },
+    { "type": "range", "id": "padding_top", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 32 },
+    { "type": "range", "id": "padding_bottom", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 64 },
+    { "type": "range", "id": "padding_top_mobile", "label": "t:shared.spacing.padding_top_mobile.label", "info": "t:shared.spacing.padding_top_mobile.info", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_bottom_mobile", "label": "t:shared.spacing.padding_bottom_mobile.label", "info": "t:shared.spacing.padding_bottom_mobile.info", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 0 }
+  ]
+}
+{% endschema %}

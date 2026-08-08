@@ -1,0 +1,74 @@
+{% doc %}
+  Renders the search field and its suggestion panel.
+
+  The input is a real `<input type="search" name="q">` inside a
+  `<form action="/search">`, so pressing Enter with JavaScript disabled runs a
+  normal search. Everything else is enhancement.
+
+  The ARIA wiring is the combobox pattern: the input owns `role="combobox"`,
+  `aria-expanded` and `aria-controls`, and `<search-list>` reports the active
+  option through `aria-activedescendant` on the input. Focus never leaves the
+  field — moving it into the suggestions closes the mobile keyboard.
+
+  Parameters:
+    id      (string, optional)  Input id. Default SearchInput
+    section (object, optional)
+
+  @example
+    {% render 'predictive-search', id: 'HeaderSearch' %}
+{% enddoc %}
+
+{%- liquid
+  assign input_id = id | default: 'SearchInput'
+  assign panel_id = input_id | append: 'Results'
+-%}
+
+<predictive-search
+  class="predictive-search"
+  data-section-id="predictive-search"
+>
+  <form class="search-form" action="{{ routes.search_url }}" method="get" role="search">
+    <label class="visually-hidden" for="{{ input_id }}">{{ 'search.label' | t }}</label>
+
+    <input
+      id="{{ input_id }}"
+      data-ref="input"
+      type="search"
+      name="q"
+      value="{{ search.terms | escape }}"
+      placeholder="{{ 'search.placeholder' | t | escape }}"
+      role="combobox"
+      aria-expanded="false"
+      aria-controls="{{ panel_id }}"
+      aria-autocomplete="list"
+      aria-haspopup="listbox"
+      autocomplete="off"
+      spellcheck="false"
+    >
+
+    <input type="hidden" name="options[prefix]" value="last">
+
+    <button
+      type="button"
+      class="search-form__reset"
+      data-ref="reset"
+      aria-label="{{ 'search.clear' | t }}"
+      hidden
+    >
+      {% render 'icon', icon: 'close' %}
+    </button>
+
+    <button type="submit" class="search-form__submit" aria-label="{{ 'search.submit' | t }}">
+      {% render 'icon', icon: 'search' %}
+    </button>
+  </form>
+
+  <div class="predictive-search__panel" id="{{ panel_id }}" data-ref="panel" data-lenis-prevent hidden>
+    {%- comment -%}
+      Filled by the predictive search section. Empty on first render so nothing
+      flashes before the customer has typed anything.
+    {%- endcomment -%}
+  </div>
+
+  <p class="visually-hidden" data-ref="status" role="status"></p>
+</predictive-search>

@@ -1,0 +1,112 @@
+{% doc %}
+  Renders a button or a link styled as one.
+
+  The distinction matters and is decided by the `href` parameter, not by a style
+  choice: something that navigates is an `<a>`, something that acts is a
+  `<button>`. Styling a link as a button is fine; making a `<div>` behave like
+  one is not, and it is the most common accessibility failure in Shopify themes.
+
+  Parameters:
+    label     (string, required)  Already translated
+    href      (string, optional)  Renders an `<a>` when present, a `<button>` otherwise
+    variant   (string, optional)  'primary' | 'secondary' | 'outline' | 'link'. Default primary
+    size      (string, optional)  'small' | 'medium' | 'large'. Default medium
+    type      (string, optional)  Button type. Default 'button'
+    name      (string, optional)  Form control name
+    value     (string, optional)  Form control value
+    full      (boolean, optional) Full width
+    disabled  (boolean, optional)
+    loading   (boolean, optional) Shows a spinner and sets aria-busy
+    icon      (string, optional)  Icon name from snippets/icon.liquid
+    icon_position (string, optional) 'start' | 'end'. Default 'end'
+    icon_only (boolean, optional) Hides the label visually. `label` becomes the aria-label
+    class     (string, optional)
+    id        (string, optional)
+    aria_label (string, optional) Overrides the accessible name
+    attributes (string, optional) Raw extra attributes, e.g. data-overlay-open="CartDrawer"
+    new_tab   (boolean, optional) Links only. Adds rel and a translated hint
+
+  @example
+    {% render 'button', label: 'products.product.add_to_cart' | t, type: 'submit', full: true %}
+
+  @example
+    {% render 'button',
+       label: 'general.actions.view_all' | t,
+       href: collection.url,
+       variant: 'secondary',
+       icon: 'arrow-right' %}
+{% enddoc %}
+
+{%- liquid
+  assign resolved_variant = variant | default: 'primary'
+  assign resolved_size = size | default: 'medium'
+  assign resolved_icon_position = icon_position | default: 'end'
+  assign resolved_type = type | default: 'button'
+  assign accessible_name = aria_label | default: label
+
+  assign classes = 'button button--' | append: resolved_variant | append: ' button--' | append: resolved_size
+  if full
+    assign classes = classes | append: ' button--full'
+  endif
+  if icon_only
+    assign classes = classes | append: ' button--icon-only'
+  endif
+  if loading
+    assign classes = classes | append: ' button--loading'
+  endif
+  if class != blank
+    assign classes = classes | append: ' ' | append: class
+  endif
+-%}
+
+{%- capture button_content -%}
+  {%- if icon != blank and resolved_icon_position == 'start' -%}
+    {% render 'icon', icon: icon, class: 'button__icon button__icon--start' %}
+  {%- endif -%}
+
+  <span class="button__label{% if icon_only %} visually-hidden{% endif %}">{{ label }}</span>
+
+  {%- if icon != blank and resolved_icon_position == 'end' -%}
+    {% render 'icon', icon: icon, class: 'button__icon button__icon--end' %}
+  {%- endif -%}
+
+  {%- if loading -%}
+    {%- comment -%}
+      The spinner is decorative. The state is announced by aria-busy on the
+      control itself, so a screen reader is told the button is working rather
+      than being read a spinning graphic.
+    {%- endcomment -%}
+    <span class="button__spinner" aria-hidden="true"></span>
+  {%- endif -%}
+{%- endcapture -%}
+
+{%- if href != blank -%}
+  <a
+    {% if id != blank %}id="{{ id }}"{% endif %}
+    class="{{ classes }}"
+    href="{{ href }}"
+    {% if icon_only %}aria-label="{{ accessible_name | escape }}"{% endif %}
+    {% if new_tab %}target="_blank" rel="noopener"{% endif %}
+    {% if disabled %}aria-disabled="true" tabindex="-1"{% endif %}
+    {{ attributes }}
+  >
+    {{ button_content }}
+    {%- if new_tab -%}
+      <span class="visually-hidden">{{ 'accessibility.new_window' | t }}</span>
+    {%- endif -%}
+  </a>
+{%- else -%}
+  <button
+    {% if id != blank %}id="{{ id }}"{% endif %}
+    class="{{ classes }}"
+    type="{{ resolved_type }}"
+    {% if name != blank %}name="{{ name }}"{% endif %}
+    {% if value != blank %}value="{{ value | escape }}"{% endif %}
+    {% if icon_only %}aria-label="{{ accessible_name | escape }}"{% endif %}
+    {% if disabled %}disabled{% endif %}
+    {% if loading %}aria-busy="true"{% endif %}
+    {{ attributes }}
+  >
+    {{ button_content }}
+  </button>
+{%- endif -%}

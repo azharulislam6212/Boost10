@@ -1,0 +1,148 @@
+{% comment %}
+  blocks/grid-banner.liquid
+
+  A promotional tile placed inside the product grid flow.
+
+  ## Position is an index, not a pixel offset
+
+  The merchant says "after the 6th product" and the section splices the banner
+  in at that point. Positioning it absolutely over the grid would break the
+  moment a filter changed the number of results, and would leave the banner
+  covering a product rather than sitting beside one.
+
+  ## Width is measured in grid cells
+
+  `grid-column: span N` rather than a percentage. The banner never has to know
+  how many columns the grid has, so a merchant who changes the collection from
+  four columns to three does not also have to come back and re-measure every
+  banner. Separate spans per breakpoint, because a tile spanning two of four
+  desktop columns should usually span both of two mobile ones.
+
+  ## Not a card
+
+  This deliberately does not reuse `product-card`. A card carries a price, a
+  badge and an add-to-cart path, and a banner that looks like one invites a
+  click that goes somewhere unexpected. It reads as an ad because it is one.
+{% endcomment %}
+
+{%- liquid
+  assign settings = block.settings
+  assign image = settings.image
+-%}
+
+{%- if image != blank -%}
+  {%- capture banner_content -%}
+    {% render 'image',
+       image: image,
+       alt: settings.heading | default: '',
+       ratio: 'adapt',
+       sizes: '(min-width: 990px) 50vw, 100vw',
+       wrapper_class: 'grid-banner__media',
+       class: 'grid-banner__image' %}
+
+    {%- if settings.heading != blank or settings.text != blank -%}
+      <div class="grid-banner__content">
+        {%- if settings.heading != blank -%}
+          <span class="grid-banner__heading">{{ settings.heading | escape }}</span>
+        {%- endif -%}
+        {%- if settings.text != blank -%}
+          <span class="grid-banner__text">{{ settings.text | escape }}</span>
+        {%- endif -%}
+      </div>
+    {%- endif -%}
+  {%- endcapture -%}
+
+  {%- comment -%}
+    `<li>` because the grid is a list and a stray `<div>` between list items is
+    invalid — and screen readers report the item count from the list, so an
+    unlisted child makes "6 of 24" wrong.
+  {%- endcomment -%}
+  <li
+    class="grid-banner-item"
+    data-grid-banner
+    data-position="{{ settings.position }}"
+    style="
+      --banner-span-desktop: {{ settings.span_desktop }};
+      --banner-span-tablet: {{ settings.span_tablet }};
+      --banner-span-mobile: {{ settings.span_mobile }};
+      --banner-rows: {{ settings.span_rows }};
+    "
+    {{ block.shopify_attributes }}
+  >
+    {%- if settings.link != blank -%}
+      <a class="grid-banner grid-banner--{{ settings.content_position }}" href="{{ settings.link }}">
+        {{ banner_content }}
+      </a>
+    {%- else -%}
+      <div class="grid-banner grid-banner--{{ settings.content_position }}">
+        {{ banner_content }}
+      </div>
+    {%- endif -%}
+  </li>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "t:blocks.grid_banner.name",
+  "tag": null,
+  "settings": [
+    { "type": "image_picker", "id": "image", "label": "t:shared.image.label" },
+    { "type": "text", "id": "heading", "label": "t:shared.heading.label" },
+    { "type": "text", "id": "text", "label": "t:shared.text.label" },
+    { "type": "url", "id": "link", "label": "t:shared.link.label" },
+    {
+      "type": "select", "id": "content_position", "label": "t:blocks.grid_banner.settings.content_position.label",
+      "options": [
+        { "value": "top", "label": "t:blocks.grid_banner.settings.content_position.options__1.label" },
+        { "value": "center", "label": "t:blocks.grid_banner.settings.content_position.options__2.label" },
+        { "value": "bottom", "label": "t:blocks.grid_banner.settings.content_position.options__3.label" }
+      ],
+      "default": "bottom"
+    },
+
+    { "type": "header", "content": "t:blocks.grid_banner.headers.placement" },
+    {
+      "type": "range", "id": "position",
+      "label": "t:blocks.grid_banner.settings.position.label",
+      "info": "t:blocks.grid_banner.settings.position.info",
+      "min": 1, "max": 24, "step": 1, "default": 5
+    },
+    {
+      "type": "select", "id": "span_desktop", "label": "t:blocks.grid_banner.settings.span_desktop.label",
+      "options": [
+        { "value": "1", "label": "1" },
+        { "value": "2", "label": "2" },
+        { "value": "3", "label": "3" },
+        { "value": "4", "label": "4" }
+      ],
+      "default": "2"
+    },
+    {
+      "type": "select", "id": "span_tablet", "label": "t:blocks.grid_banner.settings.span_tablet.label",
+      "options": [
+        { "value": "1", "label": "1" },
+        { "value": "2", "label": "2" },
+        { "value": "3", "label": "3" }
+      ],
+      "default": "2"
+    },
+    {
+      "type": "select", "id": "span_mobile", "label": "t:blocks.grid_banner.settings.span_mobile.label",
+      "options": [
+        { "value": "1", "label": "1" },
+        { "value": "2", "label": "2" }
+      ],
+      "default": "2"
+    },
+    {
+      "type": "select", "id": "span_rows", "label": "t:blocks.grid_banner.settings.span_rows.label",
+      "options": [
+        { "value": "1", "label": "1" },
+        { "value": "2", "label": "2" }
+      ],
+      "default": "1"
+    }
+  ],
+  "presets": [{ "name": "t:blocks.grid_banner.name" }]
+}
+{% endschema %}

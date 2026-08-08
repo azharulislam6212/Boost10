@@ -1,0 +1,131 @@
+{% comment %}
+  sections/overlays.liquid
+
+  Everything that floats above the page and is not the cart or search: the toast,
+  the quick option drawer, the image zoom modal and the compare drawer.
+
+  They live in a section so a merchant can turn individual ones off, and so the
+  Theme Editor can re-render them without touching the layout. Each is gated on
+  the setting that makes it reachable, so nothing ships markup for a feature that
+  is switched off.
+{% endcomment %}
+
+{% render 'toast-notification' %}
+
+{%- if settings.enable_quick_view -%}
+  <quick-option-drawer
+    id="QuickOptions"
+    class="quick-view drawer"
+    data-placement="end"
+    data-overlay-type="quick-view"
+  >
+    <dialog class="drawer__dialog" data-ref="dialog" aria-label="{{ 'sections.quick_view.title' | t }}">
+      <div class="drawer__panel" data-ref="panel">
+        <header class="drawer__header">
+          <h2 class="drawer__title">{{ 'sections.quick_view.title' | t }}</h2>
+          <button
+            type="button"
+            class="drawer__close"
+            data-overlay-close
+            aria-label="{{ 'sections.quick_view.close' | t }}"
+          >
+            {% render 'icon', icon: 'close' %}
+          </button>
+        </header>
+
+        <div class="drawer__body" data-ref="body" data-lenis-prevent>
+          <p class="quick-view__loading">{{ 'sections.quick_view.loading' | t }}</p>
+        </div>
+      </div>
+    </dialog>
+  </quick-option-drawer>
+{%- endif -%}
+
+{%- if settings.enable_image_zoom -%}
+  <media-zoom-modal id="MediaZoom" class="media-zoom-modal modal">
+    <dialog class="modal__dialog" data-ref="dialog" aria-label="{{ 'accessibility.open_zoom' | t }}">
+      <div class="modal__panel" data-ref="panel">
+        <button
+          type="button"
+          class="modal__close"
+          data-overlay-close
+          aria-label="{{ 'accessibility.close_zoom' | t }}"
+        >
+          {% render 'icon', icon: 'close' %}
+        </button>
+
+        <div class="media-zoom-modal__viewport" data-ref="viewport" data-lenis-prevent>
+          <img data-ref="image" alt="">
+        </div>
+
+        <div class="media-zoom-modal__controls">
+          <button type="button" data-ref="zoomOut" aria-label="{{ 'accessibility.zoom_out' | t }}">
+            {% render 'icon', icon: 'minus' %}
+          </button>
+          <button type="button" data-ref="reset" aria-label="{{ 'accessibility.reset_zoom' | t }}">
+            {% render 'icon', icon: 'refresh' %}
+          </button>
+          <button type="button" data-ref="zoomIn" aria-label="{{ 'accessibility.zoom_in' | t }}">
+            {% render 'icon', icon: 'plus' %}
+          </button>
+        </div>
+      </div>
+    </dialog>
+  </media-zoom-modal>
+{%- endif -%}
+
+{%- if settings.enable_compare -%}
+  <product-compare
+    id="ProductCompare"
+    class="product-compare"
+    data-section-id="compare"
+    data-limit="{{ settings.compare_limit | default: 4 }}"
+  >
+    <button type="button" class="product-compare__bar" data-ref="open" hidden></button>
+    <span class="visually-hidden" data-ref="count">0</span>
+
+    <drawer-component
+      id="CompareDrawer"
+      class="compare-drawer drawer"
+      data-placement="bottom"
+    >
+      <dialog class="drawer__dialog" data-ref="dialog" aria-label="{{ 'products.compare.drawer_title' | t }}">
+        <div class="drawer__panel" data-ref="panel">
+          <header class="drawer__header">
+            <h2 class="drawer__title">{{ 'products.compare.drawer_title' | t }}</h2>
+            <button
+              type="button"
+              class="drawer__close"
+              data-overlay-close
+              aria-label="{{ 'accessibility.close' | t }}"
+            >
+              {% render 'icon', icon: 'close' %}
+            </button>
+          </header>
+
+          <div class="drawer__body" data-ref="body" data-lenis-prevent>
+            <div data-ref="content" data-compare-content></div>
+          </div>
+
+          <footer class="drawer__footer">
+            <button type="button" class="button button--secondary" data-ref="clear">
+              {{ 'products.compare.clear_all' | t }}
+            </button>
+          </footer>
+        </div>
+      </dialog>
+    </drawer-component>
+  </product-compare>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "t:sections.overlays.name",
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "t:sections.overlays.paragraph"
+    }
+  ]
+}
+{% endschema %}

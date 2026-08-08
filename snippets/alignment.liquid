@@ -1,0 +1,94 @@
+{% doc %}
+  Emits alignment as custom properties rather than class names.
+
+  Four horizontal values (left, center, right, space-between) times four vertical
+  ones (top, middle, bottom, stretch) is sixteen combinations. As modifier
+  classes that is sixteen class names per component and a combinatorial mess in
+  the stylesheet; as two custom properties it is two lines that work on any
+  container.
+
+  It emits both the flexbox and the grid spellings, because a section using
+  `display: grid` needs `justify-items` where a flex row needs `justify-content`,
+  and a snippet that guessed wrong would silently do nothing. Both are harmless
+  on the wrong display type — the browser ignores the one that does not apply.
+
+  `space-between` deliberately has no `text-align` equivalent, so the text
+  alignment falls back to start. Distributing items across a row says nothing
+  about how the words inside them should sit.
+
+  Parameters:
+    horizontal (string, optional)  left | center | right | space-between
+    vertical   (string, optional)  top | middle | bottom | stretch
+    text       (boolean, optional) Also set text-align. Default true
+
+  @example
+    <div {% render 'alignment', horizontal: block.settings.align_x, vertical: block.settings.align_y %}>
+{% enddoc %}
+
+{%- liquid
+  assign h = horizontal | default: 'left'
+  assign v = vertical | default: 'top'
+
+  case h
+    when 'center'
+      assign justify = 'center'
+      assign align_text = 'center'
+    when 'right'
+      assign justify = 'flex-end'
+      assign align_text = 'end'
+    when 'space-between'
+      assign justify = 'space-between'
+      assign align_text = 'start'
+    else
+      assign justify = 'flex-start'
+      assign align_text = 'start'
+  endcase
+
+  comment
+    Grid uses start/end where flex uses flex-start/flex-end, and space-between is
+    not a valid justify-items value at all, so it falls back to start.
+  endcomment
+  case h
+    when 'center'
+      assign justify_items = 'center'
+    when 'right'
+      assign justify_items = 'end'
+    else
+      assign justify_items = 'start'
+  endcase
+
+  case v
+    when 'middle'
+      assign align = 'center'
+    when 'bottom'
+      assign align = 'flex-end'
+    when 'stretch'
+      assign align = 'stretch'
+    else
+      assign align = 'flex-start'
+  endcase
+
+  case v
+    when 'middle'
+      assign align_items = 'center'
+    when 'bottom'
+      assign align_items = 'end'
+    when 'stretch'
+      assign align_items = 'stretch'
+    else
+      assign align_items = 'start'
+  endcase
+
+  assign set_text = text
+  if text == nil
+    assign set_text = true
+  endif
+-%}
+
+style="
+  --align-justify: {{ justify }};
+  --align-justify-items: {{ justify_items }};
+  --align-items: {{ align }};
+  --align-items-grid: {{ align_items }};
+  {%- if set_text %}--align-text: {{ align_text }};{% endif -%}
+"

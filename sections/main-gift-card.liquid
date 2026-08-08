@@ -1,0 +1,169 @@
+{% comment %}
+  sections/main-gift-card.liquid
+
+  The gift card a recipient receives by email.
+
+  ## Why there is no QR code
+
+  Dawn generates one by bundling a QR library. This theme does not, for two
+  reasons, and neither is laziness:
+
+  A QR code here encodes the gift card **code** — a bearer instrument. Generating
+  it needs either a bundled library, which breaks the theme's zero-external-
+  JavaScript rule and adds weight to a page most customers see once, or a
+  third-party image service, which would mean sending a redeemable code to
+  someone else's server. The second is genuinely unsafe and the first is a poor
+  trade.
+
+  What a recipient actually needs is the code, in a form they can copy or print.
+  So: large type, a copy button, and a print stylesheet that drops everything but
+  the card. The code is also selectable as plain text, which is what people
+  reach for first.
+
+  The balance line only appears when it differs from the initial value, because
+  "£50 of £50 remaining" is noise on a card nobody has spent yet.
+{% endcomment %}
+
+{%- liquid
+  assign section_settings = section.settings
+-%}
+
+<div
+  class="gift-card color-{{ section_settings.color_scheme }}"
+  {% render 'spacing', section: section_settings %}
+>
+  <div class="container gift-card__inner">
+    <header class="gift-card__header">
+      {%- if section_settings.logo != blank -%}
+        {% render 'image',
+           image: section_settings.logo,
+           alt: shop.name,
+           ratio: 'adapt',
+           sizes: '160px',
+           wrapper_class: 'gift-card__logo' %}
+      {%- else -%}
+        <p class="gift-card__shop">{{ shop.name }}</p>
+      {%- endif -%}
+
+      <h1 class="gift-card__heading">
+        {{ section_settings.heading | default: 'gift_cards.issued.title' | t }}
+      </h1>
+
+      {%- if section_settings.text != blank -%}
+        <div class="gift-card__text rte">{{ section_settings.text }}</div>
+      {%- endif -%}
+    </header>
+
+    <div class="gift-card__card">
+      {%- if section_settings.image != blank -%}
+        {% render 'image',
+           image: section_settings.image,
+           alt: '',
+           ratio: 'landscape',
+           sizes: '(min-width: 750px) 46rem, 100vw',
+           wrapper_class: 'gift-card__image' %}
+      {%- endif -%}
+
+      <p class="gift-card__value">{{ gift_card.initial_value | money }}</p>
+
+      {%- if gift_card.balance != gift_card.initial_value -%}
+        <p class="gift-card__balance">
+          {{ 'gift_cards.issued.remaining_html' | t: balance: gift_card.balance | money }}
+        </p>
+      {%- endif -%}
+
+      {%- if gift_card.expired -%}
+        <p class="gift-card__expired" role="status">{{ 'gift_cards.issued.expired' | t }}</p>
+      {%- elsif gift_card.expires_on -%}
+        <p class="gift-card__expiry">
+          {{ 'gift_cards.issued.expires_on' | t: date: gift_card.expires_on | date: format: 'date' }}
+        </p>
+      {%- endif -%}
+
+      {%- comment -%}
+        Required by the Theme Store: a QR code of at least 120 x 120px. Drawn by
+        the vendored generator in the template, and hidden until it succeeds so a
+        failure leaves a clean card rather than an empty box.
+      {%- endcomment -%}
+      <div
+        class="gift-card__qr"
+        id="GiftCardQr"
+        data-code="{{ gift_card.qr_identifier | default: gift_card.code }}"
+        role="img"
+        aria-label="{{ 'gift_cards.issued.qr_label' | t }}"
+        hidden
+      ></div>
+
+      <div class="gift-card__code-wrapper">
+        <p class="visually-hidden" id="GiftCardCodeLabel">{{ 'gift_cards.issued.code_label' | t }}</p>
+
+        {%- comment -%}
+          The code is plain selectable text first, and a copy button second.
+          People reach for selection before they look for a button, and a code
+          that cannot be selected is a code that cannot be read out over a phone.
+        {%- endcomment -%}
+        <output class="gift-card__code" aria-labelledby="GiftCardCodeLabel">
+          {{ gift_card.code | format_code }}
+        </output>
+
+        <button
+          type="button"
+          class="button button--secondary gift-card__copy"
+          data-copy-text="{{ gift_card.code | format_code | escape }}"
+        >
+          {% render 'icon', icon: 'copy', size: 16 %}
+          {{ 'gift_cards.issued.copy_code' | t }}
+        </button>
+      </div>
+
+      <p class="gift-card__instructions">{{ 'gift_cards.issued.how_to_use' | t }}</p>
+    </div>
+
+    <div class="gift-card__actions">
+      {% render 'button',
+         label: 'gift_cards.issued.shop_link' | t,
+         href: shop.url,
+         variant: 'primary' %}
+
+      {%- if gift_card.pass_url -%}
+        {%- comment -%}
+          Apple Wallet, also required. Shopify generates the pass; the theme only
+          links to it, and only when Shopify says one exists.
+        {%- endcomment -%}
+        <a class="gift-card__wallet" href="{{ gift_card.pass_url }}">
+          {{ 'gift_cards.issued.add_to_apple_wallet' | t }}
+        </a>
+      {%- endif -%}
+
+      {%- comment -%}
+        Printing is a browser capability, not a feature to reimplement. The print
+        stylesheet drops everything except the card itself.
+      {%- endcomment -%}
+      <button type="button" class="button button--secondary" data-print-page>
+        {% render 'icon', icon: 'printer', size: 16 %}
+        {{ 'gift_cards.issued.print' | t }}
+      </button>
+    </div>
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "t:sections.main_gift_card.name",
+  "tag": "section",
+  "class": "section",
+  "settings": [
+    { "type": "paragraph", "content": "t:sections.main_gift_card.paragraph" },
+    { "type": "image_picker", "id": "logo", "label": "t:sections.header.settings.logo.label" },
+    { "type": "image_picker", "id": "image", "label": "t:sections.main_gift_card.settings.image.label" },
+    { "type": "text", "id": "heading", "label": "t:shared.heading.label" },
+    { "type": "richtext", "id": "text", "label": "t:shared.text.label" },
+    { "type": "color_scheme", "id": "color_scheme", "label": "t:shared.color_scheme.label", "default": "scheme-1" },
+    { "type": "header", "content": "t:shared.spacing.section_header" },
+    { "type": "range", "id": "padding_top", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 64 },
+    { "type": "range", "id": "padding_bottom", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 64 },
+    { "type": "range", "id": "padding_top_mobile", "label": "t:shared.spacing.padding_top_mobile.label", "info": "t:shared.spacing.padding_top_mobile.info", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_bottom_mobile", "label": "t:shared.spacing.padding_bottom_mobile.label", "info": "t:shared.spacing.padding_bottom_mobile.info", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 0 }
+  ]
+}
+{% endschema %}

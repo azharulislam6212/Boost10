@@ -1,0 +1,65 @@
+{% doc %}
+  The notify-me form itself, without the wrapper.
+
+  Split out from `back-in-stock-modal.liquid` so the modal and the inline
+  presentation render exactly the same fields. Two copies of a form that writes
+  to the merchant's admin is two places for the field names to drift.
+
+  Parameters:
+    product (product, required)
+    id      (string, required)  Unique per instance
+
+  @example
+    {% render 'back-in-stock-form', product: product, id: section.id %}
+{% enddoc %}
+
+{%- liquid
+  assign variant = product.selected_or_first_available_variant
+-%}
+
+<div class="back-in-stock__body">
+  <h2 class="back-in-stock__heading">{{ 'products.back_in_stock.heading' | t }}</h2>
+
+  <p class="back-in-stock__intro">
+    {{ 'products.back_in_stock.intro_html' | t: product: product.title }}
+  </p>
+
+  <validated-form>
+    {%- form 'contact', class: 'back-in-stock__form', id: 'BackInStockForm-' | append: id -%}
+      {%- comment -%}
+        Shopify writes these into the contact record. The variant fields are
+        refreshed by `<back-in-stock-form>` on every variant change, so the merchant
+        always knows which one was asked about.
+      {%- endcomment -%}
+      <input type="hidden" name="contact[product]" value="{{ product.title | escape }}">
+      <input type="hidden" name="contact[variant]" value="{{ variant.title | escape }}">
+      <input type="hidden" name="contact[url]" value="{{ shop.url }}{{ product.url }}">
+      <input type="hidden" name="contact[body]" value="">
+
+      <label for="BackInStockEmail-{{ id }}">{{ 'products.back_in_stock.email_label' | t }}</label>
+      <input
+        id="BackInStockEmail-{{ id }}"
+        type="email"
+        name="contact[email]"
+        autocomplete="email"
+        placeholder="{{ 'products.back_in_stock.email_placeholder' | t | escape }}"
+        required
+      >
+
+      {%- if settings.back_in_stock_ask_name -%}
+        <label for="BackInStockName-{{ id }}">{{ 'products.back_in_stock.name_label' | t }}</label>
+        <input id="BackInStockName-{{ id }}" name="contact[name]" autocomplete="name">
+      {%- endif -%}
+
+      <button type="submit" class="button button--primary button--full">
+        {{ 'products.back_in_stock.submit' | t }}
+      </button>
+
+      {%- if settings.back_in_stock_disclaimer != blank -%}
+        <div class="back-in-stock__disclaimer rte">{{ settings.back_in_stock_disclaimer }}</div>
+      {%- endif -%}
+    {%- endform -%}
+  </validated-form>
+
+  <p class="back-in-stock__message" data-ref="message" role="status"></p>
+</div>

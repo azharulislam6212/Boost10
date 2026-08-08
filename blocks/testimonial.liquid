@@ -1,0 +1,84 @@
+{% comment %}
+  blocks/testimonial.liquid
+
+  A quote with an attribution.
+
+  Marked up as `<blockquote>` and `<cite>` rather than two divs, because a
+  testimonial is a quotation and screen readers announce it as one. The rating is
+  decorative stars plus a translated sentence, for the same reason as everywhere
+  else: five identical glyphs read aloud are five identical words.
+
+  The theme does not collect, store or verify reviews — that is an app's job, and
+  the Theme Store rejects themes that do it. This displays what a merchant typed.
+{% endcomment %}
+
+<motion-effect
+  {% render 'motion-attrs', kind: 'text', block: block.settings %}
+  class="testimonial"
+  {% render 'spacing', block: block.settings %}
+  {{ block.shopify_attributes }}
+>
+  {%- if block.settings.rating > 0 -%}
+    <div class="testimonial__rating">
+      <div class="testimonial__stars" aria-hidden="true">
+        {%- for i in (1..5) -%}
+          {% render 'icon', icon: 'star', size: 14, class: i <= block.settings.rating | default: false %}
+        {%- endfor -%}
+      </div>
+      <span class="visually-hidden">
+        {{- 'products.product.rating_html' | t: rating: block.settings.rating, max: 5 -}}
+      </span>
+    </div>
+  {%- endif -%}
+
+  <blockquote class="testimonial__quote">
+    {{ block.settings.quote }}
+  </blockquote>
+
+  {%- if block.settings.author != blank -%}
+    <figcaption class="testimonial__author">
+      {%- if block.settings.avatar != blank -%}
+        {% render 'image', image: block.settings.avatar, ratio: 'square', sizes: '48px', wrapper_class: 'testimonial__avatar' %}
+      {%- endif -%}
+
+      <div>
+        <cite class="testimonial__name">{{ block.settings.author }}</cite>
+        {%- if block.settings.role != blank -%}
+          <span class="testimonial__role">{{ block.settings.role }}</span>
+        {%- endif -%}
+      </div>
+    </figcaption>
+  {%- endif -%}
+</motion-effect>
+
+{% schema %}
+{
+  "name": "t:blocks.testimonial.name",
+  "tag": null,
+  "settings": [
+    { "type": "richtext", "id": "quote", "label": "t:blocks.testimonial.settings.quote.label", "default": "<p>The best purchase I have made all year.</p>" },
+    { "type": "text", "id": "author", "label": "t:blocks.testimonial.settings.author.label", "default": "Sam Taylor" },
+    { "type": "text", "id": "role", "label": "t:blocks.testimonial.settings.role.label" },
+    { "type": "image_picker", "id": "avatar", "label": "t:blocks.testimonial.settings.avatar.label" },
+    { "type": "range", "id": "rating", "label": "t:blocks.testimonial.settings.rating.label", "info": "t:blocks.testimonial.settings.rating.info", "min": 0, "max": 5, "step": 1, "default": 5 },
+    { "type": "header", "content": "t:shared.animation.header" },
+    {
+      "type": "select", "id": "animation_text", "label": "t:shared.animation.animation_text.label",
+      "options": [
+        { "value": "inherit", "label": "t:shared.animation.animation_text.options__1.label" },
+        { "value": "none", "label": "t:shared.animation.animation_text.options__2.label" },
+        { "value": "fade-in", "label": "t:shared.animation.animation_text.options__3.label" },
+        { "value": "fade-up", "label": "t:shared.animation.animation_text.options__4.label" }
+      ],
+      "default": "inherit"
+    },
+    { "type": "header", "content": "t:shared.spacing.block_header" },
+    { "type": "range", "id": "padding_top", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_right", "label": "t:shared.spacing.padding_right.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_bottom", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_left", "label": "t:shared.spacing.padding_left.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_scale_mobile", "label": "t:shared.spacing.padding_scale_mobile.label", "info": "t:shared.spacing.padding_scale_mobile.info", "min": 25, "max": 100, "step": 5, "unit": "%", "default": 75 }
+  ],
+  "presets": [{ "name": "t:blocks.testimonial.name" }]
+}
+{% endschema %}

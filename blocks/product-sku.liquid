@@ -1,0 +1,71 @@
+{% comment %}
+  blocks/product-sku.liquid
+
+  The SKU or barcode, updated when the variant changes.
+
+  Public, because whether a store shows SKUs is a real decision: a fashion store
+  never does, a parts supplier always does, and for the second kind it is the
+  field a customer searches on before they order.
+
+  The whole line is hidden when the selected variant has no value rather than
+  showing a label with nothing after it. Stores commonly fill SKUs in for some
+  variants and not others.
+{% endcomment %}
+
+{%- liquid
+  assign product = closest.product
+  assign variant = product.selected_or_first_available_variant
+  assign field = block.settings.field
+
+  if field == 'barcode'
+    assign value = variant.barcode
+  else
+    assign value = variant.sku
+  endif
+-%}
+
+{%- if product -%}
+  <product-sku
+    class="product-sku"
+    data-field="{{ field }}"
+    {% render 'spacing', block: block.settings %}
+    {% if value == blank %}hidden{% endif %}
+    {{ block.shopify_attributes }}
+  >
+    <span class="product-sku__label">
+      {%- if block.settings.label != blank -%}
+        {{ block.settings.label }}
+      {%- elsif field == 'barcode' -%}
+        {{ 'products.product.barcode' | t }}
+      {%- else -%}
+        {{ 'products.product.sku' | t }}
+      {%- endif -%}
+    </span>
+    <span class="product-sku__value" data-ref="value">{{ value }}</span>
+  </product-sku>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "t:blocks.product_sku.name",
+  "tag": null,
+  "settings": [
+    {
+      "type": "select", "id": "field", "label": "t:blocks.product_sku.settings.field.label",
+      "options": [
+        { "value": "sku", "label": "t:blocks.product_sku.settings.field.options__1.label" },
+        { "value": "barcode", "label": "t:blocks.product_sku.settings.field.options__2.label" }
+      ],
+      "default": "sku"
+    },
+    { "type": "text", "id": "label", "label": "t:blocks.product_sku.settings.label.label", "info": "t:blocks.product_sku.settings.label.info" },
+    { "type": "header", "content": "t:shared.spacing.block_header" },
+    { "type": "range", "id": "padding_top", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_right", "label": "t:shared.spacing.padding_right.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_bottom", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_left", "label": "t:shared.spacing.padding_left.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_scale_mobile", "label": "t:shared.spacing.padding_scale_mobile.label", "info": "t:shared.spacing.padding_scale_mobile.info", "min": 25, "max": 100, "step": 5, "unit": "%", "default": 75 }
+  ],
+  "presets": [{ "name": "t:blocks.product_sku.name" }]
+}
+{% endschema %}

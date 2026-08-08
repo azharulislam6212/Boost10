@@ -1,0 +1,312 @@
+ 
+
+{%- liquid
+  assign section_settings = section.settings
+  assign source = section_settings.collection
+  assign per_page = section_settings.products_per_page | default: 12
+  assign desktop = section_settings.columns_desktop | default: 3
+  assign card_sizes = '(min-width: 990px) 22vw, (min-width: 750px) 33vw, 50vw'
+  assign slots = section_settings.bundle_size | default: 5
+
+  comment
+    Tiers are three explicit settings rather than a free-text field, because a
+    merchant typing "3:30, 4:40" gets it wrong once and then cannot see why the
+    bar never moves. They are serialised into one attribute for the module,
+    which stays agnostic about how many tiers exist.
+  endcomment
+  assign tier_parts = ''
+
+  if section_settings.tier_3_enable
+    assign tier_parts = tier_parts | append: '3:' | append: section_settings.tier_3_percent | append: ','
+  endif
+  if section_settings.tier_4_enable
+    assign tier_parts = tier_parts | append: '4:' | append: section_settings.tier_4_percent | append: ','
+  endif
+  if section_settings.tier_5_enable
+    assign tier_parts = tier_parts | append: '5:' | append: section_settings.tier_5_percent | append: ','
+  endif
+
+  assign tiers = tier_parts | split: ',' | join: ','
+-%}
+
+<bundle-builder
+  class="bundle color-{{ section_settings.color_scheme }}"
+  data-section-id="{{ section.id }}"
+  data-size="{{ slots }}"
+  data-tiers="{{ tiers }}"
+  data-bundle-id="bundle-{{ section.id }}"
+  data-bundle-label="{{ section_settings.heading | escape }}"
+  {% render 'spacing', section: section_settings %}
+>
+  <div class="container bundle__layout">
+
+    {%- comment -%} ---------- left: the picker ---------- {%- endcomment -%}
+    <div class="bundle__picker" data-ref="picker">
+      <div class="bundle__picker-header">
+        {% content_for 'blocks' %}
+      </div>
+
+      {%- if source != blank and source.products.size > 0 -%}
+        <results-list
+          class="bundle__results"
+          data-section-id="{{ section.id }}"
+          data-pagination="{{ section_settings.pagination_type }}"
+          data-item-selector="[data-bundle-item]"
+          data-page="1"
+          data-total="{{ source.all_products_count }}"
+        >
+          {% paginate source.products by per_page %}
+            {%- capture children -%}
+              {%- for product in source.products -%}
+                {%- assign first_variant = product.selected_or_first_available_variant -%}
+
+                <li class="product-grid__item" data-bundle-item data-product-id="{{ product.id }}">
+                  <bundle-card
+                    class="bundle-card"
+                    data-product-id="{{ product.id }}"
+                    data-variant-id="{{ first_variant.id }}"
+                    data-previous-variant-id="{{ first_variant.id }}"
+                    data-title="{{ product.title | escape }}"
+                    data-url="{{ product.url }}"
+                    data-image="{{ product.featured_image | image_url: width: 200 }}"
+                  >
+                    <script type="application/json" data-variants>
+                      {{- product.variants | json -}}
+                    </script>
+
+                    <a class="bundle-card__media" href="{{ product.url }}" tabindex="-1" aria-hidden="true">
+                      {% render 'image',
+                         image: product.featured_image,
+                         alt: '',
+                         ratio: settings.card_image_ratio,
+                         sizes: card_sizes %}
+                    </a>
+
+                    <div class="bundle-card__info">
+                      <a class="bundle-card__title" href="{{ product.url }}">{{ product.title }}</a>
+
+                      <span class="bundle-card__price" data-ref="price">
+                        {{- first_variant.price | money -}}
+                      </span>
+
+                      {%- unless product.has_only_default_variant -%}
+                        <label class="visually-hidden" for="BundleVariant-{{ section.id }}-{{ product.id }}">
+                          {{ 'products.variants.legend' | t }}
+                        </label>
+                        <select
+                          id="BundleVariant-{{ section.id }}-{{ product.id }}"
+                          class="bundle-card__variants"
+                          data-ref="variantSelect"
+                        >
+                          {%- for variant in product.variants -%}
+                            <option
+                              value="{{ variant.id }}"
+                              {% if variant == first_variant %}selected{% endif %}
+                              {% unless variant.available %}disabled{% endunless %}
+                            >
+                              {{ variant.title }}
+                              {%- unless variant.available %} &ndash; {{ 'products.product.sold_out' | t }}{% endunless -%}
+                            </option>
+                          {%- endfor -%}
+                        </select>
+                      {%- endunless -%}
+
+                      <p class="bundle-card__stock" data-ref="stock" {% if first_variant.available %}hidden{% endif %}>
+                        {{- 'products.product.sold_out' | t -}}
+                      </p>
+
+                      <button
+                        type="button"
+                        class="button button--secondary button--small bundle-card__toggle"
+                        data-ref="toggle"
+                        data-bundle-toggle
+                        aria-pressed="false"
+                        {% unless first_variant.available %}disabled{% endunless %}
+                      >
+                        <span data-toggle-label>{{ 'products.bundle.add' | t }}</span>
+                      </button>
+                    </div>
+                  </bundle-card>
+                </li>
+              {%- endfor -%}
+            {%- endcapture -%}
+
+            {%- assign bundle_grid_id = 'bundle-grid-' | append: section.id -%}
+
+            {% render 'product-grid',
+              children: children,
+              paginate: paginate,
+              section: section,
+              total: source.all_products_count,
+              item_selector: '[data-bundle-item]',
+              id: bundle_grid_id %}
+          {% endpaginate %}
+        </results-list>
+      {%- else -%}
+        <p class="bundle__empty">{{ 'products.bundle.choose_collection' | t }}</p>
+      {%- endif -%}
+    </div>
+
+    {%- comment -%} ---------- right: the tray ---------- {%- endcomment -%}
+    <aside
+      class="bundle__tray{% if section_settings.sticky_tray %} bundle__tray--sticky{% endif %}"
+      data-ref="tray"
+      aria-label="{{ 'products.bundle.summary' | t | escape }}"
+    >
+      <h2 class="bundle__title">{{ section_settings.heading }}</h2>
+
+      {%- if section_settings.subheading != blank -%}
+        <div class="bundle__subheading rte">{{ section_settings.subheading }}</div>
+      {%- endif -%}
+
+      <ol class="bundle__slots" data-ref="slots" role="list"></ol>
+
+      {%- comment -%}
+        The slot template lives in Liquid so the markup stays with every other
+        piece of markup in the theme. The module fills the values; it does not
+        invent the structure.
+      {%- endcomment -%}
+      <template data-ref="slotTemplate">
+        <span class="bundle-slot__number" aria-hidden="true"></span>
+        <img class="bundle-slot__image" data-slot-image alt="" width="56" height="56" loading="lazy" hidden>
+        <span class="bundle-slot__body">
+          <span class="bundle-slot__title" data-slot-title></span>
+          <span class="bundle-slot__variant" data-slot-variant hidden></span>
+        </span>
+        <span class="bundle-slot__price" data-slot-price></span>
+        <button type="button" class="bundle-slot__remove" data-slot-remove>
+          {% render 'icon', icon: 'close', size: 14 %}
+        </button>
+      </template>
+
+      <div class="bundle__progress">
+        <div
+          class="bundle__progress-track"
+          data-ref="progressTrack"
+          role="progressbar"
+          aria-valuemin="0"
+          aria-valuemax="{{ slots }}"
+          aria-valuenow="0"
+        >
+          <span class="bundle__progress-fill"></span>
+        </div>
+
+        <p class="bundle__progress-label" data-ref="progress" role="status"></p>
+      </div>
+
+      <dl class="bundle__totals">
+        <div class="bundle__row">
+          <dt>{{ 'products.bundle.subtotal' | t }}</dt>
+          <dd data-ref="subtotal">{{ 0 | money }}</dd>
+        </div>
+
+        <div class="bundle__row bundle__row--discount">
+          <dt class="visually-hidden">{{ 'products.bundle.total_saved' | t: amount: '' | strip }}</dt>
+          <dd data-ref="discount" hidden></dd>
+        </div>
+
+        <div class="bundle__row bundle__row--total">
+          <dt>{{ 'products.bundle.total' | t }}</dt>
+          <dd>
+            <s class="bundle__original" data-ref="originalTotal" hidden></s>
+            <span data-ref="total">{{ 0 | money }}</span>
+          </dd>
+        </div>
+      </dl>
+
+      {%- if section_settings.enable_promo_code -%}
+        <bundle-discount class="bundle__discount">
+          <form data-ref="form" class="bundle__discount-form">
+            <label for="BundlePromo-{{ section.id }}">{{ 'cart.promo.label' | t }}</label>
+            <div class="bundle__discount-field">
+              <input
+                id="BundlePromo-{{ section.id }}"
+                data-ref="input"
+                name="discount"
+                autocomplete="off"
+                placeholder="{{ 'cart.promo.placeholder' | t | escape }}"
+              >
+              <button type="submit" class="button button--secondary" data-ref="submit">
+                {{ 'cart.promo.apply' | t }}
+              </button>
+            </div>
+          </form>
+
+          <p class="bundle__discount-message" data-ref="message" role="status"></p>
+        </bundle-discount>
+      {%- endif -%}
+
+      <button type="button" class="button button--primary button--full bundle__submit" data-ref="submit" disabled>
+        {{ 'products.bundle.add_to_cart' | t }}
+      </button>
+
+      <p class="bundle__error" data-ref="error" role="alert" hidden></p>
+
+      <p class="bundle__notice">{{ 'products.bundle.applied_at_checkout' | t }}</p>
+
+      {%- if section_settings.disclaimer != blank -%}
+        <div class="bundle__disclaimer rte">{{ section_settings.disclaimer }}</div>
+      {%- endif -%}
+    </aside>
+  </div>
+</bundle-builder>
+
+{% schema %}
+{
+  "name": "t:sections.bundle_builder.name",
+  "tag": "section",
+  "class": "section",
+  "blocks": [{ "type": "@theme" }, { "type": "@app" }],
+  "settings": [
+    { "type": "paragraph", "content": "t:sections.bundle_builder.paragraph" },
+    { "type": "text", "id": "heading", "label": "t:shared.heading.label", "default": "Build your bundle" },
+    { "type": "richtext", "id": "subheading", "label": "t:sections.bundle_builder.settings.subheading.label" },
+    { "type": "collection", "id": "collection", "label": "t:sections.featured_collection.settings.collection.label" },
+    { "type": "range", "id": "bundle_size", "label": "t:sections.bundle_builder.settings.bundle_size.label", "min": 2, "max": 8, "step": 1, "default": 5 },
+    { "type": "checkbox", "id": "sticky_tray", "label": "t:sections.bundle_builder.settings.sticky_tray.label", "default": true },
+    { "type": "header", "content": "t:sections.bundle_builder.headers.discounts" },
+    { "type": "paragraph", "content": "t:sections.bundle_builder.paragraphs.discounts" },
+    { "type": "checkbox", "id": "tier_3_enable", "label": "t:sections.bundle_builder.settings.tier_3_enable.label", "default": true },
+    { "type": "range", "id": "tier_3_percent", "label": "t:sections.bundle_builder.settings.tier_3_percent.label", "min": 5, "max": 70, "step": 5, "unit": "%", "default": 30 },
+    { "type": "checkbox", "id": "tier_4_enable", "label": "t:sections.bundle_builder.settings.tier_4_enable.label", "default": true },
+    { "type": "range", "id": "tier_4_percent", "label": "t:sections.bundle_builder.settings.tier_4_percent.label", "min": 5, "max": 70, "step": 5, "unit": "%", "default": 40 },
+    { "type": "checkbox", "id": "tier_5_enable", "label": "t:sections.bundle_builder.settings.tier_5_enable.label", "default": true },
+    { "type": "range", "id": "tier_5_percent", "label": "t:sections.bundle_builder.settings.tier_5_percent.label", "min": 5, "max": 70, "step": 5, "unit": "%", "default": 50 },
+    { "type": "checkbox", "id": "enable_promo_code", "label": "t:sections.bundle_builder.settings.enable_promo_code.label", "info": "t:sections.bundle_builder.settings.enable_promo_code.info", "default": false },
+    { "type": "richtext", "id": "disclaimer", "label": "t:sections.bundle_builder.settings.disclaimer.label", "info": "t:sections.bundle_builder.settings.disclaimer.info" },
+    { "type": "header", "content": "t:sections.bundle_builder.headers.picker" },
+    { "type": "range", "id": "products_per_page", "label": "t:sections.main_collection.settings.products_per_page.label", "min": 8, "max": 48, "step": 4, "default": 12 },
+    { "type": "range", "id": "columns_desktop", "label": "t:shared.columns.desktop.label", "min": 2, "max": 4, "step": 1, "default": 3 },
+    { "type": "range", "id": "columns_tablet", "label": "t:shared.columns.tablet.label", "min": 2, "max": 4, "step": 1, "default": 2 },
+      {
+      "type": "select", "id": "columns_mobile", "label": "t:shared.columns.mobile.label",
+      "options": [
+        { "value": "1", "label": "1" },
+        { "value": "2", "label": "2" }
+      ],
+      "default": "2"
+    },
+    {
+      "type": "select", "id": "pagination_type", "label": "t:shared.pagination.label", "info": "t:shared.pagination.info",
+      "options": [
+        { "value": "paginate", "label": "t:shared.pagination.options__1.label" },
+        { "value": "load-more", "label": "t:shared.pagination.options__2.label" },
+        { "value": "infinite", "label": "t:shared.pagination.options__3.label" }
+      ],
+      "default": "load-more"
+    },
+    { "type": "color_scheme", "id": "color_scheme", "label": "t:shared.color_scheme.label", "default": "scheme-1" },
+    { "type": "header", "content": "t:shared.spacing.section_header" },
+    { "type": "range", "id": "padding_top", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 32 },
+    { "type": "range", "id": "padding_bottom", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 64 },
+    { "type": "range", "id": "padding_top_mobile", "label": "t:shared.spacing.padding_top_mobile.label", "info": "t:shared.spacing.padding_top_mobile.info", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_bottom_mobile", "label": "t:shared.spacing.padding_bottom_mobile.label", "info": "t:shared.spacing.padding_bottom_mobile.info", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 0 }
+  ],
+  "presets": [
+    {
+      "name": "t:sections.bundle_builder.name",
+      "blocks": [{ "type": "heading" }, { "type": "text" }]
+    }
+  ]
+}
+{% endschema %}

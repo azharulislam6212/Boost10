@@ -1,0 +1,123 @@
+{% comment %}
+  templates/gift_card.liquid
+
+  A Liquid template, not JSON, because Shopify renders the gift card outside the
+  normal layout: there is no header, no footer and no section group here. The
+  document is written out in full.
+
+  It is deliberately self-contained. A recipient opens this from an email, often
+  on a phone they will hand to a cashier, sometimes printed. It must work with no
+  JavaScript at all, so the code is plain text in the markup and the two scripted
+  affordances — copy and print — are progressive.
+{% endcomment %}
+
+<!doctype html>
+<html
+  class="no-js"
+  lang="{{ request.locale.iso_code }}"
+  dir="{% if request.locale.iso_code == 'ar' or request.locale.iso_code == 'he' or request.locale.iso_code == 'fa' %}rtl{% else %}ltr{% endif %}"
+>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex, nofollow">
+
+    <title>{{ 'gift_cards.issued.title' | t }} &ndash; {{ shop.name }}</title>
+
+    <link rel="canonical" href="{{ canonical_url }}">
+    {% if settings.favicon != blank %}
+      <link rel="icon" type="image/png" href="{{ settings.favicon | image_url: width: 32, height: 32 }}">
+    {% endif %}
+
+    {{ content_for_header }}
+
+    {% render 'color-schemes' %}
+    {{ 'base.css' | asset_url | stylesheet_tag: preload: true }}
+
+    <script>
+      document.documentElement.className = document.documentElement.className.replace('no-js', 'js');
+    </script>
+
+    <style>
+      /* Printing gives the recipient the card and nothing else. A printed page
+         carrying a shop header and a set of buttons wastes ink on a document
+         whose entire purpose is one code. */
+      @media print {
+        .gift-card__actions,
+        .gift-card__copy,
+        .gift-card__instructions { display: none !important; }
+
+        body { background: none; }
+        .gift-card__card { border: 1px solid #000; box-shadow: none; }
+      }
+    </style>
+  </head>
+
+  <body class="template-gift-card color-scheme-1">
+    <main id="MainContent" class="layout__main" role="main">
+      {% section 'main-gift-card' %}
+    </main>
+
+    <script type="module">
+      // The QR code is a Theme Store requirement (minimum 120 x 120px), and the
+      // library is vendored rather than fetched: a data-URI service would mean
+      // sending a redeemable code to a third party's server, and a hand-written
+      // encoder would mean betting a bearer instrument on getting Reed-Solomon
+      // and mask selection right.
+      import qrcode from '{{ 'qrcode.js' | asset_url }}';
+
+      const target = document.getElementById('GiftCardQr');
+
+      if (target) {
+        try {
+          // Type 0 auto-sizes to the content; 'M' error correction is what
+          // Shopify's own gift card passes use, and survives a phone screen
+          // being photographed at an angle.
+          const qr = qrcode(0, 'M');
+          qr.addData(target.dataset.code);
+          qr.make();
+
+          // A 4-module quiet zone is part of the spec, not decoration: without
+          // it many scanners refuse to read the code at all.
+          target.innerHTML = qr.createSvgTag({ cellSize: 5, margin: 4, scalable: true });
+          target.removeAttribute('hidden');
+        } catch (error) {
+          // A gift card without a QR code is still redeemable by typing the
+          // code, so a failure hides the image rather than breaking the page.
+          console.warn('[Boost10] The QR code could not be drawn.', error);
+        }
+      }
+
+      // Two small enhancements, inline because this template loads none of the
+      // theme's modules: importing the whole component system for a copy button
+      // on a page seen once would be the wrong trade.
+      const copy = document.querySelector('[data-copy-text]');
+
+      copy?.addEventListener('click', async () => {
+        const text = copy.dataset.copyText;
+        const original = copy.textContent;
+
+        try {
+          await navigator.clipboard.writeText(text);
+          copy.textContent = {{ 'gift_cards.issued.copied' | t | json }};
+        } catch {
+          // Clipboard access is denied in some contexts. Selecting the code is
+          // the fallback, and it is what most people do anyway.
+          const output = document.querySelector('.gift-card__code');
+          if (output) {
+            const range = document.createRange();
+            range.selectNodeContents(output);
+            const selection = window.getSelection();
+            selection?.removeAllRanges();
+            selection?.addRange(range);
+          }
+        }
+
+        window.setTimeout(() => { copy.textContent = original; }, 2000);
+      });
+
+      document.querySelector('[data-print-page]')?.addEventListener('click', () => window.print());
+    </script>
+  </body>
+</html>

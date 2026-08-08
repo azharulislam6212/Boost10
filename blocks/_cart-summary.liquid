@@ -1,0 +1,87 @@
+{% comment %}
+  blocks/_cart-summary.liquid — private.
+
+  Totals and checkout. The note, the discount field and the shipping estimator are
+  settings here rather than separate merchant blocks: they belong inside the
+  summary card visually, and a merchant dragging the discount field away from the
+  subtotal produces a layout nobody wants.
+
+  What a merchant genuinely wants to arrange — a returns promise under the
+  checkout button, a payment-security line, an app block — goes in the section's
+  own block region, which sits below this.
+{% endcomment %}
+
+{%- unless cart.empty? -%}
+  <aside class="cart-summary" aria-label="{{ 'cart.general.total' | t }}" {{ block.shopify_attributes }}>
+    {%- if settings.show_cart_note and block.settings.show_note -%}
+      <cart-note class="cart-note">
+        <label for="CartPageNote">{{ 'cart.note.label' | t }}</label>
+        <textarea
+          id="CartPageNote"
+          data-ref="input"
+          name="note"
+          placeholder="{{ 'cart.note.placeholder' | t | escape }}"
+          data-morph-preserve-value
+        >{{ cart.note }}</textarea>
+        <p class="cart-note__status" data-ref="status" role="status"></p>
+      </cart-note>
+    {%- endif -%}
+
+    {%- if settings.enable_promo_code and block.settings.show_discount -%}
+      <promo-code class="promo-code">
+        <form data-ref="form">
+          <label for="CartPageDiscount">{{ 'cart.promo.label' | t }}</label>
+          <input id="CartPageDiscount" data-ref="input" name="discount" autocomplete="off">
+          <button type="submit" data-ref="submit">{{ 'cart.promo.apply' | t }}</button>
+        </form>
+        <ul class="promo-code__list" data-ref="list" role="list" hidden></ul>
+        <p class="promo-code__message" data-ref="message" role="status" hidden></p>
+      </promo-code>
+    {%- endif -%}
+
+    {%- if settings.enable_shipping_calculator and block.settings.show_shipping -%}
+      {% render 'shipping-calculator', id: 'page' %}
+    {%- endif -%}
+
+    <div class="cart-summary__totals">
+      {%- if cart.cart_level_discount_applications.size > 0 -%}
+        <ul class="cart-summary__discounts" role="list">
+          {%- for discount in cart.cart_level_discount_applications -%}
+            <li>
+              {{ discount.title }}
+              <span>&minus;{{ discount.total_allocated_amount | money }}</span>
+            </li>
+          {%- endfor -%}
+        </ul>
+      {%- endif -%}
+
+      <div class="cart-summary__subtotal">
+        <span>{{ 'cart.general.subtotal' | t }}</span>
+        <span data-cart-subtotal>{{ cart.total_price | money }}</span>
+      </div>
+
+      <p class="cart-summary__notice">{{ 'cart.general.taxes_and_shipping_at_checkout' | t }}</p>
+
+      <button type="submit" name="checkout" class="button button--primary button--full">
+        {{ 'cart.general.checkout' | t }}
+      </button>
+
+      {%- if additional_checkout_buttons and block.settings.show_dynamic_checkout -%}
+        <div class="cart-summary__dynamic">{{ content_for_additional_checkout_buttons }}</div>
+      {%- endif -%}
+    </div>
+  </aside>
+{%- endunless -%}
+
+{% schema %}
+{
+  "name": "t:blocks.cart_summary.name",
+  "tag": null,
+  "settings": [
+    { "type": "checkbox", "id": "show_note", "label": "t:settings_schema.cart.settings.show_cart_note.label", "default": true },
+    { "type": "checkbox", "id": "show_discount", "label": "t:settings_schema.cart.settings.enable_promo_code.label", "default": true },
+    { "type": "checkbox", "id": "show_shipping", "label": "t:settings_schema.cart.settings.enable_shipping_calculator.label", "default": true },
+    { "type": "checkbox", "id": "show_dynamic_checkout", "label": "t:sections.main_cart.settings.show_dynamic_checkout.label", "info": "t:sections.main_cart.settings.show_dynamic_checkout.info", "default": true }
+  ]
+}
+{% endschema %}

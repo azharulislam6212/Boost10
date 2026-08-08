@@ -1,0 +1,120 @@
+{% doc %}
+  Renders the country and language selectors.
+
+  Both wrap Shopify's own `localization` form, which is the only supported way to
+  change market or locale and works without JavaScript.
+  `<localization-form>` turns a list of a hundred and fifty submit buttons into a
+  searchable disclosure; it does not replace the form.
+
+  Parameters:
+    id_prefix (string, required) Unique per instance, e.g. 'Footer'
+    class     (string, optional)
+
+  @example
+    {% render 'localization-selectors', id_prefix: 'Footer' %}
+{% enddoc %}
+
+{% assign id_prefix = id_prefix | default: 'country' %}
+<div class="localization {{ class }}">
+  {%- if settings.enable_country_selector and localization.available_countries.size > 1 -%}
+    <localization-form data-type="country">
+      {%- form 'localization', id: id_prefix, class: 'localization__form' -%}
+        <input type="hidden" name="country_code" value="{{ localization.country.iso_code }}" data-ref="input">
+
+        <button
+          type="button"
+          class="localization__trigger"
+          data-ref="trigger"
+          aria-expanded="false"
+          aria-controls="{{ id_prefix }}CountryPanel"
+        >
+          <span class="visually-hidden">{{ 'localization.country_label' | t }}</span>
+          <span aria-hidden="true">{{ localization.country.name }} ({{ cart.currency.iso_code }})</span>
+          {% render 'icon', icon: 'chevron-down' %}
+        </button>
+
+        <div class="localization__panel" id="{{ id_prefix }}CountryPanel" data-ref="panel" data-lenis-prevent hidden>
+          <div data-filter-wrapper>
+            <label class="visually-hidden" for="{{ id_prefix }}CountryFilter">
+              {{ 'localization.search_countries' | t }}
+            </label>
+            <input
+              id="{{ id_prefix }}CountryFilter"
+              type="search"
+              data-ref="filter"
+              autocomplete="off"
+              placeholder="{{ 'localization.search_countries' | t | escape }}"
+            >
+          </div>
+
+          <ul class="localization__list" data-ref="list" role="listbox">
+            {%- for country in localization.available_countries -%}
+              <li>
+                <button
+                  type="submit"
+                  name="country_code"
+                  value="{{ country.iso_code }}"
+                  data-option
+                  data-label="{{ country.name | escape }}"
+                  {% if country.iso_code == localization.country.iso_code %}aria-selected="true"{% endif %}
+                >
+                  {{ country.name }}
+                  <span class="localization__currency">{{ country.currency.iso_code }}</span>
+                </button>
+              </li>
+            {%- endfor -%}
+          </ul>
+
+          <p class="localization__empty" data-ref="empty" hidden>
+            {{ 'localization.no_country_results' | t }}
+          </p>
+        </div>
+      {%- endform -%}
+    </localization-form>
+  {%- endif -%}
+
+  {%- if settings.enable_language_selector and localization.available_languages.size > 1 -%}
+
+    {% assign id_prefix = id_prefix | default: 'Language' %}
+
+
+    <localization-form data-type="language">
+      {%- form 'localization', id: id_prefix, class: 'localization__form' -%}
+        <input type="hidden" name="locale_code" value="{{ localization.language.iso_code }}" data-ref="input">
+
+        <button
+          type="button"
+          class="localization__trigger"
+          data-ref="trigger"
+          aria-expanded="false"
+          aria-controls="{{ id_prefix }}LanguagePanel"
+        >
+          <span class="visually-hidden">{{ 'localization.language_label' | t }}</span>
+          <span aria-hidden="true">{{ localization.language.endonym_name | capitalize }}</span>
+          {% render 'icon', icon: 'chevron-down' %}
+        </button>
+
+        <div class="localization__panel" id="{{ id_prefix }}LanguagePanel" data-ref="panel" hidden>
+          <ul class="localization__list" data-ref="list" role="listbox">
+            {%- for language in localization.available_languages -%}
+              <li>
+                <button
+                  type="submit"
+                  name="locale_code"
+                  value="{{ language.iso_code }}"
+                  data-option
+                  data-label="{{ language.endonym_name | escape }}"
+                  lang="{{ language.iso_code }}"
+                  {% if language.iso_code == localization.language.iso_code %}aria-selected="true"{% endif %}
+                >
+                  {{ language.endonym_name | capitalize }}
+                </button>
+              </li>
+            {%- endfor -%}
+          </ul>
+        </div>
+      {%- endform -%}
+    </localization-form>
+  {%- endif -%}
+</div>
+

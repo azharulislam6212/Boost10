@@ -1,0 +1,45 @@
+{% doc %}
+  Global ARIA live regions.
+
+  Rendered EXACTLY ONCE per document, from the layout. Never render this inside
+  a section, snippet or component: duplicate `aria-live` containers cause screen
+  readers to announce the same message two or more times, and the duplicate ids
+  make `document.getElementById` non-deterministic.
+
+  Components must not create their own live regions either. They write into
+  these two shared ones through the helpers in `assets/utilities.js`:
+
+    import { announce, announceUrgent } from '@theme/utilities';
+
+    announce(Theme.strings.itemAdded);        // polite  -> #LiveRegion
+    announceUrgent(Theme.strings.cartError);  // assertive -> #LiveRegionAssertive
+
+  Choosing a region:
+    polite    — status that can wait for a pause in speech: cart updated,
+                filters applied, results count changed, cart updated.
+    assertive — errors and blocking states the customer must hear immediately:
+                failed add-to-cart, invalid discount code, form validation.
+
+  Both regions are `aria-atomic="true"`, so the full message is re-read on every
+  change rather than only the diff. Both are visually hidden, never `display:
+  none` — a hidden-by-display region is ignored by assistive technology.
+
+  @example
+    {% render 'live-region' %}
+{% enddoc %}
+
+<div
+  id="LiveRegion"
+  class="visually-hidden"
+  role="status"
+  aria-live="polite"
+  aria-atomic="true"
+></div>
+
+<div
+  id="LiveRegionAssertive"
+  class="visually-hidden"
+  role="alert"
+  aria-live="assertive"
+  aria-atomic="true"
+></div>

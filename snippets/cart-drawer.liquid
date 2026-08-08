@@ -1,0 +1,375 @@
+{% doc %}
+  Renders the cart drawer.
+
+  Rendered by `sections/cart-drawer.liquid` inside the overlay group, so it is
+  addressable by the Section Rendering API — which is how every cart mutation
+  refreshes it in the same request that changed the cart.
+
+  `data-sections` lists what should re-render alongside it. Keeping the list on
+  the element rather than in JavaScript means a merchant who removes the free
+  shipping bar stops paying for it being rendered.
+
+  The scrollable body carries `data-lenis-prevent`, which `<drawer-component>`
+  also adds defensively — without it Lenis swallows the wheel event and a tall
+  cart refuses to scroll.
+
+  @example
+    {% render 'cart-drawer' %}
+{% enddoc %}
+
+<cart-drawer
+  id="CartDrawer"
+  class="cart-drawer drawer"
+  data-placement="end"
+  data-overlay-type="cart"
+  data-sections="cart-drawer,header"
+>
+  <dialog class="drawer__dialog" data-ref="dialog" aria-label="{{ 'cart.drawer.title' | t }}">
+    <div class="drawer__panel" data-ref="panel">
+      <header class="drawer__header">
+        <h2 class="drawer__title">
+          {{ 'cart.drawer.title' | t }}
+          <span class="cart-drawer__count">({{ cart.item_count }})</span>
+        </h2>
+
+        <button
+          type="button"
+          class="drawer__close"
+          data-overlay-close
+          aria-label="{{ 'cart.drawer.close' | t }}"
+        >
+          {% render 'icon', icon: 'close' %}
+        </button>
+      </header>
+
+      {%- if settings.free_shipping_enabled -%}
+        <free-shipping-bar
+          class="free-shipping-bar"
+          data-threshold="{{ settings.free_shipping_threshold | times: 100 }}"
+        >
+          <p class="free-shipping-bar__message" data-ref="message"></p>
+          <div
+            class="free-shipping-bar__track"
+            data-ref="track"
+            role="progressbar"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-valuenow="0"
+            aria-label="{{ 'cart.free_shipping.progress_label' | t }}"
+          >
+            <span class="free-shipping-bar__fill" data-ref="fill"></span>
+          </div>
+        </free-shipping-bar>
+      {%- endif -%}
+
+      <div class="drawer__body" data-ref="body" data-lenis-prevent>
+        {%- if cart.item_count > 0 -%}
+          <cart-items class="cart-items" data-section-id="cart-drawer">
+            {%- for item in cart.items -%}
+              {% render 'cart-item', item: item, index: forloop.index, compact: true %}
+            {%- endfor -%}
+          </cart-items>
+
+          {%- if settings.enable_gift_wrap and settings.gift_wrap_product != blank -%}
+            {%- assign wrap_line = cart.items | where: 'product_id', settings.gift_wrap_product.id | first -%}
+            <gift-wrap-toggle
+              class="gift-wrap"
+              data-variant-id="{{ settings.gift_wrap_product.variants.first.id }}"
+              {% if wrap_line %}data-key="{{ wrap_line.key }}"{% endif %}
+            >
+              <label class="gift-wrap__label">
+                <input type="checkbox" data-ref="checkbox" {% if wrap_line %}checked{% endif %}>
+                <span>
+                  {{- 'cart.gift_wrap.price_html' | t: price: settings.gift_wrap_product.price | money -}}
+                </span>
+              </label>
+            </gift-wrap-toggle>
+          {%- endif -%}
+
+          {%- if settings.enable_cart_upsells -%}
+            {%- comment -%}
+              The JSON recommendations endpoint rather than a rendered section,
+              because this row offers a variant selector and the section version
+              would mean a second request to get the variant data.
+            {%- endcomment -%}
+            <cart-upsell
+              class="cart-upsell"
+              data-product-id="{{ cart.items.first.product_id }}"
+              data-limit="{{ settings.cart_upsell_count | default: 2 }}"
+              data-intent="complementary"
+              hidden
+            >
+              <h3 class="cart-upsell__title" data-ref="heading" hidden>
+                {{ 'cart.upsell.title' | t }}
+              </h3>
+
+              <div class="cart-upsell__list" data-ref="list"></div>
+
+              <template data-ref="template">
+                <div class="cart-upsell__item" data-upsell-item>
+                  <img class="cart-upsell__image" data-upsell-image alt="" width="56" height="56" loading="lazy">
+
+                  <div class="cart-upsell__info">
+                    <a class="cart-upsell__title-link" data-upsell-title href="#"></a>
+                    <span class="cart-upsell__price" data-upsell-price></span>
+
+                    <label class="visually-hidden" data-upsell-variant-label>
+                      {{ 'cart.upsell.choose_variant' | t }}
+                    </label>
+                    <select class="cart-upsell__variant" data-upsell-variant hidden></select>
+                  </div>
+
+                  <button type="button" class="button button--secondary button--small" data-upsell-add>
+                    {{ 'cart.upsell.add' | t }}
+                  </button>
+                </div>
+              </template>
+            </cart-upsell>
+          {%- endif -%}
+
+          {%- if settings.enable_free_gift and settings.free_gift_product != blank -%}
+            {%- liquid
+              assign gift_variant = settings.free_gift_product.variants.first
+              assign gift_line = cart.items | where: 'product_id', settings.free_gift_product.id | first
+            -%}
+
+            <cart-free-gift
+              class="cart-free-gift"
+              data-threshold="{{ settings.free_gift_threshold | times: 100 }}"
+              data-variant-id="{{ gift_variant.id }}"
+              data-claimed="{% if gift_line %}true{% else %}false{% endif %}"
+            >
+              <div class="cart-free-gift__media">
+                {% render 'image', image: settings.free_gift_product.featured_image, alt: '', ratio: 'square', sizes: '56px' %}
+              </div>
+
+              <div class="cart-free-gift__body">
+                <p class="cart-free-gift__heading">{{ 'cart.free_gift.heading' | t }}</p>
+                <p class="cart-free-gift__message" data-ref="message" role="status"></p>
+                <p class="cart-free-gift__notice">{{ 'cart.free_gift.applied_at_checkout' | t }}</p>
+              </div>
+
+              {%- comment -%}
+                A button, never automatic. A product appearing in a cart without
+                the customer asking reads as a bug or a trick.
+              {%- endcomment -%}
+              <button type="button" class="button button--secondary button--small" data-ref="claim" hidden>
+                {{ 'cart.free_gift.claim' | t }}
+              </button>
+            </cart-free-gift>
+          {%- endif -%}
+        {%- else -%}
+          <div class="cart-drawer__empty">
+            <p class="cart-drawer__empty-title">{{ 'cart.drawer.empty' | t }}</p>
+            <p>{{ 'cart.general.empty_subtext' | t }}</p>
+            {% render 'button',
+               label: 'cart.general.continue_shopping' | t,
+               href: routes.all_products_collection_url,
+               attributes: 'data-overlay-close' %}
+          </div>
+        {%- endif -%}
+      </div>
+
+      {%- if cart.item_count > 0 -%}
+        <footer class="drawer__footer cart-drawer__footer">
+          {%- comment -%}
+            The three extras live in tabs rather than stacked open.
+
+            Notes, a promo field and a shipping estimate are each wanted by a
+            minority of customers and by almost none at the same time. Stacked,
+            they push the subtotal and the checkout button below the fold on a
+            phone — which costs conversions from everyone to serve the few.
+
+            `<tabs-element>` gives this arrow-key movement, roving tabindex and
+            the right ARIA. Every panel's contents are the same components used
+            on the cart page, so a customer who opens the drawer and a customer
+            who opens the cart page get the same behaviour, not two
+            implementations of it.
+          {%- endcomment -%}
+          {%- liquid
+            assign show_note = settings.show_cart_note
+            assign show_discount = settings.enable_promo_code
+            assign show_shipping = settings.enable_shipping_calculator
+
+            assign tab_count = 0
+            if show_note
+              assign tab_count = tab_count | plus: 1
+            endif
+            if show_discount
+              assign tab_count = tab_count | plus: 1
+            endif
+            if show_shipping
+              assign tab_count = tab_count | plus: 1
+            endif
+          -%}
+
+          {%- if tab_count > 0 -%}
+            <tabs-element class="cart-tabs">
+              <div class="cart-tabs__list" role="tablist" aria-label="{{ 'cart.tabs.label' | t }}">
+                {%- assign first_assigned = false -%}
+
+                {%- if show_note -%}
+                  <button
+                    type="button"
+                    class="cart-tabs__tab"
+                    role="tab"
+                    id="CartTab-note"
+                    aria-controls="CartPanel-note"
+                    aria-selected="true"
+                    tabindex="0"
+                  >
+                    {% render 'icon', icon: 'note', size: 14 %}
+                    {{ 'cart.note.add' | t }}
+                  </button>
+                  {%- assign first_assigned = true -%}
+                {%- endif -%}
+
+                {%- if show_discount -%}
+                  <button
+                    type="button"
+                    class="cart-tabs__tab"
+                    role="tab"
+                    id="CartTab-discount"
+                    aria-controls="CartPanel-discount"
+                    aria-selected="{% unless first_assigned %}true{% else %}false{% endunless %}"
+                    tabindex="{% unless first_assigned %}0{% else %}-1{% endunless %}"
+                  >
+                    {% render 'icon', icon: 'tag', size: 14 %}
+                    {{ 'cart.promo.label' | t }}
+                  </button>
+                  {%- assign first_assigned = true -%}
+                {%- endif -%}
+
+                {%- if show_shipping -%}
+                  <button
+                    type="button"
+                    class="cart-tabs__tab"
+                    role="tab"
+                    id="CartTab-shipping"
+                    aria-controls="CartPanel-shipping"
+                    aria-selected="{% unless first_assigned %}true{% else %}false{% endunless %}"
+                    tabindex="{% unless first_assigned %}0{% else %}-1{% endunless %}"
+                  >
+                    {% render 'icon', icon: 'truck', size: 14 %}
+                    {{ 'cart.shipping.title' | t }}
+                  </button>
+                {%- endif -%}
+              </div>
+
+              {%- assign first_panel = true -%}
+
+              {%- if show_note -%}
+                <div
+                  class="cart-tabs__panel"
+                  role="tabpanel"
+                  id="CartPanel-note"
+                  aria-labelledby="CartTab-note"
+                  tabindex="0"
+                >
+                  <cart-note class="cart-note">
+                    <label class="visually-hidden" for="CartNote">{{ 'cart.note.label' | t }}</label>
+                    <textarea
+                      id="CartNote"
+                      data-ref="input"
+                      name="note"
+                      rows="3"
+                      placeholder="{{ 'cart.note.placeholder' | t | escape }}"
+                      data-morph-preserve-value
+                    >{{ cart.note }}</textarea>
+                    <p class="cart-note__status" data-ref="status" role="status"></p>
+                  </cart-note>
+                </div>
+                {%- assign first_panel = false -%}
+              {%- endif -%}
+
+              {%- if show_discount -%}
+                <div
+                  class="cart-tabs__panel"
+                  role="tabpanel"
+                  id="CartPanel-discount"
+                  aria-labelledby="CartTab-discount"
+                  tabindex="0"
+                  {% unless first_panel %}hidden{% endunless %}
+                >
+                  <promo-code class="promo-code">
+                    <form data-ref="form">
+                      <label class="visually-hidden" for="DiscountCode">{{ 'cart.promo.label' | t }}</label>
+                      <div class="promo-code__field">
+                        <input
+                          id="DiscountCode"
+                          data-ref="input"
+                          name="discount"
+                          autocomplete="off"
+                          placeholder="{{ 'cart.promo.placeholder' | t | escape }}"
+                        >
+                        <button type="submit" data-ref="submit">{{ 'cart.promo.apply' | t }}</button>
+                      </div>
+                    </form>
+                    <ul class="promo-code__list" data-ref="list" role="list" hidden></ul>
+                    <p class="promo-code__message" data-ref="message" role="status" hidden></p>
+                  </promo-code>
+                </div>
+                {%- assign first_panel = false -%}
+              {%- endif -%}
+
+              {%- if show_shipping -%}
+                <div
+                  class="cart-tabs__panel"
+                  role="tabpanel"
+                  id="CartPanel-shipping"
+                  aria-labelledby="CartTab-shipping"
+                  tabindex="0"
+                  {% unless first_panel %}hidden{% endunless %}
+                >
+                  {%- comment -%}
+                    The same `<shipping-calculator>` the cart page uses. Rates
+                    come from Shopify's own endpoint, so the drawer never quotes
+                    a price checkout will disagree with.
+                  {%- endcomment -%}
+                  {% render 'shipping-calculator', id: 'drawer' %}
+                </div>
+              {%- endif -%}
+            </tabs-element>
+          {%- endif -%}
+
+          {%- comment -%}
+            Order-level discounts, required by the Theme Store: the cart must
+            show discount amounts for the whole order, not only per line. These
+            come from Shopify's own applications, so an automatic discount a
+            merchant configured appears here without the theme knowing about it.
+          {%- endcomment -%}
+          {%- if cart.cart_level_discount_applications.size > 0 -%}
+            <ul class="cart-drawer__discounts" role="list">
+              {%- for discount in cart.cart_level_discount_applications -%}
+                <li class="cart-drawer__discount">
+                  {% render 'icon', icon: 'tag', size: 14 %}
+                  <span>{{ discount.title }}</span>
+                  <span class="cart-drawer__discount-amount">
+                    &minus;{{ discount.total_allocated_amount | money }}
+                  </span>
+                </li>
+              {%- endfor -%}
+            </ul>
+          {%- endif -%}
+
+          <div class="cart-drawer__totals">
+            <span>{{ 'cart.general.subtotal' | t }}</span>
+            <span data-cart-subtotal>{{ cart.total_price | money }}</span>
+          </div>
+
+          <p class="cart-drawer__notice">
+            {{ 'cart.general.taxes_and_shipping_at_checkout' | t }}
+          </p>
+
+          <form action="{{ routes.cart_url }}" method="post">
+            <button type="submit" name="checkout" class="button button--primary button--full">
+              {{ 'cart.general.checkout' | t }}
+            </button>
+          </form>
+
+          <a class="cart-drawer__view" href="{{ routes.cart_url }}">{{ 'cart.general.view_cart' | t }}</a>
+        </footer>
+      {%- endif -%}
+    </div>
+  </dialog>
+</cart-drawer>

@@ -1,0 +1,131 @@
+{% doc %}
+  A size guide, opened from beside the option it explains.
+
+  ## Where the content comes from
+
+  Three sources, narrowest first, because a store selling both shoes and t-shirts
+  needs different charts and a store selling one thing does not:
+
+  1. **`product.metafields.custom.size_chart`** — a per-product chart. Accepts a
+     page reference, rich text, or a metaobject with a `content` field, because
+     merchants set this up all three ways depending on which app or admin flow
+     they used.
+  2. **A collection metafield** of the same name, so a whole category shares one
+     chart without setting it on four hundred products.
+  3. **The theme setting**, as the store-wide fallback.
+
+  Renders nothing when all three are empty, so the trigger can never open an
+  empty drawer.
+
+  ## Placement
+
+  The trigger sits next to the option it explains, not at the bottom of the form.
+  A customer looks for a size guide while choosing a size, which is the moment
+  they are least willing to hunt for it.
+
+  Focus trapping, Escape and scroll locking come from `<modal-dialog>`, so this
+  behaves like every other overlay in the theme rather than being a second
+  implementation of the same thing.
+
+  Parameters:
+    product     (product, optional)  For the metafield lookup
+    page        (page, optional)     Overrides the resolution above
+    option_name (string, optional)
+    id          (string, required)   Unique per product form
+
+  @example
+    {% render 'size-chart-modal', product: product, option_name: option.name, id: section.id %}
+{% enddoc %}
+
+{%- liquid
+  assign chart_title = ''
+  assign chart_content = ''
+
+  comment
+    A metafield can hold a page reference, rich text, or a metaobject. Merchants
+    arrive at all three depending on which app or admin flow set it up, and a
+    snippet that only handled one would look broken to two thirds of them.
+  endcomment
+  assign meta = product.metafields.custom.size_chart
+
+  if meta == blank
+    assign meta = collection.metafields.custom.size_chart
+  endif
+
+  if meta != blank
+    if meta.type == 'page_reference' or meta.value.content != blank
+      assign chart_title = meta.value.title
+      assign chart_content = meta.value.content
+    elsif meta.type == 'metaobject_reference'
+      assign chart_title = meta.value.title
+      assign chart_content = meta.value.content | default: meta.value.chart
+    else
+      assign chart_content = meta.value
+    endif
+  endif
+
+  if page != blank
+    assign chart_title = page.title
+    assign chart_content = page.content
+  endif
+
+  if chart_content == blank and settings.size_chart_page != blank
+    assign chart_title = settings.size_chart_page.title
+    assign chart_content = settings.size_chart_page.content
+  endif
+
+  if chart_title == blank
+    assign chart_title = 'products.size_chart.title' | t
+  endif
+-%}
+
+{%- if chart_content != blank -%}
+  <button
+    type="button"
+    class="size-chart__trigger button button--link"
+    data-overlay-open="SizeChart-{{ id }}"
+    aria-expanded="false"
+    aria-controls="SizeChart-{{ id }}"
+  >
+    {% render 'icon', icon: 'ruler', size: 16 %}
+    {{ 'products.size_chart.trigger' | t }}
+    {%- if option_name != blank -%}
+      <span class="visually-hidden">{{ 'products.size_chart.for_option' | t: option: option_name }}</span>
+    {%- endif -%}
+  </button>
+
+  <modal-dialog id="SizeChart-{{ id }}" class="size-chart modal">
+    <dialog class="modal__dialog" data-ref="dialog" aria-label="{{ chart_title | escape }}">
+      <div class="modal__panel size-chart__panel" data-ref="panel">
+        <header class="size-chart__header">
+          <h2 class="size-chart__title">{{ chart_title }}</h2>
+
+          <button
+            type="button"
+            class="modal__close"
+            data-overlay-close
+            aria-label="{{ 'products.size_chart.close' | t }}"
+          >
+            {% render 'icon', icon: 'close' %}
+          </button>
+        </header>
+
+        <div class="modal__body rte" data-ref="body" data-lenis-prevent>
+          {%- comment -%}
+            The table gets its own scroll region with a tabindex, so a wide
+            supplier chart scrolls inside the modal — and can be scrolled with a
+            keyboard — rather than pushing the close button off screen.
+          {%- endcomment -%}
+          <div
+            class="size-chart__table-wrapper"
+            tabindex="0"
+            role="region"
+            aria-label="{{ chart_title | escape }}"
+          >
+            {{ chart_content }}
+          </div>
+        </div>
+      </div>
+    </dialog>
+  </modal-dialog>
+{%- endif -%}

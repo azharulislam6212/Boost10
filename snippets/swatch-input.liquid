@@ -1,0 +1,88 @@
+{% doc %}
+  An accessible swatch control.
+
+  A real `<input type="radio">` with a real `<label for>`, inside the product
+  form. With JavaScript disabled the option still submits. With a screen reader
+  the group is announced as a group and the value is announced by name, because
+  the label carries the value as visually hidden text — the swatch itself is
+  `aria-hidden` and has no accessible name of its own.
+
+  ## Marked, never disabled
+
+  An unavailable value is struck through and titled, not removed and not
+  `disabled`. Removing it tells the customer nothing; disabling it makes the
+  radio unfocusable, so a keyboard user can no longer discover the value exists.
+  `aria-describedby` points at the reason, so the state is announced rather than
+  only drawn.
+
+  Parameters:
+    value       (string, required)
+    option      (object, required)   From `product.options_with_values`
+    section_id  (string, required)
+    index       (number, required)   Loop index, for a unique id
+    checked     (boolean, optional)
+    available   (boolean, optional)  Default true
+    variant     (variant, optional)
+    form_id     (string, optional)   Defaults to `{section_id}-product-form`
+    shape, size (string, optional)   Passed through to swatch.liquid
+
+  @example
+    {% render 'swatch-input', value: value, option: option, section_id: section.id,
+       index: forloop.index, checked: option.selected_value == value, available: is_available %}
+{% enddoc %}
+
+{%- liquid
+  assign input_id = section_id | append: '-swatch-' | append: option.position | append: '-' | append: index
+  assign form = form_id | default: section_id | append: '-product-form'
+  assign is_available = available
+  if available == nil
+    assign is_available = true
+  endif
+-%}
+
+<div class="swatch-input" data-swatch-item>
+  <input
+    type="radio"
+    class="swatch-input__control visually-hidden"
+    id="{{ input_id }}"
+    name="{{ option.name | escape }}"
+    value="{{ value | escape }}"
+    form="{{ form }}"
+    {% if checked %}checked{% endif %}
+    {% unless is_available %}aria-describedby="{{ input_id }}-state"{% endunless %}
+  >
+
+  <label
+    class="swatch-input__label"
+    for="{{ input_id }}"
+    {% unless is_available %}
+      data-unavailable
+      title="{{ 'products.variants.unavailable_with_option' | t: value: value | escape }}"
+    {% endunless %}
+  >
+    {% render 'swatch',
+       value: value,
+       option_name: option.name,
+       option_value: value,
+       variant: variant,
+       shape: shape,
+       size: size,
+       disabled: is_available == false %}
+
+    <span class="visually-hidden">{{ value }}</span>
+
+    {%- unless is_available -%}
+      <span class="visually-hidden" id="{{ input_id }}-state">
+        {{- 'products.variants.unavailable_with_option' | t: value: value -}}
+      </span>
+    {%- endunless -%}
+
+    {%- if settings.swatch_tooltips -%}
+      {%- comment -%}
+        Decorative only. The accessible name already carries the value, so a
+        tooltip that repeated it would double every announcement.
+      {%- endcomment -%}
+      <span class="swatch-input__tooltip" aria-hidden="true">{{ value }}</span>
+    {%- endif -%}
+  </label>
+</div>

@@ -1,0 +1,52 @@
+{% doc %}
+  Renders the social account links.
+
+  Only accounts the merchant has filled in appear. An icon row with three of nine
+  networks is normal; rendering placeholders for the rest is not.
+
+  Each link is labelled with the network name, because an icon alone gives a
+  screen reader nothing to announce, and each opens in a new tab with a
+  translated hint saying so.
+
+  Parameters:
+    class (string, optional)
+    size  (number, optional) Icon size in px
+
+  @example
+    {% render 'social-icons' %}
+{% enddoc %}
+
+{%- liquid
+  assign networks = 'instagram,facebook,tiktok,youtube,pinterest,x,linkedin,threads,snapchat' | split: ','
+-%}
+
+{%- capture social_links -%}
+  {%- for network in networks -%}
+    {%- liquid
+      assign key = 'social_' | append: network | append: '_link'
+      assign url = settings[key]
+    -%}
+    {%- if url != blank -%}
+      <li class="social-icons__item">
+        <a
+          class="social-icons__link"
+          href="{{ url }}"
+          target="_blank"
+          rel="noopener"
+        >
+          {% render 'icon', icon: network, size: size %}
+          <span class="visually-hidden">
+            {{- 'general.share.share_on' | t: platform: network | capitalize -}}
+            {{ ' ' }}{{ 'accessibility.new_window' | t }}
+          </span>
+        </a>
+      </li>
+    {%- endif -%}
+  {%- endfor -%}
+{%- endcapture -%}
+
+{%- if social_links contains '<li' -%}
+  <ul class="social-icons {{ class }}" role="list">
+    {{ social_links }}
+  </ul>
+{%- endif -%}

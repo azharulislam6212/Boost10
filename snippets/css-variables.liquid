@@ -1,0 +1,373 @@
+{% doc %}
+  Every design token the storefront reads, emitted once in the document head.
+
+  ## The one thing to understand before editing this
+
+  Every typography value here comes from a granular theme setting, and every one
+  of those settings is visible in the theme editor. There is no runtime preset
+  layer sitting on top and silently winning.
+
+  There used to be. A `type_preset` dropdown picked a named look and overrode the
+  granular values at render time, which forced the granular controls to be hidden
+  behind `visible_if` — otherwise a merchant would see a font-size field that did
+  nothing. Always-visible typography and a runtime preset cannot both be true, so
+  the preset layer moved to where Shopify actually intends presets to live:
+  `presets` in `config/settings_data.json`, applied at install time.
+
+  **Adding a new look means adding a preset to `settings_data.json`, not a branch
+  here.** A preset in that file writes real values into real settings once, at
+  install, and then leaves the merchant free to change any of them. It cannot
+  rewrite a setting later, which is exactly why the runtime version existed and
+  exactly why it had to go.
+
+  ## Scale, not pixels
+
+  Sizes are stored in pixels because that is what a merchant thinks in, and
+  emitted in `rem` because that is what respects a customer's browser font size.
+  A theme that emits `px` for body copy overrides the setting of every person who
+  enlarged their default text — which is a real accessibility failure, not a
+  stylistic preference.
+
+  `--font-size-*` and the family variables keep the names the rest of the theme
+  already uses, so this snippet replaced the old scale-slider block without a
+  single change anywhere else.
+
+  @example
+    {% render 'css-variables' %}
+{% enddoc %}
+
+{%- liquid
+  assign body_font = settings.type_body_font
+  assign heading_font = settings.type_header_font
+  assign accent_font = settings.type_accent_font | default: settings.type_header_font
+
+  # ---- Preset resolution --------------------------------------------------
+  # This used to be a runtime switch: `settings.type_preset` picked a named look
+  # and a `case` block below overrode the granular values. That only worked
+  # because the granular settings were hidden behind `visible_if` — showing a
+  # merchant a font-size field their preset silently ignores is a broken control,
+  # and a Theme Store reviewer will read it as one.
+  #
+  # Global typography is now always visible, so the granular settings are always
+  # authoritative and `preset` is pinned here. The four named looks (Minimal,
+  # High-Tech, Editorial Modern, Luxury Elegance) belong in `settings_data.json`
+  # presets, which write real values into real settings at install time and then
+  # leave every control live and editable.
+  #
+  # The variable is kept rather than deleted so the `if preset == 'custom'`
+  # branches below read the same as before. Do not reintroduce a `type_preset`
+  # setting without also re-hiding the granular controls.
+  assign preset = 'custom'
+
+  # Values below are the floor. A granular setting a merchant never touched
+  # falls back to its schema default, and anything with no default at all lands
+  # here instead of rendering empty.
+
+  assign p_size = 16
+  assign p_size_mobile = 15
+  assign p_line = 1.6
+  assign p_track = 0
+  assign p_case = 'none'
+  assign p_weight = 400
+  assign p_font = 'body'
+
+  assign d_size = 14
+  assign d_size_mobile = 14
+  assign d_weight = 400
+  assign d_track = 0
+  assign d_case = 'none'
+  assign d_font = 'body'
+  assign d_line = 1.5
+
+  assign h1_size = 72
+  assign h1_mobile = 40
+  assign h2_size = 48
+  assign h2_mobile = 32
+  assign h3_size = 32
+  assign h3_mobile = 24
+  assign h4_size = 24
+  assign h4_mobile = 20
+  assign h5_size = 20
+  assign h5_mobile = 18
+  assign h6_size = 18
+  assign h6_mobile = 16
+  assign h_weight = 700
+  assign h_line = 1.1
+  assign h_track = 0
+  assign h_case = 'none'
+  assign h_font = 'heading'
+
+  assign menu_size = 15
+  assign menu_weight = 500
+  assign menu_track = 0
+  assign menu_case = 'none'
+  assign menu_font = 'body'
+
+  assign btn_size = 15
+  assign btn_weight = 500
+  assign btn_track = 0.04
+  assign btn_case = 'none'
+  assign btn_font = 'body'
+
+  case preset
+    when 'custom'
+      # The merchant's own values, read straight from Theme settings.
+      #
+      # The old `modern` / `editorial` / `minimal` branches lived here and are
+      # gone: they are now install-time presets in `settings_data.json`. Their
+      # exact values are preserved there, so nothing about the four looks
+      # changed — only when they get applied.
+      assign p_font = settings.type_paragraph_font
+      assign p_weight = settings.type_paragraph_weight
+      assign p_size = settings.type_paragraph_size
+      assign p_size_mobile = settings.type_paragraph_size_mobile
+      assign p_case = settings.type_paragraph_case
+
+      assign d_font = settings.type_default_font
+      assign d_weight = settings.type_default_weight
+      assign d_size = settings.type_default_size
+      assign d_size_mobile = settings.type_default_size_mobile
+      assign d_case = settings.type_default_case
+
+      assign menu_font = settings.type_menu_font
+      assign menu_weight = settings.type_menu_weight
+      assign menu_size = settings.type_menu_size
+      assign menu_case = settings.type_menu_case
+
+      assign btn_font = settings.type_button_font
+      assign btn_weight = settings.type_button_weight
+      assign btn_size = settings.type_button_size
+      assign btn_case = settings.type_button_case
+  endcase
+
+  # ---- Named line heights and tracking ------------------------------------
+  # Merchants choose words; CSS needs numbers. Doing the translation here means
+  # the schema never asks anyone what 1.15 looks like.
+
+  assign line_map_tight = 1.15
+  assign line_map_normal = 1.6
+  assign line_map_loose = 1.9
+
+  assign track_map_tight = '-0.02em'
+  assign track_map_normal = '0em'
+  assign track_map_wide = '0.06em'
+-%}
+
+<style>
+  @layer tokens {
+    :root {
+      /* ---- gradients ----
+         Named rather than pasted per section, so changing one here changes
+         every place it is used. `--gradient-primary` was already referenced by
+         the custom-element role before this group existed — a dangling variable
+         that resolved to nothing and painted invisible text. */
+      --gradient-primary: {{ settings.gradient_primary | default: 'linear-gradient(135deg, #1a1a1a 0%, #4a4a4a 100%)' }};
+      --gradient-secondary: {{ settings.gradient_secondary | default: 'linear-gradient(135deg, #c9a961 0%, #e8d5a3 100%)' }};
+      --gradient-custom: {{ settings.gradient_custom | default: 'linear-gradient(135deg, #6a5acd 0%, #ff6b9d 100%)' }};
+
+      /* ---- dividers ---- */
+      --divider-color: {{ settings.divider_color | default: '#e5e5e5' }};
+      --divider-thickness: {{ settings.divider_thickness | default: 1 }}px;
+
+      /* ---- families ---- */
+      --font-body-family: {{ body_font.family }}, {{ body_font.fallback_families }};
+      --font-body-style: {{ body_font.style }};
+      --font-body-weight: {{ body_font.weight }};
+      --font-body-weight-bold: {{ body_font.weight | plus: 300 | at_most: 1000 }};
+
+      --font-heading-family: {{ heading_font.family }}, {{ heading_font.fallback_families }};
+      --font-heading-style: {{ heading_font.style }};
+      --font-heading-weight: {{ heading_font.weight }};
+
+      --font-accent-family: {{ accent_font.family }}, {{ accent_font.fallback_families }};
+      --font-accent-style: {{ accent_font.style }};
+
+      /* ---- paragraph ---- */
+      --font-paragraph-family: var(--font-{{ p_font }}-family);
+      --font-paragraph-size: {{ p_size | divided_by: 10.0 }}rem;
+      --font-paragraph-size-mobile: {{ p_size_mobile | divided_by: 10.0 }}rem;
+      --font-paragraph-weight: {% if p_weight == 'inherit' %}inherit{% else %}{{ p_weight }}{% endif %};
+      --font-paragraph-transform: {{ p_case }};
+
+      {%- if preset == 'custom' -%}
+        {%- case settings.type_paragraph_line -%}
+          {%- when 'tight' -%}{%- assign p_line = line_map_tight -%}
+          {%- when 'loose' -%}{%- assign p_line = line_map_loose -%}
+          {%- else -%}{%- assign p_line = line_map_normal -%}
+        {%- endcase -%}
+        {%- case settings.type_paragraph_track -%}
+          {%- when 'tight' -%}{%- assign p_track_value = track_map_tight -%}
+          {%- when 'wide' -%}{%- assign p_track_value = track_map_wide -%}
+          {%- else -%}{%- assign p_track_value = track_map_normal -%}
+        {%- endcase -%}
+      {%- else -%}
+        {%- assign p_track_value = track_map_normal -%}
+      {%- endif -%}
+
+      --font-paragraph-line-height: {{ p_line }};
+      --font-paragraph-tracking: {{ p_track_value }};
+
+      /* ---- default text: captions, labels, badges, prices ---- */
+      --font-default-family: var(--font-{{ d_font }}-family);
+      --font-default-size: {{ d_size | divided_by: 10.0 }}rem;
+      --font-default-size-mobile: {{ d_size_mobile | divided_by: 10.0 }}rem;
+      --font-default-weight: {% if d_weight == 'inherit' %}inherit{% else %}{{ d_weight }}{% endif %};
+      --font-default-line-height: {{ d_line }};
+      --font-default-transform: {{ d_case }};
+
+      /* ---- headings ---- */
+      {%- assign levels = '1,2,3,4,5,6' | split: ',' -%}
+      {%- for level in levels -%}
+        {%- liquid
+          case level
+            when '1'
+              assign size = h1_size
+              assign size_mobile = h1_mobile
+            when '2'
+              assign size = h2_size
+              assign size_mobile = h2_mobile
+            when '3'
+              assign size = h3_size
+              assign size_mobile = h3_mobile
+            when '4'
+              assign size = h4_size
+              assign size_mobile = h4_mobile
+            when '5'
+              assign size = h5_size
+              assign size_mobile = h5_mobile
+            else
+              assign size = h6_size
+              assign size_mobile = h6_mobile
+          endcase
+
+          assign level_font = h_font
+          assign level_weight = h_weight
+          assign level_line = h_line
+          assign level_case = h_case
+          assign level_track = h_track
+
+          comment
+            In custom mode every heading is independent, which is the whole
+            point of six sets of controls.
+          endcomment
+          if preset == 'custom'
+            assign key = 'type_h' | append: level
+            assign level_font = settings[key | append: '_font'] | default: 'heading'
+            assign level_weight = settings[key | append: '_weight'] | default: 700
+            assign level_case = settings[key | append: '_case'] | default: 'none'
+            assign size = settings[key | append: '_size'] | default: size
+            assign size_mobile = settings[key | append: '_size_mobile'] | default: size_mobile
+
+            assign line_key = settings[key | append: '_line']
+            case line_key
+              when 'tight'
+                assign level_line = line_map_tight
+              when 'loose'
+                assign level_line = line_map_loose
+              else
+                assign level_line = line_map_normal
+            endcase
+
+            assign track_key = settings[key | append: '_track']
+            case track_key
+              when 'tight'
+                assign level_track_value = track_map_tight
+              when 'wide'
+                assign level_track_value = track_map_wide
+              else
+                assign level_track_value = track_map_normal
+            endcase
+          else
+            assign level_track_value = level_track | append: 'em'
+          endif
+        -%}
+        --font-h{{ level }}-family: var(--font-{{ level_font }}-family);
+        --font-h{{ level }}-size: {{ size | divided_by: 10.0 }}rem;
+        --font-h{{ level }}-size-mobile: {{ size_mobile | divided_by: 10.0 }}rem;
+        --font-h{{ level }}-weight: {% if level_weight == 'inherit' %}inherit{% else %}{{ level_weight }}{% endif %};
+        --font-h{{ level }}-line-height: {{ level_line }};
+        --font-h{{ level }}-tracking: {{ level_track_value }};
+        --font-h{{ level }}-transform: {{ level_case }};
+      {%- endfor -%}
+
+      /* ---- menu ---- */
+      --font-menu-family: var(--font-{{ menu_font }}-family);
+      --font-menu-size: {{ menu_size | divided_by: 10.0 }}rem;
+      --font-menu-weight: {% if menu_weight == 'inherit' %}inherit{% else %}{{ menu_weight }}{% endif %};
+      --font-menu-transform: {{ menu_case }};
+      {%- if preset == 'custom' -%}
+        {%- case settings.type_menu_track -%}
+          {%- when 'tight' -%}{%- assign menu_track_value = track_map_tight -%}
+          {%- when 'wide' -%}{%- assign menu_track_value = track_map_wide -%}
+          {%- else -%}{%- assign menu_track_value = track_map_normal -%}
+        {%- endcase -%}
+      {%- else -%}
+        {%- assign menu_track_value = menu_track | append: 'em' -%}
+      {%- endif -%}
+      --font-menu-tracking: {{ menu_track_value }};
+
+      /* ---- buttons ---- */
+      --font-button-family: var(--font-{{ btn_font }}-family);
+      --font-button-size: {{ btn_size | divided_by: 10.0 }}rem;
+      --font-button-weight: {% if btn_weight == 'inherit' %}inherit{% else %}{{ btn_weight }}{% endif %};
+      --font-button-transform: {{ btn_case }};
+      {%- if preset == 'custom' -%}
+        {%- case settings.type_button_track -%}
+          {%- when 'tight' -%}{%- assign btn_track_value = track_map_tight -%}
+          {%- when 'wide' -%}{%- assign btn_track_value = track_map_wide -%}
+          {%- else -%}{%- assign btn_track_value = track_map_normal -%}
+        {%- endcase -%}
+      {%- else -%}
+        {%- assign btn_track_value = btn_track | append: 'em' -%}
+      {%- endif -%}
+      --font-button-tracking: {{ btn_track_value }};
+
+      /* ---- custom elements: card titles, badges, countdowns, prices ---- */
+      --font-custom-weight: {% if settings.type_custom_weight == 'inherit' or settings.type_custom_weight == blank %}inherit{% else %}{{ settings.type_custom_weight }}{% endif %};
+      --font-custom-size: {{ settings.type_custom_size | default: 16 | divided_by: 10.0 }}rem;
+
+ 
+      {%- case settings.type_custom_color -%}
+        {%- when 'subtext' -%}
+          --font-custom-color: var(--color-accent-text);
+        {%- when 'heading' -%}
+          --font-custom-color: var(--color-heading);
+        {%- when 'gradient' -%}
+          --font-custom-color: transparent;
+          --font-custom-gradient: var(--gradient-{{ settings.type_custom_gradient | default: 'primary' }});
+        {%- else -%}
+          --font-custom-color: var(--color-text);
+      {%- endcase -%}
+
+      /* ---- names the rest of the theme already reads ---- */
+      --font-size-base: var(--font-paragraph-size);
+      --font-size-xs: {{ d_size | minus: 2 | at_least: 10 | divided_by: 10.0 }}rem;
+      --font-size-sm: {{ d_size | divided_by: 10.0 }}rem;
+      --font-size-md: {{ p_size | divided_by: 10.0 }}rem;
+      --font-size-lg: {{ p_size | plus: 2 | divided_by: 10.0 }}rem;
+
+      --font-size-h1: var(--font-h1-size-mobile);
+      --font-size-h2: var(--font-h2-size-mobile);
+      --font-size-h3: var(--font-h3-size-mobile);
+      --font-size-h4: var(--font-h4-size-mobile);
+      --font-size-h5: var(--font-h5-size-mobile);
+      --font-size-h6: var(--font-h6-size-mobile);
+    }
+
+    {%- comment -%}
+      Desktop sizes are applied at the breakpoint rather than clamped, because
+      the merchant chose two explicit numbers and a clamp would honour neither.
+    {%- endcomment -%}
+    @media screen and (min-width: 750px) {
+      :root {
+        --font-paragraph-size-current: var(--font-paragraph-size);
+        --font-size-h1: var(--font-h1-size);
+        --font-size-h2: var(--font-h2-size);
+        --font-size-h3: var(--font-h3-size);
+        --font-size-h4: var(--font-h4-size);
+        --font-size-h5: var(--font-h5-size);
+        --font-size-h6: var(--font-h6-size);
+      }
+    }
+  }
+</style>

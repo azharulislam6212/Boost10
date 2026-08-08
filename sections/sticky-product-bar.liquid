@@ -1,0 +1,57 @@
+{% comment %}
+  sections/sticky-product-bar.liquid
+
+  The buy bar that appears once the real one has scrolled away.
+
+  It is a *view* of the product form, not a second form. The variant select and
+  the quantity field write straight into `<product-form>`, and the button calls
+  its `submit()`. One code path to the cart means the bar and the form can never
+  disagree about what is being added — the bug that makes sticky bars add the
+  wrong variant on every theme that reimplements them.
+
+  It appears only once the real button is out of view and hides again when it
+  returns: a sticky bar sitting over the button it duplicates is a bar covering
+  content.
+
+  Rendered as its own section so a merchant can remove it from the product
+  template entirely, and so it can carry its own settings without inflating the
+  product section's.
+{% endcomment %}
+
+{%- liquid
+  assign target = product | default: closest.product
+  assign variant = target.selected_or_first_available_variant
+  assign form_id = section.settings.form_section_id | default: 'main'
+-%}
+
+{%- if target != blank and section.settings.enable -%}
+  {% render 'sticky-add-to-cart',
+     product: target,
+     form_id: form_id,
+     id: section.id,
+     position: section.settings.position,
+     show_image: section.settings.show_image,
+     show_variants: section.settings.show_variants,
+     show_quantity: section.settings.show_quantity %}
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "t:sections.sticky_product_bar.name",
+  "settings": [
+    { "type": "checkbox", "id": "enable", "label": "t:sections.sticky_product_bar.settings.enable.label", "default": true },
+    { "type": "text", "id": "form_section_id", "label": "t:sections.sticky_product_bar.settings.form_section_id.label", "info": "t:sections.sticky_product_bar.settings.form_section_id.info", "default": "main" },
+    {
+      "type": "select", "id": "position", "label": "t:sections.sticky_product_bar.settings.position.label",
+      "options": [
+        { "value": "bottom", "label": "t:sections.sticky_product_bar.settings.position.options__1.label" },
+        { "value": "top", "label": "t:sections.sticky_product_bar.settings.position.options__2.label" }
+      ],
+      "default": "bottom"
+    },
+    { "type": "checkbox", "id": "show_image", "label": "t:sections.sticky_product_bar.settings.show_image.label", "default": true },
+    { "type": "checkbox", "id": "show_variants", "label": "t:sections.sticky_product_bar.settings.show_variants.label", "default": true },
+    { "type": "checkbox", "id": "show_quantity", "label": "t:sections.sticky_product_bar.settings.show_quantity.label", "default": false }
+  ]
+}
+{% endschema %}

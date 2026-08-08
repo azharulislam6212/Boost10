@@ -1,0 +1,118 @@
+{% comment %}
+  blocks/rating-badge.liquid
+
+  A review rating badge for a hero: five stars, a score, a count.
+
+  ## The number is typed, not fetched
+
+  There is no product on a hero, so there is no rating to read. A merchant types
+  their aggregate — the figure on their Trustpilot or Judge.me dashboard — and
+  the block displays it.
+
+  That means it is **display only, and the schema says so**. It emits no
+  structured data, because a review rating a store typed into a text field is not
+  evidence, and marking it up as `AggregateRating` is the fastest route to a
+  manual action from Google. Product pages get real review markup from a real
+  metafield; a hero badge does not.
+
+  The stars are drawn from the score with a clipped overlay rather than by
+  rounding to the nearest half. 4.7 shows as 4.7 stars' worth of fill, because
+  rounding 4.7 down to four and a half is the store under-selling itself, and
+  rounding it up to five is the store lying.
+
+  The whole badge carries one accessible name — "Rated 4.7 out of 5 from 1,284
+  reviews" — because ten separate star elements read aloud is noise.
+{% endcomment %}
+
+{%- liquid
+  assign score = block.settings.rating | times: 1.0
+  assign max = block.settings.rating_max | default: 5
+
+  comment
+    Clamped, because a merchant typing 6 out of 5 should get a full row rather
+    than a bar overflowing its container.
+  endcomment
+  if score > max
+    assign score = max
+  endif
+  if score < 0
+    assign score = 0
+  endif
+
+  assign percent = score | divided_by: max | times: 100
+-%}
+
+<div
+  class="rating-badge rating-badge--{{ block.settings.layout }}"
+  {% render 'spacing', block: block.settings %}
+  {{ block.shopify_attributes }}
+>
+  <div
+    class="rating-badge__stars"
+    role="img"
+    aria-label="{{ 'products.rating.rating_label' | t: rating: block.settings.rating, max: max, count: block.settings.review_count }}"
+  >
+    {%- comment -%}
+      Two rows of the same stars: an empty one underneath, a filled one clipped
+      to the score on top. One markup, any fractional value, no half-star assets.
+    {%- endcomment -%}
+    <span class="rating-badge__stars-empty" aria-hidden="true">
+      {%- for i in (1..max) -%}
+        {% render 'icon', icon: 'star', size: block.settings.star_size %}
+      {%- endfor -%}
+    </span>
+
+    <span class="rating-badge__stars-full" style="--rating-percent: {{ percent }}%;" aria-hidden="true">
+      {%- for i in (1..max) -%}
+        {% render 'icon', icon: 'star', size: block.settings.star_size %}
+      {%- endfor -%}
+    </span>
+  </div>
+
+  <div class="rating-badge__text" aria-hidden="true">
+    {%- if block.settings.show_score -%}
+      <span class="rating-badge__score">{{ block.settings.rating }}</span>
+    {%- endif -%}
+
+    {%- if block.settings.review_count > 0 -%}
+      <span class="rating-badge__count">
+        {{ 'products.rating.review_count' | t: count: block.settings.review_count }}
+      </span>
+    {%- endif -%}
+  </div>
+
+  {%- if block.settings.text != blank -%}
+    <p class="rating-badge__caption">{{ block.settings.text }}</p>
+  {%- endif -%}
+</div>
+
+{% schema %}
+{
+  "name": "t:blocks.rating_badge.name",
+  "tag": null,
+  "settings": [
+    { "type": "paragraph", "content": "t:blocks.rating_badge.paragraph" },
+    { "type": "text", "id": "rating", "label": "t:blocks.rating_badge.settings.rating.label", "info": "t:blocks.rating_badge.settings.rating.info", "default": "4.8" },
+    { "type": "range", "id": "rating_max", "label": "t:blocks.rating_badge.settings.rating_max.label", "min": 3, "max": 10, "step": 1, "default": 5 },
+    { "type": "number", "id": "review_count", "label": "t:blocks.rating_badge.settings.review_count.label", "default": 0 },
+    { "type": "checkbox", "id": "show_score", "label": "t:blocks.rating_badge.settings.show_score.label", "default": true },
+    { "type": "text", "id": "text", "label": "t:blocks.rating_badge.settings.text.label" },
+    { "type": "range", "id": "star_size", "label": "t:blocks.rating_badge.settings.star_size.label", "min": 12, "max": 32, "step": 2, "default": 16 },
+    {
+      "type": "select", "id": "layout", "label": "t:blocks.rating_badge.settings.layout.label",
+      "options": [
+        { "value": "inline", "label": "t:blocks.rating_badge.settings.layout.options__1.label" },
+        { "value": "stacked", "label": "t:blocks.rating_badge.settings.layout.options__2.label" }
+      ],
+      "default": "inline"
+    },
+    { "type": "header", "content": "t:shared.spacing.block_header" },
+    { "type": "range", "id": "padding_top", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_right", "label": "t:shared.spacing.padding_right.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_bottom", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_left", "label": "t:shared.spacing.padding_left.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_scale_mobile", "label": "t:shared.spacing.padding_scale_mobile.label", "info": "t:shared.spacing.padding_scale_mobile.info", "min": 25, "max": 100, "step": 5, "unit": "%", "default": 75 }
+  ],
+  "presets": [{ "name": "t:blocks.rating_badge.name" }]
+}
+{% endschema %}

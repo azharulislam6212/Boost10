@@ -1,0 +1,294 @@
+{% doc %}
+  Renders a product card.
+
+  Used by collection grids, search results, recommendations, the cart drawer
+  upsell. One card everywhere means one place to fix a layout
+  bug and one place where the settings are honoured.
+
+  Structure decisions worth keeping:
+
+    - The whole card is not a link. Only the title is, with `::after` stretching
+      it over the card in CSS. A card wrapped in an `<a>` swallows the quick add
+      button and the swatches, and screen readers announce
+      the entire card contents as one enormous link name.
+    - The second image is rendered as a real `<img>`, not a background, so it is
+      lazy-loaded and never downloaded on devices that cannot hover.
+    - Quick add and quick view are buttons that open something, not links. They
+      carry the product URL as data, and `<quick-option-drawer>` fetches it.
+    - The image ratio comes from theme settings, so an entire grid keeps its
+      rhythm even when uploads are inconsistent.
+
+  Parameters:
+    product     (product, required)
+    [ratio]     (product, optional)
+    index       (number, optional)   Position in the grid. Drives the reveal delay
+    sizes       (string, optional)   Passed to snippets/image.liquid
+    priority    (boolean, optional)  Eager-load the image. First row only
+    show_vendor (boolean, optional)  Overrides the theme setting
+    class       (string, optional)
+    section     (object, optional)   `section.settings`, for the animation cascade
+    block       (object, optional)   `block.settings`, for the animation cascade
+
+  @example
+    {%- for product in collection.products -%}
+      {% render 'product-card', product: product, index: forloop.index0, priority: forloop.first %}
+    {%- endfor -%}
+{% enddoc %}
+
+{%- liquid
+  assign ratio = ratio | default: settings.card_image_ratio | default: 'portrait'
+  assign alignment = settings.card_text_alignment | default: 'left'
+  assign hover_effect = settings.card_hover_effect | default: 'image-swap'
+
+  assign vendor_visible = settings.show_vendor
+  unless show_vendor == nil
+    assign vendor_visible = show_vendor
+  endunless
+
+  assign rating_visible = settings.show_rating
+  unless show_rating == nil
+    assign rating_visible = show_rating
+  endunless
+
+  assign quick_add_style = quick_add | default: settings.quick_add_style
+
+  comment
+    Which option gets swatches on a card is the same setting the product page
+    uses, so a store selling by Flavour gets flavour swatches in both places.
+  endcomment
+  assign swatch_names = settings.swatch_option_names | default: 'Colour, Color' | downcase | split: ','
+  assign swatch_option = blank
+
+  for option in product.options_with_values
+    assign option_key = option.name | downcase | strip
+    assign option_key = option.name | downcase | strip
+
+  for name in swatch_names
+    assign swatch_name = name | downcase | strip
+
+    if swatch_name == option_key
+      assign swatch_option = option
+      break
+    endif
+  endfor
+    if swatch_option != blank
+      break
+    endif
+  endfor
+
+  assign second_image = product.media[1].preview_image
+  if hover_effect != 'image-swap'
+    assign second_image = blank
+  endif
+
+  assign card_delay = 0
+  if index != blank
+    assign card_delay = index | modulo: 4 | times: 70
+  endif
+
+  assign card_id = 'card-' | append: product.id | append: '-' | append: index
+-%}
+
+<motion-effect
+  {% render 'motion-attrs',
+     kind: 'image',
+     block: block,
+     section: section,
+     target: '.product-card__media',
+     delay: card_delay %}
+  class="product-card product-card--{{ alignment }} product-card--hover-{{ hover_effect }} {{ class }}"
+  data-product-id="{{ product.id }}"
+  data-morph-key="{{ card_id }}"
+>
+  <div class="product-card__media-wrapper">
+    {%- liquid
+      comment
+        The slider is opt-in and only when there is more than one image. A
+        carousel wrapped around a single photo is controls with nothing to
+        control, and it costs the card its simple hover swap.
+      endcomment
+      assign card_images = product.images | slice: 0, settings.card_slider_count | default: 4
+      assign use_slider = false
+      if settings.enable_card_slider and card_images.size > 1
+        assign use_slider = true
+      endif
+    -%}
+
+    {%- if use_slider -%}
+      {%- comment -%}
+        The slider sits *outside* the media link, not inside it. Swipe controls
+        nested in an anchor mean every arrow press is also a navigation, which is
+        how card sliders end up opening the product when you try to see photo
+        two. The card is still fully clickable — the title link's stretched
+        pseudo-element covers it, and this raises itself above that.
+      {%- endcomment -%}
+      <carousel-component
+        class="product-card__slider"
+        data-loop="false"
+        data-ratio="{{ ratio }}"
+      >
+        <ul
+          class="product-card__slides"
+          data-ref="track"
+          role="list"
+          aria-label="{{ product.title | escape }}"
+        >
+          {%- for card_image in card_images -%}
+            <li class="product-card__slide">
+              {% render 'image',
+                 image: card_image,
+                 ratio: ratio,
+                 sizes: sizes,
+                 priority: priority and forloop.first,
+                 class: 'product-card__image' %}
+            </li>
+          {%- endfor -%}
+        </ul>
+
+        <button type="button" class="product-card__slider-arrow" data-ref="previous" aria-label="{{ 'accessibility.previous_slide' | t }}">
+          {% render 'icon', icon: 'chevron-left', size: 14 %}
+        </button>
+
+        <button type="button" class="product-card__slider-arrow product-card__slider-arrow--next" data-ref="next" aria-label="{{ 'accessibility.next_slide' | t }}">
+          {% render 'icon', icon: 'chevron-right', size: 14 %}
+        </button>
+
+        <p class="visually-hidden" data-ref="status" role="status"></p>
+      </carousel-component>
+    {%- else -%}
+      <a
+        class="product-card__media-link"
+        href="{{ product.url }}"
+        tabindex="-1"
+        aria-hidden="true"
+      >
+        <div class="product-card__media" data-ratio="{{ ratio }}">
+          {% render 'image',
+             image: product.featured_media.preview_image,
+             ratio: ratio,
+             sizes: sizes,
+             priority: priority,
+             class: 'product-card__image product-card__image--primary' %}
+
+          {%- if second_image != blank -%}
+            {% render 'image',
+               image: second_image,
+               ratio: ratio,
+               sizes: sizes,
+               class: 'product-card__image product-card__image--secondary' %}
+          {%- endif -%}
+        </div>
+      </a>
+    {%- endif -%}
+
+    {% render 'badge', product: product %}
+
+
+    {%- if quick_add_style != 'none' and product.available -%}
+      <div class="product-card__actions">
+        {%- if product.variants.size == 1 and settings.enable_quick_view == false -%}
+          {%- comment -%}
+            A single-variant product can be added straight from the grid. Anything
+            with options must open the drawer: silently adding the first variant
+            is how customers end up returning the wrong size.
+          {%- endcomment -%}
+          <form action="{{ routes.cart_add_url }}" method="post" data-quick-add-form>
+            <input type="hidden" name="id" value="{{ product.selected_or_first_available_variant.id }}">
+            <input type="hidden" name="quantity" value="1">
+            {% render 'button',
+               label: 'products.product.add_to_cart' | t,
+               type: 'submit',
+               variant: 'primary',
+               size: 'small',
+               full: true,
+               icon_only: quick_add_style == 'icon',
+               icon: 'plus' %}
+          </form>
+        {%- else -%}
+          {% render 'button',
+             label: 'products.product.choose_options' | t,
+             variant: 'primary',
+             size: 'small',
+             full: true,
+             icon_only: quick_add_style == 'icon',
+             icon: 'plus',
+             attributes: 'data-overlay-open="QuickOptions" data-product-url="' | append: product.url | append: '" data-section-id="quick-view"' %}
+        {%- endif -%}
+      </div>
+    {%- endif -%}
+  </div>
+
+  <div class="product-card__info">
+    {%- if vendor_visible and product.vendor != blank -%}
+      <p class="product-card__vendor">
+        <span class="visually-hidden">{{ 'products.product.vendor' | t }}:</span>
+        {{ product.vendor }}
+      </p>
+    {%- endif -%}
+
+    <h3 class="product-card__title">
+      <a class="product-card__link" href="{{ product.url }}" id="{{ card_id }}-title">
+        {{ product.title | escape }}
+      </a>
+    </h3>
+
+    {%- if rating_visible -%}
+      {% render 'rating', product: product %}
+    {%- endif -%}
+
+    <div class="product-card__price{% if settings.show_second_line_price %} product-card__price--block{% endif %}">
+      {% render 'price', product: product, context: 'card' %}
+    </div>
+
+    {%- if settings.enable_compare -%}
+      <compare-trigger
+        class="product-card__compare"
+        data-product-handle="{{ product.handle }}"
+        hidden
+      >
+        <button type="button" class="product-card__compare-button" data-ref="button" aria-pressed="false">
+          {% render 'icon', icon: 'compare' %}
+          <span>{{ 'products.compare.add' | t }}</span>
+        </button>
+      </compare-trigger>
+    {%- endif -%}
+  
+    {%- if settings.show_card_swatches and swatch_option != blank -%}
+      {%- comment -%}
+        Card swatches swap the image and the price; they do not add to a cart.
+        `<variant-swatch>` exists for exactly that difference — a card has no
+        form and no page to update.
+      {%- endcomment -%}
+      <variant-swatch data-product-url="{{ product.url }}">
+        <script type="application/json" data-variants>
+          {{- product.variants | json -}}
+        </script>
+
+        <div class="swatch-group" role="group" aria-label="{{ 'accessibility.swatch_group' | t: option: swatch_option.name | escape }}">
+          {%- for value in swatch_option.values limit: settings.swatch_max_visible -%}
+            {%- assign value_variant = product.variants | where: 'title', value | first -%}
+            <button
+              type="button"
+              data-swatch-option
+              data-value="{{ value | escape }}"
+              aria-pressed="false"
+            >
+              {% render 'swatch',
+                 value: value,
+                 option_name: swatch_option.name,
+                 option_value: value,
+                 variant: value_variant,
+                 size: settings.swatch_size_card %}
+              <span class="visually-hidden">{{ value }}</span>
+            </button>
+          {%- endfor -%}
+
+          {%- if swatch_option.values.size > settings.swatch_max_visible -%}
+            {%- assign remaining = swatch_option.values.size | minus: settings.swatch_max_visible -%}
+            <span class="swatch-count">{{ 'products.variants.show_more_swatches' | t: count: remaining }}</span>
+          {%- endif -%}
+        </div>
+      </variant-swatch>
+    {%- endif -%}
+</div>
+</motion-effect>

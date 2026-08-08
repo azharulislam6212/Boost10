@@ -1,0 +1,238 @@
+{% comment %}
+  blocks/heading.liquid
+
+  A heading, at a level the merchant chooses.
+
+  Level and size are separate settings on purpose. A section's second heading
+  should usually be an `<h3>` for the document outline and can still look like the
+  largest text on the page. Tying the two together is how themes end up with
+  pages that are three `<h1>`s and no structure.
+
+  Typography overrides live behind `type_preset`. On `inherit` — the default, and
+  where the overwhelming majority of blocks will stay — this block emits no type
+  properties at all and reads the global scale from `css-variables.liquid`.
+  Theme settings remain the single source of truth; a block override is an
+  exception a merchant asked for, not a shadow copy of the type system.
+{% endcomment %}
+
+{%- liquid
+  assign tag = block.settings.level | default: 'h2'
+  assign text = block.settings.heading
+  assign gradient = block.settings.gradient | default: 'none'
+
+  assign size_fallback = 'var(--font-size-' | append: block.settings.size | append: ')'
+
+  assign heading_classes = 'block-heading__text'
+  if gradient != 'none' and gradient != blank
+    assign heading_classes = heading_classes | append: ' text-gradient text-gradient--' | append: gradient
+  endif
+-%}
+
+{%- if text != blank -%}
+  <motion-effect
+    {% render 'motion-attrs', kind: 'text', block: block.settings %}
+    class="block-heading block-heading--{{ block.settings.alignment }}"
+    {% render 'spacing', block: block.settings %}
+    {{ block.shopify_attributes }}
+  >
+    <{{ tag }}
+      class="{{ heading_classes }}"
+      style="{% render 'block-typography', block: block.settings, fallback: size_fallback %}"
+    >
+      {{ text }}
+    </{{ tag }}>
+  </motion-effect>
+{%- endif -%}
+
+{% comment %}
+  The gradient option paints the text itself, which needs a clipped background
+  and a transparent colour set together. Setting one without the other gives
+  invisible text, so the class does both or neither. `block-typography` knows
+  about this and suppresses the solid colour whenever a gradient is active —
+  otherwise a colour stored before the merchant switched to gradient would win.
+{% endcomment %}
+
+{% schema %}
+{
+  "name": "t:blocks.heading.name",
+  "tag": null,
+  "settings": [
+    { "type": "inline_richtext", "id": "heading", "label": "t:shared.heading.label", "default": "Heading" },
+    {
+      "type": "select", "id": "level", "label": "t:blocks.heading.settings.level.label", "info": "t:blocks.heading.settings.level.info",
+      "options": [
+        { "value": "h1", "label": "H1" }, { "value": "h2", "label": "H2" },
+        { "value": "h3", "label": "H3" }, { "value": "h4", "label": "H4" }
+      ],
+      "default": "h2"
+    },
+    {
+      "type": "select", "id": "size", "label": "t:blocks.heading.settings.size.label",
+      "options": [
+        { "value": "h1", "label": "t:blocks.heading.settings.size.options__1.label" },
+        { "value": "h2", "label": "t:blocks.heading.settings.size.options__2.label" },
+        { "value": "h3", "label": "t:blocks.heading.settings.size.options__3.label" },
+        { "value": "h4", "label": "t:blocks.heading.settings.size.options__4.label" }
+      ],
+      "default": "h2"
+    },
+    {
+      "type": "select", "id": "alignment", "label": "t:blocks.group.settings.alignment.label",
+      "options": [
+        { "value": "start", "label": "t:blocks.group.settings.alignment.options__1.label" },
+        { "value": "center", "label": "t:blocks.group.settings.alignment.options__2.label" },
+        { "value": "end", "label": "t:blocks.group.settings.alignment.options__3.label" }
+      ],
+      "default": "start"
+    },
+
+    { "type": "header", "content": "t:shared.typography.header" },
+    { "type": "paragraph", "content": "t:shared.typography.paragraph" },
+    {
+      "type": "select", "id": "type_preset", "label": "t:shared.typography.type_preset.label", "info": "t:shared.typography.type_preset.info",
+      "options": [
+        { "value": "inherit", "label": "t:shared.typography.type_preset.options__1.label" },
+        { "value": "custom", "label": "t:shared.typography.type_preset.options__2.label" }
+      ],
+      "default": "inherit"
+    },
+    {
+      "type": "select", "id": "font_family", "label": "t:shared.typography.font_family.label",
+      "options": [
+        { "value": "heading", "label": "t:shared.typography.font_family.options__1.label" },
+        { "value": "body", "label": "t:shared.typography.font_family.options__2.label" },
+        { "value": "accent", "label": "t:shared.typography.font_family.options__3.label" }
+      ],
+      "default": "heading",
+      "visible_if": "{{ block.settings.type_preset == 'custom' }}"
+    },
+    {
+      "type": "select", "id": "font_weight", "label": "t:shared.typography.font_weight.label",
+      "options": [
+        { "value": "inherit", "label": "t:shared.typography.font_weight.options__1.label" },
+        { "value": "300", "label": "300" }, { "value": "400", "label": "400" },
+        { "value": "500", "label": "500" }, { "value": "600", "label": "600" },
+        { "value": "700", "label": "700" }, { "value": "800", "label": "800" },
+        { "value": "900", "label": "900" }
+      ],
+      "default": "inherit",
+      "visible_if": "{{ block.settings.type_preset == 'custom' }}"
+    },
+    {
+      "type": "select", "id": "font_size", "label": "t:shared.typography.font_size.label",
+      "options": [
+        { "value": "16", "label": "16px" }, { "value": "18", "label": "18px" },
+        { "value": "20", "label": "20px" }, { "value": "24", "label": "24px" },
+        { "value": "28", "label": "28px" }, { "value": "32", "label": "32px" },
+        { "value": "40", "label": "40px" }, { "value": "48", "label": "48px" },
+        { "value": "56", "label": "56px" }, { "value": "64", "label": "64px" },
+        { "value": "72", "label": "72px" }, { "value": "80", "label": "80px" },
+        { "value": "96", "label": "96px" }
+      ],
+      "default": "48",
+      "visible_if": "{{ block.settings.type_preset == 'custom' }}"
+    },
+    {
+      "type": "select", "id": "font_size_mobile", "label": "t:shared.typography.font_size_mobile.label", "info": "t:shared.typography.font_size_mobile.info",
+      "options": [
+        { "value": "14", "label": "14px" }, { "value": "16", "label": "16px" },
+        { "value": "18", "label": "18px" }, { "value": "20", "label": "20px" },
+        { "value": "24", "label": "24px" }, { "value": "28", "label": "28px" },
+        { "value": "32", "label": "32px" }, { "value": "40", "label": "40px" },
+        { "value": "48", "label": "48px" }
+      ],
+      "default": "32",
+      "visible_if": "{{ block.settings.type_preset == 'custom' }}"
+    },
+    {
+      "type": "select", "id": "line_height", "label": "t:shared.typography.line_height.label",
+      "options": [
+        { "value": "tight", "label": "t:shared.typography.line_height.options__1.label" },
+        { "value": "normal", "label": "t:shared.typography.line_height.options__2.label" },
+        { "value": "loose", "label": "t:shared.typography.line_height.options__3.label" }
+      ],
+      "default": "tight",
+      "visible_if": "{{ block.settings.type_preset == 'custom' }}"
+    },
+    {
+      "type": "select", "id": "letter_spacing", "label": "t:shared.typography.letter_spacing.label",
+      "options": [
+        { "value": "tight", "label": "t:shared.typography.letter_spacing.options__1.label" },
+        { "value": "normal", "label": "t:shared.typography.letter_spacing.options__2.label" },
+        { "value": "wide", "label": "t:shared.typography.letter_spacing.options__3.label" }
+      ],
+      "default": "normal",
+      "visible_if": "{{ block.settings.type_preset == 'custom' }}"
+    },
+    {
+      "type": "select", "id": "text_transform", "label": "t:shared.typography.text_transform.label",
+      "options": [
+        { "value": "inherit", "label": "t:shared.typography.text_transform.options__1.label" },
+        { "value": "none", "label": "t:shared.typography.text_transform.options__2.label" },
+        { "value": "capitalize", "label": "t:shared.typography.text_transform.options__3.label" },
+        { "value": "uppercase", "label": "t:shared.typography.text_transform.options__4.label" },
+        { "value": "lowercase", "label": "t:shared.typography.text_transform.options__5.label" }
+      ],
+      "default": "inherit",
+      "visible_if": "{{ block.settings.type_preset == 'custom' }}"
+    },
+
+    { "type": "header", "content": "t:shared.typography.colour_header" },
+    {
+      "type": "select", "id": "gradient", "label": "t:blocks.heading.settings.gradient.label", "info": "t:blocks.heading.settings.gradient.info",
+      "options": [
+        { "value": "none", "label": "t:settings_schema.typography.options.case_default" },
+        { "value": "primary", "label": "t:settings_schema.typography.options.gradient_primary" },
+        { "value": "secondary", "label": "t:settings_schema.typography.options.gradient_secondary" },
+        { "value": "custom", "label": "t:settings_schema.typography.options.gradient_custom" }
+      ],
+      "default": "none"
+    },
+    {
+      "type": "select", "id": "text_color", "label": "t:shared.typography.text_color.label", "info": "t:shared.typography.text_color.info",
+      "options": [
+        { "value": "inherit", "label": "t:shared.typography.text_color.options__1.label" },
+        { "value": "text", "label": "t:settings_schema.typography.options.color_text" },
+        { "value": "subtext", "label": "t:settings_schema.typography.options.color_subtext" },
+        { "value": "heading", "label": "t:settings_schema.typography.options.color_heading" },
+        { "value": "accent", "label": "t:shared.typography.text_color.options__2.label" },
+        { "value": "sale", "label": "t:shared.typography.text_color.options__3.label" }
+      ],
+      "default": "inherit",
+      "visible_if": "{{ block.settings.gradient == 'none' }}"
+    },
+
+    { "type": "header", "content": "t:shared.animation.header" },
+    {
+      "type": "select", "id": "animation_text", "label": "t:shared.animation.animation_text.label",
+      "options": [
+        { "value": "inherit", "label": "t:shared.animation.animation_text.options__1.label" },
+        { "value": "none", "label": "t:shared.animation.animation_text.options__2.label" },
+        { "value": "fade-in", "label": "t:shared.animation.animation_text.options__3.label" },
+        { "value": "fade-up", "label": "t:shared.animation.animation_text.options__4.label" },
+        { "value": "slide-up", "label": "t:shared.animation.animation_text.options__5.label" },
+        { "value": "scale", "label": "t:shared.animation.animation_text.options__6.label" },
+        { "value": "blur", "label": "t:shared.animation.animation_text.options__7.label" },
+        { "value": "split-text", "label": "t:shared.animation.animation_text.options__8.label" },
+        { "value": "words-slide-up", "label": "t:shared.animation.animation_text.options__9.label" },
+        { "value": "words-rotate-in", "label": "t:shared.animation.animation_text.options__10.label" },
+        { "value": "words-slide-from-right", "label": "t:shared.animation.animation_text.options__11.label" },
+        { "value": "letters-slide-up", "label": "t:shared.animation.animation_text.options__12.label" },
+        { "value": "letters-slide-down", "label": "t:shared.animation.animation_text.options__13.label" },
+        { "value": "letters-fade-in", "label": "t:shared.animation.animation_text.options__14.label" },
+        { "value": "letters-fade-in-random", "label": "t:shared.animation.animation_text.options__15.label" },
+        { "value": "typewriter", "label": "t:shared.animation.animation_text.options__16.label" }
+      ],
+      "default": "inherit"
+    },
+
+    { "type": "header", "content": "t:shared.spacing.block_header" },
+    { "type": "range", "id": "padding_top", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_right", "label": "t:shared.spacing.padding_right.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_bottom", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_left", "label": "t:shared.spacing.padding_left.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_scale_mobile", "label": "t:shared.spacing.padding_scale_mobile.label", "info": "t:shared.spacing.padding_scale_mobile.info", "min": 25, "max": 100, "step": 5, "unit": "%", "default": 75 }
+  ],
+  "presets": [{ "name": "t:blocks.heading.name" }]
+}
+{% endschema %}

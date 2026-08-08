@@ -1,0 +1,258 @@
+{% doc %}
+  Emits every colour scheme as CSS custom properties.
+
+  Rendered once, from the layout, before `base.css` loads. The first scheme is
+  also written to `:root`, so any element outside a scheme container still
+  resolves every token instead of falling back to an inherited colour.
+
+  Sections opt into a scheme by adding `color-{{ section.settings.color_scheme }}`
+  to their root element. Schemes nest correctly because the properties are
+  scoped to the class rather than declared globally.
+
+  Shadow and card-shadow tokens are composed here too, so components never
+  reassemble a shadow from four separate settings.
+
+  @example  
+  {% render 'color-schemes' %}
+{% enddoc %}
+
+{%- liquid
+  assign icon_sm = settings.icon_size_sm | default: 14
+  assign icon_md = settings.icon_size_md | default: 20
+  assign icon_lg = settings.icon_size_lg | default: 28
+-%}
+
+{% style %}
+  {%- for scheme in settings.color_schemes -%}
+    {%- if forloop.index == 1 -%}
+      :root,
+    {%- endif -%}
+
+    .color-{{ scheme.id }} {
+      /* ---- surface ---- */
+      --color-background: rgb({{ scheme.settings.background.rgba }});
+      --color-background-rgb: {{ scheme.settings.background.rgb }};
+
+      {%- if scheme.settings.secondary_background != blank %}
+        --color-secondary-background: rgb({{ scheme.settings.secondary_background.rgba }});
+        --color-secondary-background-rgb: {{ scheme.settings.secondary_background.rgb }};
+      {%- else %}
+        --color-secondary-background: rgb({{ scheme.settings.background.rgba }});
+        --color-secondary-background-rgb: {{ scheme.settings.background.rgb }};
+      {%- endif %}
+
+      {%- if scheme.settings.background_gradient != blank %}
+        {%- comment -%}
+          Roles the spec names by hand. Each derives from a scheme colour rather than
+          being its own setting, so a merchant switching scheme gets a cart bubble and
+          a badge that still belong to it — and nobody has to remember to update six
+          extra colours per scheme.
+        {%- endcomment -%}
+        --cart-bubble-background: {{ scheme.settings.primary_button_background | default: scheme.settings.text }};
+        --cart-bubble-text: {{ scheme.settings.primary_button_text | default: scheme.settings.background }};
+        --badge-background: {{ scheme.settings.secondary_background | default: scheme.settings.background }};
+        --badge-text: {{ scheme.settings.text }};
+        --badge-sale-background: {{ scheme.settings.sale_price | default: scheme.settings.text }};
+        --badge-sale-text: {{ scheme.settings.background }};
+        --variant-border: {{ scheme.settings.border }};
+        --variant-border-selected: {{ scheme.settings.heading | default: scheme.settings.text }};
+        --variant-disabled: {{ scheme.settings.accent_text | default: scheme.settings.text }};
+        --color-notification-success: {{ scheme.settings.link_color | default: scheme.settings.text }};
+        --color-notification-error: {{ scheme.settings.sale_price | default: scheme.settings.text }};
+        --color-notification-background: {{ scheme.settings.secondary_background | default: scheme.settings.background }};
+        --swatch-ring: {{ scheme.settings.heading | default: scheme.settings.text }};
+
+        --gradient-background: {{ scheme.settings.background_gradient }};
+      {%- else %}
+        --gradient-background: rgb({{ scheme.settings.background.rgba }});
+      {%- endif %}
+
+      /* ---- typography ---- */
+      --color-text: rgb({{ scheme.settings.text.rgba }});
+      --color-text-rgb: {{ scheme.settings.text.rgb }};
+      --color-heading: rgb({{ scheme.settings.heading.rgba }});
+      --color-heading-rgb: {{ scheme.settings.heading.rgb }};
+      --color-accent-text: rgb({{ scheme.settings.accent_text.rgba }});
+      --color-accent-text-rgb: {{ scheme.settings.accent_text.rgb }};
+      --color-sale-price: rgb({{ scheme.settings.sale_price.rgba }});
+      --color-sale-price-rgb: {{ scheme.settings.sale_price.rgb }};
+      --color-link: rgb({{ scheme.settings.link_color.rgba }});
+      --color-link-rgb: {{ scheme.settings.link_color.rgb }};
+      --color-link-hover: rgb({{ scheme.settings.link_hover.rgba }});
+      --color-link-hover-rgb: {{ scheme.settings.link_hover.rgb }};
+
+      /* ---- primary button ---- */
+      --color-primary-button-background: rgb({{ scheme.settings.primary_button_background.rgba }});
+      --color-primary-button-background-rgb: {{ scheme.settings.primary_button_background.rgb }};
+      --color-primary-button-text: rgb({{ scheme.settings.primary_button_text.rgba }});
+      --color-primary-button-border: rgb({{ scheme.settings.primary_button_border.rgba }});
+      --color-primary-button-hover-background: rgb({{ scheme.settings.primary_button_hover_background.rgba }});
+      --color-primary-button-hover-text: rgb({{ scheme.settings.primary_button_hover_text.rgba }});
+      --color-primary-button-hover-border: rgb({{ scheme.settings.primary_button_hover_border.rgba }});
+      --color-primary-button-outline: rgb({{ scheme.settings.primary_outline_button.rgba }});
+      --color-primary-button-hover-outline: rgb({{ scheme.settings.primary_outline_button_hover.rgba }});
+
+      /* ---- secondary button ---- */
+      --color-secondary-button-background: rgb({{ scheme.settings.secondary_button_background.rgba }});
+      --color-secondary-button-text: rgb({{ scheme.settings.secondary_button_text.rgba }});
+      --color-secondary-button-border: rgb({{ scheme.settings.secondary_button_border.rgba }});
+      --color-secondary-button-hover-background: rgb({{ scheme.settings.secondary_button_hover_background.rgba }});
+      --color-secondary-button-hover-text: rgb({{ scheme.settings.secondary_button_hover_text.rgba }});
+      --color-secondary-button-hover-border: rgb({{ scheme.settings.secondary_button_hover_border.rgba }});
+      --color-secondary-button-outline: rgb({{ scheme.settings.secondary_outline_button.rgba }});
+      --color-secondary-button-hover-outline: rgb({{ scheme.settings.secondary_outline_button_hover.rgba }});
+
+      /* ---- inputs ---- */
+      --color-input-background: rgb({{ scheme.settings.input_background.rgba }});
+      --color-input-text: rgb({{ scheme.settings.input_text_color.rgba }});
+      --color-input-text-rgb: {{ scheme.settings.input_text_color.rgb }};
+      --color-input-border: rgb({{ scheme.settings.input_border_color.rgba }});
+      --color-input-hover-background: rgb({{ scheme.settings.input_hover_background.rgba }});
+
+      /* ---- cards ---- */
+      --color-card-background: rgb({{ scheme.settings.card_background.rgba }});
+      --color-card-border: rgb({{ scheme.settings.card_border.rgba }});
+      --color-card-border-rgb: {{ scheme.settings.card_border.rgb }};
+
+      /* ---- overlays ---- */
+      --color-overlay-background: rgb({{ scheme.settings.overlay_background.rgba }});
+      --color-overlay-background-rgb: {{ scheme.settings.overlay_background.rgb }};
+
+      {%- if scheme.settings.overlay_gradient != blank %}
+        --gradient-overlay-background: {{ scheme.settings.overlay_gradient }};
+      {%- else %}
+        --gradient-overlay-background: rgb({{ scheme.settings.overlay_background.rgba }});
+      {%- endif %}
+
+      /* ---- social icons ---- */
+      --color-icon-social: rgb({{ scheme.settings.color_icon_social.rgba }});
+      --color-background-social: rgb({{ scheme.settings.color_background_social.rgba }});
+      --color-border-social: rgb({{ scheme.settings.color_border_social.rgba }});
+      --color-icon-social-hover: rgb({{ scheme.settings.color_icon_social_hover.rgba }});
+      --color-background-social-hover: rgb({{ scheme.settings.color_background_social_hover.rgba }});
+      --color-border-social-hover: rgb({{ scheme.settings.color_border_social_hover.rgba }});
+
+      /* ---- slider controls ---- */
+      --color-slider-arrow-icon: rgb({{ scheme.settings.slider_arrow_icon.rgba }});
+      --color-slider-arrow-background: rgb({{ scheme.settings.slider_arrow_background.rgba }});
+      --color-slider-arrow-border: rgb({{ scheme.settings.slider_arrow_border.rgba }});
+      --color-slider-arrow-icon-hover: rgb({{ scheme.settings.slider_arrow_icon_hover.rgba }});
+      --color-slider-arrow-background-hover: rgb({{ scheme.settings.slider_arrow_background_hover.rgba }});
+      --color-slider-arrow-border-hover: rgb({{ scheme.settings.slider_arrow_border_hover.rgba }});
+      --color-slider-indicator: rgb({{ scheme.settings.slider_indicator_color.rgba }});
+      --color-slider-indicator-active: rgb({{ scheme.settings.slider_indicator_active_color.rgba }});
+
+      /* ---- structure ---- */
+      --color-border: rgb({{ scheme.settings.border.rgba }});
+      --color-border-rgb: {{ scheme.settings.border.rgb }};
+      --color-shadow: rgb({{ scheme.settings.shadow.rgba }});
+      --color-shadow-rgb: {{ scheme.settings.shadow.rgb }};
+
+      /* ---- composed shadows ----
+         Assembled once here so no component has to rebuild a shadow from four
+         separate settings, and so a scheme with a light shadow colour reads
+         correctly on a dark background. */
+      --shadow-card:
+        {{ settings.card_shadow_offset_x | default: 0 }}px
+        {{ settings.card_shadow_offset_y | default: 6 }}px
+        {{ settings.card_shadow_blur | default: 20 }}px
+        rgb({{ scheme.settings.shadow.rgb }} / {{ settings.card_shadow_opacity | default: 0 | divided_by: 100.0 }});
+
+      --shadow-drawer:
+        0 0 40px
+        rgb({{ scheme.settings.shadow.rgb }} / {{ settings.drawer_shadow_opacity | default: 15 | divided_by: 100.0 }});
+
+      --backdrop-color:
+        rgb({{ scheme.settings.overlay_background.rgb }} / {{ settings.backdrop_opacity | default: 50 | divided_by: 100.0 }});
+    }
+  {%- endfor -%}
+
+   :root {
+    /* ---- notifications ------------------------------------------------- */
+
+    --color-success: rgb({{ settings.color_success.rgba }});
+    --color-success-rgb: {{ settings.color_success.rgb }};
+    --color-error: rgb({{ settings.color_error.rgba }});
+    --color-error-rgb: {{ settings.color_error.rgb }};
+    --color-warning: rgb({{ settings.color_warning.rgba }});
+    --color-warning-rgb: {{ settings.color_warning.rgb }};
+    --color-info: rgb({{ settings.color_info.rgba }});
+    --color-info-rgb: {{ settings.color_info.rgb }};
+    --color-white: rgb({{ settings.color_white.rgba }});
+    --color-black: rgb({{ settings.color_black.rgba }});
+
+    /* Aliases kept so existing `--color-notification-*` references in base.css
+       and toast.js keep resolving. Remove once those are migrated. */
+    --color-notification-success: var(--color-success);
+    --color-notification-error: var(--color-error);
+
+    /* ---- stock states -------------------------------------------------- */
+
+    --color-instock: rgb({{ settings.color_instock.rgba }});
+    --color-instock-rgb: {{ settings.color_instock.rgb }};
+    --color-lowstock: rgb({{ settings.color_lowstock.rgba }});
+    --color-lowstock-rgb: {{ settings.color_lowstock.rgb }};
+    --color-outofstock: rgb({{ settings.color_outofstock.rgba }});
+    --color-outofstock-rgb: {{ settings.color_outofstock.rgb }};
+
+    /* ---- cart bubble --------------------------------------------------- */
+
+    --color-cart-bubble-bg: rgb({{ settings.cart_bubble_background.rgba }});
+    --color-cart-bubble-text: rgb({{ settings.cart_bubble_text_color.rgba }});
+
+    /* ---- variant pills ------------------------------------------------- */
+
+    --color-variant-bg: rgb({{ settings.variant_background_color.rgba }});
+    --color-variant-text: rgb({{ settings.variant_text_color.rgba }});
+    --color-variant-border: rgb({{ settings.variant_border_color.rgba }});
+    --color-variant-hover-bg: rgb({{ settings.variant_hover_background.rgba }});
+    --color-variant-hover-text: rgb({{ settings.variant_hover_text.rgba }});
+    --color-variant-hover-border: rgb({{ settings.variant_hover_border.rgba }});
+
+    --color-variant-selected-bg: rgb({{ settings.selected_variant_background.rgba }});
+    --color-variant-selected-text: rgb({{ settings.selected_variant_text.rgba }});
+    --color-variant-selected-border: rgb({{ settings.selected_variant_border.rgba }});
+
+    /* ---- swatches ------------------------------------------------------ */
+
+    --color-swatch-border: rgb({{ settings.swatches_border.rgba }});
+    --color-swatch-active-border: rgb({{ settings.swatches_active_border.rgba }});
+
+    /* ---- badges -------------------------------------------------------- */
+
+    --color-badge-sale-bg: rgb({{ settings.badge_sale_background.rgba }});
+    --color-badge-sale-text: rgb({{ settings.badge_sale_text.rgba }});
+
+    --color-badge-new-bg: rgb({{ settings.badge_new_background.rgba }});
+    --color-badge-new-text: rgb({{ settings.badge_new_text.rgba }});
+
+    --color-badge-hot-bg: rgb({{ settings.badge_hot_background.rgba }});
+    --color-badge-hot-text: rgb({{ settings.badge_hot_text.rgba }});
+
+    --color-badge-popular-bg: rgb({{ settings.badge_popular_background.rgba }});
+    --color-badge-popular-text: rgb({{ settings.badge_popular_text.rgba }});
+
+    --color-badge-sold-out-bg: rgb({{ settings.badge_sold_out_background.rgba }});
+    --color-badge-sold-out-text: rgb({{ settings.badge_sold_out_text.rgba }});
+
+    --color-badge-preorder-bg: rgb({{ settings.badge_preorder_background.rgba }});
+    --color-badge-preorder-text: rgb({{ settings.badge_preorder_text.rgba }});
+
+    --color-badge-custom-bg: rgb({{ settings.badge_custom_background.rgba }});
+    --color-badge-custom-text: rgb({{ settings.badge_custom_text.rgba }});
+
+    /* ---- icon sizes ---------------------------------------------------- */
+
+    /* rem, not px — an icon sitting beside text should scale with that text when
+       a customer raises their browser font size. */
+    --icon-size-sm: {{ icon_sm | divided_by: 16.0 }}rem;
+    --icon-size-md: {{ icon_md | divided_by: 16.0 }}rem;
+    --icon-size-lg: {{ icon_lg | divided_by: 16.0 }}rem;
+    --icon-size: var(--icon-size-md);
+  }
+  .color-scheme-container {
+    background-color: var(--color-background);
+    background-image: var(--gradient-background);
+    color: var(--color-text);
+  }
+{% endstyle %}

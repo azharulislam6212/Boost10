@@ -1,0 +1,66 @@
+{% doc %}
+  A scrollable row of sibling collection links.
+
+  Built from a linklist rather than from Shopify's collection list, because
+  "which collections are children of this one" is not something Shopify models —
+  a merchant expresses it in a menu, and a menu is what they already know how to
+  edit.
+
+  Marked up as navigation with `aria-current="page"` on the active pill. Real
+  links, so they are crawlable, middle-clickable and work without JavaScript.
+
+  The row scrolls rather than wraps: eleven categories wrapping to three lines
+  push the products below the fold on a phone, which is the opposite of what a
+  category header is for.
+
+  Parameters:
+    menu    (linklist, required)
+    current (collection, optional)  Defaults to the page's collection
+
+  @example
+    {% render 'sub-collections', menu: linklists[section.settings.menu] %}
+{% enddoc %}
+
+{%- liquid
+  assign active = current | default: collection
+-%}
+
+{%- if menu != blank and menu.links.size > 0 -%}
+  <nav class="sub-collections" aria-label="{{ 'collections.sub_collections.label' | t }}">
+    <ul class="sub-collections__list" role="list">
+      {%- for link in menu.links -%}
+        {%- liquid
+          assign is_current = false
+          if link.type == 'collection_link' and link.object.handle == active.handle
+            assign is_current = true
+          elsif link.url == active.url
+            assign is_current = true
+          endif
+        -%}
+
+        <li class="sub-collections__item">
+          <a
+            class="sub-collections__pill"
+            href="{{ link.url }}"
+            {% if is_current %}aria-current="page"{% endif %}
+          >
+            {%- if link.object.featured_image != blank and settings.sub_collection_images -%}
+              {% render 'image',
+                 image: link.object.featured_image,
+                 alt: '',
+                 ratio: 'square',
+                 sizes: '48px',
+                 wrapper_class: 'sub-collections__image' %}
+            {%- endif -%}
+
+            <span>{{ link.title }}</span>
+
+            {%- if link.object.all_products_count and settings.sub_collection_counts -%}
+              <span class="sub-collections__count">{{ link.object.all_products_count }}</span>
+            {%- endif -%}
+          </a>
+        </li>
+      {%- endfor -%}
+    </ul>
+  </nav>
+{%- endif -%}

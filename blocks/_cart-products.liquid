@@ -1,0 +1,77 @@
+{% comment %}
+  blocks/_cart-products.liquid — private.
+
+  The cart line items. Private on purpose: a merchant who can reorder or delete
+  this has a cart page that cannot show what is in the cart. The arrangeable part
+  of the cart page is everything around it, not this.
+{% endcomment %}
+
+<div class="cart-products" {{ block.shopify_attributes }}>
+  {%- if cart.item_count > 0 -%}
+    {%- if settings.free_shipping_enabled -%}
+      <free-shipping-bar
+        class="free-shipping-bar"
+        data-threshold="{{ settings.free_shipping_threshold | times: 100 }}"
+      >
+        <p class="free-shipping-bar__message" data-ref="message"></p>
+        <div
+          class="free-shipping-bar__track"
+          data-ref="track"
+          role="progressbar"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-valuenow="0"
+          aria-label="{{ 'cart.free_shipping.progress_label' | t }}"
+        >
+          <span class="free-shipping-bar__fill" data-ref="fill"></span>
+        </div>
+      </free-shipping-bar>
+    {%- endif -%}
+
+    <cart-items class="cart-items" data-section-id="{{ section.id }}">
+      <div class="cart-items__head" aria-hidden="true">
+        <span>{{ 'cart.general.product' | t }}</span>
+        <span>{{ 'cart.general.quantity' | t }}</span>
+        <span>{{ 'cart.general.line_total' | t }}</span>
+      </div>
+
+      {%- for item in cart.items -%}
+        {% render 'cart-item', item: item, index: forloop.index %}
+      {%- endfor -%}
+    </cart-items>
+
+    {%- if settings.enable_gift_wrap and settings.gift_wrap_product != blank -%}
+      {%- assign wrap_line = cart.items | where: 'product_id', settings.gift_wrap_product.id | first -%}
+      <gift-wrap-toggle
+        class="gift-wrap"
+        data-variant-id="{{ settings.gift_wrap_product.variants.first.id }}"
+        {% if wrap_line %}data-key="{{ wrap_line.key }}"{% endif %}
+      >
+        <label class="gift-wrap__label">
+          <input type="checkbox" data-ref="checkbox" {% if wrap_line %}checked{% endif %}>
+          <span>{{ 'cart.gift_wrap.price_html' | t: price: settings.gift_wrap_product.price | money }}</span>
+        </label>
+      </gift-wrap-toggle>
+    {%- endif -%}
+
+    <noscript>
+      <button type="submit" name="update" class="button button--secondary">
+        {{ 'cart.general.update' | t }}
+      </button>
+    </noscript>
+  {%- else -%}
+    <div class="cart-products__empty">
+      <p class="cart-products__empty-title">{{ 'cart.general.empty' | t }}</p>
+      <p>{{ 'cart.general.empty_subtext' | t }}</p>
+      {% render 'button', label: 'cart.general.continue_shopping' | t, href: routes.all_products_collection_url %}
+    </div>
+  {%- endif -%}
+</div>
+
+{% schema %}
+{
+  "name": "t:blocks.cart_products.name",
+  "tag": null,
+  "settings": []
+}
+{% endschema %}

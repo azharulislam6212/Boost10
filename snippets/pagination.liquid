@@ -1,0 +1,83 @@
+{% doc %}
+  Renders the pagination controls for a `<results-list>`.
+
+  All three modes come from here, so a section only picks the mode and this
+  decides what that means. See PAGINATION.md for the full contract.
+
+  The load-more control is an `<a href>`, not a `<button>`. Without JavaScript it
+  navigates to the next page, which is the correct fallback; the click handler
+  calls `preventDefault()`. A `<button>` here would simply do nothing.
+
+  Parameters:
+    paginate (object, required)  The `paginate` drop
+    type     (string, required)  paginate | load-more | infinite
+
+  @example
+    {% paginate collection.products by section.settings.products_per_page %}
+      {% render 'pagination', paginate: paginate, type: section.settings.pagination_type %}
+    {% endpaginate %}
+{% enddoc %}
+
+{%- liquid
+  assign mode = type | default: settings.pagination_type | default: 'paginate'
+-%}
+
+{%- if mode == 'paginate' -%}
+  {%- if paginate.pages > 1 -%}
+    <nav class="pagination" data-ref="pagination" aria-label="{{ 'general.pagination.label' | t }}">
+      <ul class="pagination__list" role="list">
+        {%- if paginate.previous -%}
+          <li>
+            <a class="pagination__link pagination__link--previous" href="{{ paginate.previous.url }}" rel="prev">
+              {% render 'icon', icon: 'chevron-left' %}
+              <span class="visually-hidden">{{ 'general.pagination.previous' | t }}</span>
+            </a>
+          </li>
+        {%- endif -%}
+
+        {%- for part in paginate.parts -%}
+          <li>
+            {%- if part.is_link -%}
+              <a class="pagination__link" href="{{ part.url }}">
+                <span class="visually-hidden">{{ 'general.pagination.page' | t: number: part.title }}</span>
+                <span aria-hidden="true">{{ part.title }}</span>
+              </a>
+            {%- elsif part.title == paginate.current_page -%}
+              <span class="pagination__link pagination__link--current" aria-current="page">
+                <span class="visually-hidden">{{ 'general.pagination.page' | t: number: part.title }}</span>
+                <span aria-hidden="true">{{ part.title }}</span>
+              </span>
+            {%- else -%}
+              <span class="pagination__ellipsis" aria-hidden="true">{{ part.title }}</span>
+            {%- endif -%}
+          </li>
+        {%- endfor -%}
+
+        {%- if paginate.next -%}
+          <li>
+            <a class="pagination__link pagination__link--next" href="{{ paginate.next.url }}" rel="next">
+              <span class="visually-hidden">{{ 'general.pagination.next' | t }}</span>
+              {% render 'icon', icon: 'chevron-right' %}
+            </a>
+          </li>
+        {%- endif -%}
+      </ul>
+    </nav>
+  {%- endif -%}
+{%- else -%}
+  {%- if paginate.next -%}
+    <a
+      class="button button--secondary pagination__load-more"
+      data-ref="loadMore"
+      data-next-url="{{ paginate.next.url }}"
+      href="{{ paginate.next.url }}"
+      rel="next"
+    >
+      {{ 'general.pagination.load_more' | t }}
+    </a>
+  {%- endif -%}
+
+  {%- if mode == 'infinite' -%}
+    <div class="pagination__sentinel" data-ref="sentinel" aria-hidden="true"></div>
+  {%- endif -%}
+{%- endif -%}

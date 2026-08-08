@@ -1,0 +1,194 @@
+{% doc %}
+  The low-level swatch renderer: one option value, one visual.
+
+  ## Resolution order
+
+  Seven sources, tried narrowest first. Each exists because the one after it is
+  not good enough for someone, and the order matters more than the list:
+
+  1. **Metaobject** — `option_value.swatch` pointing at a metaobject entry with
+     its own colour, image and label. The richest source, and the one a merchant
+     maintains once for a whole catalogue.
+  2. **Shopify's native swatch** — a colour or image set on the option value in
+     the admin. Per-product, survives a theme change, and is what Shopify itself
+     uses in filters and search.
+  3. **A variant metafield image** — the escape hatch for a pattern that is
+     genuinely a photograph: marble, wood grain, printed fabric. A hex code for
+     any of those is a lie.
+  4. **The theme's swatch map** — `settings.swatch_config`. The practical option
+     when option values are shared across a whole catalogue.
+  5. **Gradients and dual tones**, from the same map. `Sunset=linear-gradient(...)`
+     renders as written; `Navy/White=#292B6C/#ffffff` splits the circle. A
+     two-colour product drawn as one colour is wrong in a way customers notice
+     before they notice anything else.
+  6. **CSS colour names** — `Dark red=darkred` works, because a merchant who
+     writes a colour name means a colour.
+  7. **The fallback** — the variant's own image, initials, or a text pill.
+
+  ## Why the fallback is never nothing
+
+  A value with no entry renders as a readable pill, never as an empty circle. An
+  empty circle is indistinguishable from a white product, and a customer who
+  cannot tell those apart clicks the wrong one.
+
+  This snippet renders the *visual only* — `aria-hidden`, no name, no input.
+  `swatch-input.liquid` wraps it in the accessible control. Keeping them apart is
+  what lets the same visual appear in a filter checkbox, a card, and a radio
+  group without three copies of the resolution logic.
+
+  Parameters:
+    value        (string, required)  The option value, e.g. "Mango"
+    option_name  (string, optional)  The option's name, e.g. "Flavour"
+    option_value (object, optional)  Shopify's option value drop, for native swatches
+    variant      (variant, optional) Used by the variant-image fallback
+    shape        (string, optional)  circle | round | portrait. Default from settings
+    size         (string, optional)  small | medium | large. Default medium
+    disabled     (boolean, optional) Draws the unavailable cross-out
+
+  @example
+    {% render 'swatch', value: value, option_name: option.name, option_value: value, size: 'small' %}
+{% enddoc %}
+
+{%- liquid
+  assign normalized = value | strip | downcase
+
+  assign swatch_color = blank
+  assign swatch_color_secondary = blank
+  assign swatch_image = blank
+  assign swatch_gradient = blank
+  assign swatch_label = blank
+
+  # ---- 1. Metaobject ------------------------------------------------------
+  assign entry = option_value.swatch.metaobject
+  if entry != blank
+    if entry.color != blank
+      assign swatch_color = entry.color
+    endif
+    if entry.image != blank
+      assign swatch_image = entry.image | image_url: width: 120
+    endif
+    if entry.label != blank
+      assign swatch_label = entry.label
+    endif
+  endif
+
+  # ---- 2. Shopify's native swatch -----------------------------------------
+  if swatch_color == blank and swatch_image == blank
+    if option_value.swatch.color != blank
+      assign swatch_color = option_value.swatch.color
+    endif
+    if option_value.swatch.image != blank
+      assign swatch_image = option_value.swatch.image | image_url: width: 120
+    endif
+  endif
+
+  # ---- 3. A variant metafield image ---------------------------------------
+  if swatch_color == blank and swatch_image == blank
+    assign meta_image = variant.metafields.custom.swatch_image
+    if meta_image != blank
+      assign swatch_image = meta_image | image_url: width: 120
+    endif
+  endif
+
+  # ---- 4 to 6. The theme's swatch map -------------------------------------
+  if swatch_color == blank and swatch_image == blank and settings.swatch_config != blank
+    assign lines = settings.swatch_config | newline_to_br | split: '<br />'
+
+    for line in lines
+      assign raw = line | strip
+      if raw == blank
+        continue
+      endif
+
+      comment
+        Split on the first '=' only, so a gradient containing '=' in a colour
+        stop is not torn in half.
+      endcomment
+      assign pair = raw | split: '='
+      if pair.size < 2
+        continue
+      endif
+
+      assign entry_name = pair[0] | strip | downcase
+      if entry_name != normalized
+        continue
+      endif
+
+      assign entry_value = raw | remove_first: pair[0] | remove_first: '=' | strip
+
+      if entry_value contains 'gradient('
+        assign swatch_gradient = entry_value
+      elsif entry_value contains '#' or entry_value contains 'rgb'
+        assign tones = entry_value | split: '/'
+        if tones.size > 1
+          assign swatch_color = tones[0] | strip
+          assign swatch_color_secondary = tones[1] | strip
+        else
+          assign swatch_color = entry_value
+        endif
+      elsif entry_value contains '.'
+        comment
+          Anything with a dot is a filename in Content > Files. `file_url`
+          returns an empty string for a missing file, which the fallback catches.
+        endcomment
+        assign swatch_image = entry_value | file_url
+      else
+        comment
+          A bare word is a CSS colour name. A merchant who writes "darkred"
+          means a colour, and refusing it would send them to look up a hex code
+          for no reason.
+        endcomment
+        assign swatch_color = entry_value
+      endif
+
+      break
+    endfor
+  endif
+
+  # ---- 7. Fallback --------------------------------------------------------
+  assign fallback = settings.swatch_fallback | default: 'variant-image'
+
+  if swatch_color == blank and swatch_image == blank and swatch_gradient == blank
+    if fallback == 'variant-image'
+      if variant.image != blank
+        assign swatch_image = variant.image | image_url: width: 120
+      elsif variant.featured_media.preview_image != blank
+        assign swatch_image = variant.featured_media.preview_image | image_url: width: 120
+      endif
+    endif
+  endif
+
+  assign has_visual = false
+  if swatch_color != blank or swatch_image != blank or swatch_gradient != blank
+    assign has_visual = true
+  endif
+
+  assign display_label = swatch_label | default: value
+  assign initials = display_label | strip | truncate: 2, ''
+
+  assign resolved_shape = shape | default: settings.swatch_shape | default: 'circle'
+  assign resolved_size = size | default: 'medium'
+-%}
+
+<span
+  class="swatch{% unless has_visual %} swatch--text{% endunless %}"
+  data-shape="{{ resolved_shape }}"
+  data-size="{{ resolved_size }}"
+  {% if disabled %}data-disabled{% endif %}
+  data-swatch-value="{{ value | escape }}"
+  {% if option_name != blank %}data-swatch-option="{{ option_name | escape }}"{% endif %}
+  style="
+    {%- if swatch_color != blank %}--swatch-color: {{ swatch_color }};{% endif -%}
+    {%- if swatch_color_secondary != blank %}--swatch-color-secondary: {{ swatch_color_secondary }};{% endif -%}
+    {%- if swatch_gradient != blank %}--swatch-gradient: {{ swatch_gradient }};{% endif -%}
+    {%- if swatch_image != blank %}--swatch-image: url('{{ swatch_image }}');{% endif -%}"
+  aria-hidden="true"
+>
+  {%- unless has_visual -%}
+    {%- if fallback == 'label' -%}
+      {{ display_label }}
+    {%- else -%}
+      {{ initials }}
+    {%- endif -%}
+  {%- endunless -%}
+</span>

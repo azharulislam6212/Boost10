@@ -1,0 +1,170 @@
+{% comment %}
+  sections/main-account.liquid
+
+  The account dashboard: who you are, where things go, what you ordered.
+
+  Orders are listed by <customer-order-history>, which adds status filtering and
+  reorder on top of markup that is complete without it. The filter is honest
+  about its limits: Shopify's Liquid customer object has no server-side filter,
+  so it narrows the current page only and says so.
+
+  The default address is shown rather than the address book, because the question
+  a customer opens this page with is "where is my order going", not "list every
+  address I have ever used".
+{% endcomment %}
+
+{%- liquid
+  assign section_settings = section.settings
+  assign recent = section_settings.orders_to_show | default: 10
+-%}
+
+<div
+  class="customer customer--account color-{{ section_settings.color_scheme }}"
+  {% render 'spacing', section: section_settings %}
+>
+  <div class="container">
+    <header class="account__header">
+      <div>
+        <h1 class="account__title">{{ 'customer.account.title' | t }}</h1>
+        <p class="account__welcome">
+          {{ 'customer.account.welcome' | t: name: customer.first_name | default: customer.email }}
+        </p>
+      </div>
+
+      <a class="button button--link" href="{{ routes.account_logout_url }}">
+        {{ 'customer.account.log_out' | t }}
+      </a>
+    </header>
+
+    <div class="account__layout">
+      <div class="account__orders">
+        <h2 class="account__section-title">{{ 'customer.orders.title' | t }}</h2>
+
+        {%- if customer.orders.size > 0 -%}
+          <customer-order-history class="order-history">
+            {%- if section_settings.show_filter -%}
+              <div class="order-history__controls">
+                <label for="OrderFilter-{{ section.id }}">{{ 'customer.orders.filter_label' | t }}</label>
+                <select id="OrderFilter-{{ section.id }}" data-ref="filter">
+                  <option value="all">{{ 'customer.orders.filter_all' | t }}</option>
+                  <option value="fulfilled">{{ 'customer.orders.fulfilled' | t }}</option>
+                  <option value="unfulfilled">{{ 'customer.orders.unfulfilled' | t }}</option>
+                  <option value="partial">{{ 'customer.orders.partial' | t }}</option>
+                </select>
+              </div>
+            {%- endif -%}
+
+            {%- paginate customer.orders by recent -%}
+              <table class="order-table" data-ref="table">
+                <caption class="visually-hidden">{{ 'customer.orders.title' | t }}</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">{{ 'customer.orders.order_number' | t }}</th>
+                    <th scope="col">{{ 'customer.orders.date' | t }}</th>
+                    <th scope="col">{{ 'customer.orders.fulfillment_status' | t }}</th>
+                    <th scope="col">{{ 'customer.orders.total' | t }}</th>
+                    <th scope="col"><span class="visually-hidden">{{ 'customer.orders.actions' | t }}</span></th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {%- for order in customer.orders -%}
+                    {%- capture reorder_items -%}
+                      [
+                        {%- for line in order.line_items -%}
+                          {%- if line.variant != blank -%}
+                            {"id": {{ line.variant.id }}, "quantity": {{ line.quantity }}}
+                            {%- unless forloop.last -%},{%- endunless -%}
+                          {%- endif -%}
+                        {%- endfor -%}
+                      ]
+                    {%- endcapture -%}
+
+                    <tr data-order data-status="{{ order.fulfillment_status | default: 'unfulfilled' | downcase }}">
+                      <td data-label="{{ 'customer.orders.order_number' | t | escape }}">
+                        <a href="{{ order.customer_url }}">{{ order.name }}</a>
+                      </td>
+
+                      <td data-label="{{ 'customer.orders.date' | t | escape }}">
+                        <time datetime="{{ order.created_at | date: '%Y-%m-%d' }}">
+                          {{ order.created_at | date: format: 'date' }}
+                        </time>
+                      </td>
+
+                      <td data-label="{{ 'customer.orders.fulfillment_status' | t | escape }}">
+                        {{ order.fulfillment_status_label }}
+                      </td>
+
+                      <td data-label="{{ 'customer.orders.total' | t | escape }}">
+                        {{ order.total_net_amount | money }}
+                      </td>
+
+                      <td>
+                        {%- if section_settings.show_reorder -%}
+                          <button
+                            type="button"
+                            class="button button--link button--small"
+                            data-reorder
+                            data-items='{{ reorder_items | strip_newlines | strip }}'
+                          >
+                            {{ 'customer.orders.reorder' | t }}
+                          </button>
+                        {%- endif -%}
+                      </td>
+                    </tr>
+                  {%- endfor -%}
+                </tbody>
+              </table>
+
+              <p class="order-history__empty" data-ref="empty" hidden>
+                {{ 'customer.orders.none_match' | t }}
+              </p>
+
+              <p class="visually-hidden" data-ref="status" role="status"></p>
+
+              {% render 'pagination', paginate: paginate, type: 'paginate' %}
+            {%- endpaginate -%}
+          </customer-order-history>
+        {%- else -%}
+          <p class="account__empty">{{ 'customer.orders.none' | t }}</p>
+          {% render 'button', label: 'cart.general.continue_shopping' | t, href: routes.all_products_collection_url %}
+        {%- endif -%}
+      </div>
+
+      <aside class="account__sidebar" aria-label="{{ 'customer.account.details' | t }}">
+        <h2 class="account__section-title">{{ 'customer.account.default_address' | t }}</h2>
+
+        {%- if customer.default_address != blank -%}
+          <address class="account__address">
+            {{ customer.default_address | format_address }}
+          </address>
+        {%- else -%}
+          <p class="account__empty">{{ 'customer.addresses.none' | t }}</p>
+        {%- endif -%}
+
+        <a class="button button--secondary button--full" href="{{ routes.account_addresses_url }}">
+          {{ 'customer.account.view_addresses' | t: count: customer.addresses_count }}
+        </a>
+      </aside>
+    </div>
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "t:sections.main_account.name",
+  "tag": "section",
+  "class": "section",
+  "settings": [
+    { "type": "range", "id": "orders_to_show", "label": "t:sections.main_account.settings.orders_to_show.label", "min": 5, "max": 50, "step": 5, "default": 10 },
+    { "type": "checkbox", "id": "show_filter", "label": "t:sections.main_account.settings.show_filter.label", "info": "t:sections.main_account.settings.show_filter.info", "default": true },
+    { "type": "checkbox", "id": "show_reorder", "label": "t:sections.main_account.settings.show_reorder.label", "info": "t:sections.main_account.settings.show_reorder.info", "default": true },
+    { "type": "color_scheme", "id": "color_scheme", "label": "t:shared.color_scheme.label", "default": "scheme-1" },
+    { "type": "header", "content": "t:shared.spacing.section_header" },
+    { "type": "range", "id": "padding_top", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 48 },
+    { "type": "range", "id": "padding_bottom", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 64 },
+    { "type": "range", "id": "padding_top_mobile", "label": "t:shared.spacing.padding_top_mobile.label", "info": "t:shared.spacing.padding_top_mobile.info", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_bottom_mobile", "label": "t:shared.spacing.padding_bottom_mobile.label", "info": "t:shared.spacing.padding_bottom_mobile.info", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 0 }
+  ]
+}
+{% endschema %}

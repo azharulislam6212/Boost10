@@ -1,0 +1,149 @@
+{% doc %}
+  Renders the quantity selector, add to cart and everything attached to them.
+
+  A real `<form action="/cart/add" method="post">`. Submission is intercepted so
+  the drawer can open instead of the page reloading, but if the script never
+  loads the form still works — the difference between a bad deploy costing
+  conversion and costing every sale.
+
+  Parameters:
+    product (product, required)
+    section (object, required)
+    block   (object, optional)  For `block.shopify_attributes`
+    show_dynamic (boolean, optional) Accelerated checkout buttons
+
+  @example
+    {% render 'buy-buttons', product: product, section: section, block: block %}
+{% enddoc %}
+
+{%- liquid
+  assign variant = product.selected_or_first_available_variant
+  assign form_id = section.id | append: '-product-form'
+-%}
+
+<product-form
+  class="buy-buttons"
+  data-product-id="{{ product.id }}"
+  {{ block.shopify_attributes }}
+>
+  {%- form 'product', product, id: form_id, class: 'buy-buttons__form', novalidate: 'novalidate' -%}
+    <input type="hidden" name="id" value="{{ variant.id }}" data-ref="idInput">
+
+    {%- if product.gift_card? -%}
+      <gift-card-recipient-form class="gift-card-recipient">
+        <label class="gift-card-recipient__toggle">
+          <input type="checkbox" data-ref="toggle" id="{{ section.id }}-gift-toggle">
+          <span>{{ 'gift_cards.recipient.checkbox' | t }}</span>
+        </label>
+
+        <div class="gift-card-recipient__fields" data-ref="fields" hidden>
+          <label for="{{ section.id }}-recipient-email">{{ 'gift_cards.recipient.email_label' | t }}</label>
+          <input
+            id="{{ section.id }}-recipient-email"
+            data-ref="email"
+            type="email"
+            name="properties[Recipient email]"
+            autocomplete="email"
+            disabled
+          >
+
+          <label for="{{ section.id }}-recipient-name">{{ 'gift_cards.recipient.name_label' | t }}</label>
+          <input id="{{ section.id }}-recipient-name" data-ref="name" name="properties[Recipient name]" disabled>
+
+          <label for="{{ section.id }}-recipient-message">{{ 'gift_cards.recipient.message_label' | t }}</label>
+          <textarea
+            id="{{ section.id }}-recipient-message"
+            data-ref="message"
+            name="properties[Message]"
+            maxlength="200"
+            placeholder="{{ 'gift_cards.recipient.message_placeholder' | t | escape }}"
+            disabled
+          ></textarea>
+
+          <label for="{{ section.id }}-recipient-date">{{ 'gift_cards.recipient.send_on' | t }}</label>
+          <input id="{{ section.id }}-recipient-date" data-ref="sendOn" type="date" name="properties[Send on]" disabled>
+
+          <p class="gift-card-recipient__counter" data-ref="counter"></p>
+          <p class="gift-card-recipient__error" data-ref="error" role="alert" hidden></p>
+        </div>
+      </gift-card-recipient-form>
+    {%- endif -%}
+
+    <div class="buy-buttons__row">
+      <quantity-selector class="quantity-selector" data-min="{{ variant.quantity_rule.min | default: 1 }}"
+        {% if variant.quantity_rule.max %}data-max="{{ variant.quantity_rule.max }}"{% endif %}
+        data-step="{{ variant.quantity_rule.increment | default: 1 }}">
+        <button type="button" data-ref="decrease" aria-label="{{ 'products.product.quantity_decrease' | t: product: product.title | escape }}">
+          {% render 'icon', icon: 'minus', size: 14 %}
+        </button>
+
+        <label class="visually-hidden" for="{{ section.id }}-quantity">{{ 'products.product.quantity' | t }}</label>
+        <input
+          id="{{ section.id }}-quantity"
+          data-ref="input"
+          type="number"
+          name="quantity"
+          value="{{ variant.quantity_rule.min | default: 1 }}"
+          min="{{ variant.quantity_rule.min | default: 1 }}"
+          step="{{ variant.quantity_rule.increment | default: 1 }}"
+          inputmode="numeric"
+        >
+
+        <button type="button" data-ref="increase" aria-label="{{ 'products.product.quantity_increase' | t: product: product.title | escape }}">
+          {% render 'icon', icon: 'plus', size: 14 %}
+        </button>
+
+        <p class="quantity-selector__message" data-ref="message" role="status" hidden></p>
+      </quantity-selector>
+
+      {%- liquid
+        comment
+          Pre-order is continue-selling with nothing on hand. The label has to say
+          so: the single thing that turns a pre-order into a chargeback is a
+          customer who did not know they were waiting.
+        endcomment
+        assign is_preorder = false
+        if settings.enable_preorder
+          if variant.inventory_management != blank and variant.inventory_policy == 'continue' and variant.inventory_quantity <= 0
+            assign is_preorder = true
+          endif
+          if settings.preorder_tag != blank and product.tags contains settings.preorder_tag
+            assign is_preorder = true
+          endif
+        endif
+      -%}
+
+      <button
+        type="submit"
+        id="AddToCart-{{ section.id }}"
+        class="button button--primary button--full buy-buttons__submit"
+        data-ref="submit"
+        {% if is_preorder %}data-preorder{% endif %}
+        {% unless variant.available %}disabled{% endunless %}
+      >
+        {%- if variant.available == false -%}
+          {{ 'products.product.sold_out' | t }}
+        {%- elsif is_preorder -%}
+          {{ 'products.product.preorder' | t }}
+        {%- else -%}
+          {{ 'products.product.add_to_cart' | t }}
+        {%- endif -%}
+      </button>
+    </div>
+
+    <p class="buy-buttons__error" data-ref="error" role="alert" hidden></p>
+
+    {% render 'stock-indicator', variant: variant, show_bar: settings.show_stock_bar %}
+
+    {%- if show_dynamic and product.selling_plan_groups.size == 0 -%}
+      {{ form | payment_button }}
+    {%- endif -%}
+  {%- endform -%}
+</product-form>
+
+{%- if settings.enable_back_in_stock -%}
+  {% render 'back-in-stock-modal',
+     product: product,
+     id: section.id,
+     style: settings.back_in_stock_style %}
+{%- endif -%}

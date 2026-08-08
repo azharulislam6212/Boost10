@@ -1,0 +1,154 @@
+{% doc %}
+  Renders the status badges that sit over a product image.
+
+  Badge order is fixed and deliberate: sold out beats preorder beats sale beats
+  custom tag beats low stock. A product that is both on sale and unavailable
+  should say "Sold out", because that is the fact that changes what the customer
+  does next. Only one badge is shown by default for the same reason — a stack of
+  four competing labels tells a customer nothing.
+
+  Custom tag badges sit below sale and above low stock on purpose. "Bestseller"
+  is merchandising; "Only 2 left" is information the customer acts on. When a
+  merchant genuinely wants both, that is what `all` is for.
+
+  Every badge is real text, not an image or a pseudo-element, so it is
+  translated, searchable and readable by a screen reader.
+
+  ## Custom tag badges
+
+  Configured in Theme settings › Badges as newline-separated `tag:Label` pairs:
+
+      new-arrival:New
+      bestseller:Bestseller
+      limited:Limited edition
+
+  The label side is merchant-authored copy, so it is not a translation key — a
+  merchant writing their own badge text in their own language is the whole
+  point. It is escaped, because it lands in HTML.
+
+  A bare tag with no colon uses the tag itself as the label, which is what
+  happens when someone types `Bestseller` and expects it to work.
+
+  Parameters:
+    product   (product, required)
+    variant   (variant, optional)  Evaluates this variant rather than the product
+    all       (boolean, optional)  Show every applicable badge instead of the first
+    class     (string, optional)
+
+  @example
+    {% render 'badge', product: product %}
+
+  @example
+    {% render 'badge', product: product, variant: product.selected_or_first_available_variant, all: true %}
+{% enddoc %}
+
+{%- liquid
+  assign target = variant | default: product.selected_or_first_available_variant
+  assign available = product.available
+  if variant != blank
+    assign available = variant.available
+  endif
+
+  assign is_preorder = false
+  if settings.enable_preorder and settings.preorder_tag != blank
+    if product.tags contains settings.preorder_tag
+      assign is_preorder = true
+    endif
+  endif
+
+  assign on_sale = false
+  if target.compare_at_price != blank and target.compare_at_price > target.price
+    assign on_sale = true
+  endif
+
+  assign is_low_stock = false
+  if settings.show_low_stock_badge and available and target.inventory_management != blank
+    if target.inventory_policy == 'deny' and target.inventory_quantity > 0
+      if target.inventory_quantity <= settings.low_stock_threshold
+        assign is_low_stock = true
+      endif
+    endif
+  endif
+
+  assign shown = 0
+-%}
+
+<div class="badges badges--{{ settings.badge_position }} {{ class }}" data-badges>
+  {%- if settings.show_sold_out_badge and available == false -%}
+    <span class="badge badge--sold-out">{{ 'products.product.sold_out' | t }}</span>
+    {%- assign shown = shown | plus: 1 -%}
+  {%- endif -%}
+
+  {%- if settings.show_preorder_badge and is_preorder and available -%}
+    {%- if all or shown == 0 -%}
+      <span class="badge badge--preorder">{{ 'products.product.preorder' | t }}</span>
+      {%- assign shown = shown | plus: 1 -%}
+    {%- endif -%}
+  {%- endif -%}
+
+  {%- if on_sale and available -%}
+    {%- if all or shown == 0 -%}
+      {%- liquid
+        assign saved_amount = target.compare_at_price | minus: target.price
+        assign saved_percent = saved_amount | times: 100.0 | divided_by: target.compare_at_price | round
+
+        comment
+          `| money` has to be applied before the value reaches `| t`, not after.
+          Written inline as `t: amount: saved_amount | money` the filter chain
+          applies `money` to the *translated string*, which renders the raw cent
+          value in the badge and a currency symbol in the wrong place. Assigning
+          first is the only way to control the order.
+        endcomment
+        assign saved_money = saved_amount | money
+      -%}
+      <span class="badge badge--sale">
+        {%- case settings.sale_badge_type -%}
+          {%- when 'percentage' -%}
+            {{ 'products.product.sale_percent' | t: percent: saved_percent }}
+          {%- when 'amount' -%}
+            {{ 'products.product.sale_amount' | t: amount: saved_money }}
+          {%- else -%}
+            {{ 'products.product.on_sale' | t }}
+        {%- endcase -%}
+      </span>
+      {%- assign shown = shown | plus: 1 -%}
+    {%- endif -%}
+  {%- endif -%}
+
+  {%- if settings.show_custom_tag_badges and settings.custom_tag_badges != blank and available -%}
+    {%- if all or shown == 0 -%}
+      {%- assign badge_rules = settings.custom_tag_badges | newline_to_br | split: '<br />' -%}
+      {%- for rule in badge_rules -%}
+        {%- liquid
+          assign clean_rule = rule | strip
+          if clean_rule == blank
+            continue
+          endif
+
+          assign parts = clean_rule | split: ':'
+          assign rule_tag = parts[0] | strip
+          if parts.size > 1
+            assign rule_label = parts[1] | strip
+          else
+            assign rule_label = rule_tag
+          endif
+        -%}
+        {%- if product.tags contains rule_tag -%}
+          <span class="badge badge--custom" data-badge-tag="{{ rule_tag | handle }}">
+            {{- rule_label | escape -}}
+          </span>
+          {%- assign shown = shown | plus: 1 -%}
+          {%- unless all -%}{%- break -%}{%- endunless -%}
+        {%- endif -%}
+      {%- endfor -%}
+    {%- endif -%}
+  {%- endif -%}
+
+  {%- if is_low_stock -%}
+    {%- if all or shown == 0 -%}
+      <span class="badge badge--low-stock">
+        {{- 'products.inventory.low_stock_count' | t: count: target.inventory_quantity -}}
+      </span>
+    {%- endif -%}
+  {%- endif -%}
+</div>

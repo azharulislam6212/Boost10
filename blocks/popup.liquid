@@ -1,0 +1,101 @@
+{% comment %}
+  blocks/popup.liquid
+
+  A trigger and the modal it opens: size guide, care instructions, ask a question.
+
+  The content comes from a page rather than a textarea, because this is the kind
+  of text a merchant maintains — a returns policy changes, and they will update a
+  page long before they remember a theme setting. It also means the same content
+  can be linked to from the footer.
+
+  Renders nothing when no page is chosen, so the trigger can never open an empty
+  modal.
+
+  Focus trapping, Escape and scroll locking come from `<modal-dialog>`. This
+  block adds no behaviour of its own, which is the point: a popup that
+  reimplemented focus management would be a second, worse copy of the one every
+  other overlay in the theme uses.
+{% endcomment %}
+
+{%- liquid
+  assign page = block.settings.page
+  assign modal_id = 'Popup-' | append: block.id
+-%}
+
+{%- if page != blank and page.content != blank -%}
+  <div class="popup-block" {% render 'spacing', block: block.settings %} {{ block.shopify_attributes }}>
+    <button
+      type="button"
+      class="popup-block__trigger button button--{{ block.settings.style }}"
+      data-overlay-open="{{ modal_id }}"
+      aria-expanded="false"
+      aria-controls="{{ modal_id }}"
+    >
+      {%- if block.settings.icon != 'none' -%}
+        {% render 'icon', icon: block.settings.icon, size: 16 %}
+      {%- endif -%}
+      {{ block.settings.label | default: page.title }}
+    </button>
+
+    <modal-dialog id="{{ modal_id }}" class="popup-block__modal modal">
+      <dialog class="modal__dialog" data-ref="dialog" aria-label="{{ page.title | escape }}">
+        <div class="modal__panel" data-ref="panel">
+          <header class="modal__header">
+            <h2 class="modal__title">{{ page.title }}</h2>
+
+            <button
+              type="button"
+              class="modal__close"
+              data-overlay-close
+              aria-label="{{ 'accessibility.close' | t }}"
+            >
+              {% render 'icon', icon: 'close' %}
+            </button>
+          </header>
+
+          <div class="modal__body rte" data-ref="body" data-lenis-prevent>
+            {{ page.content }}
+          </div>
+        </div>
+      </dialog>
+    </modal-dialog>
+  </div>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "t:blocks.popup.name",
+  "tag": null,
+  "settings": [
+    { "type": "paragraph", "content": "t:blocks.popup.paragraph" },
+    { "type": "page", "id": "page", "label": "t:blocks.popup.settings.page.label" },
+    { "type": "text", "id": "label", "label": "t:blocks.popup.settings.label.label", "info": "t:blocks.popup.settings.label.info" },
+    {
+      "type": "select", "id": "icon", "label": "t:blocks.icon_with_text.settings.icon.label",
+      "options": [
+        { "value": "none", "label": "t:shared.animation.animation_text.options__2.label" },
+        { "value": "info", "label": "t:blocks.icon_with_text.settings.icon.options__6.label" },
+        { "value": "ruler", "label": "t:blocks.popup.settings.icon.options__ruler.label" },
+        { "value": "truck", "label": "t:blocks.icon_with_text.settings.icon.options__1.label" }
+      ],
+      "default": "info"
+    },
+    {
+      "type": "select", "id": "style", "label": "t:blocks.button.settings.style.label",
+      "options": [
+        { "value": "link", "label": "t:blocks.button.settings.style.options__4.label" },
+        { "value": "secondary", "label": "t:blocks.button.settings.style.options__2.label" },
+        { "value": "primary", "label": "t:blocks.button.settings.style.options__1.label" }
+      ],
+      "default": "link"
+    },
+    { "type": "header", "content": "t:shared.spacing.block_header" },
+    { "type": "range", "id": "padding_top", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_right", "label": "t:shared.spacing.padding_right.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_bottom", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_left", "label": "t:shared.spacing.padding_left.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_scale_mobile", "label": "t:shared.spacing.padding_scale_mobile.label", "info": "t:shared.spacing.padding_scale_mobile.info", "min": 25, "max": 100, "step": 5, "unit": "%", "default": 75 }
+  ],
+  "presets": [{ "name": "t:blocks.popup.name" }]
+}
+{% endschema %}

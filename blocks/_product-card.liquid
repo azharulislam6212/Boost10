@@ -1,0 +1,123 @@
+{% comment %}
+  blocks/_product-card.liquid — private.
+
+  One card, placed by whatever is rendering a grid: the collection page, search,
+  recommendations, the bundle picker.
+
+  Private because a card is not something a merchant adds to a grid — the grid
+  decides how many there are. But it is a *block* rather than a snippet call so
+  that its settings live per section: a collection page can show vendors and
+  ratings while a recommendation row stays minimal, without either needing a new
+  global setting.
+
+  Every setting defaults to `inherit`, meaning "use Theme settings". A merchant
+  who never opens the card block gets the store-wide look, which is what almost
+  all of them want.
+{% endcomment %}
+
+{%- liquid
+  assign card_product = product | default: closest.product
+  assign s = block.settings
+
+  assign ratio = s.image_ratio
+  if ratio == 'inherit' or ratio == blank
+    assign ratio = settings.card_image_ratio
+  endif
+
+  assign show_vendor = settings.show_vendor
+  case s.show_vendor
+    when 'show'
+      assign show_vendor = true
+    when 'hide'
+      assign show_vendor = false
+  endcase
+
+  assign show_rating = settings.show_rating
+  case s.show_rating
+    when 'show'
+      assign show_rating = true
+    when 'hide'
+      assign show_rating = false
+  endcase
+
+  assign quick_add = s.quick_add_style
+  if quick_add == 'inherit' or quick_add == blank
+    assign quick_add = settings.quick_add_style
+  endif
+-%}
+
+{%- if card_product -%}
+  {% render 'product-card',
+     product: card_product,
+     index: index,
+     priority: priority,
+     sizes: sizes,
+     ratio: ratio,
+     show_vendor: show_vendor,
+     show_rating: show_rating,
+     quick_add: quick_add,
+     section: section.settings,
+     block: block.settings %}
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "t:blocks.product_card.name",
+  "tag": null,
+  "settings": [
+    { "type": "paragraph", "content": "t:blocks.product_card.paragraph" },
+    {
+      "type": "select", "id": "image_ratio", "label": "t:settings_schema.product_cards.settings.card_image_ratio.label",
+      "options": [
+        { "value": "inherit", "label": "t:shared.inherit.label" },
+        { "value": "adapt", "label": "t:settings_schema.product_cards.settings.card_image_ratio.options__1.label" },
+        { "value": "square", "label": "t:settings_schema.product_cards.settings.card_image_ratio.options__2.label" },
+        { "value": "portrait", "label": "t:settings_schema.product_cards.settings.card_image_ratio.options__3.label" },
+        { "value": "landscape", "label": "t:settings_schema.product_cards.settings.card_image_ratio.options__4.label" },
+        { "value": "tall", "label": "t:settings_schema.product_cards.settings.card_image_ratio.options__5.label" },
+        { "value": "long", "label": "t:settings_schema.product_cards.settings.card_image_ratio.options__6.label" }
+      ],
+      "default": "inherit"
+    },
+    {
+      "type": "select", "id": "show_vendor", "label": "t:settings_schema.product_cards.settings.show_vendor.label",
+      "options": [
+        { "value": "inherit", "label": "t:shared.inherit.label" },
+        { "value": "show", "label": "t:shared.show.label" },
+        { "value": "hide", "label": "t:shared.hide.label" }
+      ],
+      "default": "inherit"
+    },
+    {
+      "type": "select", "id": "show_rating", "label": "t:settings_schema.product_cards.settings.show_rating.label",
+      "options": [
+        { "value": "inherit", "label": "t:shared.inherit.label" },
+        { "value": "show", "label": "t:shared.show.label" },
+        { "value": "hide", "label": "t:shared.hide.label" }
+      ],
+      "default": "inherit"
+    },
+    {
+      "type": "select", "id": "quick_add_style", "label": "t:settings_schema.product_cards.settings.quick_add_style.label",
+      "options": [
+        { "value": "inherit", "label": "t:shared.inherit.label" },
+        { "value": "none", "label": "t:settings_schema.product_cards.settings.quick_add_style.options__1.label" },
+        { "value": "icon", "label": "t:settings_schema.product_cards.settings.quick_add_style.options__2.label" },
+        { "value": "button", "label": "t:settings_schema.product_cards.settings.quick_add_style.options__3.label" }
+      ],
+      "default": "inherit"
+    },
+    { "type": "header", "content": "t:shared.animation.header" },
+    {
+      "type": "select", "id": "animation_image", "label": "t:shared.animation.animation_image.label",
+      "options": [
+        { "value": "inherit", "label": "t:shared.animation.animation_image.options__1.label" },
+        { "value": "none", "label": "t:shared.animation.animation_image.options__2.label" },
+        { "value": "fade-in", "label": "t:shared.animation.animation_image.options__3.label" },
+        { "value": "fade-up", "label": "t:shared.animation.animation_image.options__4.label" }
+      ],
+      "default": "inherit"
+    }
+  ]
+}
+{% endschema %}

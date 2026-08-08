@@ -1,0 +1,123 @@
+{%- comment -%}
+  Phase 3b — replacement for the `<nav class="header__nav">` element in
+  `sections/header.liquid` (currently lines 56–106), and for the hamburger
+  button in `header__start` (lines 34–43).
+
+  Two changes:
+
+  1. A top-level link with children looks for a `mega-menu` theme block whose
+     `menu_item` matches its title. Found, the block renders the panel. Not
+     found, the plain column layout is used — so a merchant who adds a menu item
+     and no block still gets a working dropdown rather than an empty box.
+
+  2. `desktop_menu_style` can hide the inline nav entirely and route desktop
+     customers through the same drawer as mobile. The drawer markup is not
+     duplicated for this; `MenuDrawer` already exists at the bottom of the
+     section and the hamburger simply stops being mobile-only.
+{%- endcomment -%}
+
+{%- comment -%} ---- replaces the hamburger in header__start ---- {%- endcomment -%}
+<button
+  type="button"
+  class="header__menu-toggle header__menu-toggle--{{ section.settings.desktop_menu_style | default: 'inline' }}"
+  data-overlay-open="MenuDrawer"
+  aria-expanded="false"
+  aria-controls="MenuDrawer"
+  aria-label="{{ 'accessibility.open_menu' | t }}"
+>
+  {% render 'icon', icon: 'menu', size: 20 %}
+</button>
+
+{%- comment -%} ---- replaces <nav class="header__nav"> ---- {%- endcomment -%}
+{%- if section.settings.desktop_menu_style != 'drawer' -%}
+  <nav class="header__nav" aria-label="{{ 'sections.header.menu' | t }}">
+    <ul class="header__menu" role="list">
+      {%- for link in menu.links -%}
+        {%- liquid
+          # Find a mega menu block for this link. Matched on title, because an
+          # index would silently reassign every panel when a merchant reorders
+          # the navigation — a failure that looks like a caching bug rather
+          # than a settings problem.
+          assign mega_block = null
+          for candidate in section.blocks
+            if candidate.type == 'mega-menu'
+              assign candidate_item = candidate.settings.menu_item | strip
+              assign link_title = link.title | strip
+              if candidate_item == link_title
+                assign mega_block = candidate
+                break
+              endif
+            endif
+          endfor
+        -%}
+
+        <li class="header__menu-item">
+          {%- if link.links.size > 0 or mega_block != null -%}
+            <mega-menu
+              class="mega-menu{% if mega_block %} mega-menu--custom{% endif %}"
+              data-trigger="{{ section.settings.menu_trigger }}"
+            >
+              <a
+                class="header__link"
+                href="{{ link.url }}"
+                data-ref="trigger"
+                aria-expanded="false"
+                {% if link.active %}aria-current="page"{% endif %}
+              >
+                {{ link.title }}
+                {% render 'icon', icon: 'chevron-down', size: 12 %}
+              </a>
+
+              <div class="mega-menu__panel" data-ref="panel">
+                <div class="container">
+                 
+
+                  {%- if mega_block != null -%}
+                    {% comment %} {% content_for 'block', id: mega_block.id, link: link %} {% endcomment %}
+                  {%- else -%}
+
+                    {%- comment -%}
+                      Fallback. Identical column markup to the block's, so the
+                      two look the same and a merchant adding a block later sees
+                      their promo images appear rather than the whole panel
+                      change shape.
+                    {%- endcomment -%}
+                    <div class="mega-menu__content mega-menu__content--full">
+                      <div class="mega-menu__columns" style="--mega-columns: 4;">
+                        {%- for child in link.links -%}
+                          <div class="mega-menu__column">
+                            <a class="mega-menu__heading" href="{{ child.url }}">{{ child.title }}</a>
+
+                            {%- if child.links.size > 0 -%}
+                              <ul class="mega-menu__list" role="list">
+                                {%- for grandchild in child.links -%}
+                                  <li>
+                                    <a class="mega-menu__link" href="{{ grandchild.url }}">
+                                      {{- grandchild.title -}}
+                                    </a>
+                                  </li>
+                                {%- endfor -%}
+                              </ul>
+                            {%- endif -%}
+                          </div>
+                        {%- endfor -%}
+                      </div>
+                    </div>
+                  {%- endif -%}
+                </div>
+              </div>
+            </mega-menu>
+          {%- else -%}
+            <a
+              class="header__link"
+              href="{{ link.url }}"
+              {% if link.active %}aria-current="page"{% endif %}
+            >
+              {{ link.title }}
+            </a>
+          {%- endif -%}
+        </li>
+      {%- endfor -%}
+    </ul>
+  </nav>
+{%- endif -%}

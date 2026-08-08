@@ -1,0 +1,108 @@
+{% comment %}
+  sections/product-recommendations.liquid
+
+  Related products. Also the section the recommendations endpoint renders when
+  `<product-recommendations>` fetches with `section_id`, which is why the heading
+  starts hidden: it is revealed only once there is something to head.
+{% endcomment %}
+
+{%- liquid
+  assign source = product | default: recommendations.products.first
+-%}
+
+<product-recommendations
+  class="product-recommendations color-{{ section.settings.color_scheme }}"
+  data-product-id="{{ source.id }}"
+  data-section-id="{{ section.id }}"
+  data-limit="{{ section.settings.products_to_show }}"
+  {% render 'spacing', section: section.settings %}
+>
+  <div class="container">
+    <h2 class="product-recommendations__title" data-recommendations-heading {% unless recommendations.performed %}hidden{% endunless %}>
+      {{ section.settings.heading | default: 'products.recommendations.title' | t }}
+    </h2>
+
+    {%- comment -%}
+      Carousel or grid, and the carousel is the default on mobile for a reason:
+      four recommendations stacked below a product page push the footer a screen
+      further away, and a recommendation is worth less the further it sits from
+      the product that prompted it.
+
+      Both layouts are the same list. `<carousel-component>` wraps it rather than
+      replacing it, so the markup a customer gets without JavaScript is a
+      readable row either way.
+    {%- endcomment -%}
+    {%- if section.settings.layout == 'carousel' -%}
+      <carousel-component class="product-recommendations__carousel" data-loop="false">
+    {%- endif -%}
+
+    <ul
+      class="product-grid product-grid--{{ section.settings.layout }}"
+      role="list"
+      {%- comment -%}
+        One element, two names: `content` is what `<product-recommendations>`
+        morphs into, `track` is what the carousel scrolls. Giving the carousel a
+        separate wrapper would mean the morph replaced the element the carousel
+        holds a reference to.
+      {%- endcomment -%}
+      data-ref="content track"
+      data-recommendations-content
+      style="--columns-desktop: {{ section.settings.columns_desktop }};"
+    >
+      {%- if recommendations.performed and recommendations.products_count > 0 -%}
+        {%- for item in recommendations.products -%}
+          <li class="product-grid__item" data-product-id="{{ item.id }}">
+            {% content_for 'block',
+              type: '_product-card',
+              id: 'product-card',
+              product: item,
+              index: forloop.index0,
+              sizes: '(min-width: 990px) 25vw, 50vw'
+            %}
+          </li>
+        {%- endfor -%}
+      {%- endif -%}
+    </ul>
+
+    {%- if section.settings.layout == 'carousel' -%}
+        <button type="button" class="product-recommendations__arrow" data-ref="previous" aria-label="{{ 'accessibility.previous_slide' | t }}">
+          {% render 'icon', icon: 'chevron-left', size: 16 %}
+        </button>
+
+        <button type="button" class="product-recommendations__arrow product-recommendations__arrow--next" data-ref="next" aria-label="{{ 'accessibility.next_slide' | t }}">
+          {% render 'icon', icon: 'chevron-right', size: 16 %}
+        </button>
+
+        <p class="visually-hidden" data-ref="status" role="status"></p>
+      </carousel-component>
+    {%- endif -%}
+  </div>
+</product-recommendations>
+
+{% schema %}
+{
+  "name": "t:sections.product_recommendations.name",
+  "tag": "section",
+  "class": "section",
+  "settings": [
+    { "type": "text", "id": "heading", "label": "t:shared.heading.label", "default": "You may also like" },
+    { "type": "range", "id": "products_to_show", "label": "t:sections.product_recommendations.settings.products_to_show.label", "min": 2, "max": 10, "step": 1, "default": 4 },
+    {
+      "type": "select", "id": "layout", "label": "t:sections.product_recommendations.settings.layout.label",
+      "options": [
+        { "value": "grid", "label": "t:sections.product_recommendations.settings.layout.options__1.label" },
+        { "value": "carousel", "label": "t:sections.product_recommendations.settings.layout.options__2.label" }
+      ],
+      "default": "carousel"
+    },
+    { "type": "range", "id": "columns_desktop", "label": "t:shared.columns.desktop.label", "min": 2, "max": 5, "step": 1, "default": 4 },
+    { "type": "color_scheme", "id": "color_scheme", "label": "t:shared.color_scheme.label", "default": "scheme-1" },
+    { "type": "header", "content": "t:shared.spacing.section_header" },
+    { "type": "range", "id": "padding_top", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 48 },
+    { "type": "range", "id": "padding_bottom", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 48 },
+    { "type": "range", "id": "padding_top_mobile", "label": "t:shared.spacing.padding_top_mobile.label", "info": "t:shared.spacing.padding_top_mobile.info", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_bottom_mobile", "label": "t:shared.spacing.padding_bottom_mobile.label", "info": "t:shared.spacing.padding_bottom_mobile.info", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 0 }
+  ],
+  "presets": [{ "name": "t:sections.product_recommendations.name" }]
+}
+{% endschema %}

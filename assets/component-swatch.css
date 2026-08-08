@@ -1,0 +1,281 @@
+/**
+ * component-swatch.css — Boost10
+ *
+ * Every swatch in the theme: product page, product cards, filter drawer and
+ * sidebar.
+ *
+ * ## Why this is a separate file
+ *
+ * `CSS_STRATEGY.md` argues for one stylesheet, and the measurement behind that
+ * argument still holds: splitting costs more than it saves once gzip's shared
+ * dictionary is accounted for. This file is the deliberate exception, requested
+ * by the blueprint, and it is a defensible one for a different reason than size:
+ * the swatch engine is the part of this theme most likely to be extended by a
+ * merchant or an agency, and having it in one addressable file makes that a
+ * contained change rather than a search through two thousand lines.
+ *
+ * It is loaded immediately after `base.css`, unlayered from `base.css`'s point
+ * of view but layered internally, so it slots into `components` rather than
+ * outranking everything.
+ *
+ * ## Shapes and sizes
+ *
+ * Driven by `data-shape` and `data-size` on the swatch itself rather than by
+ * class names, so a section can override one instance without a modifier class
+ * existing for every combination. Three shapes times three sizes would be nine
+ * classes; it is two attributes.
+ *
+ * All sizing goes through `--swatch-size`, so a merchant's own CSS can change
+ * every swatch in the theme with one custom property.
+ */
+
+@layer components {
+  /* ==========================================================================
+     Tokens
+     ========================================================================== */
+
+  :root {
+    --swatch-size-small: 2rem;
+    --swatch-size-medium: 2.8rem;
+    --swatch-size-large: 4rem;
+    --swatch-gap: var(--space-2, 0.8rem);
+    --swatch-border: 1px solid var(--color-border);
+    --swatch-ring: var(--color-heading);
+  }
+
+  /* ==========================================================================
+     The visual
+     ========================================================================== */
+
+  .swatch {
+    display: inline-grid;
+    place-items: center;
+    inline-size: var(--swatch-size, var(--swatch-size-medium));
+    block-size: var(--swatch-size, var(--swatch-size-medium));
+    border: var(--swatch-border);
+    background-color: var(--swatch-color, var(--color-secondary-background));
+    background-image: var(--swatch-gradient, var(--swatch-image, none));
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    font-size: 1rem;
+    line-height: 1;
+    text-transform: uppercase;
+    overflow: hidden;
+
+    /* A pale swatch on a pale background is invisible without this, and white is
+       one of the most common colours a store sells. */
+    box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.08);
+  }
+
+  /* Dual tone: split rather than blended, because a half-and-half product is two
+     colours and a gradient between them is a third colour that does not exist. */
+  .swatch[style*='--swatch-color-secondary'] {
+    background-image: linear-gradient(
+      135deg,
+      var(--swatch-color) 0 50%,
+      var(--swatch-color-secondary) 50% 100%
+    );
+  }
+
+  /* ---- sizes ---- */
+
+  .swatch[data-size='small'] { --swatch-size: var(--swatch-size-small); }
+  .swatch[data-size='medium'] { --swatch-size: var(--swatch-size-medium); }
+  .swatch[data-size='large'] { --swatch-size: var(--swatch-size-large); }
+
+  /* ---- shapes ---- */
+
+  .swatch[data-shape='circle'] { border-radius: 50%; }
+  .swatch[data-shape='round'],
+  .swatch[data-shape='square'] { border-radius: 6px; }
+
+  .swatch[data-shape='portrait'] {
+    border-radius: 6px;
+    block-size: calc(var(--swatch-size, var(--swatch-size-medium)) * 1.333);
+  }
+
+  /* ---- text fallback ---- */
+
+  .swatch--text {
+    inline-size: auto;
+    min-inline-size: var(--swatch-size, var(--swatch-size-medium));
+    padding-inline: var(--space-3, 1.2rem);
+    border-radius: 999px;
+    background-color: var(--color-background);
+    color: var(--color-text);
+    font-size: var(--font-size-xs, 1.2rem);
+    text-transform: none;
+    box-shadow: none;
+  }
+
+  .swatch--text[data-shape='portrait'] { block-size: auto; padding-block: var(--space-2, 0.8rem); }
+
+  /* ==========================================================================
+     The control
+     ========================================================================== */
+
+  .swatch-input {
+    position: relative;
+    display: inline-flex;
+  }
+
+  .swatch-input__label {
+    display: inline-flex;
+    padding: 3px;
+    border: 1px solid transparent;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: border-color var(--transition-fast, 150ms ease);
+  }
+
+  .swatch-input__label:has(.swatch[data-shape='round']),
+  .swatch-input__label:has(.swatch[data-shape='square']),
+  .swatch-input__label:has(.swatch[data-shape='portrait']) {
+    border-radius: 8px;
+  }
+
+  .swatch-input__label:has(.swatch--text) { border-radius: 999px; }
+
+  @media (hover: hover) {
+    .swatch-input__label:hover { border-color: var(--color-border); }
+  }
+
+  /* Selected. The ring sits outside the swatch rather than on it, so a white
+     swatch and its selection indicator stay distinguishable. */
+  .swatch-input__control:checked + .swatch-input__label {
+    border-color: var(--swatch-ring);
+  }
+
+  /* Focus is drawn on the label, because the input itself is visually hidden and
+     an outline on a 1px clipped element is invisible. */
+  .swatch-input__control:focus-visible + .swatch-input__label {
+    outline: 2px solid var(--swatch-ring);
+    outline-offset: 2px;
+  }
+
+  /* ---- unavailable ---- */
+
+  .swatch-input__label[data-unavailable] { opacity: 0.5; }
+
+  .swatch-input__label[data-unavailable]::after {
+    content: '';
+    position: absolute;
+    inset-block-start: 50%;
+    inset-inline: 10%;
+    block-size: 1px;
+    background-color: var(--color-text);
+    transform: rotate(-45deg);
+    pointer-events: none;
+  }
+
+  /* ==========================================================================
+     Tooltip
+     ========================================================================== */
+
+  .swatch-input__tooltip {
+    position: absolute;
+    inset-block-end: calc(100% + var(--space-2, 0.8rem));
+    inset-inline-start: 50%;
+    z-index: 2;
+    padding: 0.4rem 0.8rem;
+    border-radius: var(--radius-badge, 4px);
+    background-color: var(--color-heading);
+    color: var(--color-background);
+    font-size: 1.1rem;
+    line-height: 1.4;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transform: translate(-50%, 0.4rem);
+    transition:
+      opacity var(--transition-fast, 150ms ease),
+      transform var(--transition-fast, 150ms ease),
+      visibility 0s linear 150ms;
+  }
+
+  @media (hover: hover) {
+    .swatch-input__label:hover .swatch-input__tooltip,
+    .swatch-input__control:focus-visible + .swatch-input__label .swatch-input__tooltip {
+      opacity: 1;
+      visibility: visible;
+      transform: translate(-50%, 0);
+      transition-delay: 0s;
+    }
+  }
+
+  /* ==========================================================================
+     Groups
+     ========================================================================== */
+
+  .advanced-swatches__list,
+  .swatch-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--swatch-gap);
+    align-items: center;
+  }
+
+  .advanced-swatches__more {
+    font-size: var(--font-size-xs, 1.2rem);
+    text-decoration: underline;
+  }
+
+  /* ==========================================================================
+     Cards
+     ========================================================================== */
+
+  variant-swatch {
+    display: block;
+    margin-block-start: var(--space-2, 0.8rem);
+  }
+
+  variant-swatch [data-swatch-option] {
+    display: inline-flex;
+    padding: 2px;
+    border: 1px solid transparent;
+    border-radius: 50%;
+    cursor: pointer;
+  }
+
+  variant-swatch [data-swatch-option][data-active] { border-color: var(--swatch-ring); }
+
+  variant-swatch [data-swatch-option]:focus-visible {
+    outline: 2px solid var(--swatch-ring);
+    outline-offset: 2px;
+  }
+
+  /* The image cross-fades rather than snapping, so sweeping a cursor across a
+     grid does not strobe. */
+  [data-card-image] img { transition: opacity var(--transition-fast, 150ms ease); }
+  [data-variant-previewing] [data-card-image] img { opacity: 0.92; }
+
+  .swatch-count {
+    font-size: var(--font-size-xs, 1.2rem);
+    color: var(--color-accent-text);
+  }
+
+  /* ==========================================================================
+     Filters
+     ========================================================================== */
+
+  .facets__checkbox .swatch { --swatch-size: var(--swatch-size-small); }
+
+  .facets__checkbox input:checked ~ .swatch {
+    box-shadow:
+      inset 0 0 0 1px rgb(0 0 0 / 0.08),
+      0 0 0 2px var(--color-background),
+      0 0 0 4px var(--swatch-ring);
+  }
+
+  /* ==========================================================================
+     Reduced motion
+     ========================================================================== */
+
+  @media (prefers-reduced-motion: reduce) {
+    .swatch-input__tooltip,
+    [data-card-image] img {
+      transition: none;
+    }
+  }
+}

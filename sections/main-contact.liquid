@@ -1,0 +1,181 @@
+{% comment %}
+  sections/main-contact.liquid
+
+  A contact form the merchant builds from blocks, beside their address details.
+
+  Shopify's `{% form 'contact' %}` is the whole transport. Every field becomes a
+  `contact[Label]` entry that arrives in the merchant's inbox, which is why the
+  label is the field name and why the block schema says so.
+
+  The form is not intercepted. Shopify validates it, handles the reply-to header,
+  applies its own spam handling and reports errors after a reload — and
+  re-implementing that in JavaScript would mean owning a second, worse copy of
+  something that already works. The success and error states below are Shopify's
+  own, rendered where a customer will see them.
+{% endcomment %}
+
+{%- liquid
+  assign section_settings = section.settings
+  assign fields = section.blocks | where: 'type', 'form-field'
+-%}
+
+<div
+  class="main-contact color-{{ section_settings.color_scheme }}"
+  {% render 'spacing', section: section_settings %}
+>
+  <div class="container">
+    <div class="main-contact__layout main-contact__layout--{{ section_settings.layout }}">
+
+      <div class="main-contact__form-side">
+        {%- if section_settings.heading != blank -%}
+          <h1 class="main-contact__heading">{{ section_settings.heading }}</h1>
+        {%- endif -%}
+
+        {%- if section_settings.text != blank -%}
+          <div class="main-contact__text rte">{{ section_settings.text }}</div>
+        {%- endif -%}
+
+      {%- assign form_id = 'ContactForm-' | append: section.id -%}
+
+        <validated-form>
+          {%- form 'contact', id: form_id, class: 'contact-form' -%}
+            {%- if form.posted_successfully? -%}
+              <div class="contact-form__success" role="status" tabindex="-1">
+                {{ section_settings.success_text | default: 'templates.contact.form.post_success' | t }}
+              </div>
+            {%- endif -%}
+
+            {%- if form.errors -%}
+              <div class="contact-form__errors" role="alert" tabindex="-1">
+                <h2 class="contact-form__errors-title">{{ 'templates.contact.form.error_heading' | t }}</h2>
+                <ul role="list">
+                  {%- for field in form.errors -%}
+                    <li>
+                      {%- if field == 'form' -%}
+                        {{ form.errors.messages[field] }}
+                      {%- else -%}
+                        {{ form.errors.translated_fields[field] | capitalize }}
+                        {{ form.errors.messages[field] }}
+                      {%- endif -%}
+                    </li>
+                  {%- endfor -%}
+                </ul>
+              </div>
+            {%- endif -%}
+
+            <div class="contact-form__fields">
+              {%- if fields.size > 0 -%}
+                {%- for block in fields -%}
+                  {% render block %}
+                {%- endfor -%}
+              {%- else -%}
+                {%- comment -%}
+                  A merchant who deleted every field still gets a usable form. An
+                  empty contact page is worse than an opinionated one.
+                {%- endcomment -%}
+                <div class="form-field">
+                  <label for="ContactFallbackEmail-{{ section.id }}">
+                    {{ 'templates.contact.form.email' | t }} *
+                  </label>
+                  <input
+                    id="ContactFallbackEmail-{{ section.id }}"
+                    type="email"
+                    name="contact[email]"
+                    autocomplete="email"
+                    required
+                  >
+                </div>
+
+                <div class="form-field">
+                  <label for="ContactFallbackBody-{{ section.id }}">
+                    {{ 'templates.contact.form.message' | t }}
+                  </label>
+                  <textarea id="ContactFallbackBody-{{ section.id }}" name="contact[body]" rows="5"></textarea>
+                </div>
+              {%- endif -%}
+            </div>
+
+            <button type="submit" class="button button--primary">
+              {{ section_settings.button_label | default: 'templates.contact.form.send' | t }}
+            </button>
+          {%- endform -%}
+        </validated-form>
+      </div>
+
+      <aside class="main-contact__details" aria-label="{{ 'templates.contact.details' | t }}">
+        {%- for block in section.blocks -%}
+          {%- unless block.type == 'form-field' -%}
+            {% render block %}
+          {%- endunless -%}
+        {%- endfor -%}
+
+        {%- if section_settings.map_embed != blank -%}
+          {%- comment -%}
+            A merchant-pasted embed, loaded lazily and titled. No SDK, no key: a
+            store finder that is blank until someone configures an API is a store
+            finder that ships broken.
+          {%- endcomment -%}
+          <div class="main-contact__map">
+            <iframe
+              src="{{ section_settings.map_embed }}"
+              title="{{ 'templates.contact.map_title' | t | escape }}"
+              loading="lazy"
+              referrerpolicy="no-referrer-when-downgrade"
+              allowfullscreen
+            ></iframe>
+          </div>
+        {%- elsif section_settings.map_image != blank -%}
+          {% render 'image',
+             image: section_settings.map_image,
+             alt: '',
+             ratio: 'landscape',
+             sizes: '(min-width: 990px) 40vw, 100vw',
+             wrapper_class: 'main-contact__map-image' %}
+        {%- endif -%}
+      </aside>
+    </div>
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "t:sections.main_contact.name",
+  "tag": "section",
+  "class": "section",
+  "blocks": [{ "type": "@theme" }, { "type": "@app" }],
+  "settings": [
+    { "type": "text", "id": "heading", "label": "t:shared.heading.label", "default": "Contact us" },
+    { "type": "richtext", "id": "text", "label": "t:shared.text.label" },
+    { "type": "text", "id": "button_label", "label": "t:blocks.button.settings.label.label" },
+    { "type": "richtext", "id": "success_text", "label": "t:sections.main_contact.settings.success_text.label" },
+    {
+      "type": "select", "id": "layout", "label": "t:sections.main_contact.settings.layout.label",
+      "options": [
+        { "value": "split", "label": "t:sections.main_contact.settings.layout.options__1.label" },
+        { "value": "stacked", "label": "t:sections.main_contact.settings.layout.options__2.label" }
+      ],
+      "default": "split"
+    },
+    { "type": "header", "content": "t:sections.main_contact.headers.map" },
+    { "type": "paragraph", "content": "t:sections.main_contact.paragraphs.map" },
+    { "type": "url", "id": "map_embed", "label": "t:sections.main_contact.settings.map_embed.label", "info": "t:sections.main_contact.settings.map_embed.info" },
+    { "type": "image_picker", "id": "map_image", "label": "t:sections.main_contact.settings.map_image.label", "info": "t:sections.main_contact.settings.map_image.info" },
+    { "type": "color_scheme", "id": "color_scheme", "label": "t:shared.color_scheme.label", "default": "scheme-1" },
+    { "type": "header", "content": "t:shared.spacing.section_header" },
+    { "type": "range", "id": "padding_top", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 48 },
+    { "type": "range", "id": "padding_bottom", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 64 },
+    { "type": "range", "id": "padding_top_mobile", "label": "t:shared.spacing.padding_top_mobile.label", "info": "t:shared.spacing.padding_top_mobile.info", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_bottom_mobile", "label": "t:shared.spacing.padding_bottom_mobile.label", "info": "t:shared.spacing.padding_bottom_mobile.info", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 0 }
+  ],
+  "presets": [
+    {
+      "name": "t:sections.main_contact.name",
+      "blocks": [
+        { "type": "form-field" },
+        { "type": "form-field" },
+        { "type": "form-field" }
+      ]
+    }
+  ]
+}
+{% endschema %}

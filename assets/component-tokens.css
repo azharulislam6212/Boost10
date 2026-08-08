@@ -1,0 +1,166 @@
+/* ==========================================================================
+   boost10 — Phase 1: component token consumers
+   ==========================================================================
+
+   `css-variables-components.liquid` only *emits* the tokens. This file is what
+   makes them visible: it points the existing badge, variant, swatch, stock and
+   cart-bubble rules at the new custom properties.
+
+   Load after base.css. Once these rules are merged back into base.css by hand,
+   delete this file.
+   ========================================================================== */
+
+
+/* --------------------------------------------------------------------------
+   Badges
+   --------------------------------------------------------------------------
+   One rule per variant rather than a shared rule with overrides — a merchant
+   who sets Sale to a light background needs Sale's text colour to follow, and a
+   cascade of partial overrides is where that stops being predictable.
+   -------------------------------------------------------------------------- */
+
+.badge {
+  background-color: var(--color-badge-custom-bg);
+  color: var(--color-badge-custom-text);
+  border-radius: var(--badge-radius, var(--radius-badge, 0));
+}
+
+.badge--sale        { background-color: var(--color-badge-sale-bg);     color: var(--color-badge-sale-text); }
+.badge--new         { background-color: var(--color-badge-new-bg);      color: var(--color-badge-new-text); }
+.badge--hot         { background-color: var(--color-badge-hot-bg);      color: var(--color-badge-hot-text); }
+.badge--popular     { background-color: var(--color-badge-popular-bg);  color: var(--color-badge-popular-text); }
+.badge--sold-out    { background-color: var(--color-badge-sold-out-bg); color: var(--color-badge-sold-out-text); }
+.badge--preorder    { background-color: var(--color-badge-preorder-bg); color: var(--color-badge-preorder-text); }
+
+/* Icon inside a badge inherits the badge's own text colour, so a merchant never
+   has to set the same colour twice. */
+.badge svg {
+  inline-size: var(--icon-size-sm);
+  block-size: var(--icon-size-sm);
+  fill: none;
+  stroke: currentColor;
+  flex-shrink: 0;
+}
+
+
+/* --------------------------------------------------------------------------
+   Variant pills
+   -------------------------------------------------------------------------- */
+
+.variant-option,
+.variant-picker__option {
+  background-color: var(--color-variant-bg);
+  color: var(--color-variant-text);
+  border: 1px solid var(--color-variant-border);
+  transition:
+    background-color 150ms ease,
+    color 150ms ease,
+    border-color 150ms ease;
+}
+
+/* :where() keeps this at zero specificity for the hover part, so the selected
+   state below wins without needing !important. */
+.variant-option:hover,
+.variant-picker__option:hover {
+  background-color: var(--color-variant-hover-bg);
+  color: var(--color-variant-hover-text);
+  border-color: var(--color-variant-hover-border);
+}
+
+.variant-option[aria-checked='true'],
+.variant-option.is-selected,
+.variant-picker__option[aria-checked='true'],
+.variant-picker__option.is-selected,
+.variant-picker__option:has(input:checked) {
+  background-color: var(--color-variant-selected-bg);
+  color: var(--color-variant-selected-text);
+  border-color: var(--color-variant-selected-border);
+}
+
+/* Unavailable variants keep the merchant's out-of-stock colour rather than a
+   hardcoded grey, so the signal matches the stock indicator elsewhere. */
+.variant-option[data-available='false'],
+.variant-picker__option[data-available='false'] {
+  color: var(--color-outofstock);
+  border-color: var(--color-outofstock);
+}
+
+
+/* --------------------------------------------------------------------------
+   Swatches
+   -------------------------------------------------------------------------- */
+
+.swatch,
+.swatch-input__label {
+  border: 1px solid var(--color-swatch-border);
+}
+
+.swatch[aria-checked='true'],
+.swatch.is-selected,
+.swatch-input__input:checked + .swatch-input__label {
+  border-color: var(--color-swatch-active-border);
+  box-shadow: 0 0 0 1px var(--color-swatch-active-border);
+}
+
+
+/* --------------------------------------------------------------------------
+   Stock indicator
+   -------------------------------------------------------------------------- */
+
+.stock-indicator[data-state='in-stock']     { --stock-color: var(--color-instock); }
+.stock-indicator[data-state='low-stock']    { --stock-color: var(--color-lowstock); }
+.stock-indicator[data-state='out-of-stock'] { --stock-color: var(--color-outofstock); }
+
+.stock-indicator { color: var(--stock-color, var(--color-text)); }
+.stock-indicator__dot { background-color: var(--stock-color, currentColor); }
+
+/* The bar's track is the same colour at low alpha — one setting, two roles. */
+.stock-indicator__bar { background-color: rgb(var(--color-lowstock-rgb) / 0.15); }
+.stock-indicator__bar-fill { background-color: var(--stock-color, var(--color-lowstock)); }
+
+
+/* --------------------------------------------------------------------------
+   Cart bubble
+   -------------------------------------------------------------------------- */
+
+.cart-bubble,
+.header__cart-count,
+[data-cart-count] {
+  background-color: var(--color-cart-bubble-bg);
+  color: var(--color-cart-bubble-text);
+}
+
+
+/* --------------------------------------------------------------------------
+   Toasts / notifications
+   -------------------------------------------------------------------------- */
+
+.toast[data-variant='success'] { --toast-color: var(--color-success); --toast-tint: rgb(var(--color-success-rgb) / 0.10); }
+.toast[data-variant='error']   { --toast-color: var(--color-error);   --toast-tint: rgb(var(--color-error-rgb) / 0.10); }
+.toast[data-variant='warning'] { --toast-color: var(--color-warning); --toast-tint: rgb(var(--color-warning-rgb) / 0.10); }
+.toast[data-variant='info']    { --toast-color: var(--color-info);    --toast-tint: rgb(var(--color-info-rgb) / 0.10); }
+
+.toast {
+  border-inline-start: 3px solid var(--toast-color, var(--color-info));
+  background-color: var(--toast-tint, var(--color-background));
+}
+
+.toast__icon { color: var(--toast-color, var(--color-info)); }
+
+
+/* --------------------------------------------------------------------------
+   Global icon sizing
+   --------------------------------------------------------------------------
+   Applies only where the icon has no explicit size attribute, so the `size:`
+   parameter passed to `{% render 'icon' %}` still wins where a specific size
+   was deliberately chosen.
+   -------------------------------------------------------------------------- */
+
+svg.icon:not([width]) {
+  inline-size: var(--icon-size);
+  block-size: var(--icon-size);
+}
+
+.icon--sm { --icon-size: var(--icon-size-sm); }
+.icon--md { --icon-size: var(--icon-size-md); }
+.icon--lg { --icon-size: var(--icon-size-lg); }

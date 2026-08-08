@@ -1,0 +1,78 @@
+{% doc %}
+  The shipping estimator, shared by the cart page and the cart drawer.
+
+  One copy, because two would drift — and a customer who gets one estimate in the
+  drawer and a different one on the cart page has been given a reason not to
+  trust either.
+
+  Rates come from Shopify's own endpoint. The theme neither computes nor caches
+  them, so the estimate is the same number checkout will use, and a merchant
+  changing a shipping profile sees the change immediately.
+
+  ## The ids are namespaced
+
+  The drawer and the cart page can both be in the document at once, and duplicate
+  `id` attributes break every `<label for>` on the page — the browser binds each
+  label to whichever element it finds first, so clicking one form's label focuses
+  the other form's field.
+
+  Province lists come from Shopify's `country_option_tags`, read from the
+  selected option rather than fetched. A theme shipping its own list of provinces
+  would be wrong somewhere in the world within a year.
+
+  Parameters:
+    id       (string, required)  Unique per instance, e.g. 'drawer' or 'page'
+    heading  (boolean, optional) Render the title. Default true
+
+  @example
+    {% render 'shipping-calculator', id: 'drawer' %}
+{% enddoc %}
+
+{%- liquid
+  assign instance = id | default: 'page'
+  assign show_heading = heading
+  if heading == nil
+    assign show_heading = true
+  endif
+-%}
+
+<shipping-calculator class="shipping-calculator">
+  {%- if show_heading -%}
+    <h2 class="shipping-calculator__title">{{ 'cart.shipping_calculator.title' | t }}</h2>
+  {%- endif -%}
+
+  <div class="shipping-calculator__fields">
+    <div class="form-field">
+      <label for="ShippingCountry-{{ instance }}">{{ 'cart.shipping_calculator.country' | t }}</label>
+      <select id="ShippingCountry-{{ instance }}" data-ref="country" name="country">
+        {{ country_option_tags }}
+      </select>
+    </div>
+
+    {%- comment -%}
+      Hidden until a country with provinces is chosen. An empty dropdown reads as
+      a required field a customer cannot fill.
+    {%- endcomment -%}
+    <div class="form-field" data-province-wrapper hidden>
+      <label for="ShippingProvince-{{ instance }}">{{ 'cart.shipping_calculator.province' | t }}</label>
+      <select id="ShippingProvince-{{ instance }}" data-ref="province" name="province" disabled></select>
+    </div>
+
+    <div class="form-field">
+      <label for="ShippingZip-{{ instance }}">{{ 'cart.shipping_calculator.zip' | t }}</label>
+      <input
+        id="ShippingZip-{{ instance }}"
+        data-ref="zip"
+        name="zip"
+        autocomplete="postal-code"
+        autocapitalize="characters"
+      >
+    </div>
+  </div>
+
+  <button type="button" class="button button--secondary" data-ref="submit">
+    {{ 'cart.shipping_calculator.calculate' | t }}
+  </button>
+
+  <div class="shipping-calculator__results" data-ref="results" role="status"></div>
+</shipping-calculator>

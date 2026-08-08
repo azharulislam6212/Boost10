@@ -1,0 +1,73 @@
+{% doc %}
+  The visible breadcrumb trail.
+
+  Plain links inside a labelled `<nav>`, with `aria-current="page"` on the last
+  item. No microdata: `structured-data.liquid` already emits a BreadcrumbList in
+  JSON-LD, and describing the same trail twice in two syntaxes is two places for
+  it to drift.
+
+  The separator is a CSS `::before` on each item after the first, not a character
+  in the markup. A literal slash between links is read aloud as "slash" by every
+  screen reader, on every page.
+
+  On a product page the trail uses `collection` when the customer arrived through
+  one, which Shopify sets automatically. That means the breadcrumb reflects the
+  route they actually took rather than a canonical path they never saw.
+
+  @example
+    {% render 'breadcrumbs' %}
+{% enddoc %}
+
+{%- unless request.page_type == 'index' -%}
+  <nav class="breadcrumbs" aria-label="{{ 'general.breadcrumbs.label' | t }}">
+    <ol class="breadcrumbs__list" role="list">
+      <li class="breadcrumbs__item">
+        <a href="{{ routes.root_url }}">{{ 'general.breadcrumbs.home' | t }}</a>
+      </li>
+
+      {%- case request.page_type -%}
+        {%- when 'product' -%}
+          {%- if collection.url != blank -%}
+            <li class="breadcrumbs__item">
+              <a href="{{ collection.url }}">{{ collection.title }}</a>
+            </li>
+          {%- endif -%}
+          <li class="breadcrumbs__item" aria-current="page">{{ product.title }}</li>
+
+        {%- when 'collection' -%}
+          {%- if current_tags -%}
+            <li class="breadcrumbs__item">
+              <a href="{{ collection.url }}">{{ collection.title }}</a>
+            </li>
+            <li class="breadcrumbs__item" aria-current="page">{{ current_tags | join: ', ' }}</li>
+          {%- else -%}
+            <li class="breadcrumbs__item" aria-current="page">{{ collection.title }}</li>
+          {%- endif -%}
+
+        {%- when 'blog' -%}
+          <li class="breadcrumbs__item" aria-current="page">{{ blog.title }}</li>
+
+        {%- when 'article' -%}
+          <li class="breadcrumbs__item">
+            <a href="{{ blog.url }}">{{ blog.title }}</a>
+          </li>
+          <li class="breadcrumbs__item" aria-current="page">{{ article.title }}</li>
+
+        {%- when 'page' -%}
+          <li class="breadcrumbs__item" aria-current="page">{{ page.title }}</li>
+
+        {%- when 'policy' -%}
+          <li class="breadcrumbs__item" aria-current="page">{{ policy.title }}</li>
+
+        {%- when 'search' -%}
+          <li class="breadcrumbs__item" aria-current="page">{{ 'search.title' | t }}</li>
+
+        {%- when 'list-collections' -%}
+          <li class="breadcrumbs__item" aria-current="page">{{ 'collections.list.title' | t }}</li>
+
+        {%- else -%}
+          <li class="breadcrumbs__item" aria-current="page">{{ page_title }}</li>
+      {%- endcase -%}
+    </ol>
+  </nav>
+{%- endunless -%}

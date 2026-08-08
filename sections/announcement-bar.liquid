@@ -1,0 +1,149 @@
+{%- liquid
+  assign section_settings = section.settings
+  assign count = section.blocks.size
+  assign mode = section_settings.mode | default: 'slider'
+  assign should_render = true
+  if section_settings.homepage_only and request.page_type != 'index'
+    assign should_render = false
+  endif
+-%}
+
+{%- if count > 0 and should_render -%}
+  {%- capture announcements -%}
+    {%- content_for 'blocks' -%}
+  {%- endcapture -%}
+
+  <announcement-bar
+    class="announcement-bar color-{{ section_settings.color_scheme }}{% unless section_settings.enable_on_mobile %} announcement-bar--desktop-only{% endunless %}"
+    data-announcement-bar
+    data-section-id="{{ section.id }}"
+    {% if section_settings.show_close %}data-dismissible{% endif %}
+    {% render 'spacing', section: section_settings %}
+  >
+    <div class="container announcement-bar__inner">
+      {%- case mode -%}
+        {%- when 'marquee' -%}
+          <motion-effect
+            class="announcement-bar__marquee marquee__viewport"
+            data-effect="marquee"
+            data-direction="{{ section_settings.marquee_direction | default: 'left' }}"
+            data-speed="{{ section_settings.marquee_speed | default: 40 }}"
+            data-pause-on-hover="{{ section_settings.pause_on_hover }}"
+            role="marquee"
+            aria-label="{{ 'sections.announcements.carousel_label' | t }}"
+          >
+            <div class="marquee__track" data-marquee-track>
+              {{ announcements }}
+            </div>
+          </motion-effect>
+
+        {%- else -%}
+          {%- if count > 1 -%}
+            <swiper-carousel
+              class="announcement-bar__carousel"
+              {% render 'carousel-attrs', settings: section_settings %}
+            >
+              <div
+                class="announcement-bar__track"
+                data-ref="track"
+                tabindex="0"
+                role="group"
+                aria-label="{{ 'sections.announcements.carousel_label' | t }}"
+              >
+                {{ announcements }}
+              </div>
+
+              <button
+                type="button"
+                class="announcement-bar__arrow"
+                data-ref="previous"
+                aria-label="{{ 'sections.announcements.previous' | t }}"
+              >
+                {% render 'icon', icon: 'chevron-left', size: 14 %}
+              </button>
+
+              <button
+                type="button"
+                class="announcement-bar__arrow"
+                data-ref="next"
+                aria-label="{{ 'sections.announcements.next' | t }}"
+              >
+                {% render 'icon', icon: 'chevron-right', size: 14 %}
+              </button>
+
+              <p class="visually-hidden" data-ref="status" role="status"></p>
+            </swiper-carousel>
+          {%- else -%}
+            {%- comment -%}
+              One announcement is not a carousel. Rendering the component around
+              a single slide costs the script, the duplicated markup and a live
+              region, and gives the customer arrows that do nothing.
+            {%- endcomment -%}
+            {{ announcements }}
+          {%- endif -%}
+      {%- endcase -%}
+
+      {%- if section_settings.show_close -%}
+        <button
+          type="button"
+          class="announcement-bar__close"
+          data-ref="close"
+          aria-label="{{ 'accessibility.close' | t }}"
+        >
+          {% render 'icon', icon: 'close', size: 14 %}
+        </button>
+      {%- endif -%}
+    </div>
+  </announcement-bar>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "t:sections.announcement_bar.name",
+  "tag": "section",
+  "class": "announcement-bar-section",
+  "max_blocks": 6,
+  "blocks": [{ "type": "@theme" }, { "type": "@app" }],
+  "settings": [
+    {
+      "type": "select", "id": "mode", "label": "t:sections.announcement_bar.settings.mode.label",
+      "options": [
+        { "value": "slider", "label": "t:sections.announcement_bar.settings.mode.options__1.label" },
+        { "value": "marquee", "label": "t:sections.announcement_bar.settings.mode.options__2.label" }
+      ],
+      "default": "slider"
+    },
+
+    { "type": "header", "content": "t:sections.announcement_bar.headers.slider", "visible_if": "{{ section.settings.mode == 'slider' }}" },
+    { "type": "checkbox", "id": "carousel_autoplay", "label": "t:shared.carousel.autoplay.label", "default": true, "visible_if": "{{ section.settings.mode == 'slider' }}" },
+    { "type": "range", "id": "carousel_speed", "label": "t:shared.carousel.speed.label", "min": 3, "max": 12, "step": 1, "unit": "s", "default": 5, "visible_if": "{{ section.settings.mode == 'slider' }}" },
+    { "type": "checkbox", "id": "carousel_loop", "label": "t:shared.carousel.loop.label", "default": true, "visible_if": "{{ section.settings.mode == 'slider' }}" },
+
+    { "type": "header", "content": "t:sections.announcement_bar.headers.marquee", "visible_if": "{{ section.settings.mode == 'marquee' }}" },
+    {
+      "type": "select", "id": "marquee_direction", "label": "t:sections.marquee.settings.direction.label",
+      "options": [
+        { "value": "left", "label": "t:sections.marquee.settings.direction.options__1.label" },
+        { "value": "right", "label": "t:sections.marquee.settings.direction.options__2.label" }
+      ],
+      "default": "left",
+      "visible_if": "{{ section.settings.mode == 'marquee' }}"
+    },
+    { "type": "range", "id": "marquee_speed", "label": "t:sections.marquee.settings.speed.label", "min": 10, "max": 120, "step": 5, "unit": "px", "default": 40, "visible_if": "{{ section.settings.mode == 'marquee' }}" },
+    { "type": "checkbox", "id": "pause_on_hover", "label": "t:sections.marquee.settings.pause_on_hover.label", "default": true, "visible_if": "{{ section.settings.mode == 'marquee' }}" },
+
+    { "type": "header", "content": "t:sections.announcement_bar.headers.visibility" },
+    { "type": "checkbox", "id": "enable_on_mobile", "label": "t:sections.announcement_bar.settings.enable_on_mobile.label", "default": true },
+    { "type": "checkbox", "id": "homepage_only", "label": "t:sections.announcement_bar.settings.homepage_only.label", "default": false },
+    { "type": "checkbox", "id": "show_close", "label": "t:sections.announcement_bar.settings.show_close.label", "info": "t:sections.announcement_bar.settings.show_close.info", "default": false },
+
+    { "type": "color_scheme", "id": "color_scheme", "label": "t:shared.color_scheme.label", "default": "scheme-3" },
+
+    { "type": "header", "content": "t:shared.spacing.section_header" },
+    { "type": "range", "id": "padding_top", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 8 },
+    { "type": "range", "id": "padding_bottom", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 8 },
+    { "type": "range", "id": "padding_top_mobile", "label": "t:shared.spacing.padding_top_mobile.label", "info": "t:shared.spacing.padding_top_mobile.info", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_bottom_mobile", "label": "t:shared.spacing.padding_bottom_mobile.label", "info": "t:shared.spacing.padding_bottom_mobile.info", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 0 }
+  ]
+}
+{% endschema %}

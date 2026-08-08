@@ -1,0 +1,287 @@
+{% doc %}
+  JSON-LD for the current page.
+
+  One script per page, emitted in the head. Google reads the first valid block
+  for each type and a theme that scatters three of them across a document gives
+  itself three chances to disagree with itself.
+
+  ## What is here, and what deliberately is not
+
+  **Product** — name, image, description, SKU, brand, and an Offer with the price
+  Shopify actually has. `priceValidUntil` is omitted rather than guessed: a made
+  up date is a rich result that expires on a day nobody chose.
+
+  **No aggregateRating unless a rating metafield exists.** Emitting review markup
+  a store has not earned is the fastest route to a manual action, and it is the
+  single most common reason themes get rejected for structured data.
+
+  **Organization** — on the home page only. Repeating it on every page adds bytes
+  and tells Google nothing new.
+
+  **BreadcrumbList** — mirrors the visible breadcrumb exactly. Structured data
+  that describes navigation the customer cannot see is the definition of
+  mismatched markup.
+
+  **Article** — for blog posts, with the author as a Person and the real
+  published and modified dates.
+
+  Everything is escaped through `| json`, which handles quotes, newlines and
+  unicode in one pass. Hand-escaping product descriptions into JSON is how themes
+  ship invalid structured data that only breaks for the merchant whose product
+  name contains an apostrophe.
+
+  @example
+    {% render 'structured-data' %}
+{% enddoc %}
+
+
+{%- liquid
+  comment
+    The logo lives on the header section, which structured data cannot reach, so
+    the theme-level share image is the source here. A merchant who wants a logo
+    in rich results sets it in Theme settings rather than only on the header.
+  endcomment
+  assign shop_image = settings.share_image
+-%}
+
+{%- case request.page_type -%}
+  {%- when 'index' -%}
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": {{ shop.name | json }},
+        "url": {{ shop.url | append: routes.root_url | json }}
+        {%- if shop_image != blank -%}
+          ,"logo": {{ shop_image | image_url: width: 500 | prepend: "https:" | json }}
+        {%- endif -%}
+        {%- if shop.description != blank -%}
+          ,"description": {{ shop.description | strip_html | json }}
+        {%- endif -%}
+        {%- assign social = '' -%}
+        {%- assign networks = 'instagram,facebook,tiktok,youtube,pinterest,x,linkedin' | split: ',' -%}
+        {%- for network in networks -%}
+          {%- assign key = 'social_' | append: network | append: '_link' -%}
+          {%- if settings[key] != blank -%}
+            {%- assign social = social | append: settings[key] | append: '|' -%}
+          {%- endif -%}
+        {%- endfor -%}
+        {%- if social != blank -%}
+          ,"sameAs": {{ social | split: '|' | json }}
+        {%- endif -%}
+      }
+    </script>
+
+ {%- capture search_url -%}{{ shop.url }}{{ routes.search_url }}?q={search_term_string}{%- endcapture -%}
+
+      <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": {{ shop.name | json }},
+        "url": {{ shop.url | append: routes.root_url | json }},
+        "potentialAction": {
+          "@type": "SearchAction",
+          "target": {
+            "@type": "EntryPoint",
+            "urlTemplate": {{ search_url | strip | json }}
+          },
+          "query-input": "required name=search_term_string"
+        }
+      }
+      </script>
+
+  {%- when 'product' -%}
+    {%- liquid
+      assign variant = product.selected_or_first_available_variant
+
+      assign availability = 'https://schema.org/OutOfStock'
+      if variant.available
+        assign availability = 'https://schema.org/InStock'
+        if variant.inventory_management != blank and variant.inventory_policy == 'continue' and variant.inventory_quantity <= 0
+          assign availability = 'https://schema.org/PreOrder'
+        endif
+      endif
+    -%}
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Product",
+        "name": {{ product.title | json }},
+        "url": {{ shop.url | append: product.url | json }},
+        "description": {{ product.description | strip_html | truncatewords: 100 | json }}
+        {%- if product.featured_media -%}
+          ,"image": [
+            {%- for media in product.media limit: 5 -%}
+              {%- if media.media_type == 'image' -%}
+                {{ media | image_url: width: 1200 | prepend: "https:" | json }}
+                {%- unless forloop.last -%},{%- endunless -%}
+              {%- endif -%}
+            {%- endfor -%}
+          ]
+        {%- endif -%}
+        {%- if product.vendor != blank -%}
+          ,"brand": { "@type": "Brand", "name": {{ product.vendor | json }} }
+        {%- endif -%}
+        {%- if variant.sku != blank -%}
+          ,"sku": {{ variant.sku | json }}
+        {%- endif -%}
+        {%- if variant.barcode != blank -%}
+          ,"gtin": {{ variant.barcode | json }}
+        {%- endif -%}
+
+        {%- comment -%}
+          Ratings only when the store genuinely has them. Inventing review markup
+          is the fastest route to a manual action.
+        {%- endcomment -%}
+        {%- if product.metafields.reviews.rating_count > 0 and product.metafields.reviews.rating.value != blank -%}
+          ,"aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": {{ product.metafields.reviews.rating.value.rating | json }},
+            "bestRating": {{ product.metafields.reviews.rating.value.scale_max | json }},
+            "worstRating": {{ product.metafields.reviews.rating.value.scale_min | json }},
+            "ratingCount": {{ product.metafields.reviews.rating_count | json }}
+          }
+        {%- endif -%}
+
+        {%- if product.variants.size > 1 -%}
+          ,"offers": [
+            {%- for v in product.variants -%}
+              {
+                "@type": "Offer",
+                "name": {{ v.title | json }},
+                "sku": {{ v.sku | json }},
+                "price": {{ v.price | divided_by: 100.0 | json }},
+                "priceCurrency": {{ cart.currency.iso_code | json }},
+                "availability": "{% if v.available %}https://schema.org/InStock{% else %}https://schema.org/OutOfStock{% endif %}",
+                "url": {{ shop.url | append: v.url | json }}
+              }{%- unless forloop.last -%},{%- endunless -%}
+            {%- endfor -%}
+          ]
+        {%- else -%}
+          ,"offers": {
+            "@type": "Offer",
+            "price": {{ variant.price | divided_by: 100.0 | json }},
+            "priceCurrency": {{ cart.currency.iso_code | json }},
+            "availability": "{{ availability }}",
+            "url": {{ shop.url | append: product.url | json }}
+          }
+        {%- endif -%}
+      }
+    </script>
+
+  {%- when 'article' -%}
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Article",
+        "headline": {{ article.title | json }},
+        "url": {{ shop.url | append: article.url | json }},
+        "datePublished": {{ article.published_at | date: '%Y-%m-%dT%H:%M:%SZ' | json }},
+        "dateModified": {{ article.updated_at | default: article.published_at | date: '%Y-%m-%dT%H:%M:%SZ' | json }}
+        {%- if article.excerpt_or_content != blank -%}
+          ,"description": {{ article.excerpt_or_content | strip_html | truncatewords: 60 | json }}
+        {%- endif -%}
+        {%- if article.image -%}
+          ,"image": [{{ article.image | image_url: width: 1200 | prepend: "https:" | json }}]
+        {%- endif -%}
+        {%- if article.author != blank -%}
+          ,"author": { "@type": "Person", "name": {{ article.author | json }} }
+        {%- endif -%}
+        ,"publisher": {
+          "@type": "Organization",
+          "name": {{ shop.name | json }}
+          {%- if shop_image != blank -%}
+            ,"logo": {
+              "@type": "ImageObject",
+              "url": {{ shop_image | image_url: width: 500 | prepend: "https:" | json }}
+            }
+          {%- endif -%}
+        }
+      }
+    </script>
+{%- endcase -%}
+
+{%- comment -%}
+  Breadcrumbs, on every page that has a trail. Mirrors what breadcrumbs.liquid
+  renders, so the markup and the page never describe different journeys.
+{%- endcomment -%}
+{%- if request.page_type == 'product' or request.page_type == 'collection' or request.page_type == 'article' or request.page_type == 'blog' or request.page_type == 'page' -%}
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": {{ 'general.breadcrumbs.home' | t | json }},
+          "item": {{ shop.url | append: routes.root_url | json }}
+        }
+        {%- case request.page_type -%}
+          {%- when 'product' -%}
+            {%- if collection.url != blank -%}
+              ,{
+                "@type": "ListItem",
+                "position": 2,
+                "name": {{ collection.title | json }},
+                "item": {{ shop.url | append: collection.url | json }}
+              },
+              {
+                "@type": "ListItem",
+                "position": 3,
+                "name": {{ product.title | json }},
+                "item": {{ shop.url | append: product.url | json }}
+              }
+            {%- else -%}
+              ,{
+                "@type": "ListItem",
+                "position": 2,
+                "name": {{ product.title | json }},
+                "item": {{ shop.url | append: product.url | json }}
+              }
+            {%- endif -%}
+
+          {%- when 'collection' -%}
+            ,{
+              "@type": "ListItem",
+              "position": 2,
+              "name": {{ collection.title | json }},
+              "item": {{ shop.url | append: collection.url | json }}
+            }
+
+          {%- when 'blog' -%}
+            ,{
+              "@type": "ListItem",
+              "position": 2,
+              "name": {{ blog.title | json }},
+              "item": {{ shop.url | append: blog.url | json }}
+            }
+
+          {%- when 'article' -%}
+            ,{
+              "@type": "ListItem",
+              "position": 2,
+              "name": {{ blog.title | json }},
+              "item": {{ shop.url | append: blog.url | json }}
+            },
+            {
+              "@type": "ListItem",
+              "position": 3,
+              "name": {{ article.title | json }},
+              "item": {{ shop.url | append: article.url | json }}
+            }
+
+          {%- when 'page' -%}
+            ,{
+              "@type": "ListItem",
+              "position": 2,
+              "name": {{ page.title | json }},
+              "item": {{ shop.url | append: page.url | json }}
+            }
+        {%- endcase -%}
+      ]
+    }
+  </script>
+{%- endif -%}

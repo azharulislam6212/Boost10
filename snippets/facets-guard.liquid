@@ -1,0 +1,128 @@
+{%- comment -%}
+  Phase 6 — the `snippets/facets.liquid` edit outstanding since Phase 2.
+
+  `facets-horizontal.liquid` renders one dropdown per filter group and calls
+  this snippet once per group with `filter:` set. Without the guard below,
+  every dropdown renders every filter, so a store with five filters shows
+  twenty-five filter groups.
+
+  Two edits, both small.
+{%- endcomment -%}
+
+
+{%- comment -%} ============================================================
+  EDIT 1 — the `{%- liquid -%}` block at the top (currently lines 22–25)
+  ============================================================ {%- endcomment -%}
+
+{%- liquid
+  assign layout = context | default: 'sidebar'
+  assign sort_options = results.sort_options
+  assign current_sort = results.sort_by | default: results.default_sort_by
+
+  # A single filter can be passed in, which is how the horizontal layout asks
+  # for one group at a time. Wrapping it in an array rather than branching the
+  # loop keeps one `{% for %}` below — the alternative duplicates the whole
+  # group body, which is 80 lines and the exact duplication this refactor has
+  # been removing everywhere else.
+  if filter
+    assign filters_to_render = filter | concat: empty_array
+  else
+    assign filters_to_render = results.filters
+  endif
+
+  # The horizontal layout supplies its own summary button and popover, so the
+  # `<details>` wrapper below would nest a disclosure inside a disclosure.
+  assign wrap_in_details = true
+  if layout == 'horizontal'
+    assign wrap_in_details = false
+  endif
+-%}
+
+
+{%- comment -%} ============================================================
+  NOTE on `filter | concat: empty_array`
+
+  Liquid has no array literal. `concat` needs an array on both sides, and an
+  undefined variable is `nil`, not an empty array — so `filter | concat: nil`
+  fails silently and returns nothing.
+
+  If your Liquid version rejects the line above, use this instead, which is
+  uglier but works everywhere:
+
+    {%- assign filters_to_render = '' | split: '' -%}
+    {%- if filter -%}
+      {%- assign filters_to_render = filters_to_render | concat: filter -%}
+    {%- endif -%}
+
+  Simplest of all, if you prefer: keep `results.filters` and skip non-matching
+  filters inside the loop with
+
+    {%- if filter and f.param_name != filter.param_name -%}{%- continue -%}{%- endif -%}
+
+  That costs one wasted iteration per filter and needs no array construction.
+  ============================================================ {%- endcomment -%}
+
+
+{%- comment -%} ============================================================
+  EDIT 2 — the filter loop (currently lines 61–71)
+
+  Replace the `{%- for filter in results.filters -%}` line and its `<details>`
+  wrapper with the block below. Everything inside `.facets__group-content`
+  stays exactly as it is.
+
+  The loop variable is renamed to `f` because `filter` is now the incoming
+  parameter, and shadowing it would make the guard above unreadable.
+  ============================================================ {%- endcomment -%}
+
+<accordion-element
+  class="facets__groups"
+  data-collapse-below="{% if layout == 'drawer' %}0{% else %}750{% endif %}"
+>
+  {%- for f in filters_to_render -%}
+    {%- if wrap_in_details -%}
+      <details class="facets__group" data-default-open {% if f.active_values.size > 0 %}open{% endif %}>
+        <summary class="facets__summary">
+          <span class="facets__group-label">{{ f.label }}</span>
+          {%- if f.active_values.size > 0 -%}
+            <span class="facets__group-count">{{ f.active_values.size }}</span>
+          {%- endif -%}
+          {% render 'icon', icon: 'chevron-down', size: 14 %}
+        </summary>
+
+        <div class="facets__group-content">
+          {%- comment -%} …existing filter body, with `filter` renamed to `f`… {%- endcomment -%}
+        </div>
+      </details>
+    {%- else -%}
+      {%- comment -%}
+        Horizontal: no disclosure wrapper, because the dropdown's `<summary>`
+        already is one. The body is identical, which is why it should be moved
+        into its own snippet rather than written twice — see the note below.
+      {%- endcomment -%}
+      <div class="facets__group facets__group--flat">
+        <div class="facets__group-content">
+          {%- comment -%} …existing filter body, with `filter` renamed to `f`… {%- endcomment -%}
+        </div>
+      </div>
+    {%- endif -%}
+  {%- endfor -%}
+</accordion-element>
+
+
+{%- comment -%} ============================================================
+  RECOMMENDED — extract the body
+
+  The filter body is around 80 lines of `{% case filter.type %}` covering price
+  ranges, checkboxes and swatches. Pasting it into both branches above means
+  the next change to swatch rendering has to be made twice, and the two copies
+  will drift the way the carousel branches did.
+
+  Cut everything currently between `<div class="facets__group-content">` and
+  its closing tag into `snippets/facet-group.liquid`, taking `filter` and
+  `layout` as parameters, then call it from both branches:
+
+    {% render 'facet-group', filter: f, layout: layout, results: results %}
+
+  That is a mechanical move — no logic changes — and it makes the two branches
+  above four lines each.
+  ============================================================ {%- endcomment -%}

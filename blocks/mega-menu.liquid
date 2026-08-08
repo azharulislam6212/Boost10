@@ -1,0 +1,316 @@
+{% comment %}
+  blocks/mega-menu.liquid
+
+  The contents of one mega menu panel: link columns, up to three promotional
+  images, and optionally a collection tab strip with a product carousel.
+
+  ## How a block finds its menu item
+
+  The block carries a `menu_item` text setting, and the header matches it
+  against the title of each top-level link. A link with no matching block falls
+  back to the plain column layout built from its own child links.
+
+  Matching on title rather than on an index is deliberate. A merchant who
+  reorders the navigation would otherwise silently move every promo image to
+  the wrong menu, and the failure would look like a caching bug rather than a
+  settings problem.
+
+  It does mean renaming a menu item in the Navigation admin detaches its block.
+  That is visible and recoverable — the panel reverts to plain columns — where
+  the index version is neither.
+
+  ## Why the panel is not a `<dialog>`
+
+  Drawers and modals in this theme are native dialogs, and a mega menu looks
+  like a case for the same treatment. It is not: a dialog moves to the top
+  layer and makes the rest of the page inert, which is correct for a cart
+  drawer and wrong for a menu the customer is hovering through on the way to
+  somewhere else. `<mega-menu>` in `global.js` already handles the open state,
+  hover intent and Escape.
+
+  Parameters, when rendered from the header:
+    link (object)  The top-level link this panel belongs to
+{% endcomment %}
+
+{%- liquid
+  assign settings = block.settings
+  assign promo_count = 0
+  for i in (1..3)
+    assign key = 'image_' | append: i
+    if settings[key] != blank
+      assign promo_count = promo_count | plus: 1
+    endif
+  endfor
+
+  assign has_tabs = false
+  if settings.enable_tabs and settings.tab_collection_1 != blank
+    assign has_tabs = true
+  endif
+-%}
+
+<div
+  class="mega-menu__content mega-menu__content--{{ settings.layout }}"
+  {{ block.shopify_attributes }}
+>
+  {%- comment -%} ---- link columns ---- {%- endcomment -%}
+  {%- if link.links.size > 0 -%}
+    <div
+      class="mega-menu__columns"
+      style="--mega-columns: {{ settings.columns }};"
+    >
+      {%- for child in link.links -%}
+        <div class="mega-menu__column">
+          <a class="mega-menu__heading" href="{{ child.url }}">{{ child.title }}</a>
+
+          {%- if child.links.size > 0 -%}
+            <ul class="mega-menu__list" role="list">
+              {%- for grandchild in child.links -%}
+                <li>
+                  <a class="mega-menu__link" href="{{ grandchild.url }}">{{ grandchild.title }}</a>
+                </li>
+              {%- endfor -%}
+            </ul>
+          {%- endif -%}
+        </div>
+      {%- endfor -%}
+    </div>
+  {%- endif -%}
+
+  {%- comment -%} ---- promotional images ---- {%- endcomment -%}
+  {%- if promo_count > 0 -%}
+    <div class="mega-menu__promos" style="--promo-count: {{ promo_count }};">
+      {%- for i in (1..3) -%}
+        {%- liquid
+          assign image_key = 'image_' | append: i
+          assign heading_key = 'image_heading_' | append: i
+          assign text_key = 'image_text_' | append: i
+          assign link_key = 'image_link_' | append: i
+          assign position_key = 'image_position_' | append: i
+
+          assign promo_image = settings[image_key]
+          assign promo_heading = settings[heading_key]
+          assign promo_text = settings[text_key]
+          assign promo_link = settings[link_key]
+          assign promo_position = settings[position_key] | default: 'overlay'
+        -%}
+
+        {%- if promo_image != blank -%}
+          {%- comment -%}
+            The whole card is one anchor when a link is set, so the target is
+            the full image rather than a small text link inside it. Nesting a
+            second anchor for the heading would be invalid markup and would
+            give a keyboard user two stops for one destination.
+          {%- endcomment -%}
+          {%- if promo_link != blank -%}
+            <a
+              class="mega-menu__promo mega-menu__promo--{{ promo_position }}"
+              href="{{ promo_link }}"
+            >
+          {%- else -%}
+            <div class="mega-menu__promo mega-menu__promo--{{ promo_position }}">
+          {%- endif -%}
+
+            {% render 'image',
+               image: promo_image,
+               alt: promo_heading | default: '',
+               ratio: settings.image_ratio,
+               sizes: '(min-width: 990px) 300px, 50vw',
+               wrapper_class: 'mega-menu__promo-media',
+               class: 'mega-menu__promo-image' %}
+
+            {%- if promo_heading != blank or promo_text != blank -%}
+              <div class="mega-menu__promo-content">
+                {%- if promo_heading != blank -%}
+                  <span class="mega-menu__promo-heading">{{ promo_heading | escape }}</span>
+                {%- endif -%}
+                {%- if promo_text != blank -%}
+                  <span class="mega-menu__promo-text">{{ promo_text | escape }}</span>
+                {%- endif -%}
+              </div>
+            {%- endif -%}
+
+          {%- if promo_link != blank -%}</a>{%- else -%}</div>{%- endif -%}
+        {%- endif -%}
+      {%- endfor -%}
+    </div>
+  {%- endif -%}
+
+  {%- comment -%} ---- collection tabs + product carousel ---- {%- endcomment -%}
+  {%- if has_tabs -%}
+    {%- capture tab_collections -%}
+      {%- for i in (1..3) -%}
+        {%- assign key = 'tab_collection_' | append: i -%}
+        {%- if settings[key] != blank -%}{{ settings[key].handle }},{%- endif -%}
+      {%- endfor -%}
+    {%- endcapture -%}
+    {%- assign handles = tab_collections | split: ',' -%}
+
+    <collection-tabs class="mega-menu__tabs">
+      {%- comment -%}
+        A real tablist, so arrow keys move between tabs and only the active one
+        is in the tab order — which is what a screen reader user expects the
+        moment the markup claims `role="tablist"`.
+      {%- endcomment -%}
+      <div class="mega-menu__tablist" role="tablist" data-ref="tablist">
+        {%- for handle in handles -%}
+          {%- assign tab_collection = collections[handle] -%}
+          <button
+            type="button"
+            class="mega-menu__tab"
+            role="tab"
+            id="MegaTab-{{ block.id }}-{{ forloop.index }}"
+            aria-controls="MegaPanel-{{ block.id }}-{{ forloop.index }}"
+            aria-selected="{% if forloop.first %}true{% else %}false{% endif %}"
+            tabindex="{% if forloop.first %}0{% else %}-1{% endif %}"
+          >
+            {{ tab_collection.title | default: handle | escape }}
+          </button>
+        {%- endfor -%}
+      </div>
+
+      {%- for handle in handles -%}
+        {%- assign tab_collection = collections[handle] -%}
+        <div
+          class="mega-menu__tabpanel"
+          role="tabpanel"
+          id="MegaPanel-{{ block.id }}-{{ forloop.index }}"
+          aria-labelledby="MegaTab-{{ block.id }}-{{ forloop.index }}"
+          tabindex="0"
+          {% unless forloop.first %}hidden{% endunless %}
+        >
+          {%- if tab_collection.products.size > 0 -%}
+            {%- capture children -%}
+              {%- for product in tab_collection.products limit: settings.products_to_show -%}
+                <li class="carousel-shell__item">
+                  {% render 'product-card',
+                     product: product,
+                     sizes: '(min-width: 990px) 220px, 45vw',
+                     context: 'mega-menu' %}
+                </li>
+              {%- endfor -%}
+            {%- endcapture -%}
+
+            {% render 'carousel-shell',
+               children: children,
+               layout: 'carousel',
+               layout_mobile: 'carousel',
+               tag: 'ul',
+               label: tab_collection.title,
+               classes: 'mega-menu__carousel',
+               track_classes: 'product-grid',
+               columns_desktop: settings.tab_columns,
+               columns_tablet: 3,
+               columns_mobile: 2,
+               settings: settings %}
+          {%- endif -%}
+        </div>
+      {%- endfor -%}
+    </collection-tabs>
+  {%- endif -%}
+</div>
+
+{% schema %}
+{
+  "name": "t:blocks.mega_menu.name",
+  "tag": null,
+  "settings": [
+    {
+      "type": "text", "id": "menu_item",
+      "label": "t:blocks.mega_menu.settings.menu_item.label",
+      "info": "t:blocks.mega_menu.settings.menu_item.info"
+    },
+    {
+      "type": "select", "id": "layout", "label": "t:blocks.mega_menu.settings.layout.label",
+      "options": [
+        { "value": "full", "label": "t:blocks.mega_menu.settings.layout.options__1.label" },
+        { "value": "contained", "label": "t:blocks.mega_menu.settings.layout.options__2.label" }
+      ],
+      "default": "full"
+    },
+    {
+      "type": "select", "id": "columns", "label": "t:shared.columns.desktop.label",
+      "options": [
+        { "value": "2", "label": "2" },
+        { "value": "3", "label": "3" },
+        { "value": "4", "label": "4" },
+        { "value": "5", "label": "5" }
+      ],
+      "default": "4"
+    },
+
+    { "type": "header", "content": "t:blocks.mega_menu.headers.promos" },
+    {
+      "type": "select", "id": "image_ratio", "label": "t:shared.image_ratio.label",
+      "options": [
+        { "value": "square", "label": "t:shared.image_ratio.options__1.label" },
+        { "value": "portrait", "label": "t:shared.image_ratio.options__2.label" },
+        { "value": "landscape", "label": "t:shared.image_ratio.options__3.label" }
+      ],
+      "default": "portrait"
+    },
+
+    { "type": "image_picker", "id": "image_1", "label": "t:blocks.mega_menu.settings.image.label_1" },
+    { "type": "text", "id": "image_heading_1", "label": "t:shared.heading.label" },
+    { "type": "text", "id": "image_text_1", "label": "t:shared.text.label" },
+    { "type": "url", "id": "image_link_1", "label": "t:shared.link.label" },
+    {
+      "type": "select", "id": "image_position_1", "label": "t:blocks.mega_menu.settings.image_position.label",
+      "options": [
+        { "value": "overlay", "label": "t:blocks.mega_menu.settings.image_position.options__1.label" },
+        { "value": "bottom", "label": "t:blocks.mega_menu.settings.image_position.options__2.label" }
+      ],
+      "default": "overlay"
+    },
+
+    { "type": "image_picker", "id": "image_2", "label": "t:blocks.mega_menu.settings.image.label_2" },
+    { "type": "text", "id": "image_heading_2", "label": "t:shared.heading.label" },
+    { "type": "text", "id": "image_text_2", "label": "t:shared.text.label" },
+    { "type": "url", "id": "image_link_2", "label": "t:shared.link.label" },
+    {
+      "type": "select", "id": "image_position_2", "label": "t:blocks.mega_menu.settings.image_position.label",
+      "options": [
+        { "value": "overlay", "label": "t:blocks.mega_menu.settings.image_position.options__1.label" },
+        { "value": "bottom", "label": "t:blocks.mega_menu.settings.image_position.options__2.label" }
+      ],
+      "default": "overlay"
+    },
+
+    { "type": "image_picker", "id": "image_3", "label": "t:blocks.mega_menu.settings.image.label_3" },
+    { "type": "text", "id": "image_heading_3", "label": "t:shared.heading.label" },
+    { "type": "text", "id": "image_text_3", "label": "t:shared.text.label" },
+    { "type": "url", "id": "image_link_3", "label": "t:shared.link.label" },
+    {
+      "type": "select", "id": "image_position_3", "label": "t:blocks.mega_menu.settings.image_position.label",
+      "options": [
+        { "value": "overlay", "label": "t:blocks.mega_menu.settings.image_position.options__1.label" },
+        { "value": "bottom", "label": "t:blocks.mega_menu.settings.image_position.options__2.label" }
+      ],
+      "default": "overlay"
+    },
+
+    { "type": "header", 
+    "content": "t:blocks.mega_menu.headers.tabs"
+   },
+    { "type": "checkbox", "id":
+     "enable_tabs", 
+     "label": "t:blocks.mega_menu.settings.enable_tabs.label",
+      "default": false },
+    { "type": "collection", "id": "tab_collection_1",
+     "label": "t:blocks.mega_menu.settings.tab_collection.label_1" },
+    { "type": "collection", "id": "tab_collection_2", "label": "t:blocks.mega_menu.settings.tab_collection.label_2" },
+    { "type": "collection", "id": "tab_collection_3", "label": "t:blocks.mega_menu.settings.tab_collection.label_3" },
+    { "type": "range", "id": "products_to_show", "label": "t:blocks.mega_menu.settings.products_to_show.label", "min": 2, "max": 12, "step": 1, "default": 6 },
+    {
+      "type": "select", "id": "tab_columns", "label": "t:shared.columns.desktop.label",
+      "options": [
+        { "value": "3", "label": "3" },
+        { "value": "4", "label": "4" },
+        { "value": "5", "label": "5" }
+      ],
+      "default": "4"
+    },
+    { "type": "checkbox", "id": "carousel_navigation", "label": "t:shared.carousel.navigation.label", "default": true }
+  ],
+  "presets": [{ "name": "t:blocks.mega_menu.name" }]
+}
+{% endschema %}

@@ -1,0 +1,133 @@
+{% comment %}
+  blocks/filters.liquid
+
+  Public. A merchant selling twelve products does not want a filter sidebar, and
+  making them turn off four settings to hide it is worse than letting them remove
+  the block.
+
+  It receives `results`, `results_size` and `paginate` from the section, because a
+  block cannot see the `paginate` scope it was rendered inside. Passing them keeps
+  the same block working for a collection and for a search result set.
+
+  The sidebar and the drawer are the same markup. `<facet-filters>` keeps whichever
+  one is off screen in step after a filter change, so the two can never disagree
+  about what is selected.
+{% endcomment %}
+
+{%- liquid
+  assign results_set = results | default: collection
+  assign layout = block.settings.layout
+  if layout == 'inherit' or layout == blank
+    assign layout = settings.facets_layout
+  endif
+-%}
+
+{%- if results_set -%}
+  <div class="collection-filters collection-filters--{{ layout }}" {{ block.shopify_attributes }}>
+    <div class="collection-filters__bar">
+      {%- if block.settings.show_result_count -%}
+        <p class="collection-filters__count">
+          {{- 'products.facets.product_count' | t: count: results_size -}}
+        </p>
+      {%- endif -%}
+
+      {%- if layout == 'drawer' -%}
+        <button
+          type="button"
+          class="button button--secondary"
+          data-overlay-open="FacetDrawer-{{ section.id }}"
+          aria-expanded="false"
+          aria-controls="FacetDrawer-{{ section.id }}"
+        >
+          {% render 'icon', icon: 'filter', size: 16 %}
+          {{ 'products.facets.filter_and_sort' | t }}
+          <span class="collection-filters__badge" data-facet-count hidden></span>
+        </button>
+      {%- endif -%}
+
+      {%- if block.settings.enable_view_toggle -%}
+        {%- comment -%}
+          A display preference, so it is stored locally rather than in the URL:
+          two addresses for the same products is bad for sharing and worse for
+          indexing, and the choice would follow a shared link to someone who
+          prefers the other view. It writes an attribute; the layout is CSS.
+        {%- endcomment -%}
+        <layout-toggle class="facets__view" data-target="ProductGrid-{{ section.id }}">
+          <button
+            type="button"
+            data-view-option="grid"
+            aria-pressed="true"
+            aria-label="{{ 'collections.view.grid' | t }}"
+          >
+            {% render 'icon', icon: 'grid', size: 16 %}
+          </button>
+
+          <button
+            type="button"
+            data-view-option="list"
+            aria-pressed="false"
+            aria-label="{{ 'collections.view.list' | t }}"
+          >
+            {% render 'icon', icon: 'list', size: 16 %}
+          </button>
+        </layout-toggle>
+      {%- endif -%}
+    </div>
+
+    {%- if layout == 'sidebar' -%}
+      <aside class="collection-filters__sidebar" aria-label="{{ 'products.facets.title' | t }}">
+        {% render 'facets', results: results_set, section: section, context: 'sidebar' %}
+      </aside>
+    {%- else -%}
+      <facet-drawer
+        id="FacetDrawer-{{ section.id }}"
+        class="facet-drawer drawer"
+        data-placement="start"
+      >
+        <dialog class="drawer__dialog" data-ref="dialog" aria-label="{{ 'products.facets.filter_and_sort' | t }}">
+          <div class="drawer__panel" data-ref="panel">
+            <header class="drawer__header">
+              <h2 class="drawer__title">{{ 'products.facets.filter_and_sort' | t }}</h2>
+              <button type="button" class="drawer__close" data-overlay-close aria-label="{{ 'accessibility.close_filters' | t }}">
+                {% render 'icon', icon: 'close' %}
+              </button>
+            </header>
+
+            <div class="drawer__body" data-ref="body" data-lenis-prevent>
+              {% render 'facets', results: results_set, section: section, context: 'drawer' %}
+            </div>
+
+            <footer class="drawer__footer">
+              <button type="button" class="button button--secondary" data-clear-filters>
+                {{ 'products.facets.clear_all' | t }}
+              </button>
+              <button type="button" class="button button--primary" data-apply-filters>
+                {{ 'products.facets.show_results' | t }}
+              </button>
+            </footer>
+          </div>
+        </dialog>
+      </facet-drawer>
+    {%- endif -%}
+  </div>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "t:blocks.filters.name",
+  "tag": null,
+  "settings": [
+    {
+      "type": "select", "id": "layout", "label": "t:sections.main_collection.settings.filter_layout.label",
+      "options": [
+        { "value": "inherit", "label": "t:shared.inherit.label" },
+        { "value": "sidebar", "label": "t:sections.main_collection.settings.filter_layout.options__1.label" },
+        { "value": "drawer", "label": "t:sections.main_collection.settings.filter_layout.options__2.label" }
+      ],
+      "default": "inherit"
+    },
+    { "type": "checkbox", "id": "show_result_count", "label": "t:sections.main_collection.settings.show_result_count.label", "default": true }
+  ],
+  "presets": [{ "name": "t:blocks.filters.name" }]
+}
+{% endschema %}

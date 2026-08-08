@@ -1,0 +1,95 @@
+{% doc %}
+  The sticky buy bar.
+
+  A snippet as well as a section, because two places need it: the product
+  template mounts it as a section a merchant can remove, and quick view renders
+  it inline where a section cannot go.
+
+  Everything it shows is a mirror. The variant select writes into
+  `<product-form>`, the quantity field writes into `<product-form>`, and the
+  button calls that form's `submit()`. Nothing here holds state, which is why the
+  bar can never disagree with the form above it.
+
+  The variant control is a native `<select>`, not a copy of the swatch picker. A
+  second set of radios would be a second source of truth for the selected
+  variant, and a screen reader would meet the same option group twice on one page.
+
+  Parameters:
+    product   (product, required)
+    form_id   (string, required)   The id of the real buy button, e.g. `main`
+    id        (string, required)   Unique per instance
+    position  (string, optional)   bottom | top. Default bottom
+    show_image, show_variants, show_quantity (boolean, optional)
+
+  @example
+    {% render 'sticky-add-to-cart', product: product, form_id: 'main', id: section.id %}
+{% enddoc %}
+
+{%- liquid
+  assign variant = product.selected_or_first_available_variant
+  assign place = position | default: 'bottom'
+-%}
+
+{%- if product != blank -%}
+  <sticky-add-to-cart
+    class="sticky-bar sticky-bar--{{ place }}"
+    data-form="AddToCart-{{ form_id }}"
+    data-watch="AddToCart-{{ form_id }}"
+    hidden
+  >
+    <div class="container sticky-bar__inner">
+      {%- if show_image -%}
+        <div class="sticky-bar__media">
+          {% render 'image', image: product.featured_image, alt: '', ratio: 'square', sizes: '56px' %}
+        </div>
+      {%- endif -%}
+
+      <div class="sticky-bar__info">
+        <span class="sticky-bar__title" data-ref="title">{{ product.title }}</span>
+        <span class="sticky-bar__price" data-ref="price">
+          {% render 'price', product: product, variant: variant %}
+        </span>
+      </div>
+
+      {%- if show_variants and product.has_only_default_variant == false -%}
+        <div class="sticky-bar__variants">
+          <label class="visually-hidden" for="StickyVariant-{{ id }}">
+            {{ 'products.variants.legend' | t }}
+          </label>
+          <select id="StickyVariant-{{ id }}" data-ref="variantSelect">
+            {%- for v in product.variants -%}
+              <option
+                value="{{ v.id }}"
+                {% if v == variant %}selected{% endif %}
+                {% unless v.available %}disabled{% endunless %}
+              >
+                {{ v.title }}
+                {%- unless v.available %} &ndash; {{ 'products.product.sold_out' | t }}{% endunless -%}
+              </option>
+            {%- endfor -%}
+          </select>
+        </div>
+      {%- endif -%}
+
+      {%- if show_quantity -%}
+        <div class="sticky-bar__quantity">
+          <label class="visually-hidden" for="StickyQuantity-{{ id }}">
+            {{ 'products.product.quantity' | t }}
+          </label>
+          <input
+            id="StickyQuantity-{{ id }}"
+            type="number"
+            data-ref="quantityInput"
+            value="1"
+            min="1"
+            inputmode="numeric"
+          >
+        </div>
+      {%- endif -%}
+
+      <button type="button" class="button button--primary sticky-bar__submit" data-ref="submit">
+        {{ 'products.product.add_to_cart' | t }}
+      </button>
+    </div>
+  </sticky-add-to-cart>
+{%- endif -%}

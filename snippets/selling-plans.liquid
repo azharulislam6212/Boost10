@@ -1,0 +1,76 @@
+{% doc %}
+  The subscription frequency selector.
+
+  One copy, rendered by both the product page block and quick view. Two would
+  drift, and the failure is silent in the worst way: a customer who picks
+  "every 30 days" in quick view and gets a one-time purchase has been charged
+  the wrong thing, and nothing on screen said so.
+
+  Renders nothing when a product has no selling plan groups, so a store with no
+  subscriptions ships no subscription markup.
+
+  Per-variant allocations are emitted as JSON because a selling plan's price can
+  differ per variant — `<selling-plan-selector>` reads the map on every variant
+  change rather than assuming one price applies to all of them.
+
+  Parameters:
+    product (product, required)
+    layout  (string, optional)  Falls back to the theme setting
+
+  @example
+    {% render 'selling-plans', product: product %}
+{% enddoc %}
+
+{%- if product and product.selling_plan_groups.size > 0 -%}
+<selling-plan-selector
+  class="selling-plans"
+  data-layout="{{ layout | default: settings.selling_plan_layout }}"
+>
+  <script type="application/json" data-allocations>
+    {
+      {%- for v in product.variants -%}
+        "{{ v.id }}": [
+          {%- for allocation in v.selling_plan_allocations -%}
+            {
+              "id": {{ allocation.selling_plan.id }},
+              "name": {{ allocation.selling_plan.name | json }},
+              "price": {{ allocation.price }},
+              "compare_at_price": {{ allocation.compare_at_price | default: v.price }},
+              "per_delivery_price": {{ allocation.per_delivery_price }}
+            }{%- unless forloop.last -%},{%- endunless -%}
+          {%- endfor -%}
+        ]{%- unless forloop.last -%},{%- endunless -%}
+      {%- endfor -%}
+    }
+  </script>
+
+  <fieldset class="selling-plans__options">
+    <legend class="visually-hidden">{{ 'products.selling_plans.heading' | t }}</legend>
+
+    <label class="selling-plans__option" data-purchase-option>
+      <input type="radio" name="purchase-option" value="" data-ref="oneTime" checked>
+      <span>{{ 'products.selling_plans.one_time' | t }}</span>
+    </label>
+
+    <label class="selling-plans__option" data-purchase-option>
+      <input type="radio" name="purchase-option" value="subscription" data-ref="subscribe">
+      <span>{{ 'products.selling_plans.subscription' | t }}</span>
+    </label>
+  </fieldset>
+
+  <label class="visually-hidden" for="Plan-{{ block.id }}">
+    {{ 'products.selling_plans.select_plan' | t }}
+  </label>
+  <select
+    id="Plan-{{ block.id }}"
+    data-ref="interval"
+    name="selling_plan"
+    form="{{ section.id }}-product-form"
+    hidden
+    disabled
+  ></select>
+
+  <p class="selling-plans__summary" data-ref="summary" role="status"></p>
+  <p class="selling-plans__unavailable" data-ref="unavailable" hidden></p>
+</selling-plan-selector>
+{%- endif -%}

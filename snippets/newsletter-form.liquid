@@ -1,0 +1,69 @@
+{% doc %}
+  Renders the newsletter signup.
+
+  Shopify's `customer` form creates a customer account with the email marketing
+  consent flag set. There is no separate newsletter endpoint, and no theme should
+  post subscriber emails anywhere else.
+
+  Success and error states come back from Shopify in `form.posted_successfully?`
+  and `form.errors`, after a page reload. The form is not intercepted: doing so
+  would mean re-implementing Shopify's own validation and consent handling.
+
+  Parameters:
+    id      (string, required)  Unique per instance
+    heading (string, optional)
+    text    (string, optional)
+    class   (string, optional)
+
+  @example
+    {% render 'newsletter-form', id: 'FooterNewsletter' %}
+{% enddoc %}
+
+<div class="newsletter {{ class }}">
+  {%- if heading != blank -%}
+    <h2 class="newsletter__heading">{{ heading }}</h2>
+  {%- endif -%}
+
+  {%- if text != blank -%}
+    <div class="newsletter__text rte">{{ text }}</div>
+  {%- endif -%}
+
+  <validated-form>
+    {%- form 'customer', id: id, class: 'newsletter__form' -%}
+      <input type="hidden" name="contact[tags]" value="newsletter">
+
+      <label class="visually-hidden" for="{{ id }}-email">{{ 'general.newsletter.label' | t }}</label>
+
+      <div class="newsletter__field">
+        <input
+          id="{{ id }}-email"
+          type="email"
+          name="contact[email]"
+          value="{{ form.email }}"
+          placeholder="{{ 'general.newsletter.placeholder' | t | escape }}"
+          autocomplete="email"
+          required
+          {% if form.errors %}
+            aria-invalid="true"
+            aria-describedby="{{ id }}-error"
+          {% endif %}
+        >
+
+        <button type="submit" class="button button--primary">
+          {{ 'general.newsletter.submit' | t }}
+        </button>
+      </div>
+
+      {%- if form.errors -%}
+        <p class="newsletter__error" id="{{ id }}-error" role="alert">
+          {{ form.errors.translated_fields.email | capitalize }}
+          {{ form.errors.messages.email }}
+        </p>
+      {%- endif -%}
+
+      {%- if form.posted_successfully? -%}
+        <p class="newsletter__success" role="status">{{ 'general.newsletter.success' | t }}</p>
+      {%- endif -%}
+    {%- endform -%}
+  </validated-form>
+</div>

@@ -1,0 +1,80 @@
+{% doc %}
+  Open Graph, Twitter cards, and the product meta Facebook and Pinterest read.
+
+  Named for what it does rather than for SEO in general: the title, description,
+  canonical and hreflang tags stay in `theme.liquid`, because those are
+  structural and every page has them. This snippet owns the social and
+  rich-preview metadata, which is the part a merchant or an agency actually
+  edits.
+
+  Two details worth keeping:
+
+  **`og:image` is emitted twice**, once as `http:` and once as `https:` in
+  `og:image:secure_url`. Facebook still prefers the pair, and the cost is one tag.
+
+  **Descriptions are truncated to 40 words.** Longer ones are silently cut by
+  every platform that reads them, usually mid-sentence; cutting on a word
+  boundary here means the merchant sees what will be shown.
+
+  @example
+    {% render 'social-meta-tags' %}
+{% enddoc %}
+
+    {%- comment -%} ---------- Open Graph / Twitter ---------- {%- endcomment -%}
+    {%- liquid
+      assign og_type = 'website'
+      assign og_title = page_title
+      assign og_description = page_description | default: shop.description | default: shop.name
+      assign og_image = settings.share_image
+
+      case request.page_type
+        when 'product'
+          assign og_type = 'product'
+          assign og_title = product.title
+          if product.featured_media
+            assign og_image = product.featured_media.preview_image
+          endif
+        when 'article'
+          assign og_type = 'article'
+          assign og_title = article.title
+          if article.image
+            assign og_image = article.image
+          endif
+        when 'collection'
+          assign og_title = collection.title
+          if collection.featured_image
+            assign og_image = collection.featured_image
+          endif
+      endcase
+    -%}
+
+    <meta property="og:site_name" content="{{ shop.name | escape }}">
+    <meta property="og:type" content="{{ og_type }}">
+    <meta property="og:title" content="{{ og_title | escape }}">
+    <meta property="og:url" content="{{ canonical_url }}">
+    <meta property="og:locale" content="{{ request.locale.iso_code }}">
+    {%- if og_description != blank -%}
+      <meta property="og:description" content="{{ og_description | strip_html | truncatewords: 40 | escape }}">
+    {%- endif -%}
+    {%- if og_image != blank -%}
+      <meta property="og:image" content="http:{{ og_image | image_url: width: 1200 }}">
+      <meta property="og:image:secure_url" content="https:{{ og_image | image_url: width: 1200 }}">
+      <meta property="og:image:width" content="1200">
+      <meta property="og:image:height" content="{{ 1200 | divided_by: og_image.aspect_ratio | round }}">
+      <meta property="og:image:alt" content="{{ og_image.alt | default: og_title | escape }}">
+    {%- endif -%}
+
+    {%- if request.page_type == 'product' -%}
+      <meta property="product:price:amount" content="{{ product.selected_or_first_available_variant.price | divided_by: 100.0 }}">
+      <meta property="product:price:currency" content="{{ cart.currency.iso_code }}">
+      <meta property="product:availability" content="{% if product.available %}in stock{% else %}out of stock{% endif %}">
+    {%- endif -%}
+
+    <meta name="twitter:card" content="{% if og_image != blank %}summary_large_image{% else %}summary{% endif %}">
+    <meta name="twitter:title" content="{{ og_title | escape }}">
+    {%- if og_description != blank -%}
+      <meta name="twitter:description" content="{{ og_description | strip_html | truncatewords: 40 | escape }}">
+    {%- endif -%}
+    {%- if og_image != blank -%}
+      <meta name="twitter:image" content="https:{{ og_image | image_url: width: 1200 }}">
+    {%- endif -%}

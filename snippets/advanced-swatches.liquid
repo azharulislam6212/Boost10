@@ -1,0 +1,101 @@
+{% doc %}
+  Renders a full row of swatches for one product option.
+
+  `swatch.liquid` draws a single value; this draws the option — the inputs, the
+  labels, the overflow control and the availability marking — so a section never
+  has to assemble that itself.
+
+  ## Where a swatch comes from
+
+  Four sources, narrowest first. Each one exists because the one after it is not
+  good enough for someone:
+
+  1. **Shopify's native swatch** on the option value. Per-product, survives a
+     theme change, and is what Shopify itself uses in filters and search.
+  2. **A variant metafield** (`variant.metafields.custom.swatch_image`). This is
+     the escape hatch for a pattern that is genuinely an image — marble, wood
+     grain, a printed fabric — where a hex code is a lie.
+  3. **The theme's swatch map**, `settings.swatch_config`. The practical option
+     when option values are shared across a whole catalogue.
+  4. **The fallback**, chosen in settings.
+
+  Dual-tone values are supported by writing two hex codes separated by a slash in
+  the map — `Navy/White=#292B6C/#ffffff` — because a two-colour product rendered
+  as one colour is wrong in a way customers notice immediately.
+
+  ## Why unavailable values are marked and not removed
+
+  Hiding a sold-out size tells the customer nothing. A disabled radio cannot be
+  focused, so a keyboard user can no longer discover it exists. Both are worse
+  than a struck-through swatch with a title saying why.
+
+  The control markup lives in `swatch-input.liquid` and the visual in
+  `swatch.liquid`. This snippet owns only the row: the loop, the availability
+  test, and the overflow control. Three files rather than one, because the same
+  visual has to appear in a filter checkbox and on a product card where neither
+  a radio nor a row is wanted.
+
+  Parameters:
+    product (product, required)
+    option  (object, required)   From `product.options_with_values`
+    section (object, required)
+    max_visible (number, optional) 0 for no limit
+    shape, size (string, optional) Passed through
+
+  @example
+    {% render 'advanced-swatches', product: product, option: option, section: section %}
+{% enddoc %}
+
+{%- liquid
+  assign limit = max_visible | default: settings.swatch_max_visible | default: 0
+  assign shape = shape | default: settings.swatch_shape | default: 'circle'
+  assign size = size | default: settings.swatch_size_pdp | default: 'medium'
+-%}
+
+<variant-swatches
+  class="advanced-swatches advanced-swatches--{{ shape }}"
+  data-option="{{ option.name | escape }}"
+  data-max-visible="{{ limit }}"
+  data-trigger="{{ settings.swatch_trigger | default: 'click' }}"
+>
+  <div class="advanced-swatches__list">
+    {%- for value in option.values -%}
+      {%- liquid
+        assign input_id = section.id | append: '-swatch-' | append: option.position | append: '-' | append: forloop.index
+
+        comment
+          Availability is evaluated against this value alone, which is enough for
+          the row. `<variant-picker>` re-evaluates it against the other selected
+          options as soon as it connects.
+        endcomment
+        assign matching = false
+        for variant in product.variants
+          if variant.options contains value and variant.available
+            assign matching = true
+            break
+          endif
+        endfor
+
+        assign variant_for_value = product.variants | where: 'title', value | first
+      -%}
+
+      {% render 'swatch-input',
+         value: value,
+         option: option,
+         section_id: section.id,
+         index: forloop.index,
+         checked: option.selected_value == value,
+         available: matching,
+         variant: variant_for_value,
+         shape: shape,
+         size: size %}
+    {%- endfor -%}
+  </div>
+
+  {%- comment -%}
+    Rendered always and revealed by the element, because whether the row overflows
+    depends on the limit and on how many values exist — neither of which Liquid
+    should duplicate the arithmetic for.
+  {%- endcomment -%}
+  <button type="button" class="advanced-swatches__more button button--link" data-ref="more" hidden></button>
+</variant-swatches>

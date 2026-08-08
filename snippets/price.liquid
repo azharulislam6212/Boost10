@@ -1,0 +1,144 @@
+{% doc %}
+  Renders a product or variant price.
+
+  All price display goes through this snippet, because pricing is where small
+  inconsistencies become customer complaints: a card showing the compare-at
+  price while the product page shows the sale price, or a range reading "From
+  $0" because a draft variant is priced at zero.
+
+  What it handles:
+    - Sale pricing, with the regular price marked up as `<s>` so it is announced
+      as struck-through rather than read as the price to pay.
+    - Ranges, using Shopify's own `price_varies`, so "From £12" only appears when
+      the variants genuinely differ.
+    - Unit pricing, which is a legal requirement in much of the EU and is gated
+      on `settings.show_unit_price`.
+    - Currency codes, gated on `settings.currency_code_enabled`.
+    - Sold out and preorder states, which change what a price even means.
+
+  Visually hidden labels ("Regular price", "Sale price") are always emitted.
+  Without them a screen reader hears two numbers and no indication of which one
+  applies.
+
+  Parameters:
+    product      (product, optional)  Provide this or `variant`
+    variant      (variant, optional)  Wins over `product` when present
+    price_class  (string, optional)   Extra classes on the wrapper
+    show_badges  (boolean, optional)  Appends the saving amount or percentage
+    context      (string, optional)   'card' | 'product' | 'cart'. Default 'card'
+
+  @example
+    {% render 'price', product: product %}
+
+  @example
+    {% render 'price', variant: product.selected_or_first_available_variant, context: 'product', show_badges: true %}
+{% enddoc %}
+
+{%- liquid
+  assign target = variant | default: product.selected_or_first_available_variant
+  assign resolved_context = context | default: 'card'
+
+  assign current_price = target.price | default: product.price
+  assign compare_price = target.compare_at_price | default: product.compare_at_price
+
+  assign varies = false
+  if variant == blank and product.price_varies
+    assign varies = true
+    assign current_price = product.price_min
+  endif
+
+  assign on_sale = false
+  if compare_price != blank and compare_price > current_price
+    assign on_sale = true
+  endif
+
+  assign money_filter = 'money'
+  if settings.currency_code_enabled
+    assign money_filter = 'money_with_currency'
+  endif
+
+  if money_filter == 'money_with_currency'
+    assign current_display = current_price | money_with_currency
+    assign compare_display = compare_price | money_with_currency
+  else
+    assign current_display = current_price | money
+    assign compare_display = compare_price | money
+  endif
+
+  assign available = target.available | default: product.available
+-%}
+
+<div
+  class="price {{ price_class }}
+    {%- if on_sale %} price--on-sale{% endif -%}
+    {%- if varies %} price--varies{% endif -%}
+    {%- unless available %} price--sold-out{% endunless -%}
+    {{ ' ' }}price--{{ resolved_context }}"
+  data-price
+>
+  {%- if on_sale -%}
+    <span class="visually-hidden">{{ 'products.product.sale_price' | t }}</span>
+    <span class="price__sale" data-price-current>
+      {%- if varies -%}
+        {{ 'products.product.from_price_html' | t: price: current_display }}
+      {%- else -%}
+        {{ current_display }}
+      {%- endif -%}
+    </span>
+
+    <span class="visually-hidden">{{ 'products.product.regular_price' | t }}</span>
+    <s class="price__compare" data-price-compare>{{ compare_display }}</s>
+
+    {%- if show_badges -%}
+      {%- liquid
+        assign saved_amount = compare_price | minus: current_price
+        assign saved_percent = saved_amount | times: 100.0 | divided_by: compare_price | round
+      -%}
+      {%- case settings.sale_badge_type -%}
+        {%- when 'percentage' -%}
+          <span class="price__saving">{{ 'products.product.sale_percent' | t: percent: saved_percent }}</span>
+        {%- when 'amount' -%}
+          <span class="price__saving">
+            {{- 'products.product.sale_amount' | t: amount: saved_amount | money -}}
+          </span>
+        {%- else -%}
+          <span class="price__saving">{{ 'products.product.on_sale' | t }}</span>
+      {%- endcase -%}
+    {%- endif -%}
+  {%- else -%}
+    <span class="visually-hidden">{{ 'products.product.regular_price' | t }}</span>
+    <span class="price__regular" data-price-current>
+      {%- if varies -%}
+        {{ 'products.product.from_price_html' | t: price: current_display }}
+      {%- else -%}
+        {{ current_display }}
+      {%- endif -%}
+    </span>
+  {%- endif -%}
+
+  {%- if settings.show_unit_price and target.unit_price_measurement -%}
+    <div class="price__unit" data-unit-price>
+      <span class="visually-hidden">{{ 'products.product.unit_price' | t }}</span>
+      {%- if money_filter == 'money_with_currency' -%}
+        {{ target.unit_price | money_with_currency }}
+      {%- else -%}
+        {{ target.unit_price | money }}
+      {%- endif -%}
+      <span aria-hidden="true">/</span>
+      <span class="visually-hidden">{{ 'accessibility.unit_price_separator' | t }}</span>
+      {%- if target.unit_price_measurement.reference_value != 1 -%}
+        {{- target.unit_price_measurement.reference_value -}}
+      {%- endif -%}
+      {{ target.unit_price_measurement.reference_unit }}
+    </div>
+  {%- endif -%}
+
+  {%- if settings.show_tax_notice and resolved_context == 'product' -%}
+    <div class="price__notice">
+      {{ 'products.product.include_taxes' | t }}
+      {%- if shop.shipping_policy.body != blank %}
+        {{ 'products.product.shipping_policy_html' | t: link: shop.shipping_policy.url }}
+      {%- endif -%}
+    </div>
+  {%- endif -%}
+</div>

@@ -1,0 +1,163 @@
+{% comment %}
+  sections/store-locator.liquid
+
+  Split screen: a searchable, filterable store list on one side, a map on the
+  other.
+
+  ## About the map
+
+  There is no Leaflet, Mapbox or Google SDK here, on purpose. Each is external
+  JavaScript — usually external JavaScript plus a merchant API account — and a
+  store finder that renders blank until someone pastes a key is a store finder
+  that ships broken. The theme's first rule is zero external libraries, and this
+  is exactly the case that rule exists for.
+
+  So: the merchant pastes an embed URL with `{query}` where the address goes, and
+  selecting a store rewrites the iframe. That *is* pan-and-open-info-window for an
+  embed. With no embed configured, the list still searches, still sorts by
+  distance and still links to directions — which is what customers came for.
+
+  ## About "open now"
+
+  Not computed. Doing it properly needs the store's timezone, public holidays and
+  half-day closures; doing it badly sends someone across a city to a locked door.
+  Merchants set the badge by hand, or leave it off and let the hours speak.
+{% endcomment %}
+
+{%- liquid
+  assign section_settings = section.settings
+  assign locations = section.blocks | where: 'type', 'store-location'
+-%}
+
+<store-locator
+  class="store-locator color-{{ section_settings.color_scheme }}"
+  {% if section_settings.map_embed != blank %}data-embed="{{ section_settings.map_embed }}"{% endif %}
+  data-unit="{{ section_settings.distance_unit }}"
+  {% render 'spacing', section: section_settings %}
+>
+  <div class="container store-locator__layout">
+
+    <div class="store-locator__sidebar">
+      {%- if section_settings.heading != blank -%}
+        <h1 class="store-locator__heading">{{ section_settings.heading }}</h1>
+      {%- endif -%}
+
+      <div class="store-locator__controls">
+        <label class="visually-hidden" for="StoreSearch-{{ section.id }}">
+          {{ 'sections.store_locator.search_label' | t }}
+        </label>
+
+        <div class="store-locator__search">
+          {% render 'icon', icon: 'search', size: 16 %}
+          <input
+            id="StoreSearch-{{ section.id }}"
+            type="search"
+            data-ref="search"
+            autocomplete="off"
+            placeholder="{{ 'sections.store_locator.search_placeholder' | t | escape }}"
+          >
+        </div>
+
+        {%- if section_settings.enable_radius -%}
+          <label class="visually-hidden" for="StoreRadius-{{ section.id }}">
+            {{ 'sections.store_locator.radius_label' | t }}
+          </label>
+          <select id="StoreRadius-{{ section.id }}" data-ref="radius">
+            <option value="0">{{ 'sections.store_locator.radius_any' | t }}</option>
+            <option value="5">{{ 'sections.store_locator.radius_value' | t: distance: 5, unit: section_settings.distance_unit }}</option>
+            <option value="10">{{ 'sections.store_locator.radius_value' | t: distance: 10, unit: section_settings.distance_unit }}</option>
+            <option value="25">{{ 'sections.store_locator.radius_value' | t: distance: 25, unit: section_settings.distance_unit }}</option>
+            <option value="50">{{ 'sections.store_locator.radius_value' | t: distance: 50, unit: section_settings.distance_unit }}</option>
+          </select>
+        {%- endif -%}
+
+        {%- comment -%}
+          Offered on a button, never on load. A page that asks for location
+          before anyone has asked it for anything is a page people leave.
+        {%- endcomment -%}
+        <button type="button" class="button button--secondary button--small" data-ref="locate">
+          {% render 'icon', icon: 'pin', size: 14 %}
+          {{ 'sections.store_locator.use_my_location' | t }}
+        </button>
+      </div>
+
+      {%- if locations.size > 0 -%}
+        <ul class="store-locator__list" data-ref="list" role="list">
+          {%- for block in locations -%}
+            {% render block %}
+          {%- endfor -%}
+        </ul>
+      {%- else -%}
+        <ul class="store-locator__list" data-ref="list" role="list"></ul>
+        <p class="store-locator__setup">{{ 'sections.store_locator.add_stores' | t }}</p>
+      {%- endif -%}
+
+      <p class="store-locator__empty" data-ref="empty" hidden>
+        {{ 'sections.store_locator.no_results' | t }}
+      </p>
+
+      <p class="visually-hidden" data-ref="status" role="status"></p>
+    </div>
+
+    <div class="store-locator__map">
+      {%- if section_settings.map_embed != blank -%}
+
+        {%- assign map_embed = section_settings.map_embed | replace: '{query}', '' -%}
+        <iframe
+          data-ref="map"
+          src="{{ map_embed }}"
+          title="{{ 'sections.store_locator.map_title' | t | escape }}"
+          loading="lazy"
+          referrerpolicy="no-referrer-when-downgrade"
+          allowfullscreen
+        ></iframe>
+      {%- elsif section_settings.map_image != blank -%}
+        {% render 'image',
+           image: section_settings.map_image,
+           alt: '',
+           ratio: 'square',
+           sizes: '(min-width: 990px) 55vw, 100vw' %}
+      {%- endif -%}
+    </div>
+  </div>
+</store-locator>
+
+{% schema %}
+{
+  "name": "t:sections.store_locator.name",
+  "tag": "section",
+  "class": "section",
+  "blocks": [
+    { "type": "store-location" },
+    { "type": "@app" }
+  ],
+  "settings": [
+    { "type": "text", "id": "heading", "label": "t:shared.heading.label", "default": "Find a store" },
+    { "type": "checkbox", "id": "enable_radius", "label": "t:sections.store_locator.settings.enable_radius.label", "info": "t:sections.store_locator.settings.enable_radius.info", "default": true },
+    {
+      "type": "select", "id": "distance_unit", "label": "t:sections.store_locator.settings.distance_unit.label",
+      "options": [
+        { "value": "km", "label": "t:sections.store_locator.settings.distance_unit.options__1.label" },
+        { "value": "mi", "label": "t:sections.store_locator.settings.distance_unit.options__2.label" }
+      ],
+      "default": "km"
+    },
+    { "type": "header", "content": "t:sections.store_locator.headers.map" },
+    { "type": "paragraph", "content": "t:sections.store_locator.paragraphs.map" },
+    { "type": "url", "id": "map_embed", "label": "t:sections.store_locator.settings.map_embed.label", "info": "t:sections.store_locator.settings.map_embed.info" },
+    { "type": "image_picker", "id": "map_image", "label": "t:sections.store_locator.settings.map_image.label", "info": "t:sections.store_locator.settings.map_image.info" },
+    { "type": "color_scheme", "id": "color_scheme", "label": "t:shared.color_scheme.label", "default": "scheme-1" },
+    { "type": "header", "content": "t:shared.spacing.section_header" },
+    { "type": "range", "id": "padding_top", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 48 },
+    { "type": "range", "id": "padding_bottom", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 64 },
+    { "type": "range", "id": "padding_top_mobile", "label": "t:shared.spacing.padding_top_mobile.label", "info": "t:shared.spacing.padding_top_mobile.info", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_bottom_mobile", "label": "t:shared.spacing.padding_bottom_mobile.label", "info": "t:shared.spacing.padding_bottom_mobile.info", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 0 }
+  ],
+  "presets": [
+    {
+      "name": "t:sections.store_locator.name",
+      "blocks": [{ "type": "store-location" }, { "type": "store-location" }]
+    }
+  ]
+}
+{% endschema %}

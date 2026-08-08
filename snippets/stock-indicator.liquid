@@ -1,0 +1,88 @@
+{% doc %}
+  Renders the stock scarcity line for a variant.
+
+  Two rules, both about honesty:
+
+  Quantities are only shown at or below the threshold. "312 in stock" is
+  information a customer did not ask for and a competitor did, and a bar that
+  reads 97% full is scarcity theatre pointing the wrong way.
+
+  Nothing is shown when Shopify is not tracking inventory. A store with tracking
+  off has no number to report, and inventing "only a few left" is the kind of
+  claim that ends up in front of a consumer protection regulator.
+
+  The live element `<inventory-status>` re-renders this on every variant change;
+  this snippet is the server-rendered first paint, so the line is correct before
+  any script runs.
+
+  Parameters:
+    variant   (variant, required)
+    threshold (number, optional)  Defaults to the theme setting
+    show_bar  (boolean, optional) Progress bar as well as text
+
+  @example
+    {% render 'stock-indicator', variant: product.selected_or_first_available_variant %}
+{% enddoc %}
+
+{%- liquid
+  assign limit = threshold | default: settings.low_stock_threshold | default: 10
+  assign managed = false
+  if variant.inventory_management != blank
+    assign managed = true
+  endif
+
+  assign quantity = variant.inventory_quantity
+
+  assign state = ''
+  if variant.available == false
+    assign state = 'out-of-stock'
+  elsif managed and variant.inventory_policy == 'continue' and quantity <= 0
+    assign state = 'backordered'
+  elsif managed and quantity > 0 and quantity <= limit
+    assign state = 'low-stock'
+  elsif variant.available
+    assign state = 'in-stock'
+  endif
+
+  assign percent = 0
+  if state == 'low-stock' and limit > 0
+    assign percent = quantity | times: 100 | divided_by: limit
+  endif
+-%}
+
+{%- if state != blank -%}
+  <inventory-status
+    class="inventory-status"
+    data-state="{{ state }}"
+    data-threshold="{{ limit }}"
+  >
+    <span class="inventory-status__dot" aria-hidden="true"></span>
+
+    <span data-ref="label">
+      {%- case state -%}
+        {%- when 'out-of-stock' -%}
+          {{ 'products.product.sold_out' | t }}
+        {%- when 'backordered' -%}
+          {{ 'products.inventory.backordered' | t }}
+        {%- when 'low-stock' -%}
+          {{ 'products.inventory.low_stock_count' | t: count: quantity }}
+        {%- else -%}
+          {{ 'products.inventory.in_stock' | t }}
+      {%- endcase -%}
+    </span>
+
+    {%- if show_bar and state == 'low-stock' -%}
+      <span
+        class="inventory-status__bar"
+        style="--stock-percent: {{ percent }}%;"
+        role="progressbar"
+        aria-valuemin="0"
+        aria-valuemax="{{ limit }}"
+        aria-valuenow="{{ quantity }}"
+        aria-label="{{ 'products.inventory.low_stock_count' | t: count: quantity | escape }}"
+      >
+        <span class="inventory-status__fill"></span>
+      </span>
+    {%- endif -%}
+  </inventory-status>
+{%- endif -%}

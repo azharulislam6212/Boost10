@@ -1,0 +1,210 @@
+{% doc %}
+  Renders one cart line.
+
+  Shared by the cart page and the cart drawer, from one file, so the two can
+  never drift apart. `data-key` is what every mutation uses: line indexes shift
+  the moment anything is removed, and using them produces the classic bug where
+  removing the second item removes the third.
+
+  Parameters:
+    item  (line_item, required)
+    index (number, required)  `forloop.index`, for the no-JS form fallback
+    compact (boolean, optional) Drawer layout
+
+  @example
+    {%- for item in cart.items -%}
+      {% render 'cart-item', item: item, index: forloop.index %}
+    {%- endfor -%}
+{% enddoc %}
+
+<div
+  class="cart-item{% if compact %} cart-item--compact{% endif %}"
+  data-line-item
+  data-key="{{ item.key }}"
+  data-line="{{ index }}"
+  data-title="{{ item.product.title | escape }}"
+  data-morph-key="line-{{ item.key }}"
+>
+  <a class="cart-item__media" href="{{ item.url }}" tabindex="-1" aria-hidden="true">
+    {% render 'image', image: item.image, ratio: 'square', sizes: '120px', class: 'cart-item__image' %}
+  </a>
+
+  <div class="cart-item__info">
+    <a class="cart-item__title" href="{{ item.url }}">{{ item.product.title }}</a>
+
+    {%- unless item.product.has_only_default_variant -%}
+      {%- if settings.enable_cart_variant_switcher -%}
+        {%- comment -%}
+          Changing a variant in the cart is a remove plus an add, because
+          Shopify's change endpoint cannot move a line to a different variant.
+          `cart.changeVariant` does both in order and reverts the select if
+          either half fails, so the customer never sees a cart that lost a line
+          and gained nothing.
+        {%- endcomment -%}
+        <cart-variant-selector
+          class="cart-item__variant-switcher"
+          data-key="{{ item.key }}"
+          data-quantity="{{ item.quantity }}"
+        >
+          <label class="visually-hidden" for="CartVariant-{{ item.key }}">
+            {{ 'cart.variant_switcher.label' | t }}
+          </label>
+
+          <select id="CartVariant-{{ item.key }}" data-ref="select">
+            {%- for variant in item.product.variants -%}
+              <option
+                value="{{ variant.id }}"
+                {% if variant.id == item.variant.id %}selected{% endif %}
+                {% unless variant.available %}disabled{% endunless %}
+              >
+                {{ variant.title }}
+                {%- unless variant.available %} &ndash; {{ 'products.product.sold_out' | t }}{% endunless -%}
+              </option>
+            {%- endfor -%}
+          </select>
+        </cart-variant-selector>
+      {%- else -%}
+        <p class="cart-item__variant">{{ item.variant.title }}</p>
+      {%- endif -%}
+    {%- endunless -%}
+
+    {%- comment -%}
+      A pre-order line has to say so in the cart as well as on the product page.
+      A customer who forgot they were waiting finds out at delivery, and that is
+      a chargeback rather than a support ticket.
+    {%- endcomment -%}
+    {%- if settings.enable_preorder -%}
+      {%- liquid
+        assign is_preorder = false
+        if item.variant.inventory_management != blank and item.variant.inventory_policy == 'continue' and item.variant.inventory_quantity <= 0
+          assign is_preorder = true
+        endif
+        if settings.preorder_tag != blank and item.product.tags contains settings.preorder_tag
+          assign is_preorder = true
+        endif
+      -%}
+
+      {%- if is_preorder -%}
+        <p class="cart-item__preorder">
+          {% render 'icon', icon: 'truck', size: 14 %}
+          {{ 'products.preorder.heading' | t }}
+        </p>
+      {%- endif -%}
+    {%- endif -%}
+
+    {%- if item.selling_plan_allocation -%}
+      <p class="cart-item__plan">
+        {{ 'cart.selling_plans.subscription_html' | t: plan: item.selling_plan_allocation.selling_plan.name }}
+      </p>
+
+      {%- if settings.enable_cart_selling_plan_switcher -%}
+        <cart-selling-plan-selector
+          data-key="{{ item.key }}"
+          data-variant-id="{{ item.variant.id }}"
+          data-quantity="{{ item.quantity }}"
+        >
+          <label class="visually-hidden" for="Plan-{{ item.key }}">
+            {{ 'cart.selling_plans.change' | t }}
+          </label>
+          <select id="Plan-{{ item.key }}" data-ref="select">
+            <option value="">{{ 'cart.selling_plans.one_time' | t }}</option>
+            {%- for allocation in item.variant.selling_plan_allocations -%}
+              <option
+                value="{{ allocation.selling_plan.id }}"
+                {% if allocation.selling_plan.id == item.selling_plan_allocation.selling_plan.id %}selected{% endif %}
+              >
+                {{ allocation.selling_plan.name }}
+              </option>
+            {%- endfor -%}
+          </select>
+        </cart-selling-plan-selector>
+      {%- endif -%}
+    {%- endif -%}
+
+    {%- comment -%}
+      Properties beginning with an underscore are the theme's own bookkeeping —
+      bundle ids, gift wrap flags — and are not shown to the customer.
+    {%- endcomment -%}
+    {%- for property in item.properties -%}
+      {%- if property.last != blank and property.first.first != '_' -%}
+        <p class="cart-item__property">
+          <span class="cart-item__property-name">{{ property.first }}:</span>
+          {%- if property.last contains '/uploads/' -%}
+            <a href="{{ property.last }}">{{ property.last | split: '/' | last }}</a>
+          {%- else -%}
+            {{ property.last }}
+          {%- endif -%}
+        </p>
+      {%- endif -%}
+    {%- endfor -%}
+
+    {%- if item.line_level_discount_allocations.size > 0 -%}
+      <ul class="cart-item__discounts" role="list">
+        {%- for discount in item.line_level_discount_allocations -%}
+          <li class="cart-item__discount">
+            {{ discount.discount_application.title }}
+            (&minus;{{ discount.amount | money }})
+          </li>
+        {%- endfor -%}
+      </ul>
+    {%- endif -%}
+
+    <p class="cart-item__error" data-line-error role="alert" hidden></p>
+  </div>
+
+  <div class="cart-item__quantity">
+    <quantity-selector
+      data-key="{{ item.key }}"
+      data-line="{{ index }}"
+      data-min="1"
+      {% if item.variant.inventory_management != blank and item.variant.inventory_policy == 'deny' %}
+        data-max="{{ item.variant.inventory_quantity }}"
+      {% endif %}
+    >
+      <button type="button" data-ref="decrease" aria-label="{{ 'products.product.quantity_decrease' | t: product: item.product.title | escape }}">
+        {% render 'icon', icon: 'minus' %}
+      </button>
+
+      <label class="visually-hidden" for="Quantity-{{ item.key }}">{{ 'cart.general.quantity' | t }}</label>
+      <input
+        id="Quantity-{{ item.key }}"
+        data-ref="input"
+        type="number"
+        name="updates[]"
+        value="{{ item.quantity }}"
+        min="1"
+        inputmode="numeric"
+        data-morph-preserve-value
+      >
+
+      <button type="button" data-ref="increase" aria-label="{{ 'products.product.quantity_increase' | t: product: item.product.title | escape }}">
+        {% render 'icon', icon: 'plus' %}
+      </button>
+
+      <p class="quantity-selector__message" data-ref="message" role="status" hidden></p>
+    </quantity-selector>
+
+    <button
+      type="button"
+      class="cart-item__remove"
+      data-remove-item
+      aria-label="{{ 'cart.general.remove' | t: product: item.product.title | escape }}"
+    >
+      {% render 'icon', icon: 'trash' %}
+    </button>
+  </div>
+
+  <div class="cart-item__price">
+    {%- if item.original_line_price != item.final_line_price -%}
+      <span class="visually-hidden">{{ 'products.product.sale_price' | t }}</span>
+      <span class="cart-item__price-final">{{ item.final_line_price | money }}</span>
+      <s class="cart-item__price-original">{{ item.original_line_price | money }}</s>
+    {%- else -%}
+      <span class="cart-item__price-final">{{ item.original_line_price | money }}</span>
+    {%- endif -%}
+
+    {%- if item.unit_price_measurement and settings.show_unit_price -%}
+      <p class="cart-item__unit">{{ item.unit_price | money }}</p>
+    {%- endif -%}
+  </div>
+</div>

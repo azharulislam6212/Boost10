@@ -1,0 +1,137 @@
+{% comment %}
+  sections/recently-viewed.liquid
+
+  Two jobs in one file, which is why it looks unusual.
+
+  Rendered **in a template**, it emits the `<recently-viewed>` element, which
+  records the current product and then asks for its own contents.
+
+  Rendered **by the Section Rendering API** — `/?section_id=recently-viewed&handles=…`
+  — it returns just the cards, which the element morphs into place.
+
+  The `handles` parameter is what distinguishes the two calls. Splitting this
+  into two sections would mean two places to change a card.
+
+  Nothing renders when the history is shorter than the minimum. One card in a row
+  built for four looks broken, and a customer on their second page view has no
+  useful history yet.
+{% endcomment %}
+
+{%- liquid
+  assign section_settings = section.settings
+  assign raw = request.url | split: 'handles=' | last | split: '&' | first
+  assign is_fetch = false
+  if request.url contains 'handles='
+    assign is_fetch = true
+  endif
+  assign handles = raw | replace: '%2C', ',' | split: ','
+-%}
+
+{%- if is_fetch -%}
+  {%- comment -%} ---- the fetch: cards only ---- {%- endcomment -%}
+  <div data-recently-viewed-content>
+    {%- for handle in handles -%}
+      {%- assign item = all_products[handle] -%}
+      {%- if item != blank and item.id != blank -%}
+        <li class="product-grid__item" data-product-id="{{ item.id }}">
+          {% render 'product-card',
+             product: item,
+             index: forloop.index0,
+             sizes: '(min-width: 990px) 25vw, 50vw' %}
+        </li>
+      {%- endif -%}
+    {%- endfor -%}
+  </div>
+{%- else -%}
+  {%- comment -%} ---- the template: the element ---- {%- endcomment -%}
+  <recently-viewed
+    class="recently-viewed color-{{ section_settings.color_scheme }}"
+    data-section-id="{{ section.id }}"
+    data-limit="{{ section_settings.products_to_show }}"
+    data-minimum="{{ section_settings.minimum_products }}"
+    {% if product %}data-exclude="{{ product.handle }}"{% endif %}
+    {% render 'spacing', section: section_settings %}
+    hidden
+  >
+    <div class="container">
+      <div class="recently-viewed__head">
+        <h2 class="recently-viewed__title">
+          {{ section_settings.heading | default: 'products.recently_viewed.title' | t }}
+        </h2>
+
+        {%- if section_settings.show_clear -%}
+          <button type="button" class="button button--link button--small" data-history-clear>
+            {{ 'products.recently_viewed.clear' | t }}
+          </button>
+        {%- endif -%}
+      </div>
+
+      {%- comment -%}
+        Carousel by default. Four recently viewed products stacked below a
+        product page push the footer a screen further away, and the row is the
+        least important thing on the page.
+      {%- endcomment -%}
+      {%- if section_settings.layout == 'carousel' -%}
+        <carousel-component class="recently-viewed__carousel" data-loop="false">
+      {%- endif -%}
+
+      <ul
+        class="product-grid recently-viewed__grid recently-viewed__grid--{{ section_settings.layout }}"
+        role="list"
+        data-ref="content track"
+        data-recently-viewed-content
+        style="--columns-desktop: {{ section_settings.columns_desktop }}; --columns-mobile: {{ section_settings.columns_mobile }};"
+      ></ul>
+
+      {%- if section_settings.layout == 'carousel' -%}
+          <button type="button" class="recently-viewed__arrow" data-ref="previous" aria-label="{{ 'accessibility.previous_slide' | t }}">
+            {% render 'icon', icon: 'chevron-left', size: 16 %}
+          </button>
+
+          <button type="button" class="recently-viewed__arrow recently-viewed__arrow--next" data-ref="next" aria-label="{{ 'accessibility.next_slide' | t }}">
+            {% render 'icon', icon: 'chevron-right', size: 16 %}
+          </button>
+
+          <p class="visually-hidden" data-ref="status" role="status"></p>
+        </carousel-component>
+      {%- endif -%}
+    </div>
+  </recently-viewed>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "t:sections.recently_viewed.name",
+  "settings": [
+    { "type": "paragraph", "content": "t:sections.recently_viewed.paragraph" },
+    { "type": "text", "id": "heading", "label": "t:shared.heading.label" },
+    { "type": "range", "id": "products_to_show", "label": "t:sections.featured_collection.settings.products_to_show.label", "min": 2, "max": 10, "step": 1, "default": 4 },
+    { "type": "range", "id": "minimum_products", "label": "t:sections.recently_viewed.settings.minimum_products.label", "info": "t:sections.recently_viewed.settings.minimum_products.info", "min": 1, "max": 6, "step": 1, "default": 2 },
+    {
+      "type": "select", "id": "layout", "label": "t:sections.product_recommendations.settings.layout.label",
+      "options": [
+        { "value": "grid", "label": "t:sections.product_recommendations.settings.layout.options__1.label" },
+        { "value": "carousel", "label": "t:sections.product_recommendations.settings.layout.options__2.label" }
+      ],
+      "default": "carousel"
+    },
+    { "type": "range", "id": "columns_desktop", "label": "t:shared.columns.desktop.label", "min": 2, "max": 5, "step": 1, "default": 4 },
+       {
+      "type": "select", "id": "columns_mobile", "label": "t:sections.product_recommendations.settings.layout.label",
+      "options": [
+        { "value": "1", "label": "1" },
+        { "value": "2", "label": "2" }
+      ],
+      "default": "2"
+    },
+    { "type": "checkbox", "id": "show_clear", "label": "t:sections.recently_viewed.settings.show_clear.label", "info": "t:sections.recently_viewed.settings.show_clear.info", "default": true },
+    { "type": "color_scheme", "id": "color_scheme", "label": "t:shared.color_scheme.label", "default": "scheme-1" },
+    { "type": "header", "content": "t:shared.spacing.section_header" },
+    { "type": "range", "id": "padding_top", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 48 },
+    { "type": "range", "id": "padding_bottom", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 48 },
+    { "type": "range", "id": "padding_top_mobile", "label": "t:shared.spacing.padding_top_mobile.label", "info": "t:shared.spacing.padding_top_mobile.info", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_bottom_mobile", "label": "t:shared.spacing.padding_bottom_mobile.label", "info": "t:shared.spacing.padding_bottom_mobile.info", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 0 }
+  ],
+  "presets": [{ "name": "t:sections.recently_viewed.name" }]
+}
+{% endschema %}

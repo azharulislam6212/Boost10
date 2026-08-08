@@ -1,0 +1,144 @@
+{% comment %}
+  blocks/_product-quantity.liquid
+
+  The quantity selector as its own block.
+
+  ## Why a block and not just a setting
+
+  The spec asks for both: a distinct block *and* a toggle inside Buy Buttons.
+  They are not redundant. A merchant who wants quantity directly above the
+  add-to-cart button uses the toggle; one who wants it beside the variant
+  picker, or below the price, needs to place it independently.
+
+  Rendering both would give the customer two quantity inputs that disagree, so
+  `_product-buy-buttons.liquid` must skip its inline selector when this block is
+  present. The guard is in the install notes.
+
+  ## Not a `<input type="number">` alone
+
+  A bare number input is the smallest correct implementation and it is what most
+  themes ship. The buttons exist because the native spinners are ~10px tall on
+  desktop and absent on mobile, which fails the 24×24 target-size guideline.
+
+  The input stays a real `number` input underneath, so a keyboard user types a
+  value and phone keyboards show digits.
+
+  ## `aria-live` on the input, not the buttons
+
+  Pressing plus changes a value the customer cannot see change if they are not
+  looking at it. The input announces its own new value; announcing from the
+  button would read the button's label again instead.
+{% endcomment %}
+
+{%- liquid
+  assign product = closest.product
+  assign variant = product.selected_or_first_available_variant
+
+  # Shopify enforces these server-side. Reflecting them in the input means the
+  # customer is told before they add, not after checkout rejects it.
+  assign min = variant.quantity_rule.min | default: 1
+  assign step = variant.quantity_rule.increment | default: 1
+  assign max = variant.quantity_rule.max
+
+  assign input_id = 'Quantity-' | append: block.id
+-%}
+
+{%- if product -%}
+  <quantity-selector
+    class="quantity-selector"
+    data-min="{{ min }}"
+    data-step="{{ step }}"
+    {% if max %}data-max="{{ max }}"{% endif %}
+    {% render 'block-border', settings: block.settings %}
+    {% render 'spacing', block: block.settings %}
+    {{ block.shopify_attributes }}
+  >
+    {%- if block.settings.show_label -%}
+      <label class="quantity-selector__label" for="{{ input_id }}">
+        {{ 'products.product.quantity' | t }}
+      </label>
+    {%- else -%}
+      <label class="visually-hidden" for="{{ input_id }}">
+        {{ 'products.product.quantity' | t }}
+      </label>
+    {%- endif -%}
+
+    <div class="quantity-selector__control">
+      <button
+        type="button"
+        class="quantity-selector__button"
+        data-ref="decrease"
+        aria-controls="{{ input_id }}"
+        aria-label="{{ 'products.product.quantity_decrease' | t: product: product.title | escape }}"
+      >
+        {% render 'icon', icon: 'minus', size: 14 %}
+      </button>
+
+      <input
+        id="{{ input_id }}"
+        class="quantity-selector__input"
+        data-ref="input"
+        type="number"
+        name="quantity"
+        value="{{ min }}"
+        min="{{ min }}"
+        step="{{ step }}"
+        {% if max %}max="{{ max }}"{% endif %}
+        inputmode="numeric"
+        autocomplete="off"
+        aria-live="polite"
+        form="{{ product_form_id }}"
+      >
+
+      <button
+        type="button"
+        class="quantity-selector__button"
+        data-ref="increase"
+        aria-controls="{{ input_id }}"
+        aria-label="{{ 'products.product.quantity_increase' | t: product: product.title | escape }}"
+      >
+        {% render 'icon', icon: 'plus', size: 14 %}
+      </button>
+    </div>
+
+    {%- comment -%}
+      Quantity rules are a merchant setting the customer cannot discover by
+      trying — a step of 6 looks like a broken plus button otherwise.
+    {%- endcomment -%}
+    {%- if variant.quantity_rule.increment > 1 or variant.quantity_rule.min > 1 -%}
+      <p class="quantity-selector__rule">
+        {{ 'products.product.quantity_rule' | t: min: min, step: step }}
+      </p>
+    {%- endif -%}
+  </quantity-selector>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "t:blocks.product_quantity.name",
+  "tag": null,
+  "settings": [
+    { "type": "checkbox", "id": "show_label", "label": "t:blocks.product_quantity.settings.show_label.label", "default": true },
+
+    { "type": "header", "content": "t:shared.border.header" },
+    { "type": "range", "id": "border_thickness", "label": "t:shared.border.thickness.label", "min": 0, "max": 8, "step": 1, "unit": "px", "default": 0 },
+    {
+      "type": "select", "id": "border_style", "label": "t:shared.border.style.label",
+      "options": [
+        { "value": "solid", "label": "t:shared.border.style.options__1.label" },
+        { "value": "dashed", "label": "t:shared.border.style.options__2.label" },
+        { "value": "dotted", "label": "t:shared.border.style.options__3.label" }
+      ],
+      "default": "solid",
+      "visible_if": "{{ block.settings.border_thickness > 0 }}"
+    },
+    { "type": "color", "id": "border_color", "label": "t:shared.border.color.label", "visible_if": "{{ block.settings.border_thickness > 0 }}" },
+    { "type": "range", "id": "border_radius", "label": "t:shared.border.radius.label", "min": 0, "max": 40, "step": 2, "unit": "px", "default": 0 },
+
+    { "type": "header", "content": "t:shared.spacing.block_header" },
+    { "type": "range", "id": "padding_top", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_bottom", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 }
+  ],
+  "presets": [{ "name": "t:blocks.product_quantity.name" }]
+}
+{% endschema %}

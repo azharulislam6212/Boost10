@@ -1,0 +1,243 @@
+{% comment %}
+  sections/hero-banner.liquid
+
+  The adaptive hero: image or video background, optional parallax, blocks over
+  the top, and an optional product carousel beside it.
+
+  ## Height
+
+  Seven modes, and "adapt" is the honest default: the section takes the height of
+  the image the merchant uploaded, so nothing is cropped and no space is invented.
+  The fixed modes exist because a merchant with three heroes across a site usually
+  wants them the same height regardless of what they uploaded.
+
+  ## Video
+
+  A video background is `muted`, `playsinline`, `loop` and `autoplay` — the only
+  combination browsers will actually autoplay. There is a poster image behind it
+  so the first paint is an image rather than a black rectangle, and the video is
+  skipped entirely under reduced motion, where the poster is the whole hero.
+
+  Separate mobile and desktop sources, because a 1920px video on a phone is a
+  data bill nobody agreed to.
+
+  ## Parallax
+
+  `<parallax-media>` writes a custom property that feeds a `translate3d`, so the
+  effect runs on the compositor. It does not start under reduced motion or on
+  touch — it is decorative movement tied to scrolling, which is exactly what the
+  preference switches off, and on a finger-driven scroll the lag between layers
+  reads as a fault rather than an effect.
+{% endcomment %}
+
+{%- liquid
+  assign section_settings = section.settings
+  assign has_video = false
+  if section_settings.video != blank or section_settings.video_url != blank
+    assign has_video = true
+  endif
+
+  assign products = section_settings.collection.products
+-%}
+
+<div
+  class="hero hero--{{ section_settings.height }} hero--{{ section_settings.layout }} color-{{ section_settings.color_scheme }}"
+  {% if section_settings.height == 'custom' %}style="--hero-height: {{ section_settings.height_custom }}px; --hero-height-mobile: {{ section_settings.height_custom_mobile }}px;"{% endif %}
+>
+  {%- comment -%} ---------- background ---------- {%- endcomment -%}
+  <div class="hero__media">
+    {%- capture media -%}
+      {%- if has_video -%}
+        {%- comment -%}
+          The poster renders first and stays behind the video, so the first paint
+          is an image rather than a black rectangle while the video buffers.
+        {%- endcomment -%}
+        {% render 'image',
+           image: section_settings.image,
+           mobile_image: section_settings.image_mobile,
+           alt: '',
+           ratio: 'none',
+           priority: true,
+           preload: true,
+           sizes: '100vw',
+           wrapper_class: 'hero__poster' %}
+
+        <deferred-media class="hero__video" data-autoplay="true">
+          <template data-ref="template">
+            {%- if section_settings.video != blank -%}
+              {{ section_settings.video
+                 | video_tag: autoplay: true, loop: true, muted: true, controls: false, playsinline: true, image_size: '1920x' }}
+            {%- else -%}
+              {{ section_settings.video_url | external_video_tag: loading: 'lazy' }}
+            {%- endif -%}
+          </template>
+        </deferred-media>
+      {%- else -%}
+        {% render 'image',
+           image: section_settings.image,
+           mobile_image: section_settings.image_mobile,
+           alt: section_settings.image.alt,
+           ratio: 'none',
+           priority: true,
+           preload: true,
+           sizes: '100vw',
+           wrapper_class: 'hero__image' %}
+      {%- endif -%}
+    {%- endcapture -%}
+
+    {%- if section_settings.enable_parallax -%}
+      <parallax-media class="hero__parallax" data-speed="{{ section_settings.parallax_speed }}">
+        {{ media }}
+      </parallax-media>
+    {%- else -%}
+      {{ media }}
+    {%- endif -%}
+
+    {%- if section_settings.overlay_opacity > 0 -%}
+      {%- comment -%}
+        The overlay is a sibling rather than a background on the media wrapper,
+        so it sits above a parallax layer that is moving underneath it.
+      {%- endcomment -%}
+      <div
+        class="hero__overlay hero__overlay--{{ section_settings.overlay_style }}"
+        style="--overlay-opacity: {{ section_settings.overlay_opacity | divided_by: 100.0 }}; --overlay-color: {{ section_settings.overlay_color }};"
+        aria-hidden="true"
+      ></div>
+    {%- endif -%}
+  </div>
+
+  {%- comment -%} ---------- content ---------- {%- endcomment -%}
+  <div class="hero__inner container">
+    <div
+      class="hero__content"
+      {% render 'alignment', horizontal: section_settings.align_x, vertical: section_settings.align_y %}
+    >
+      {% content_for 'blocks' %}
+    </div>
+
+    {%- comment -%}
+      The side carousel is a real product carousel, not a decorative strip: the
+      same `_product-card` block used on collection pages, so a card in a hero
+      behaves like a card anywhere else.
+    {%- endcomment -%}
+    {%- if section_settings.layout == 'split' and products.size > 0 -%}
+      <div class="hero__products">
+        <carousel-component class="hero__carousel" data-loop="false">
+          <ul
+            class="hero__carousel-track"
+            data-ref="track"
+            role="list"
+            tabindex="0"
+            aria-label="{{ section_settings.collection.title | escape }}"
+          >
+            {%- for product in products limit: section_settings.products_to_show -%}
+              <li class="hero__carousel-item" data-product-id="{{ product.id }}">
+                {% content_for 'block',
+                  type: '_product-card',
+                  id: 'product-card',
+                  product: product,
+                  index: forloop.index0,
+                  sizes: '(min-width: 990px) 20vw, 60vw'
+                %}
+              </li>
+            {%- endfor -%}
+          </ul>
+
+          <button type="button" class="hero__arrow" data-ref="previous" aria-label="{{ 'accessibility.previous_slide' | t }}">
+            {% render 'icon', icon: 'chevron-left', size: 16 %}
+          </button>
+          <button type="button" class="hero__arrow hero__arrow--next" data-ref="next" aria-label="{{ 'accessibility.next_slide' | t }}">
+            {% render 'icon', icon: 'chevron-right', size: 16 %}
+          </button>
+
+          <p class="visually-hidden" data-ref="status" role="status"></p>
+        </carousel-component>
+      </div>
+    {%- endif -%}
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "t:sections.hero_banner.name",
+  "tag": "section",
+  "class": "section section--full",
+  "blocks": [{ "type": "@theme" }, { "type": "@app" }],
+  "settings": [
+    { "type": "header", "content": "t:sections.hero_banner.headers.media" },
+    { "type": "image_picker", "id": "image", "label": "t:shared.image.label", "info": "t:sections.hero_banner.settings.image.info" },
+    { "type": "image_picker", "id": "image_mobile", "label": "t:shared.image_mobile.label", "info": "t:shared.image_mobile.info" },
+    { "type": "video", "id": "video", "label": "t:sections.hero_banner.settings.video.label", "info": "t:sections.hero_banner.settings.video.info" },
+    { "type": "video_url", "id": "video_url", "label": "t:sections.about_brand.settings.video_url.label", "accept": ["youtube", "vimeo"] },
+    { "type": "header", "content": "t:sections.hero_banner.headers.height" },
+    {
+      "type": "select", "id": "height", "label": "t:sections.hero_banner.settings.height.label",
+      "options": [
+        { "value": "adapt", "label": "t:sections.hero_banner.settings.height.options__1.label" },
+        { "value": "small", "label": "t:sections.hero_banner.settings.height.options__2.label" },
+        { "value": "medium", "label": "t:sections.hero_banner.settings.height.options__3.label" },
+        { "value": "large", "label": "t:sections.hero_banner.settings.height.options__4.label" },
+        { "value": "xlarge", "label": "t:sections.hero_banner.settings.height.options__5.label" },
+        { "value": "full", "label": "t:sections.hero_banner.settings.height.options__6.label" },
+        { "value": "custom", "label": "t:sections.hero_banner.settings.height.options__7.label" }
+      ],
+      "default": "large"
+    },
+    { "type": "range", "id": "height_custom", "label": "t:sections.hero_banner.settings.height_custom.label", "min": 200, "max": 1000, "step": 20, "unit": "px", "default": 600 },
+    { "type": "range", "id": "height_custom_mobile", "label": "t:sections.hero_banner.settings.height_custom_mobile.label", "min": 200, "max": 800, "step": 20, "unit": "px", "default": 420 },
+    { "type": "header", "content": "t:sections.hero_banner.headers.overlay" },
+    { "type": "color", "id": "overlay_color", "label": "t:sections.hero_banner.settings.overlay_color.label", "default": "#000000" },
+    { "type": "range", "id": "overlay_opacity", "label": "t:sections.hero_banner.settings.overlay_opacity.label", "info": "t:sections.hero_banner.settings.overlay_opacity.info", "min": 0, "max": 90, "step": 5, "unit": "%", "default": 30 },
+    {
+      "type": "select", "id": "overlay_style", "label": "t:sections.hero_banner.settings.overlay_style.label",
+      "options": [
+        { "value": "solid", "label": "t:sections.hero_banner.settings.overlay_style.options__1.label" },
+        { "value": "gradient-up", "label": "t:sections.hero_banner.settings.overlay_style.options__2.label" },
+        { "value": "gradient-down", "label": "t:sections.hero_banner.settings.overlay_style.options__3.label" }
+      ],
+      "default": "solid"
+    },
+    { "type": "header", "content": "t:sections.hero_banner.headers.motion" },
+    { "type": "checkbox", "id": "enable_parallax", "label": "t:sections.hero_banner.settings.enable_parallax.label", "info": "t:sections.hero_banner.settings.enable_parallax.info", "default": false },
+    { "type": "range", "id": "parallax_speed", "label": "t:sections.hero_banner.settings.parallax_speed.label", "min": 10, "max": 50, "step": 5, "unit": "%", "default": 30 },
+    { "type": "header", "content": "t:sections.hero_banner.headers.layout" },
+    {
+      "type": "select", "id": "layout", "label": "t:sections.main_contact.settings.layout.label",
+      "options": [
+        { "value": "full", "label": "t:sections.hero_banner.settings.layout.options__1.label" },
+        { "value": "split", "label": "t:sections.hero_banner.settings.layout.options__2.label" }
+      ],
+      "default": "full"
+    },
+    { "type": "collection", "id": "collection", "label": "t:sections.hero_banner.settings.collection.label", "info": "t:sections.hero_banner.settings.collection.info" },
+    { "type": "range", "id": "products_to_show", "label": "t:sections.featured_collection.settings.products_to_show.label", "min": 2, "max": 8, "step": 1, "default": 4 },
+    {
+      "type": "select", "id": "align_x", "label": "t:sections.hero_banner.settings.align_x.label",
+      "options": [
+        { "value": "left", "label": "t:blocks.group.settings.alignment.options__1.label" },
+        { "value": "center", "label": "t:blocks.group.settings.alignment.options__2.label" },
+        { "value": "right", "label": "t:blocks.group.settings.alignment.options__3.label" },
+        { "value": "space-between", "label": "t:sections.hero_banner.settings.align_x.options__4.label" }
+      ],
+      "default": "left"
+    },
+    {
+      "type": "select", "id": "align_y", "label": "t:sections.hero_banner.settings.align_y.label",
+      "options": [
+        { "value": "top", "label": "t:sections.hero_banner.settings.align_y.options__1.label" },
+        { "value": "middle", "label": "t:sections.hero_banner.settings.align_y.options__2.label" },
+        { "value": "bottom", "label": "t:sections.hero_banner.settings.align_y.options__3.label" },
+        { "value": "stretch", "label": "t:sections.hero_banner.settings.align_y.options__4.label" }
+      ],
+      "default": "middle"
+    },
+    { "type": "color_scheme", "id": "color_scheme", "label": "t:shared.color_scheme.label", "default": "scheme-3" }
+  ],
+  "presets": [
+    {
+      "name": "t:sections.hero_banner.name",
+      "blocks": [{ "type": "rating-badge" }, { "type": "heading" }, { "type": "text" }, { "type": "buttons" }]
+    }
+  ]
+}
+{% endschema %}

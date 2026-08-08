@@ -1,0 +1,65 @@
+{% doc %}
+  A notify-me modal for a sold-out variant.
+
+  The fields live in `back-in-stock-form.liquid`, which this and the inline
+  presentation both render. Two copies of a form that writes to the merchant's
+  admin is two places for the field names to drift.
+
+  The trigger only exists when the selected variant is unavailable, and
+  `<back-in-stock-form>` shows and hides it as the customer switches variants. A
+  permanent "notify me" beside an in-stock product is noise.
+
+  Parameters:
+    product (product, required)
+    id      (string, required)  Unique per product form
+    style   (string, optional)  'modal' or 'inline'. Default modal
+
+  @example
+    {% render 'back-in-stock-modal', product: product, id: section.id %}
+{% enddoc %}
+
+{%- liquid
+  assign variant = product.selected_or_first_available_variant
+  assign presentation = style | default: 'modal'
+  assign modal_id = 'BackInStock-' | append: id
+-%}
+
+<back-in-stock-form
+  class="back-in-stock back-in-stock--{{ presentation }}"
+  data-product-title="{{ product.title | escape }}"
+  data-style="{{ presentation }}"
+  {% if variant.available %}hidden{% endif %}
+>
+  {%- if presentation == 'modal' -%}
+    <button
+      type="button"
+      class="button button--secondary button--full back-in-stock__trigger"
+      data-overlay-open="{{ modal_id }}"
+      aria-expanded="false"
+      aria-controls="{{ modal_id }}"
+    >
+      {% render 'icon', icon: 'bell', size: 16 %}
+      {{ 'products.back_in_stock.trigger' | t }}
+    </button>
+
+    <modal-dialog id="{{ modal_id }}" class="back-in-stock__modal modal">
+      <dialog class="modal__dialog" data-ref="dialog" aria-label="{{ 'products.back_in_stock.heading' | t | escape }}">
+        <div class="modal__panel back-in-stock__panel" data-ref="panel">
+          <button
+            type="button"
+            class="modal__close"
+            data-overlay-close
+            aria-label="{{ 'general.actions.close' | t }}"
+          >
+            {% render 'icon', icon: 'close' %}
+          </button>
+  {%- endif -%}
+
+          {% render 'back-in-stock-form', product: product, id: id %}
+
+  {%- if presentation == 'modal' -%}
+        </div>
+      </dialog>
+    </modal-dialog>
+  {%- endif -%}
+</back-in-stock-form>

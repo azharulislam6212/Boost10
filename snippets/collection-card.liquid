@@ -1,0 +1,87 @@
+{% doc %}
+  One collection, as a card.
+
+  Structurally the same idea as `product-card.liquid`: the title carries the link
+  and a stretched `::after` makes the whole tile clickable, rather than wrapping
+  everything in an anchor. Wrapping swallows any button inside the card and gives
+  a screen reader one enormous link name made of every word in the tile.
+
+  The image falls back through the collection's own image, then its first
+  product's, then a placeholder. A merchant who has not set a collection image
+  still gets a card that looks deliberate rather than a grey box — and the
+  fallback costs nothing, because the product image is already on the page's
+  data path.
+
+  The product count is optional and off by default in the sections that use it.
+  "3 products" under a category tile reads as a small shop, and it is the kind of
+  number that only helps once a collection is large.
+
+  Parameters:
+    collection (collection, required)
+    index      (number, optional)   For the animation cascade
+    priority   (boolean, optional)  Eager load, hero cards only
+    sizes      (string, optional)
+    ratio      (string, optional)   Defaults to the theme card ratio
+    show_count (boolean, optional)
+    show_description (boolean, optional)
+    section    (object, optional)   `section.settings`, for the animation cascade
+
+  @example
+    {% render 'collection-card', collection: collection, index: forloop.index0, show_count: true %}
+{% enddoc %}
+
+{%- liquid
+  assign card_ratio = ratio | default: settings.card_image_ratio | default: 'portrait'
+
+  assign card_image = collection.featured_image
+  if card_image == blank
+    assign card_image = collection.products.first.featured_image
+  endif
+-%}
+
+<div
+  class="collection-card"
+  data-collection-id="{{ collection.id }}"
+  {% render 'motion-attrs', kind: 'image', section: section, index: index %}
+>
+  <div class="collection-card__media">
+    {%- if card_image != blank -%}
+      {% render 'image',
+         image: card_image,
+         alt: '',
+         ratio: card_ratio,
+         priority: priority,
+         sizes: sizes | default: '(min-width: 990px) 25vw, 50vw',
+         class: 'collection-card__image' %}
+    {%- else -%}
+      <div class="collection-card__placeholder">
+        {{ 'collection-1' | placeholder_svg_tag: 'collection-card__placeholder-svg' }}
+      </div>
+    {%- endif -%}
+  </div>
+
+  <div class="collection-card__info">
+    <h3 class="collection-card__title">
+      {%- comment -%}
+        Title-only link with a stretched pseudo-element. The tile is clickable,
+        the accessible name is the collection title, and anything interactive
+        added later still works.
+      {%- endcomment -%}
+      <a class="collection-card__link" href="{{ collection.url }}">
+        {{ collection.title }}
+      </a>
+    </h3>
+
+    {%- if show_count -%}
+      <p class="collection-card__count">
+        {{ 'collections.list.product_count' | t: count: collection.all_products_count }}
+      </p>
+    {%- endif -%}
+
+    {%- if show_description and collection.description != blank -%}
+      <div class="collection-card__description">
+        {{ collection.description | strip_html | truncatewords: 18 }}
+      </div>
+    {%- endif -%}
+  </div>
+</div>

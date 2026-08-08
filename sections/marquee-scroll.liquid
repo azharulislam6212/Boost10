@@ -1,0 +1,124 @@
+{% comment %}
+  sections/marquee-scroll.liquid
+
+  A continuous ticker.
+
+  Driven by `motion-engine.js`'s marquee preset, which clones the track once and
+  marks the clone `aria-hidden`. Without that, a screen reader reads every item
+  twice and a customer hears the same three promises six times.
+
+  Reduced motion stops it dead rather than slowing it down. A marquee is
+  decorative movement with no user control, which is exactly what the preference
+  exists to switch off — so under `prefers-reduced-motion` the items render as a
+  static row and nothing scrolls.
+
+  Pause on hover is on by default. Text moving under a cursor that is trying to
+  click it is the most common complaint about tickers.
+{% endcomment %}
+
+{%- liquid
+  assign section_settings = section.settings
+  assign speed = section_settings.speed | default: 40
+-%}
+
+{%- if section.blocks.size > 0 -%}
+  <div
+    class="marquee color-{{ section_settings.color_scheme }}"
+    {% render 'spacing', section: section_settings %}
+  >
+    <motion-effect
+      class="marquee__viewport"
+      data-effect="marquee"
+      data-direction="{{ section_settings.direction }}"
+      data-speed="{{ speed }}"
+      data-pause-on-hover="{{ section_settings.pause_on_hover }}"
+      role="marquee"
+      aria-label="{{ section_settings.label | default: 'sections.marquee.label' | t | escape }}"
+    >
+      <div class="marquee__track" data-marquee-track>
+        {%- for block in section.blocks -%}
+          {%- case block.type -%}
+            {%- when 'text' -%}
+              <span class="marquee__item" {{ block.shopify_attributes }}>
+                {%- if block.settings.icon != 'none' -%}
+                  {% render 'icon', icon: block.settings.icon, size: 16, class: 'marquee__icon' %}
+                {%- endif -%}
+                <span>{{ block.settings.text }}</span>
+              </span>
+
+            {%- when 'image' -%}
+              <span class="marquee__item marquee__item--image" {{ block.shopify_attributes }}>
+                {% render 'image',
+                   image: block.settings.image,
+                   alt: block.settings.alt,
+                   ratio: 'adapt',
+                   sizes: '160px',
+                   wrapper_class: 'marquee__image' %}
+              </span>
+          {%- endcase -%}
+        {%- endfor -%}
+      </div>
+    </motion-effect>
+  </div>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "t:sections.marquee.name",
+  "tag": "section",
+  "class": "section",
+  "max_blocks": 12,
+  "blocks": [
+    {
+      "type": "text",
+      "name": "t:shared.text.label",
+      "settings": [
+        { "type": "text", "id": "text", "label": "t:shared.text.label", "default": "Free shipping over £50" },
+        {
+          "type": "select", "id": "icon", "label": "t:blocks.icon_with_text.settings.icon.label",
+          "options": [
+            { "value": "none", "label": "t:shared.animation.animation_text.options__2.label" },
+            { "value": "star", "label": "t:blocks.icon_with_text.settings.icon.options__5.label" },
+            { "value": "truck", "label": "t:blocks.icon_with_text.settings.icon.options__1.label" },
+            { "value": "check", "label": "t:blocks.icon_with_text.settings.icon.options__4.label" }
+          ],
+          "default": "star"
+        }
+      ]
+    },
+    {
+      "type": "image",
+      "name": "t:shared.image.label",
+      "settings": [
+        { "type": "image_picker", "id": "image", "label": "t:shared.image.label" },
+        { "type": "text", "id": "alt", "label": "t:blocks.image.settings.alt.label", "info": "t:blocks.image.settings.alt.info" }
+      ]
+    }
+  ],
+  "settings": [
+    { "type": "text", "id": "label", "label": "t:sections.marquee.settings.label.label", "info": "t:sections.marquee.settings.label.info" },
+    {
+      "type": "select", "id": "direction", "label": "t:sections.marquee.settings.direction.label",
+      "options": [
+        { "value": "left", "label": "t:sections.marquee.settings.direction.options__1.label" },
+        { "value": "right", "label": "t:sections.marquee.settings.direction.options__2.label" }
+      ],
+      "default": "left"
+    },
+    { "type": "range", "id": "speed", "label": "t:sections.marquee.settings.speed.label", "min": 10, "max": 120, "step": 5, "unit": "s", "default": 40 },
+    { "type": "checkbox", "id": "pause_on_hover", "label": "t:sections.marquee.settings.pause_on_hover.label", "info": "t:sections.marquee.settings.pause_on_hover.info", "default": true },
+    { "type": "color_scheme", "id": "color_scheme", "label": "t:shared.color_scheme.label", "default": "scheme-3" },
+    { "type": "header", "content": "t:shared.spacing.section_header" },
+    { "type": "range", "id": "padding_top", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 48 },
+    { "type": "range", "id": "padding_bottom", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 48 },
+    { "type": "range", "id": "padding_top_mobile", "label": "t:shared.spacing.padding_top_mobile.label", "info": "t:shared.spacing.padding_top_mobile.info", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_bottom_mobile", "label": "t:shared.spacing.padding_bottom_mobile.label", "info": "t:shared.spacing.padding_bottom_mobile.info", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 0 }
+  ],
+  "presets": [
+    {
+      "name": "t:sections.marquee.name",
+      "blocks": [{ "type": "text" }, { "type": "text" }, { "type": "text" }]
+    }
+  ]
+}
+{% endschema %}

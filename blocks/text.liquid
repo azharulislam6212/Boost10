@@ -1,0 +1,215 @@
+{% comment %}
+  blocks/text.liquid
+
+  Rich text.
+
+  Typography overrides mirror `blocks/heading.liquid` exactly — same setting ids,
+  same `type_preset` gate, same shared `block-typography` resolver. A merchant
+  who learns the controls on one block already knows the other, and the keyword
+  mappings cannot drift apart because there is only one copy of them.
+
+  The properties land on the wrapper rather than on the paragraphs inside,
+  because `richtext` output is `<p>` and `<a>` and `<strong>` that the merchant
+  wrote and this block does not own. Inheriting down through `.rte` lets a link
+  keep its own colour while still picking up the family and size.
+{% endcomment %}
+
+{%- liquid
+  assign gradient = block.settings.gradient | default: 'none'
+
+  assign size_fallback = 'var(--font-size-' | append: block.settings.size | append: ')'
+
+  assign text_classes = 'block-text rte block-text--' | append: block.settings.alignment
+  if gradient != 'none' and gradient != blank
+    assign text_classes = text_classes | append: ' text-gradient text-gradient--' | append: gradient
+  endif
+-%}
+
+{%- if block.settings.text != blank -%}
+  <motion-effect
+    {% render 'motion-attrs', kind: 'text', block: block.settings %}
+    class="{{ text_classes }}"
+    style="{% render 'block-typography', block: block.settings, fallback: size_fallback %}"
+    {% render 'spacing', block: block.settings %}
+    {{ block.shopify_attributes }}
+  >
+    {{ block.settings.text }}
+  </motion-effect>
+{%- endif -%}
+
+{% comment %}
+  Note that `spacing` emits its own `style` attribute. Two `style` attributes on
+  one element is invalid HTML and the second is discarded, so the typography
+  properties are written into the first one above rather than rendered after it.
+{% endcomment %}
+
+{% schema %}
+{
+  "name": "t:blocks.text.name",
+  "tag": null,
+  "settings": [
+    { "type": "richtext", "id": "text", "label": "t:shared.text.label", "default": "<p>Share information about your brand, a product detail, or a promotion.</p>" },
+    {
+      "type": "select", "id": "size", "label": "t:blocks.heading.settings.size.label",
+      "options": [
+        { "value": "sm", "label": "t:blocks.text.settings.size.options__1.label" },
+        { "value": "md", "label": "t:blocks.text.settings.size.options__2.label" },
+        { "value": "lg", "label": "t:blocks.text.settings.size.options__3.label" }
+      ],
+      "default": "md"
+    },
+    {
+      "type": "select", "id": "alignment", "label": "t:blocks.group.settings.alignment.label",
+      "options": [
+        { "value": "start", "label": "t:blocks.group.settings.alignment.options__1.label" },
+        { "value": "center", "label": "t:blocks.group.settings.alignment.options__2.label" },
+        { "value": "end", "label": "t:blocks.group.settings.alignment.options__3.label" }
+      ],
+      "default": "start"
+    },
+
+    { "type": "header", "content": "t:shared.typography.header" },
+    { "type": "paragraph", "content": "t:shared.typography.paragraph" },
+    {
+      "type": "select", "id": "type_preset", "label": "t:shared.typography.type_preset.label", "info": "t:shared.typography.type_preset.info",
+      "options": [
+        { "value": "inherit", "label": "t:shared.typography.type_preset.options__1.label" },
+        { "value": "custom", "label": "t:shared.typography.type_preset.options__2.label" }
+      ],
+      "default": "inherit"
+    },
+    {
+      "type": "select", "id": "font_family", "label": "t:shared.typography.font_family.label",
+      "options": [
+        { "value": "body", "label": "t:shared.typography.font_family.options__2.label" },
+        { "value": "heading", "label": "t:shared.typography.font_family.options__1.label" },
+        { "value": "accent", "label": "t:shared.typography.font_family.options__3.label" }
+      ],
+      "default": "body",
+      "visible_if": "{{ block.settings.type_preset == 'custom' }}"
+    },
+    {
+      "type": "select", "id": "font_weight", "label": "t:shared.typography.font_weight.label",
+      "options": [
+        { "value": "inherit", "label": "t:shared.typography.font_weight.options__1.label" },
+        { "value": "300", "label": "300" }, { "value": "400", "label": "400" },
+        { "value": "500", "label": "500" }, { "value": "600", "label": "600" },
+        { "value": "700", "label": "700" }
+      ],
+      "default": "inherit",
+      "visible_if": "{{ block.settings.type_preset == 'custom' }}"
+    },
+    {
+      "type": "select", "id": "font_size", "label": "t:shared.typography.font_size.label",
+      "options": [
+        { "value": "14", "label": "14px" }, { "value": "15", "label": "15px" },
+        { "value": "16", "label": "16px" }, { "value": "18", "label": "18px" },
+        { "value": "20", "label": "20px" }, { "value": "24", "label": "24px" },
+        { "value": "28", "label": "28px" }, { "value": "32", "label": "32px" }
+      ],
+      "default": "16",
+      "visible_if": "{{ block.settings.type_preset == 'custom' }}"
+    },
+    {
+      "type": "select", "id": "font_size_mobile", "label": "t:shared.typography.font_size_mobile.label", "info": "t:shared.typography.font_size_mobile.info",
+      "options": [
+        { "value": "13", "label": "13px" }, { "value": "14", "label": "14px" },
+        { "value": "15", "label": "15px" }, { "value": "16", "label": "16px" },
+        { "value": "18", "label": "18px" }, { "value": "20", "label": "20px" },
+        { "value": "24", "label": "24px" }
+      ],
+      "default": "15",
+      "visible_if": "{{ block.settings.type_preset == 'custom' }}"
+    },
+    {
+      "type": "select", "id": "line_height", "label": "t:shared.typography.line_height.label",
+      "options": [
+        { "value": "tight", "label": "t:shared.typography.line_height.options__1.label" },
+        { "value": "normal", "label": "t:shared.typography.line_height.options__2.label" },
+        { "value": "loose", "label": "t:shared.typography.line_height.options__3.label" }
+      ],
+      "default": "normal",
+      "visible_if": "{{ block.settings.type_preset == 'custom' }}"
+    },
+    {
+      "type": "select", "id": "letter_spacing", "label": "t:shared.typography.letter_spacing.label",
+      "options": [
+        { "value": "tight", "label": "t:shared.typography.letter_spacing.options__1.label" },
+        { "value": "normal", "label": "t:shared.typography.letter_spacing.options__2.label" },
+        { "value": "wide", "label": "t:shared.typography.letter_spacing.options__3.label" }
+      ],
+      "default": "normal",
+      "visible_if": "{{ block.settings.type_preset == 'custom' }}"
+    },
+    {
+      "type": "select", "id": "text_transform", "label": "t:shared.typography.text_transform.label",
+      "options": [
+        { "value": "inherit", "label": "t:shared.typography.text_transform.options__1.label" },
+        { "value": "none", "label": "t:shared.typography.text_transform.options__2.label" },
+        { "value": "capitalize", "label": "t:shared.typography.text_transform.options__3.label" },
+        { "value": "uppercase", "label": "t:shared.typography.text_transform.options__4.label" },
+        { "value": "lowercase", "label": "t:shared.typography.text_transform.options__5.label" }
+      ],
+      "default": "inherit",
+      "visible_if": "{{ block.settings.type_preset == 'custom' }}"
+    },
+
+    { "type": "header", "content": "t:shared.typography.colour_header" },
+    {
+      "type": "select", "id": "gradient", "label": "t:blocks.heading.settings.gradient.label", "info": "t:blocks.heading.settings.gradient.info",
+      "options": [
+        { "value": "none", "label": "t:settings_schema.typography.options.case_default" },
+        { "value": "primary", "label": "t:settings_schema.typography.options.gradient_primary" },
+        { "value": "secondary", "label": "t:settings_schema.typography.options.gradient_secondary" },
+        { "value": "custom", "label": "t:settings_schema.typography.options.gradient_custom" }
+      ],
+      "default": "none"
+    },
+    {
+      "type": "select", "id": "text_color", "label": "t:shared.typography.text_color.label", "info": "t:shared.typography.text_color.info",
+      "options": [
+        { "value": "inherit", "label": "t:shared.typography.text_color.options__1.label" },
+        { "value": "text", "label": "t:settings_schema.typography.options.color_text" },
+        { "value": "subtext", "label": "t:settings_schema.typography.options.color_subtext" },
+        { "value": "heading", "label": "t:settings_schema.typography.options.color_heading" },
+        { "value": "accent", "label": "t:shared.typography.text_color.options__2.label" },
+        { "value": "sale", "label": "t:shared.typography.text_color.options__3.label" }
+      ],
+      "default": "inherit",
+      "visible_if": "{{ block.settings.gradient == 'none' }}"
+    },
+
+    { "type": "header", "content": "t:shared.animation.header" },
+    {
+      "type": "select", "id": "animation_text", "label": "t:shared.animation.animation_text.label",
+      "options": [
+        { "value": "inherit", "label": "t:shared.animation.animation_text.options__1.label" },
+        { "value": "none", "label": "t:shared.animation.animation_text.options__2.label" },
+        { "value": "fade-in", "label": "t:shared.animation.animation_text.options__3.label" },
+        { "value": "fade-up", "label": "t:shared.animation.animation_text.options__4.label" },
+        { "value": "slide-up", "label": "t:shared.animation.animation_text.options__5.label" },
+        { "value": "scale", "label": "t:shared.animation.animation_text.options__6.label" },
+        { "value": "blur", "label": "t:shared.animation.animation_text.options__7.label" },
+        { "value": "split-text", "label": "t:shared.animation.animation_text.options__8.label" },
+        { "value": "words-slide-up", "label": "t:shared.animation.animation_text.options__9.label" },
+        { "value": "words-rotate-in", "label": "t:shared.animation.animation_text.options__10.label" },
+        { "value": "words-slide-from-right", "label": "t:shared.animation.animation_text.options__11.label" },
+        { "value": "letters-slide-up", "label": "t:shared.animation.animation_text.options__12.label" },
+        { "value": "letters-slide-down", "label": "t:shared.animation.animation_text.options__13.label" },
+        { "value": "letters-fade-in", "label": "t:shared.animation.animation_text.options__14.label" },
+        { "value": "letters-fade-in-random", "label": "t:shared.animation.animation_text.options__15.label" },
+        { "value": "typewriter", "label": "t:shared.animation.animation_text.options__16.label" }
+      ],
+      "default": "inherit"
+    },
+
+    { "type": "header", "content": "t:shared.spacing.block_header" },
+    { "type": "range", "id": "padding_top", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_right", "label": "t:shared.spacing.padding_right.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_bottom", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_left", "label": "t:shared.spacing.padding_left.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "padding_scale_mobile", "label": "t:shared.spacing.padding_scale_mobile.label", "info": "t:shared.spacing.padding_scale_mobile.info", "min": 25, "max": 100, "step": 5, "unit": "%", "default": 75 }
+  ],
+  "presets": [{ "name": "t:blocks.text.name" }]
+}
+{% endschema %}

@@ -1,0 +1,100 @@
+{% comment %}
+  sections/cookie-banner.liquid
+
+  Consent notice.
+
+  ## What this is, and what it is not
+
+  It records a choice in localStorage and calls Shopify's own Customer Privacy
+  API when it is available. It does **not** block scripts, gate pixels, or make a
+  store GDPR compliant on its own — no theme can, because a theme cannot control
+  what an app injects. The schema says so plainly, because a merchant who
+  believes a banner is compliance is a merchant who finds out otherwise from a
+  regulator.
+
+  Shopify's own consent tracking is the mechanism that actually gates Shopify's
+  pixels, so `<cookie-banner>` calls it when present and falls back to storing
+  the choice locally when it is not.
+
+  ## Accept and decline carry equal weight
+
+  Both are real buttons with the same prominence. A decline styled as a faint
+  link beside a large accept button is a dark pattern, and several regulators
+  now say so explicitly.
+
+  There is no close button that leaves the question unanswered: dismissing
+  without choosing is treated as no consent, which is what "no answer" means in
+  every jurisdiction that requires the banner.
+{% endcomment %}
+
+{%- liquid
+  assign section_settings = section.settings
+-%}
+
+{%- if section_settings.enable -%}
+  <cookie-banner
+    id="CookieBanner"
+    class="cookie-banner cookie-banner--{{ section_settings.position }} color-{{ section_settings.color_scheme }}"
+    data-storage-key="cookie-consent"
+    role="region"
+    aria-label="{{ 'general.cookies.label' | t }}"
+    hidden
+  >
+    <div class="container cookie-banner__inner">
+      <div class="cookie-banner__text rte">
+        {%- if section_settings.text != blank -%}
+          {{ section_settings.text }}
+        {%- else -%}
+          <p>{{ 'general.cookies.message' | t }}</p>
+        {%- endif -%}
+
+        {%- if section_settings.policy_page != blank -%}
+          <a href="{{ section_settings.policy_page.url }}">
+            {{ section_settings.policy_link_label | default: 'general.cookies.learn_more' | t }}
+          </a>
+        {%- elsif shop.privacy_policy != blank -%}
+          <a href="{{ shop.privacy_policy.url }}">{{ 'general.cookies.learn_more' | t }}</a>
+        {%- endif -%}
+      </div>
+
+      <div class="cookie-banner__actions">
+        {%- comment -%}
+          Decline first in the DOM and equal in weight. A faint decline beside a
+          prominent accept is a dark pattern, and regulators have started saying
+          so by name.
+        {%- endcomment -%}
+        <button type="button" class="button button--secondary" data-ref="decline">
+          {{ section_settings.decline_label | default: 'general.cookies.decline' | t }}
+        </button>
+
+        <button type="button" class="button button--primary" data-ref="accept">
+          {{ section_settings.accept_label | default: 'general.cookies.accept' | t }}
+        </button>
+      </div>
+    </div>
+  </cookie-banner>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "t:sections.cookie_banner.name",
+  "settings": [
+    { "type": "paragraph", "content": "t:sections.cookie_banner.paragraph" },
+    { "type": "checkbox", "id": "enable", "label": "t:sections.cookie_banner.settings.enable.label", "default": false },
+    { "type": "richtext", "id": "text", "label": "t:shared.text.label" },
+    { "type": "page", "id": "policy_page", "label": "t:sections.cookie_banner.settings.policy_page.label", "info": "t:sections.cookie_banner.settings.policy_page.info" },
+    { "type": "text", "id": "policy_link_label", "label": "t:sections.cookie_banner.settings.policy_link_label.label" },
+    { "type": "text", "id": "accept_label", "label": "t:sections.cookie_banner.settings.accept_label.label" },
+    { "type": "text", "id": "decline_label", "label": "t:sections.cookie_banner.settings.decline_label.label" },
+    {
+      "type": "select", "id": "position", "label": "t:sections.cookie_banner.settings.position.label",
+      "options": [
+        { "value": "bottom", "label": "t:sections.sticky_product_bar.settings.position.options__1.label" },
+        { "value": "corner", "label": "t:sections.cookie_banner.settings.position.options__2.label" }
+      ],
+      "default": "bottom"
+    },
+    { "type": "color_scheme", "id": "color_scheme", "label": "t:shared.color_scheme.label", "default": "scheme-2" }
+  ]
+}
+{% endschema %}
