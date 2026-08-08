@@ -1,0 +1,298 @@
+{% doc %}
+  Renders the product media gallery.
+
+  The file was empty. `blocks/_product-media-gallery.liquid` renders it, so the
+  product page had no images at all — the one thing a product page cannot do
+  without. Everything it needs already existed: `media-gallery.js` documents the
+  markup it expects, and `base.css` already styles every class below.
+
+  ## Why a scroll container and not a stack of slides
+
+  The stage is a horizontally scrolling, snapping list. Every image sits at its
+  natural position in the document, so lazy loading works, and a customer can
+  swipe through the media before any JavaScript has run. The alternative — a
+  stack of absolutely positioned slides at `opacity: 0` — downloads every image
+  immediately and shows nothing at all until a script sorts it out.
+
+  The stacked layout is the same markup with the scroll axis removed in CSS, so
+  the two layouts share one set of nodes rather than branching here.
+
+  ## Filtering images by option
+
+  When enabled, an image belongs to an option value if its alt text ends with
+  `|option:value`. Images with no such marker are always shown, because shared
+  photography — a size chart, a fabric close-up — belongs to every variant.
+  `filter_images_strict` turns that off for stores that have labelled every file.
+
+  Filtering happens here rather than in JavaScript so the first paint is already
+  correct; `<variant-picker>` re-filters on change.
+
+  ## Video, models and zoom
+
+  Video and 3D models are wrapped in `<deferred-media>`: the poster is a real
+  image and the player lives in a `<template>`, so nothing heavy is fetched
+  until someone presses play. Zoom is opt-in per block and only wraps images.
+
+  Parameters:
+    product  (product, required)
+    section  (object, required)
+    settings (object, required)  The block's settings
+    block_shopify_attributes (string, optional)
+
+  @example
+    {% render 'product-media', product: product, section: section, settings: block.settings %}
+{% enddoc %}
+
+{%- liquid
+  assign s = settings
+  assign layout = s.gallery_layout | default: 'carousel'
+  assign ratio = s.gallery_image_ratio | default: 'adapt'
+  assign thumbs_position = s.thumbnails_position | default: 'thumbnails-below'
+  assign pagination = s.pagination_type | default: 'thumbnails'
+  assign current = product.selected_or_first_available_variant
+
+  assign media_items = product.media
+
+  comment
+    Variant media filtering. `hide_variants` keeps only the media attached to the
+    selected variant plus anything not attached to any variant, which is the
+    behaviour merchants mean by "hide unselected variant media".
+  endcomment
+  if s.hide_variants and current.featured_media != blank
+    assign kept = ''
+    for item in product.media
+      assign is_variant_media = false
+      for variant in product.variants
+        if variant.featured_media.id == item.id
+          assign is_variant_media = true
+          break
+        endif
+      endfor
+
+      if is_variant_media == false or item.id == current.featured_media.id
+        assign kept = kept | append: item.id | append: ','
+      endif
+    endfor
+    assign kept_ids = kept | split: ','
+  endif
+
+  comment
+    Option filtering reads `SEO text|option:value` from the alt text. The value
+    is compared without case, because a merchant typing "Mango" into Files and
+    "mango" into the option is describing the same thing.
+  endcomment
+  if s.enable_filter_images
+    assign selected_values = ''
+    for option in product.options_with_values
+      assign selected_values = selected_values | append: option.selected_value | downcase | append: ','
+    endfor
+  endif
+
+  assign gap = s.gallery_gap | default: 10
+-%}
+
+<media-gallery
+  class="product-media product-media--{{ layout }} product-media--{{ thumbs_position }}"
+  data-layout="{{ layout }}"
+  data-section-id="{{ section.id }}"
+  data-product-id="{{ product.id }}"
+  {% if s.enable_gallery_loop %}data-loop="true"{% endif %}
+  {% if s.sticky_gallery %}data-sticky="true"{% endif %}
+  style="--gallery-gap: {{ gap }}px;"
+  {% render 'spacing', block: s %}
+  {{ block_shopify_attributes }}
+>
+  {%- comment -%}
+    The stage is focusable and labelled as a group so a keyboard user reaches the
+    media and hears what it is before the arrow keys mean anything.
+  {%- endcomment -%}
+  <div
+    class="product-media__stage"
+    data-ref="stage"
+    tabindex="0"
+    role="group"
+    aria-label="{{ 'products.product.gallery' | t: product: product.title | escape }}"
+  >
+    {%- for item in media_items -%}
+      {%- liquid
+        assign show = true
+
+        if s.hide_variants and current.featured_media != blank
+          assign show = false
+          for id in kept_ids
+            if id == item.id
+              assign show = true
+              break
+            endif
+          endfor
+        endif
+
+        if show and s.enable_filter_images
+          assign alt_raw = item.alt | default: ''
+          if alt_raw contains '|option:'
+            assign marker = alt_raw | split: '|option:' | last | downcase | strip
+            assign show = false
+            for value in selected_values
+              if value == marker
+                assign show = true
+                break
+              endif
+            endfor
+          elsif s.filter_images_strict
+            assign show = false
+          endif
+        endif
+
+        assign clean_alt = item.alt | default: product.title | split: '|' | first
+      -%}
+
+      {%- if show -%}
+        <div
+          class="product-media__item{% if forloop.first and s.gallery_full_width_first %} product-media__item--wide{% endif %}"
+          data-media
+          data-media-id="{{ item.id }}"
+          data-media-type="{{ item.media_type }}"
+        >
+          {%- case item.media_type -%}
+            {%- when 'image' -%}
+              {%- if s.enable_image_zoom -%}
+                <media-zoom
+                  class="product-media__zoom"
+                  data-zoom-src="{{ item | image_url: width: 2048 }}"
+                  data-level="2"
+                >
+                  {% render 'image',
+                     image: item,
+                     alt: clean_alt,
+                     ratio: ratio,
+                     class: 'product-media__image',
+                     id: 'zoom-image',
+                     priority: forloop.first,
+                     sizes: '(min-width: 990px) 50vw, 100vw' %}
+
+                  <button
+                    type="button"
+                    class="product-media__zoom-trigger"
+                    data-ref="trigger"
+                    aria-label="{{ 'accessibility.open_zoom' | t }}"
+                  >
+                    {% render 'icon', icon: 'zoom-in', size: 18 %}
+                  </button>
+                </media-zoom>
+              {%- else -%}
+                {% render 'image',
+                   image: item,
+                   alt: clean_alt,
+                   ratio: ratio,
+                   class: 'product-media__image',
+                   priority: forloop.first,
+                   sizes: '(min-width: 990px) 50vw, 100vw' %}
+              {%- endif -%}
+
+            {%- when 'video' or 'external_video' -%}
+              <deferred-media class="product-media__video" data-autoplay="false">
+                <button
+                  type="button"
+                  class="product-media__play"
+                  data-ref="poster"
+                  aria-label="{{ 'accessibility.play_video' | t }}"
+                >
+                  {% render 'image',
+                     image: item.preview_image,
+                     alt: clean_alt,
+                     ratio: ratio,
+                     class: 'product-media__poster',
+                     sizes: '(min-width: 990px) 50vw, 100vw' %}
+                  {% render 'icon', icon: 'play', size: 28 %}
+                </button>
+
+                <template data-ref="template">
+                  {%- if item.media_type == 'video' -%}
+                    {{ item | video_tag: controls: true, playsinline: true, preload: 'none' }}
+                  {%- else -%}
+                    {{ item | external_video_tag: loading: 'lazy' }}
+                  {%- endif -%}
+                </template>
+              </deferred-media>
+
+            {%- when 'model' -%}
+              <deferred-media class="product-media__model" data-autoplay="false">
+                <button
+                  type="button"
+                  class="product-media__play"
+                  data-ref="poster"
+                  aria-label="{{ 'products.product.view_in_space' | t }}"
+                >
+                  {% render 'image',
+                     image: item.preview_image,
+                     alt: clean_alt,
+                     ratio: ratio,
+                     class: 'product-media__poster',
+                     sizes: '(min-width: 990px) 50vw, 100vw' %}
+                  {% render 'icon', icon: 'grid', size: 28 %}
+                </button>
+
+                <template data-ref="template">
+                  {{ item | model_viewer_tag: reveal: 'interaction', toggleable: true }}
+                </template>
+              </deferred-media>
+
+            {%- else -%}
+              {{ item }}
+          {%- endcase -%}
+        </div>
+      {%- endif -%}
+    {%- else -%}
+      {%- comment -%}
+        A product with no media still needs a box of the right shape, or the two
+        columns collapse and the buy button jumps up the page.
+      {%- endcomment -%}
+      <div class="product-media__item product-media__item--empty" data-media data-media-id="0" data-media-type="image">
+        {{ 'product-1' | placeholder_svg_tag: 'product-media__image placeholder-svg' }}
+      </div>
+    {%- endfor -%}
+  </div>
+
+  {%- if pagination == 'thumbnails' and product.media.size > 1 -%}
+    <media-thumbnails
+      class="product-media__thumbnails"
+      data-ref="thumbnails"
+      data-size="{{ s.thumbnail_size | default: 'medium' }}"
+      data-style="{{ s.thumbnail_style | default: 'round' }}"
+    >
+      {%- for item in media_items -%}
+        <button
+          type="button"
+          class="product-media__thumbnail"
+          data-thumbnail
+          data-media-id="{{ item.id }}"
+          aria-current="{% if forloop.first %}true{% else %}false{% endif %}"
+          aria-label="{{ 'accessibility.go_to_slide' | t: index: forloop.index }}"
+        >
+          {% render 'image',
+             image: item.preview_image,
+             alt: '',
+             ratio: 'square',
+             sizes: '120px',
+             widths: '120,240' %}
+
+          {%- unless item.media_type == 'image' -%}
+            {%- comment -%}
+              A video thumbnail that looks like a photograph is a photograph as
+              far as the customer is concerned, so the type is marked.
+            {%- endcomment -%}
+            <span class="product-media__thumbnail-badge" aria-hidden="true">
+              {% render 'icon', icon: 'play', size: 12 %}
+            </span>
+          {%- endunless -%}
+        </button>
+      {%- endfor -%}
+    </media-thumbnails>
+  {%- endif -%}
+
+  {%- comment -%}
+    The gallery writes the current position here. Without it a screen reader user
+    swiping through media hears nothing change.
+  {%- endcomment -%}
+  <p class="visually-hidden" data-ref="status" role="status"></p>
+</media-gallery>

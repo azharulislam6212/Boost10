@@ -148,7 +148,7 @@ export class ShareButton extends BaseComponent {
     input.removeAttribute('hidden');
     input.value = this.url;
     input.select();
-    this.#feedback(themeString('shareCopyManual', 'Copy the link below'));
+    this.#feedback(themeString('shareCopyManually', 'Copy the link below'));
   }
 }
 

@@ -1261,7 +1261,7 @@
 
   .product-media__stage {
     display: flex;
-    gap: var(--space-2);
+    gap: var(--gallery-gap, var(--space-2));
     overflow-x: auto;
     scroll-snap-type: x mandatory;
     scrollbar-width: none;
@@ -1286,17 +1286,37 @@
   }
 
   .product-media__thumbnail {
-    flex: 0 0 8rem;
+    flex: 0 0 var(--thumb-size, 8rem);
     border: 2px solid transparent;
     border-radius: var(--radius-media);
     overflow: hidden;
   }
 
+  /* Thumbnail size and shape are block settings that previously had nothing to
+     act on. Size is a custom property so the side-mounted layouts below can
+     reuse it for their column width instead of repeating the number. */
+
+  .product-media__thumbnails[data-size='small'] { --thumb-size: 6rem; }
+  .product-media__thumbnails[data-size='medium'] { --thumb-size: 8rem; }
+  .product-media__thumbnails[data-size='large'] { --thumb-size: 10rem; }
+
+  .product-media__thumbnails[data-style='round'] .product-media__thumbnail { border-radius: var(--radius-media); }
+  .product-media__thumbnails[data-style='circle'] .product-media__thumbnail { border-radius: 50%; }
+  .product-media__thumbnails[data-style='none'] .product-media__thumbnail { border-radius: 0; }
+
   .product-media__thumbnail[aria-current='true'] { border-color: var(--color-heading); }
+
+  /* A first image spanning the full stage only means anything in the stacked
+     layout; in a carousel every item is already 100% wide. */
+  .product-media--stacked .product-media__item--wide { flex: 1 1 100%; }
+
+  .product-media__item--empty { display: grid; place-items: center; background-color: var(--color-secondary-background); }
+
+  .product-media__zoom { display: block; position: relative; }
 
   .product-media--thumbnails-start {
     display: grid;
-    grid-template-columns: 8rem minmax(0, 1fr);
+    grid-template-columns: var(--thumb-size, 8rem) minmax(0, 1fr);
     gap: var(--space-3);
   }
 
@@ -1633,6 +1653,9 @@
   .cart-upsell__info { display: flex; flex-direction: column; gap: var(--space-1); min-inline-size: 0; }
   .cart-upsell__title-link { font-size: var(--font-size-sm); font-weight: 500; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .cart-upsell__price { font-size: var(--font-size-xs); color: var(--color-accent-text); }
+  /* The label wraps its select so the control is named before JavaScript runs.
+     Without `display: block` an inline label would collapse the column here. */
+  .cart-upsell__variant-label { display: block; }
   .cart-upsell__variant { font-size: var(--font-size-xs); padding-block: var(--space-1); }
 
   .cart-free-gift {
@@ -2544,9 +2567,21 @@
      second grid definition is what keeps the two one rule instead of two that
      drift apart. */
   @media screen and (min-width: 990px) {
-    .product-media--thumbnails-end { display: grid; grid-template-columns: minmax(0, 1fr) 8rem; gap: var(--space-3); }
-    .product-media--thumbnails-end .media-thumbnails { order: 2; flex-direction: column; overflow-y: auto; }
-    .product-media--thumbnails-end .media-gallery { order: 1; }
+    /* Sticky only on desktop. On a phone the gallery is most of the viewport, so
+       pinning it leaves the buy button with nowhere to scroll to. The header
+       offset keeps the top of the gallery clear of a sticky header. */
+    .product-media[data-sticky='true'] {
+      position: sticky;
+      inset-block-start: calc(var(--header-height, 0px) + var(--space-4));
+      align-self: start;
+    }
+
+    /* These targeted `.media-thumbnails` and `.media-gallery` — class names the
+       markup does not emit. The elements are the custom element itself and the
+       stage inside it, so the desktop side-strip never applied. */
+    .product-media--thumbnails-end { display: grid; grid-template-columns: minmax(0, 1fr) var(--thumb-size, 8rem); gap: var(--space-3); }
+    .product-media--thumbnails-end .product-media__thumbnails { order: 2; flex-direction: column; margin-block-start: 0; overflow-y: auto; max-block-size: 60rem; }
+    .product-media--thumbnails-end .product-media__stage { order: 1; }
   }
 
   /* ---- hero, tabs, badges -------------------------------------------------- */
@@ -5687,8 +5722,11 @@ announcement-bar[data-dismissed] { display: none; }
   flex-shrink: 0;
   display: grid;
   place-items: center;
-  inline-size: 1.75rem;
-  block-size: 1.75rem;
+  /* 24px is the WCAG 2.5.8 minimum target. The icon inside stays small; it is
+     the hit area that has to grow, which is why this is a size and not a font
+     change. */
+  inline-size: 2.4rem;
+  block-size: 2.4rem;
   padding: 0;
   border: 0;
   background: none;

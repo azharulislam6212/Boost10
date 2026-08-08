@@ -108,10 +108,41 @@
       assign body_font_bold_italic = body_font_bold | font_modify: 'style', 'italic'
       assign heading_font = settings.type_header_font
       assign heading_font_bold = heading_font | font_modify: 'weight', 'bold'
+
+      comment
+        The accent font had a `--font-accent-family` custom property but no
+        `@font-face` anywhere, so selecting one changed the family name in CSS
+        and the browser fell straight through to the fallback stack. It is
+        declared here like the other two.
+
+        It falls back to the heading font, so the two are compared before
+        emitting: declaring the same face twice costs bytes and buys nothing.
+      endcomment
+      assign accent_font = settings.type_accent_font | default: settings.type_header_font
+      assign accent_is_distinct = true
+      if accent_font.family == heading_font.family and accent_font.style == heading_font.style and accent_font.weight == heading_font.weight
+        assign accent_is_distinct = false
+      endif
     -%}
 
-    <link rel="preload" as="font" href="{{ body_font | font_url }}" type="font/woff2" crossorigin>
-    <link rel="preload" as="font" href="{{ heading_font | font_url }}" type="font/woff2" crossorigin>
+    {%- comment -%}
+      Preload is guarded by `system?`. A system font has no file to fetch and
+      `font_url` returns nothing, so an unguarded tag emits `href=""` — which
+      browsers resolve to the current page and preload the HTML document a second
+      time. That is a wasted request on every page view for any merchant who
+      picks a system font.
+
+      Only the two faces that paint above the fold are preloaded. Bold, italic
+      and accent are declared below and fetched when first used: preloading
+      everything makes each preload compete with the others and delays the one
+      that actually blocks first paint.
+    {%- endcomment -%}
+    {%- unless body_font.system? -%}
+      <link rel="preload" as="font" href="{{ body_font | font_url }}" type="font/woff2" crossorigin>
+    {%- endunless -%}
+    {%- unless heading_font.system? -%}
+      <link rel="preload" as="font" href="{{ heading_font | font_url }}" type="font/woff2" crossorigin>
+    {%- endunless -%}
 
     {% style %}
       {{ body_font | font_face: font_display: 'swap' }}
@@ -120,6 +151,9 @@
       {{ body_font_bold_italic | font_face: font_display: 'swap' }}
       {{ heading_font | font_face: font_display: 'swap' }}
       {{ heading_font_bold | font_face: font_display: 'swap' }}
+      {%- if accent_is_distinct -%}
+        {{ accent_font | font_face: font_display: 'swap' }}
+      {%- endif -%}
     {% endstyle %}
 
  
@@ -547,6 +581,13 @@
         accountRegister: {{ routes.account_register_url | json }},
         accountAddresses: {{ routes.account_addresses_url | json }},
         cart: {{ routes.cart_url | json }},
+        {%- comment -%}
+          `cartUrl` and `rootUrl` are the names the modules ask for. They were
+          only ever spelled `cart` and `root` here, so `getRoute` fell through to
+          its "/" fallback and logged a warning on every add to cart.
+        {%- endcomment -%}
+        cartUrl: {{ routes.cart_url | json }},
+        rootUrl: {{ routes.root_url | json }},
         cartAdd: {{ routes.cart_add_url | json }},
         cartChange: {{ routes.cart_change_url | json }},
         cartUpdate: {{ routes.cart_update_url | json }},
@@ -570,6 +611,13 @@
         cartCount: {{ cart.item_count | json }}
       };
 
+      {%- comment -%}
+        The cart module seeds itself from `Theme.cart` on connect. Without it the
+        drawer starts with no state and the first open shows an empty cart until
+        a mutation forces a refresh.
+      {%- endcomment -%}
+      window.Theme.cart = {{ cart | json }};
+
       window.Theme.template = {
         name: {{ template.name | json }},
         suffix: {{ template.suffix | json }},
@@ -591,6 +639,7 @@
         paginationType: {{ settings.pagination_type | default: 'load-more' | json }},
         quickView: {{ settings.enable_quick_view | default: true | json }},
         compare: {{ settings.enable_compare | default: false | json }},
+        compareLimit: {{ settings.compare_limit | default: 4 | json }},
         recentlyViewed: {{ settings.enable_recently_viewed | default: true | json }},
         freeShippingEnabled: {{ settings.free_shipping_enabled | default: false | json }},
         freeShippingThreshold: {{ settings.free_shipping_threshold | default: 0 | times: 100 | json }},
