@@ -212,9 +212,7 @@
     --line-height-body: var(--font-paragraph-line-height, 1.6);
     --line-height-heading: var(--font-h2-line-height, 1.15);
 
-    --grid-gap-x: var(--space-4);
-    --grid-gap-y: var(--space-7);
-
+  
     --focus-ring: 2px solid var(--color-link);
     --focus-offset: 3px;
 
@@ -501,7 +499,7 @@
 
   input.input--custom,
   select.input--custom {
-    --input-height: var(--input-custom-height, var(--height-input, 46px));
+      --input-height: var(--input-custom-height, var(--height-input, 46px));
   }
 
   textarea {
@@ -743,8 +741,6 @@
     font-size: var(--button-font-size);
     font-weight: 500;
     line-height: 1.2;
-    letter-spacing: calc(var(--button-letter-spacing, 0) * 0.01em);
-    text-transform: var(--button-text-transform, none);
     text-align: center;
     text-decoration: none;
     cursor: pointer;
@@ -895,7 +891,7 @@
 
   /* Merchant-defined tag badges. Deliberately the least loud of the five: a
      "Bestseller" label should not out-shout "Sold out". */
-  .badge--custom { background-color: var(--badge-custom-background, var(--color-heading)); color: var(--badge-custom-text, var(--color-background)); }
+  .badge--custom { background-color: var(--color-badge-custom-bg, var(--color-heading)); color: var(--color-badge-custom-text, var(--color-background)); }
 
   /* ---- price ----------------------------------------------------------- */
 
@@ -6008,7 +6004,7 @@ announcement-bar[data-dismissed] { display: none; }
   position: relative;
   display: block;
   overflow: hidden;
-  border-radius: var(--card-radius, 0);
+  border-radius: var(--radius-card, 0);
   grid-column: span var(--banner-span-mobile, 2);
   grid-row: span var(--banner-rows, 1);
   color: inherit;
@@ -6128,142 +6124,7 @@ announcement-bar[data-dismissed] { display: none; }
 }
 
 
-/* ==========================================================================
-   Colour sources, brand marquee (was phase5.css)
-   ========================================================================== */
 
-/* --------------------------------------------------------------------------
-   1. Colour sources
-   --------------------------------------------------------------------------
-   Paired with `snippets/color-source.liquid`. The snippet supplies the custom
-   properties; these rules decide what to do with them.
-   -------------------------------------------------------------------------- */
-
-.color-source-custom {
-  color: var(--source-color, inherit);
-}
-
-/* A gradient cannot be a `color`, so it is painted as a background and clipped
-   to the glyphs.
-
-   The `color` fallback is declared first and unconditionally. If the clip is
-   unsupported, the gradient never paints, and `color: transparent` outside the
-   `@supports` guard would leave the heading invisible rather than merely
-   un-gradiented — a total content loss from a decorative setting. */
-.color-source-gradient {
-  color: var(--source-color, currentColor);
-}
-
-@supports (background-clip: text) or (-webkit-background-clip: text) {
-  .color-source-gradient {
-    background-image: var(--source-gradient, none);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-
-    /* Clipping to glyphs means the painted box is the text box. Without this a
-       descender or an italic overhang is cropped mid-stroke. */
-    padding-block: 0.08em;
-    margin-block: -0.08em;
-  }
-}
-
-/* Forced-colors mode replaces authored colours wholesale. A clipped gradient
-   there resolves to transparent text on a transparent background. */
-@media (forced-colors: active) {
-  .color-source-gradient {
-    background-image: none;
-    color: CanvasText;
-  }
-}
-
-
-/* --------------------------------------------------------------------------
-   2. Footer brand mark
-   -------------------------------------------------------------------------- */
-
-.footer-brand {
-  inline-size: 100%;
-  overflow: hidden;
-  opacity: var(--brand-opacity, 0.1);
-  line-height: 1;
-
-  /* Decorative and oversized — it must never intercept a click meant for the
-     policy links sitting above it. */
-  pointer-events: none;
-  user-select: none;
-}
-
-.footer-brand--start .footer-brand__static { text-align: start; }
-.footer-brand--center .footer-brand__static { text-align: center; }
-.footer-brand--end .footer-brand__static { text-align: end; }
-
-/* Fluid between the two settings. `clamp()` rather than breakpoints, because a
-   mark whose job is filling the width reads as undersized just before each
-   step. */
-.footer-brand__text {
-  display: block;
-  font-size: clamp(var(--brand-min, 48px), 14vw, var(--brand-max, 220px));
-  font-family: var(--font-heading-family);
-  font-weight: var(--font-heading-weight, 700);
-  white-space: nowrap;
-  text-transform: uppercase;
-  letter-spacing: -0.03em;
-}
-
-.footer-brand__image {
-  inline-size: 100%;
-  block-size: auto;
-  max-block-size: var(--brand-max, 220px);
-  object-fit: contain;
-}
-
-.footer-brand__track {
-  display: flex;
-  align-items: center;
-  gap: var(--space-8);
-  inline-size: max-content;
-}
-
-.footer-brand__track > * { flex-shrink: 0; }
-
-/* The marquee preset clones the track; without clipping, the clone spills
-   across the page for the frame before the animation starts. */
-.footer-brand__viewport { overflow: hidden; }
-
-
-/* --------------------------------------------------------------------------
-   3. RTL corrections
-   --------------------------------------------------------------------------
-   Logical properties handle most of the theme. These are the cases they
-   cannot: `transform` and `background` positions are physical, and no logical
-   equivalent exists.
-   -------------------------------------------------------------------------- */
-
-/* Chevrons that mean "forward" have to point the other way, and a glyph is
-   not something `margin-inline` can fix. */
-[dir='rtl'] .icon--directional,
-[dir='rtl'] .pagination__next svg,
-[dir='rtl'] .pagination__previous svg,
-[dir='rtl'] .breadcrumb__separator svg {
-  transform: scaleX(-1);
-}
-
-/* Gradients are painted along a physical axis. An overlay that fades from the
-   inline start has to be re-declared, not mirrored. */
-[dir='rtl'] .grid-banner--top .grid-banner__content,
-[dir='rtl'] .grid-banner--bottom .grid-banner__content {
-  /* Vertical gradients are direction-neutral — declared here only so a future
-     horizontal variant has an obvious place to live. */
-  background-position: right center;
-}
-
-/* Scroll-snap carousels: `scrollLeft` is negative in RTL in some engines and
-   positive in others. The carousel component already reads `isRTL()`, so this
-   only has to make sure the track itself is laid out in the right direction. */
-[dir='rtl'] .carousel-shell__track {
-  direction: rtl;
-}
 
 /* Anything genuinely direction-neutral inside an RTL page — a price, an SKU, a
    phone number — has to be isolated or the surrounding text reorders it. */
@@ -6536,49 +6397,7 @@ announcement-bar[data-dismissed] { display: none; }
 }
 
 
-/* --------------------------------------------------------------------------
-   5. Vertical filters
-   --------------------------------------------------------------------------
-   The third filter layout, alongside drawer and horizontal.
-
-   `sidebar` and `vertical` differ in one thing: the sidebar collapses to a
-   drawer trigger below 750px, and vertical stays a column at every width. That
-   is a merchant choice for stores whose filters matter more than the grid.
-   -------------------------------------------------------------------------- */
-
-.collection-filters--vertical {
-  display: grid;
-  gap: var(--space-6);
-  grid-template-columns: minmax(0, 1fr);
-}
-
-@media screen and (min-width: 750px) {
-  .collection-filters--vertical {
-    grid-template-columns: var(--filter-width, 16rem) minmax(0, 1fr);
-    align-items: start;
-  }
-
-  .collection-filters--vertical .facets--vertical {
-    position: sticky;
-    inset-block-start: calc(var(--header-height, 0px) + var(--space-4));
-    max-block-size: calc(100vh - var(--header-height, 0px) - var(--space-8));
-    overflow-y: auto;
-    overscroll-behavior: contain;
-  }
-}
-
-/* Below the breakpoint the filters stack above the grid rather than becoming a
-   drawer — that is the difference from `sidebar`. Capping the height stops
-   twelve filter groups from pushing the products off the first screen. */
-@media screen and (max-width: 749px) {
-  .collection-filters--vertical .facets--vertical {
-    max-block-size: 40vh;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    border-block-end: 1px solid var(--color-border);
-    padding-block-end: var(--space-4);
-  }
-}
+ 
 
 /* Flat groups, used by the horizontal dropdowns where the popover is already
    the disclosure. */

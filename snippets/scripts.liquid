@@ -1,66 +1,95 @@
-  
- {% liquid 
+{% doc %}
+  Every script tag the document head needs: the import map, the `window.Theme`
+  payload the components read on connect, and the module preloads.
 
-    assign rtl_locales_mofify = 'ar,arc,ckb,dv,fa,ha,he,khw,ks,ku,ps,sd,ur,uz-AF,yi' | split: ','
-    assign locale_root_modify = request.locale.iso_code | split: '-' | first
-    assign is_text_direction = 'ltr'
-    if rtl_locales_mofify contains request.locale.iso_code or rtl_locales_mofify contains locale_root_modify
-        assign is_text_direction = 'rtl'
-    endif
+  The password page uses the same snippet with a reduced payload rather than a
+  second copy of it. Two files drift — the old `password.liquid` had already
+  lost the bold-italic font face and the accent family, and its import map was
+  missing `@theme/form-validation` while its markup rendered `<validated-form>`.
+  @param {string} [context] - A unique ID for the divider, linking it to a block or section.
+ 
+  Accepts:
+  - context (string, optional) `password` for the reduced payload. Anything else,
+    including nothing, emits the full storefront payload.
 
-    assign use_cart_drawer = false
+  Usage:
+  {% render 'scripts' %}
+  {% render 'scripts', context: 'password' %}
+{% enddoc %}
+
+{%- liquid
+  assign is_password = false
+  if context == 'password'
+    assign is_password = true
+  endif
+
+  # A password page has no cart, no smooth scroll and no page transitions, so
+  # these are pinned rather than read from settings. A merchant who enables
+  # smooth scroll should not get Lenis on the one page that cannot scroll.
+  assign use_cart_drawer = false
+  assign is_smooth_scroll = false
+  assign is_page_transitions = false
+
+  unless is_password
     if settings.cart_type == 'drawer'
-        assign use_cart_drawer = true
+      assign use_cart_drawer = true
     endif
-      assign is_smooth_scroll = settings.enable_smooth_scroll | default: false
-      assign is_page_transitions = settings.enable_page_transitions | default: false
+    assign is_smooth_scroll = settings.enable_smooth_scroll | default: false
+    assign is_page_transitions = settings.enable_page_transitions | default: false
+  endunless
+-%}
 
-    %}
-    
-    <script type="importmap">
-      {
-        "imports": {
+{%- comment -%}
+  `render` is scope-isolated, so the direction is resolved here rather than
+  passed in. One snippet, one locale list — see snippets/text-direction.liquid.
+{%- endcomment -%}
+{%- capture text_direction -%}{% render 'text-direction' %}{%- endcapture -%}
+{%- assign text_direction = text_direction | strip -%}
+
+{%- comment -%}
+  ---------- Import map ----------
+  The core block is everything a password page can reach. The comma that joins
+  the two halves lives inside the `unless`, so the JSON stays valid either way.
+{%- endcomment -%}
+<script type="importmap">
+  {
+    "imports": {
           "@theme/component":                "{{ 'component.js' | asset_url }}",
           "@theme/shadow-component":         "{{ 'shadow-component.js' | asset_url }}",
           "@theme/utilities":                "{{ 'utilities.js' | asset_url }}",
           "@theme/events":                   "{{ 'events.js' | asset_url }}",
           "@theme/morph":                    "{{ 'morph.js' | asset_url }}",
           "@theme/section-renderer":         "{{ 'section-renderer.js' | asset_url }}",
-
-         "@theme/facet-dropdown": "{{ 'facet-dropdown.js' | asset_url }}",
-          "@theme/carousel-pagination": "{{ 'carousel-pagination.js' | asset_url }}",
-          "@theme/collection-tabs": "{{ 'collection-tabs.js' | asset_url }}",
-          "@theme/announcement-bar": "{{ 'announcement-bar.js' | asset_url }}",
-
           "@theme/dialog":                   "{{ 'dialog.js' | asset_url }}",
-          "@theme/toast":                    "{{ 'toast.js' | asset_url }}",
           "@theme/modules":                  "{{ 'modules.js' | asset_url }}",
           "@theme/form-validation":          "{{ 'form-validation.js' | asset_url }}",
           "@theme/motion-engine":            "{{ 'motion-engine.js' | asset_url }}",
           "@theme/motion-effect":            "{{ 'motion-effect.js' | asset_url }}",
           "@theme/scrollbar":                "{{ 'scrollbar.js' | asset_url }}",
           "@theme/lenis":                    "{{ 'lenis.js' | asset_url }}",
-          "@theme/swiper":                   "{{ 'swiper.js' | asset_url }}",
           "@theme/page-transition":          "{{ 'page-transition.js' | asset_url }}",
-
+          "@theme/localization":             "{{ 'localization.js' | asset_url }}"{%- unless is_password -%},
+          "@theme/facet-dropdown": "{{ 'facet-dropdown.js' | asset_url }}",
+          "@theme/carousel-pagination": "{{ 'carousel-pagination.js' | asset_url }}",
+          "@theme/collection-tabs": "{{ 'collection-tabs.js' | asset_url }}",
+          "@theme/announcement-bar": "{{ 'announcement-bar.js' | asset_url }}",
+          "@theme/toast":                    "{{ 'toast.js' | asset_url }}",
+          "@theme/swiper":                   "{{ 'swiper.js' | asset_url }}",
           "@theme/search":                   "{{ 'search.js' | asset_url }}",
           "@theme/results-list":             "{{ 'results-list.js' | asset_url }}",
-          "@theme/localization":             "{{ 'localization.js' | asset_url }}",
           "@theme/facets":                   "{{ 'facets.js' | asset_url }}",
-
           "@theme/cart-drawer":              "{{ 'cart-drawer.js' | asset_url }}",
           "@theme/cart-items":               "{{ 'cart-items.js' | asset_url }}",
           "@theme/promo-code":            "{{ 'promo-code.js' | asset_url }}",
           "@theme/cart-selling-plans":       "{{ 'cart-selling-plans.js' | asset_url }}",
           "@theme/cart-shipping":            "{{ 'cart-shipping.js' | asset_url }}",
           "@theme/free-shipping-bar":        "{{ 'free-shipping-bar.js' | asset_url }}",
-
           "@theme/product-form":             "{{ 'product-form.js' | asset_url }}",
           "@theme/sticky-add-to-cart":       "{{ 'sticky-add-to-cart.js' | asset_url }}",
-        "@theme/bundle-builder": "{{ 'bundle-builder.js' | asset_url }}",
+          "@theme/bundle-builder": "{{ 'bundle-builder.js' | asset_url }}",
           "@theme/variant-picker":           "{{ 'variant-picker.js' | asset_url }}",
           "@theme/variant-swatch":           "{{ 'variant-swatch.js' | asset_url }}",
-        "@theme/back-in-stock": "{{ 'back-in-stock.js' | asset_url }}",
+          "@theme/back-in-stock": "{{ 'back-in-stock.js' | asset_url }}",
           "@theme/product-selling-plans":    "{{ 'product-selling-plans.js' | asset_url }}",
           "@theme/quantity-selector":        "{{ 'quantity-selector.js' | asset_url }}",
           "@theme/product-recommendations":  "{{ 'product-recommendations.js' | asset_url }}",
@@ -69,248 +98,250 @@
           "@theme/media-gallery":            "{{ 'media-gallery.js' | asset_url }}",
           "@theme/media-coordinator":        "{{ 'media-coordinator.js' | asset_url }}",
           "@theme/media-zoom":               "{{ 'media-zoom.js' | asset_url }}",
-
           "@theme/customer-addresses":       "{{ 'customer-addresses.js' | asset_url }}",
           "@theme/customer-orders":          "{{ 'customer-orders.js' | asset_url }}",
-
           "@theme/compare":                  "{{ 'compare.js' | asset_url }}",
           "@theme/recently-viewed":          "{{ 'recently-viewed.js' | asset_url }}",
           "@theme/promo-popup":              "{{ 'promo-popup.js' | asset_url }}",
-          "@theme/store-locator":            "{{ 'store-locator.js' | asset_url }}"
-        }
-      }
-    </script>
+          "@theme/store-locator":            "{{ 'store-locator.js' | asset_url }}"{%- endunless -%}
+    }
+  }
+</script>
 
- 
-    <script>
-      document.documentElement.classList.remove('no-js');
-      document.documentElement.classList.add('js');
+<script>
+  document.documentElement.classList.remove('no-js');
+  document.documentElement.classList.add('js');
 
-      window.Theme = window.Theme || {};
+  window.Theme = window.Theme || {};
 
-      window.Theme.routes = {
-        root: {{ routes.root_url | json }},
-        account: {{ routes.account_url | json }},
-        accountLogin: {{ routes.account_login_url | json }},
-        accountLogout: {{ routes.account_logout_url | json }},
-        accountRegister: {{ routes.account_register_url | json }},
-        accountAddresses: {{ routes.account_addresses_url | json }},
-        cart: {{ routes.cart_url | json }},
-        cartUrl: {{ routes.cart_url | json }},
-        rootUrl: {{ routes.root_url | json }},
-        cartAdd: {{ routes.cart_add_url | json }},
-        cartChange: {{ routes.cart_change_url | json }},
-        cartUpdate: {{ routes.cart_update_url | json }},
-        cartClear: {{ routes.cart_clear_url | json }},
-        collections: {{ routes.collections_url | json }},
-        allProducts: {{ routes.all_products_collection_url | json }},
-        search: {{ routes.search_url | json }},
-        predictiveSearch: {{ routes.predictive_search_url | json }},
-        productRecommendations: {{ routes.product_recommendations_url | json }}
-      };
+  window.Theme.routes = {
+    root: {{ routes.root_url | json }}{%- unless is_password -%},
+    account: {{ routes.account_url | json }},
+    accountLogin: {{ routes.account_login_url | json }},
+    accountLogout: {{ routes.account_logout_url | json }},
+    accountRegister: {{ routes.account_register_url | json }},
+    accountAddresses: {{ routes.account_addresses_url | json }},
+    cart: {{ routes.cart_url | json }},
+    cartUrl: {{ routes.cart_url | json }},
+    rootUrl: {{ routes.root_url | json }},
+    cartAdd: {{ routes.cart_add_url | json }},
+    cartChange: {{ routes.cart_change_url | json }},
+    cartUpdate: {{ routes.cart_update_url | json }},
+    cartClear: {{ routes.cart_clear_url | json }},
+    collections: {{ routes.collections_url | json }},
+    allProducts: {{ routes.all_products_collection_url | json }},
+    search: {{ routes.search_url | json }},
+    predictiveSearch: {{ routes.predictive_search_url | json }},
+    productRecommendations: {{ routes.product_recommendations_url | json }}{%- endunless -%}
+  };
 
-      window.Theme.shop = {
-        id: {{ shop.id | json }},
-        domain: {{ shop.permanent_domain | json }},
-        name: {{ shop.name | json }},
-        moneyFormat: {{ shop.money_format | json }},
-        moneyWithCurrencyFormat: {{ shop.money_with_currency_format | json }},
-        currency: {{ cart.currency.iso_code | json }},
-        locale: {{ request.locale.iso_code | json }},
-        direction: {{ is_text_direction | json }},
-        cartCount: {{ cart.item_count | json }}
-      };
+  window.Theme.shop = {
+    id: {{ shop.id | json }},
+    domain: {{ shop.permanent_domain | json }},
+    name: {{ shop.name | json }},
+    moneyFormat: {{ shop.money_format | json }},
+    moneyWithCurrencyFormat: {{ shop.money_with_currency_format | json }},
+    currency: {{ cart.currency.iso_code | json }},
+    locale: {{ request.locale.iso_code | json }},
+    direction: {{ text_direction | json }}{%- unless is_password -%},
+    cartCount: {{ cart.item_count | json }}{%- endunless -%}
+  };
 
- 
-      window.Theme.cart = {{ cart | json }};
+  {%- unless is_password -%}
+    window.Theme.cart = {{ cart | json }};
+  {%- endunless -%}
 
-      window.Theme.template = {
-        name: {{ template.name | json }},
-        suffix: {{ template.suffix | json }},
-        pageType: {{ request.page_type | json }},
-        designMode: {{ request.design_mode | json }}
-      };
+  window.Theme.template = {
+    name: {% if is_password %}'password'{% else %}{{ template.name | json }}{% endif %},
+    suffix: {% if is_password %}null{% else %}{{ template.suffix | json }}{% endif %},
+    pageType: {{ request.page_type | json }},
+    designMode: {{ request.design_mode | json }}
+  };
 
-      window.Theme.settings = {
-        cartType: {{ settings.cart_type | default: 'drawer' | json }},
-        smoothScroll: {{ is_smooth_scroll | json }},
-        pageTransitions: {{ is_page_transitions | json }},
-        predictiveSearch: {{ settings.predictive_search_enabled | default: true | json }},
-        predictiveSearchProducts: {{ settings.predictive_search_show_products | default: true | json }},
-        predictiveSearchCollections: {{ settings.predictive_search_show_collections | default: true | json }},
-        predictiveSearchArticles: {{ settings.predictive_search_show_articles | default: false | json }},
-        predictiveSearchPages: {{ settings.predictive_search_show_pages | default: false | json }},
-        predictiveSearchLimit: {{ settings.predictive_search_results_limit | default: 6 | json }},
-        facetsLayout: {{ settings.facets_layout | default: 'sidebar' | json }},
-        paginationType: {{ settings.pagination_type | default: 'load-more' | json }},
-        quickView: {{ settings.enable_quick_view | default: true | json }},
-        compare: {{ settings.enable_compare | default: false | json }},
-        compareLimit: {{ settings.compare_limit | default: 4 | json }},
-        recentlyViewed: {{ settings.enable_recently_viewed | default: true | json }},
-        freeShippingEnabled: {{ settings.free_shipping_enabled | default: false | json }},
-        freeShippingThreshold: {{ settings.free_shipping_threshold | default: 0 | times: 100 | json }},
-        showVendor: {{ settings.show_vendor | default: false | json }},
-        swatchTrigger: {{ settings.swatch_trigger | default: 'click' | json }},
-        preorderEnabled: {{ settings.enable_preorder | default: false | json }},
-        filterImages: {{ settings.enable_filter_images | default: false | json }},
-        filterImagesStrict: {{ settings.filter_images_strict | default: false | json }}
-      };
+  window.Theme.settings = {
+    cartType: {% if is_password %}'none'{% else %}{{ settings.cart_type | default: 'drawer' | json }}{% endif %},
+    smoothScroll: {{ is_smooth_scroll | json }},
+    pageTransitions: {{ is_page_transitions | json }}{%- unless is_password -%},
+    predictiveSearch: {{ settings.predictive_search_enabled | default: true | json }},
+    predictiveSearchProducts: {{ settings.predictive_search_show_products | default: true | json }},
+    predictiveSearchCollections: {{ settings.predictive_search_show_collections | default: true | json }},
+    predictiveSearchArticles: {{ settings.predictive_search_show_articles | default: false | json }},
+    predictiveSearchPages: {{ settings.predictive_search_show_pages | default: false | json }},
+    predictiveSearchLimit: {{ settings.predictive_search_results_limit | default: 6 | json }},
+    facetsLayout: {{ settings.facets_layout | default: 'sidebar' | json }},
+    paginationType: {{ settings.pagination_type | default: 'load-more' | json }},
+    quickView: {{ settings.enable_quick_view | default: true | json }},
+    compare: {{ settings.enable_compare | default: false | json }},
+    compareLimit: {{ settings.compare_limit | default: 4 | json }},
+    recentlyViewed: {{ settings.enable_recently_viewed | default: true | json }},
+    freeShippingEnabled: {{ settings.free_shipping_enabled | default: false | json }},
+    freeShippingThreshold: {{ settings.free_shipping_threshold | default: 0 | times: 100 | json }},
+    showVendor: {{ settings.show_vendor | default: false | json }},
+    swatchTrigger: {{ settings.swatch_trigger | default: 'click' | json }},
+    preorderEnabled: {{ settings.enable_preorder | default: false | json }},
+    filterImages: {{ settings.enable_filter_images | default: false | json }},
+    filterImagesStrict: {{ settings.filter_images_strict | default: false | json }}{%- endunless -%}
+  };
 
-      window.Theme.strings = {
-        addToCart: {{ 'products.product.add_to_cart' | t | json }},
-        soldOut: {{ 'products.product.sold_out' | t | json }},
-        unavailable: {{ 'products.product.unavailable' | t | json }},
-        unavailableWithOption: {{ 'products.product.value_unavailable' | t: option_value: '[value]' | json }},
-        preorder: {{ 'products.product.preorder' | t | json }},
-        variantSelected: {{ 'products.variants.selected_announcement' | t: variant: '[variant]' | json }},
-        swatchSelected: {{ 'accessibility.swatch_selected' | t: value: '[value]' | json }},
-        swatchesMore: {{ 'products.variants.show_more_swatches' | t: count: '[count]' | json }},
-        inStock: {{ 'products.inventory.in_stock' | t | json }},
-        backordered: {{ 'products.inventory.backordered' | t | json }},
-        lowStockCount: {{ 'products.inventory.low_stock_count' | t: count: '[count]' | json }},
-        oneTimePurchase: {{ 'products.selling_plans.one_time_summary' | t | json }},
-        backInStockBody: {{ 'products.back_in_stock.body' | t: product: '[product]', variant: '[variant]' | json }},
-        backInStockSuccess: {{ 'products.back_in_stock.success' | t | json }},
-        backInStockError: {{ 'products.back_in_stock.error' | t | json }},
-        giftCardSending: {{ 'gift_cards.recipient.sending' | t | json }},
-        giftCardSelf: {{ 'gift_cards.recipient.self' | t | json }},
-        giftCardCharacters: {{ 'gift_cards.recipient.characters_left' | t: max: '[max]' | json }},
-        giftCardEmailRequired: {{ 'gift_cards.recipient.email_required' | t | json }},
-        shareCopied: {{ 'general.share.copied' | t | json }},
-        shareLink: {{ 'general.share.link' | t | json }},
-        shareCopyManually: {{ 'general.share.copy_manually' | t | json }},
-        formRequired: {{ 'general.forms.required' | t: field: '[field]' | json }},
-        formEmail: {{ 'general.forms.email' | t | json }},
-        formPhone: {{ 'general.forms.phone' | t | json }},
-        formUrl: {{ 'general.forms.url' | t | json }},
-        formTooShort: {{ 'general.forms.too_short' | t: min: '[min]' | json }},
-        formTooLong: {{ 'general.forms.too_long' | t: max: '[max]' | json }},
-        formMin: {{ 'general.forms.min' | t: min: '[min]' | json }},
-        formMax: {{ 'general.forms.max' | t: max: '[max]' | json }},
-        formPattern: {{ 'general.forms.pattern' | t | json }},
-        formInvalid: {{ 'general.forms.invalid' | t | json }},
-        formError: {{ 'general.forms.error_summary' | t | json }},
-        viewGrid: {{ 'collections.view.grid_selected' | t | json }},
-        viewList: {{ 'collections.view.list_selected' | t | json }},
-        addedToCart: {{ 'cart.general.added_to_cart' | t | json }},
-        viewCart: {{ 'cart.general.view_cart' | t | json }},
-        freeGiftEarned: {{ 'cart.free_gift.earned' | t | json }},
-        freeGiftRemaining: {{ 'cart.free_gift.remaining_html' | t: amount: '[amount]' | json }},
-        freeGiftClaimed: {{ 'cart.free_gift.claimed' | t | json }},
-        bundleFull: {{ 'products.bundle.full' | t: count: '[count]' | json }},
-        bundleAdd: {{ 'products.bundle.add' | t | json }},
-        bundleRemove: {{ 'products.bundle.remove' | t | json }},
-        bundleAdded: {{ 'products.bundle.added' | t: product: '[product]', count: '[count]', total: '[total]' | json }},
-        bundleRemoved: {{ 'products.bundle.removed' | t: product: '[product]' | json }},
-        bundleRemoveLabel: {{ 'products.bundle.remove_label' | t: product: '[product]', index: '[index]' | json }},
-        bundleAddedToCart: {{ 'products.bundle.added_to_cart' | t | json }},
-        bundleIncomplete: {{ 'products.bundle.incomplete' | t: count: '[count]' | json }},
-        bundleStart: {{ 'products.bundle.start_html' | t: count: '[count]' | json }},
-        bundleSavedWithPercent: {{ 'products.bundle.saved_with_percent' | t: amount: '[amount]', percent: '[percent]' | json }},
-        bundleProperty: {{ 'products.bundle.property_name' | t | json }},
-        discountFailed: {{ 'cart.promo.failed' | t | json }},
-        bundleProgress: {{ 'products.bundle.progress_html' | t: count: '[count]', percent: '[percent]' | json }},
-        bundleUnlocked: {{ 'products.bundle.tier_unlocked_html' | t: percent: '[percent]' | json }},
-        bundleSaved: {{ 'products.bundle.total_saved' | t: amount: '[amount]' | json }},
-        bundleSlotEmpty: {{ 'products.bundle.slot_empty' | t: index: '[index]' | json }},
-        bundleSlotFilled: {{ 'products.bundle.slot_filled' | t: index: '[index]', product: '[product]' | json }},
-        quantityError: {{ 'products.product.quantity_error_html' | t: quantity: '[quantity]' | json }},
-        quantityMinimum: {{ 'products.product.quantity_minimum_html' | t: quantity: '[quantity]' | json }},
-        quantityMaximum: {{ 'products.product.quantity_maximum_html' | t: quantity: '[quantity]' | json }},
-        cartError: {{ 'cart.errors.general' | t | json }},
-        cartQuantityError: {{ 'cart.errors.quantity_html' | t: quantity: '[quantity]' | json }},
-        itemAdded: {{ 'cart.notifications.item_added' | t | json }},
-        itemRemoved: {{ 'cart.notifications.item_removed' | t | json }},
-        cartUpdated: {{ 'cart.notifications.cart_updated' | t | json }},
-        planUpdated: {{ 'cart.notifications.plan_updated' | t | json }},
-        noteSaved: {{ 'cart.note.saved' | t | json }},
-        giftWrapAdded: {{ 'cart.gift_wrap.added' | t | json }},
-        giftWrapRemoved: {{ 'cart.gift_wrap.removed' | t | json }},
-        discountCheckoutNotice: {{ 'cart.discount.checkout_notice' | t | json }},
-        discountRemove: {{ 'cart.promo.remove' | t: code: '[code]' | json }},
-        discountSavingHtml: {{ 'cart.discount.savings_html' | t: amount: '[amount]' | json }},
-        shippingError: {{ 'cart.shipping_calculator.error' | t | json }},
-        shippingNoRates: {{ 'cart.shipping_calculator.no_rates' | t | json }},
-        shippingRatesFound: {{ 'cart.shipping_calculator.rates_found_html' | t: count: '[count]', address: '[address]' | json }},
-        discountApplied: {{ 'cart.promo.applied' | t | json }},
-        discountInvalid: {{ 'cart.discount.invalid' | t | json }},
-        freeShippingRemaining: {{ 'cart.free_shipping.remaining_html' | t: amount: '[amount]' | json }},
-        freeShippingUnlocked: {{ 'cart.free_shipping.unlocked' | t | json }},
-        searchNoResults: {{ 'search.no_results' | t | json }},
-        searchResultsAvailable: {{ 'search.predictive.results_available' | t | json }},
-        localizationNoResults: {{ 'localization.no_country_results' | t | json }},
-        searchResultsCount: {{ 'search.results_count' | t: count: '[count]' | json }},
-        filtersActive: {{ 'products.facets.active_count' | t: count: '[count]' | json }},
-        facetsNoResults: {{ 'products.facets.no_results' | t | json }},
-        facetsPriceRange: {{ 'products.facets.price_range_html' | t: min: '[min]', max: '[max]' | json }},
-        facetsSortedBy: {{ 'products.facets.sorted_by_html' | t: sort: '[sort]' | json }},
-        paginationShowing: {{ 'general.pagination.showing_count' | t: shown: '[shown]', total: '[total]' | json }},
-        loading: {{ 'accessibility.loading' | t | json }},
-        close: {{ 'accessibility.close' | t | json }},
-        carouselPosition: {{ 'accessibility.of_count' | t: index: '[index]', count: '[count]' | json }},
-        mediaPosition: {{ 'accessibility.of_count' | t: index: '[index]', count: '[count]' | json }},
-        zoomLevel: {{ 'accessibility.zoom_level' | t: level: '[level]' | json }},
-        copied: {{ 'general.share.copied' | t | json }},
-        backToTop: {{ 'general.actions.back_to_top' | t | json }},
-        networkError: {{ 'general.errors.network' | t | json }},
-        faqResults: {{ 'sections.faq.results' | t: count: '[count]' | json }},
-        storesFound: {{ 'sections.store_locator.found' | t: count: '[count]' | json }},
-        storesNoResults: {{ 'sections.store_locator.no_results' | t | json }},
-        storesLocationDenied: {{ 'sections.store_locator.location_denied' | t | json }},
-        storesLocationUnavailable: {{ 'sections.store_locator.location_unavailable' | t | json }},
-        storeSelected: {{ 'sections.store_locator.selected' | t: name: '[name]' | json }},
-        storeDistance: {{ 'sections.store_locator.distance' | t: distance: '[distance]', unit: '[unit]' | json }},
-        storeMapTitle: {{ 'sections.store_locator.store_map_title' | t: name: '[name]' | json }},
-        compareLimit: {{ 'compare.limit_reached' | t: count: '[count]' | json }},
-        compareAdded: {{ 'compare.added' | t | json }},
-        compareRemoved: {{ 'compare.removed' | t | json }},
-        compareAddLabel: {{ 'compare.add_label' | t | json }},
-        compareRemoveLabel: {{ 'compare.remove_label' | t | json }},
-        compareTriggerCount: {{ 'products.compare.trigger_count' | t: count: '[count]' | json }},
-        subscriptionSave: {{ 'products.selling_plans.save_percent' | t: percent: '[percent]' | json }},
-        subscriptionUnavailable: {{ 'products.selling_plans.unavailable' | t | json }},
-        giftCardDatePast: {{ 'gift_cards.recipient.date_past' | t | json }},
-        ordersShowing: {{ 'customer.orders.showing_on_page' | t: shown: '[shown]', total: '[total]' | json }},
-        reorderSuccess: {{ 'customer.orders.reorder_success' | t | json }},
-        reorderPartial: {{ 'customer.orders.reorder_partial' | t | json }},
-        reorderFailed: {{ 'customer.orders.reorder_failed' | t | json }},
-        addressDeleteConfirm: {{ 'customer.addresses.delete_confirm_named' | t: address: '[address]' | json }}
-      };
+  window.Theme.strings = {
+    close: {{ 'accessibility.close' | t | json }},
+    loading: {{ 'accessibility.loading' | t | json }},
+    networkError: {{ 'general.errors.network' | t | json }},
+    formRequired: {{ 'general.forms.required' | t: field: '[field]' | json }},
+    formEmail: {{ 'general.forms.email' | t | json }},
+    formPhone: {{ 'general.forms.phone' | t | json }},
+    formTooShort: {{ 'general.forms.too_short' | t: min: '[min]' | json }},
+    formTooLong: {{ 'general.forms.too_long' | t: max: '[max]' | json }},
+    formInvalid: {{ 'general.forms.invalid' | t | json }},
+    formError: {{ 'general.forms.error_summary' | t | json }},
+    localizationNoResults: {{ 'localization.no_country_results' | t | json }}{%- unless is_password -%},
+    addToCart: {{ 'products.product.add_to_cart' | t | json }},
+    soldOut: {{ 'products.product.sold_out' | t | json }},
+    unavailable: {{ 'products.product.unavailable' | t | json }},
+    unavailableWithOption: {{ 'products.product.value_unavailable' | t: option_value: '[value]' | json }},
+    preorder: {{ 'products.product.preorder' | t | json }},
+    variantSelected: {{ 'products.variants.selected_announcement' | t: variant: '[variant]' | json }},
+    swatchSelected: {{ 'accessibility.swatch_selected' | t: value: '[value]' | json }},
+    swatchesMore: {{ 'products.variants.show_more_swatches' | t: count: '[count]' | json }},
+    inStock: {{ 'products.inventory.in_stock' | t | json }},
+    backordered: {{ 'products.inventory.backordered' | t | json }},
+    lowStockCount: {{ 'products.inventory.low_stock_count' | t: count: '[count]' | json }},
+    oneTimePurchase: {{ 'products.selling_plans.one_time_summary' | t | json }},
+    backInStockBody: {{ 'products.back_in_stock.body' | t: product: '[product]', variant: '[variant]' | json }},
+    backInStockSuccess: {{ 'products.back_in_stock.success' | t | json }},
+    backInStockError: {{ 'products.back_in_stock.error' | t | json }},
+    giftCardSending: {{ 'gift_cards.recipient.sending' | t | json }},
+    giftCardSelf: {{ 'gift_cards.recipient.self' | t | json }},
+    giftCardCharacters: {{ 'gift_cards.recipient.characters_left' | t: max: '[max]' | json }},
+    giftCardEmailRequired: {{ 'gift_cards.recipient.email_required' | t | json }},
+    shareCopied: {{ 'general.share.copied' | t | json }},
+    shareLink: {{ 'general.share.link' | t | json }},
+    shareCopyManually: {{ 'general.share.copy_manually' | t | json }},
+    formUrl: {{ 'general.forms.url' | t | json }},
+    formMin: {{ 'general.forms.min' | t: min: '[min]' | json }},
+    formMax: {{ 'general.forms.max' | t: max: '[max]' | json }},
+    formPattern: {{ 'general.forms.pattern' | t | json }},
+    viewGrid: {{ 'collections.view.grid_selected' | t | json }},
+    viewList: {{ 'collections.view.list_selected' | t | json }},
+    addedToCart: {{ 'cart.general.added_to_cart' | t | json }},
+    viewCart: {{ 'cart.general.view_cart' | t | json }},
+    freeGiftEarned: {{ 'cart.free_gift.earned' | t | json }},
+    freeGiftRemaining: {{ 'cart.free_gift.remaining_html' | t: amount: '[amount]' | json }},
+    freeGiftClaimed: {{ 'cart.free_gift.claimed' | t | json }},
+    bundleFull: {{ 'products.bundle.full' | t: count: '[count]' | json }},
+    bundleAdd: {{ 'products.bundle.add' | t | json }},
+    bundleRemove: {{ 'products.bundle.remove' | t | json }},
+    bundleAdded: {{ 'products.bundle.added' | t: product: '[product]', count: '[count]', total: '[total]' | json }},
+    bundleRemoved: {{ 'products.bundle.removed' | t: product: '[product]' | json }},
+    bundleRemoveLabel: {{ 'products.bundle.remove_label' | t: product: '[product]', index: '[index]' | json }},
+    bundleAddedToCart: {{ 'products.bundle.added_to_cart' | t | json }},
+    bundleIncomplete: {{ 'products.bundle.incomplete' | t: count: '[count]' | json }},
+    bundleStart: {{ 'products.bundle.start_html' | t: count: '[count]' | json }},
+    bundleSavedWithPercent: {{ 'products.bundle.saved_with_percent' | t: amount: '[amount]', percent: '[percent]' | json }},
+    bundleProperty: {{ 'products.bundle.property_name' | t | json }},
+    discountFailed: {{ 'cart.promo.failed' | t | json }},
+    bundleProgress: {{ 'products.bundle.progress_html' | t: count: '[count]', percent: '[percent]' | json }},
+    bundleUnlocked: {{ 'products.bundle.tier_unlocked_html' | t: percent: '[percent]' | json }},
+    bundleSaved: {{ 'products.bundle.total_saved' | t: amount: '[amount]' | json }},
+    bundleSlotEmpty: {{ 'products.bundle.slot_empty' | t: index: '[index]' | json }},
+    bundleSlotFilled: {{ 'products.bundle.slot_filled' | t: index: '[index]', product: '[product]' | json }},
+    quantityError: {{ 'products.product.quantity_error_html' | t: quantity: '[quantity]' | json }},
+    quantityMinimum: {{ 'products.product.quantity_minimum_html' | t: quantity: '[quantity]' | json }},
+    quantityMaximum: {{ 'products.product.quantity_maximum_html' | t: quantity: '[quantity]' | json }},
+    cartError: {{ 'cart.errors.general' | t | json }},
+    cartQuantityError: {{ 'cart.errors.quantity_html' | t: quantity: '[quantity]' | json }},
+    itemAdded: {{ 'cart.notifications.item_added' | t | json }},
+    itemRemoved: {{ 'cart.notifications.item_removed' | t | json }},
+    cartUpdated: {{ 'cart.notifications.cart_updated' | t | json }},
+    planUpdated: {{ 'cart.notifications.plan_updated' | t | json }},
+    noteSaved: {{ 'cart.note.saved' | t | json }},
+    giftWrapAdded: {{ 'cart.gift_wrap.added' | t | json }},
+    giftWrapRemoved: {{ 'cart.gift_wrap.removed' | t | json }},
+    discountCheckoutNotice: {{ 'cart.discount.checkout_notice' | t | json }},
+    discountRemove: {{ 'cart.promo.remove' | t: code: '[code]' | json }},
+    discountSavingHtml: {{ 'cart.discount.savings_html' | t: amount: '[amount]' | json }},
+    shippingError: {{ 'cart.shipping_calculator.error' | t | json }},
+    shippingNoRates: {{ 'cart.shipping_calculator.no_rates' | t | json }},
+    shippingRatesFound: {{ 'cart.shipping_calculator.rates_found_html' | t: count: '[count]', address: '[address]' | json }},
+    discountApplied: {{ 'cart.promo.applied' | t | json }},
+    discountInvalid: {{ 'cart.discount.invalid' | t | json }},
+    freeShippingRemaining: {{ 'cart.free_shipping.remaining_html' | t: amount: '[amount]' | json }},
+    freeShippingUnlocked: {{ 'cart.free_shipping.unlocked' | t | json }},
+    searchNoResults: {{ 'search.no_results' | t | json }},
+    searchResultsAvailable: {{ 'search.predictive.results_available' | t | json }},
+    searchResultsCount: {{ 'search.results_count' | t: count: '[count]' | json }},
+    filtersActive: {{ 'products.facets.active_count' | t: count: '[count]' | json }},
+    facetsNoResults: {{ 'products.facets.no_results' | t | json }},
+    facetsPriceRange: {{ 'products.facets.price_range_html' | t: min: '[min]', max: '[max]' | json }},
+    facetsSortedBy: {{ 'products.facets.sorted_by_html' | t: sort: '[sort]' | json }},
+    paginationShowing: {{ 'general.pagination.showing_count' | t: shown: '[shown]', total: '[total]' | json }},
+    carouselPosition: {{ 'accessibility.of_count' | t: index: '[index]', count: '[count]' | json }},
+    mediaPosition: {{ 'accessibility.of_count' | t: index: '[index]', count: '[count]' | json }},
+    zoomLevel: {{ 'accessibility.zoom_level' | t: level: '[level]' | json }},
+    copied: {{ 'general.share.copied' | t | json }},
+    backToTop: {{ 'general.actions.back_to_top' | t | json }},
+    faqResults: {{ 'sections.faq.results' | t: count: '[count]' | json }},
+    storesFound: {{ 'sections.store_locator.found' | t: count: '[count]' | json }},
+    storesNoResults: {{ 'sections.store_locator.no_results' | t | json }},
+    storesLocationDenied: {{ 'sections.store_locator.location_denied' | t | json }},
+    storesLocationUnavailable: {{ 'sections.store_locator.location_unavailable' | t | json }},
+    storeSelected: {{ 'sections.store_locator.selected' | t: name: '[name]' | json }},
+    storeDistance: {{ 'sections.store_locator.distance' | t: distance: '[distance]', unit: '[unit]' | json }},
+    storeMapTitle: {{ 'sections.store_locator.store_map_title' | t: name: '[name]' | json }},
+    compareLimit: {{ 'compare.limit_reached' | t: count: '[count]' | json }},
+    compareAdded: {{ 'compare.added' | t | json }},
+    compareRemoved: {{ 'compare.removed' | t | json }},
+    compareAddLabel: {{ 'compare.add_label' | t | json }},
+    compareRemoveLabel: {{ 'compare.remove_label' | t | json }},
+    compareTriggerCount: {{ 'products.compare.trigger_count' | t: count: '[count]' | json }},
+    subscriptionSave: {{ 'products.selling_plans.save_percent' | t: percent: '[percent]' | json }},
+    subscriptionUnavailable: {{ 'products.selling_plans.unavailable' | t | json }},
+    giftCardDatePast: {{ 'gift_cards.recipient.date_past' | t | json }},
+    ordersShowing: {{ 'customer.orders.showing_on_page' | t: shown: '[shown]', total: '[total]' | json }},
+    reorderSuccess: {{ 'customer.orders.reorder_success' | t | json }},
+    reorderPartial: {{ 'customer.orders.reorder_partial' | t | json }},
+    reorderFailed: {{ 'customer.orders.reorder_failed' | t | json }},
+    addressDeleteConfirm: {{ 'customer.addresses.delete_confirm_named' | t: address: '[address]' | json }}{%- endunless -%}
+  };
 
-      window.Theme.storageKey = 'boost10:{{ shop.permanent_domain }}';
-    </script>
- 
-    <link rel="modulepreload" href="{{ 'global.js' | asset_url }}" fetchpriority="low">
-    <link rel="modulepreload" href="{{ 'component.js' | asset_url }}" fetchpriority="low">
-    <link rel="modulepreload" href="{{ 'utilities.js' | asset_url }}" fetchpriority="low">
-    <link rel="modulepreload" href="{{ 'events.js' | asset_url }}" fetchpriority="low">
-    <link rel="modulepreload" href="{{ 'swiper.js' | asset_url }}" fetchpriority="low">
+  window.Theme.storageKey = 'boost10:{{ shop.permanent_domain }}';
+</script>
 
-    {%- if is_smooth_scroll -%}
-      <link rel="modulepreload" href="{{ 'scrollbar.js' | asset_url }}" fetchpriority="low">
-      <link rel="modulepreload" href="{{ 'lenis.js' | asset_url }}" fetchpriority="low">
-    {%- endif -%}
+<link rel="modulepreload" href="{{ 'global.js' | asset_url }}" fetchpriority="low">
+<link rel="modulepreload" href="{{ 'component.js' | asset_url }}" fetchpriority="low">
+<link rel="modulepreload" href="{{ 'utilities.js' | asset_url }}" fetchpriority="low">
+<link rel="modulepreload" href="{{ 'events.js' | asset_url }}" fetchpriority="low">
 
-    {%- if use_cart_drawer -%}
-      <link rel="modulepreload" href="{{ 'cart-drawer.js' | asset_url }}" fetchpriority="low">
-    {%- endif -%}
+{%- unless is_password -%}
+  <link rel="modulepreload" href="{{ 'swiper.js' | asset_url }}" fetchpriority="low">
+{%- endunless -%}
 
-    {%- case template.name -%}
-      {%- when 'product' -%}
-        <link rel="modulepreload" href="{{ 'product-form.js' | asset_url }}" fetchpriority="low">
-        <link rel="modulepreload" href="{{ 'variant-picker.js' | asset_url }}" fetchpriority="low">
-        <link rel="modulepreload" href="{{ 'media-gallery.js' | asset_url }}" fetchpriority="low">
-        <link rel="modulepreload" href="{{ 'media-coordinator.js' | asset_url }}" fetchpriority="low">
-      {%- when 'collection', 'search' -%}
-        <link rel="modulepreload" href="{{ 'facets.js' | asset_url }}" fetchpriority="low">
-      {%- when 'cart' -%}
-        <link rel="modulepreload" href="{{ 'cart-items.js' | asset_url }}" fetchpriority="low">
-        <link rel="modulepreload" href="{{ 'quantity-selector.js' | asset_url }}" fetchpriority="low">
-      {%- when 'customers/account', 'customers/order' -%}
-        <link rel="modulepreload" href="{{ 'customer-orders.js' | asset_url }}" fetchpriority="low">
-      {%- when 'customers/addresses' -%}
-        <link rel="modulepreload" href="{{ 'customer-addresses.js' | asset_url }}" fetchpriority="low">
-    {%- endcase -%}
+{%- if is_smooth_scroll -%}
+  <link rel="modulepreload" href="{{ 'scrollbar.js' | asset_url }}" fetchpriority="low">
+  <link rel="modulepreload" href="{{ 'lenis.js' | asset_url }}" fetchpriority="low">
+{%- endif -%}
 
-    
-    <script type="module" src="{{ 'global.js' | asset_url }}"></script>
+{%- if use_cart_drawer -%}
+  <link rel="modulepreload" href="{{ 'cart-drawer.js' | asset_url }}" fetchpriority="low">
+{%- endif -%}
+
+{%- unless is_password -%}
+  {%- case template.name -%}
+    {%- when 'product' -%}
+      <link rel="modulepreload" href="{{ 'product-form.js' | asset_url }}" fetchpriority="low">
+      <link rel="modulepreload" href="{{ 'variant-picker.js' | asset_url }}" fetchpriority="low">
+      <link rel="modulepreload" href="{{ 'media-gallery.js' | asset_url }}" fetchpriority="low">
+      <link rel="modulepreload" href="{{ 'media-coordinator.js' | asset_url }}" fetchpriority="low">
+    {%- when 'collection', 'search' -%}
+      <link rel="modulepreload" href="{{ 'facets.js' | asset_url }}" fetchpriority="low">
+    {%- when 'cart' -%}
+      <link rel="modulepreload" href="{{ 'cart-items.js' | asset_url }}" fetchpriority="low">
+      <link rel="modulepreload" href="{{ 'quantity-selector.js' | asset_url }}" fetchpriority="low">
+    {%- when 'customers/account', 'customers/order' -%}
+      <link rel="modulepreload" href="{{ 'customer-orders.js' | asset_url }}" fetchpriority="low">
+    {%- when 'customers/addresses' -%}
+      <link rel="modulepreload" href="{{ 'customer-addresses.js' | asset_url }}" fetchpriority="low">
+  {%- endcase -%}
+{%- endunless -%}
+
+<script type="module" src="{{ 'global.js' | asset_url }}"></script>
