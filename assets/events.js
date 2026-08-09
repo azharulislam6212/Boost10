@@ -49,6 +49,7 @@ export const EVENTS = {
   PRODUCT_FORM_ERROR: 'product-form:error',
 
   /* ----------------------------------------------------------------- media */
+  CAROUSEL_CHANGE: 'carousel:change',
   MEDIA_SELECT: 'media:select',
   MEDIA_LOADED: 'media:loaded',
   ZOOM_OPEN: 'zoom:open',

@@ -14,13 +14,15 @@
   {%- endcapture -%}
 
   <announcement-bar
-    class="announcement-bar color-{{ section_settings.color_scheme }}{% unless section_settings.enable_on_mobile %} announcement-bar--desktop-only{% endunless %}"
+    class="announcement-bar color-scheme-container color-{{ section_settings.color_scheme }}{% unless section_settings.enable_on_mobile %} announcement-bar--desktop-only{% endunless %}"
     data-announcement-bar
     data-section-id="{{ section.id }}"
     {% if section_settings.show_close %}data-dismissible{% endif %}
     {% render 'spacing', section: section_settings %}
   >
     <div class="container announcement-bar__inner">
+
+    
       {%- case mode -%}
         {%- when 'marquee' -%}
           <motion-effect
@@ -40,36 +42,36 @@
         {%- else -%}
           {%- if count > 1 -%}
             <swiper-carousel
-              class="announcement-bar__carousel"
-              {% render 'carousel-attrs', settings: section_settings %}
+              class="announcement-bar__carousel carousel-shell swiper"
+              data-layout="carousel"
+              data-layout-mobile="carousel"
+              data-options="
+                {%- render 'carousel-options',
+                    settings: section_settings,
+                    columns_desktop: 1,
+                    columns_tablet: 1,
+                    columns_mobile: 1 -%}   "
+              style="{% render 'carousel-style', settings: section_settings %}"
             >
+              {%- comment -%}
+                `tabindex` is gone from the track: it existed because the old
+                track was a native scroll container a keyboard user had to be
+                able to scroll. Swiper translates the wrapper instead, so a
+                focusable div with no behaviour was a dead stop in the tab order.
+              {%- endcomment -%}
               <div
-                class="announcement-bar__track"
+                class="announcement-bar__track swiper-wrapper"
                 data-ref="track"
-                tabindex="0"
                 role="group"
                 aria-label="{{ 'sections.announcements.carousel_label' | t }}"
               >
                 {{ announcements }}
               </div>
 
-              <button
-                type="button"
-                class="announcement-bar__arrow"
-                data-ref="previous"
-                aria-label="{{ 'sections.announcements.previous' | t }}"
-              >
-                {% render 'icon', icon: 'chevron-left', size: 14 %}
-              </button>
-
-              <button
-                type="button"
-                class="announcement-bar__arrow"
-                data-ref="next"
-                aria-label="{{ 'sections.announcements.next' | t }}"
-              >
-                {% render 'icon', icon: 'chevron-right', size: 14 %}
-              </button>
+              {% render 'carousel-nav',
+                 settings: section_settings,
+                 position: 'inside',
+                 size: 28 %}
 
               <p class="visually-hidden" data-ref="status" role="status"></p>
             </swiper-carousel>
@@ -103,47 +105,512 @@
   "tag": "section",
   "class": "announcement-bar-section",
   "max_blocks": 6,
-  "blocks": [{ "type": "@theme" }, { "type": "@app" }],
+  "blocks": [
+    {
+      "type": "@theme"
+    },
+    {
+      "type": "@app"
+    }
+  ],
   "settings": [
     {
-      "type": "select", "id": "mode", "label": "t:sections.announcement_bar.settings.mode.label",
+      "type": "select",
+      "id": "mode",
+      "label": "t:sections.announcement_bar.settings.mode.label",
       "options": [
-        { "value": "slider", "label": "t:sections.announcement_bar.settings.mode.options__1.label" },
-        { "value": "marquee", "label": "t:sections.announcement_bar.settings.mode.options__2.label" }
+        {
+          "value": "slider",
+          "label": "t:sections.announcement_bar.settings.mode.options__1.label"
+        },
+        {
+          "value": "marquee",
+          "label": "t:sections.announcement_bar.settings.mode.options__2.label"
+        }
       ],
       "default": "slider"
     },
-
-    { "type": "header", "content": "t:sections.announcement_bar.headers.slider", "visible_if": "{{ section.settings.mode == 'slider' }}" },
-    { "type": "checkbox", "id": "carousel_autoplay", "label": "t:shared.carousel.autoplay.label", "default": true, "visible_if": "{{ section.settings.mode == 'slider' }}" },
-    { "type": "range", "id": "carousel_speed", "label": "t:shared.carousel.speed.label", "min": 3, "max": 12, "step": 1, "unit": "s", "default": 5, "visible_if": "{{ section.settings.mode == 'slider' }}" },
-    { "type": "checkbox", "id": "carousel_loop", "label": "t:shared.carousel.loop.label", "default": true, "visible_if": "{{ section.settings.mode == 'slider' }}" },
-
-    { "type": "header", "content": "t:sections.announcement_bar.headers.marquee", "visible_if": "{{ section.settings.mode == 'marquee' }}" },
     {
-      "type": "select", "id": "marquee_direction", "label": "t:sections.marquee.settings.direction.label",
+      "type": "header",
+      "content": "t:sections.announcement_bar.headers.slider",
+      "visible_if": "{{ section.settings.mode == 'slider' }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "carousel_autoplay",
+      "label": "t:shared.carousel.autoplay.label",
+      "default": true,
+      "visible_if": "{{ section.settings.mode == 'slider' }}"
+    },
+    {
+      "type": "range",
+      "id": "carousel_speed",
+      "label": "t:shared.carousel.speed.label",
+      "min": 3,
+      "max": 12,
+      "step": 1,
+      "unit": "s",
+      "default": 5,
+      "visible_if": "{{ section.settings.mode == 'slider' }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "carousel_loop",
+      "label": "t:shared.carousel.loop.label",
+      "default": true,
+      "visible_if": "{{ section.settings.mode == 'slider' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:sections.announcement_bar.headers.marquee",
+      "visible_if": "{{ section.settings.mode == 'marquee' }}"
+    },
+    {
+      "type": "select",
+      "id": "marquee_direction",
+      "label": "t:sections.marquee.settings.direction.label",
       "options": [
-        { "value": "left", "label": "t:sections.marquee.settings.direction.options__1.label" },
-        { "value": "right", "label": "t:sections.marquee.settings.direction.options__2.label" }
+        {
+          "value": "left",
+          "label": "t:sections.marquee.settings.direction.options__1.label"
+        },
+        {
+          "value": "right",
+          "label": "t:sections.marquee.settings.direction.options__2.label"
+        }
       ],
       "default": "left",
       "visible_if": "{{ section.settings.mode == 'marquee' }}"
     },
-    { "type": "range", "id": "marquee_speed", "label": "t:sections.marquee.settings.speed.label", "min": 10, "max": 120, "step": 5, "unit": "px", "default": 40, "visible_if": "{{ section.settings.mode == 'marquee' }}" },
-    { "type": "checkbox", "id": "pause_on_hover", "label": "t:sections.marquee.settings.pause_on_hover.label", "default": true, "visible_if": "{{ section.settings.mode == 'marquee' }}" },
-
-    { "type": "header", "content": "t:sections.announcement_bar.headers.visibility" },
-    { "type": "checkbox", "id": "enable_on_mobile", "label": "t:sections.announcement_bar.settings.enable_on_mobile.label", "default": true },
-    { "type": "checkbox", "id": "homepage_only", "label": "t:sections.announcement_bar.settings.homepage_only.label", "default": false },
-    { "type": "checkbox", "id": "show_close", "label": "t:sections.announcement_bar.settings.show_close.label", "info": "t:sections.announcement_bar.settings.show_close.info", "default": false },
-
-    { "type": "color_scheme", "id": "color_scheme", "label": "t:shared.color_scheme.label", "default": "scheme-3" },
-
-    { "type": "header", "content": "t:shared.spacing.section_header" },
-    { "type": "range", "id": "padding_top", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 8 },
-    { "type": "range", "id": "padding_bottom", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 8 },
-    { "type": "range", "id": "padding_top_mobile", "label": "t:shared.spacing.padding_top_mobile.label", "info": "t:shared.spacing.padding_top_mobile.info", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 0 },
-    { "type": "range", "id": "padding_bottom_mobile", "label": "t:shared.spacing.padding_bottom_mobile.label", "info": "t:shared.spacing.padding_bottom_mobile.info", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 0 }
+    {
+      "type": "range",
+      "id": "marquee_speed",
+      "label": "t:sections.marquee.settings.speed.label",
+      "min": 10,
+      "max": 120,
+      "step": 5,
+      "unit": "px",
+      "default": 40,
+      "visible_if": "{{ section.settings.mode == 'marquee' }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "pause_on_hover",
+      "label": "t:sections.marquee.settings.pause_on_hover.label",
+      "default": true,
+      "visible_if": "{{ section.settings.mode == 'marquee' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:sections.announcement_bar.headers.visibility"
+    },
+    {
+      "type": "checkbox",
+      "id": "enable_on_mobile",
+      "label": "t:sections.announcement_bar.settings.enable_on_mobile.label",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "homepage_only",
+      "label": "t:sections.announcement_bar.settings.homepage_only.label",
+      "default": false
+    },
+    {
+      "type": "checkbox",
+      "id": "show_close",
+      "label": "t:sections.announcement_bar.settings.show_close.label",
+      "info": "t:sections.announcement_bar.settings.show_close.info",
+      "default": false
+    },
+    {
+      "type": "color_scheme",
+      "id": "color_scheme",
+      "label": "t:shared.color_scheme.label",
+      "default": "scheme-3"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.spacing.section_header"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 160,
+      "step": 4,
+      "unit": "px",
+      "default": 8
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 160,
+      "step": 4,
+      "unit": "px",
+      "default": 8
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "label": "t:shared.spacing.padding_top_mobile.label",
+      "info": "t:shared.spacing.padding_top_mobile.info",
+      "min": 0,
+      "max": 120,
+      "step": 4,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "label": "t:shared.spacing.padding_bottom_mobile.label",
+      "info": "t:shared.spacing.padding_bottom_mobile.info",
+      "min": 0,
+      "max": 120,
+      "step": 4,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "header",
+      "content": "t:shared.carousel.header"
+    },
+    {
+      "type": "select",
+      "id": "layout",
+      "label": "t:shared.carousel.layout.label",
+      "options": [
+        {
+          "value": "grid",
+          "label": "t:shared.carousel.layout.options__1.label"
+        },
+        {
+          "value": "carousel",
+          "label": "t:shared.carousel.layout.options__2.label"
+        }
+      ],
+      "default": "grid"
+    },
+    {
+      "type": "select",
+      "id": "layout_mobile",
+      "label": "t:shared.carousel.layout_mobile.label",
+      "options": [
+        {
+          "value": "grid",
+          "label": "t:shared.carousel.layout.options__1.label"
+        },
+        {
+          "value": "carousel",
+          "label": "t:shared.carousel.layout.options__2.label"
+        }
+      ],
+      "default": "carousel"
+    },
+    {
+      "type": "range",
+      "id": "columns_desktop",
+      "label": "t:shared.carousel.columns_desktop.label",
+      "min": 1,
+      "max": 6,
+      "step": 1,
+      "default": 4
+    },
+    {
+      "type": "range",
+      "id": "columns_tablet",
+      "label": "t:shared.carousel.columns_tablet.label",
+      "min": 1,
+      "max": 4,
+      "step": 1,
+      "default": 2
+    },
+    {
+      "type": "range",
+      "id": "columns_mobile",
+      "label": "t:shared.carousel.columns_mobile.label",
+      "min": 1,
+      "max": 3,
+      "step": 1,
+      "default": 1
+    },
+    {
+      "type": "header",
+      "content": "t:shared.carousel.headers.motion"
+    },
+    {
+      "type": "select",
+      "id": "carousel_effect",
+      "label": "t:shared.carousel.effect.label",
+      "info": "t:shared.carousel.effect.info",
+      "options": [
+        {
+          "value": "slide",
+          "label": "t:shared.carousel.effect.options__1.label"
+        },
+        {
+          "value": "fade",
+          "label": "t:shared.carousel.effect.options__2.label"
+        }
+      ],
+      "default": "slide"
+    },
+    {
+      "type": "range",
+      "id": "carousel_autoplay_delay",
+      "label": "t:shared.carousel.autoplay_delay.label",
+      "min": 2,
+      "max": 15,
+      "step": 1,
+      "unit": "s",
+      "default": 5,
+      "visible_if": "{{ section.settings.carousel_autoplay }}"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.carousel.headers.navigation"
+    },
+    {
+      "type": "checkbox",
+      "id": "carousel_navigation",
+      "label": "t:shared.carousel.navigation.label",
+      "default": true
+    },
+    {
+      "type": "select",
+      "id": "carousel_nav_position",
+      "label": "t:shared.carousel.nav_position.label",
+      "info": "t:shared.carousel.nav_position.info",
+      "options": [
+        {
+          "value": "outside",
+          "label": "t:shared.carousel.nav_position.options__1.label"
+        },
+        {
+          "value": "inside",
+          "label": "t:shared.carousel.nav_position.options__2.label"
+        },
+        {
+          "value": "bottom",
+          "label": "t:shared.carousel.nav_position.options__3.label"
+        },
+        {
+          "value": "inline",
+          "label": "t:shared.carousel.nav_position.options__4.label"
+        }
+      ],
+      "default": "outside",
+      "visible_if": "{{ section.settings.carousel_navigation }}"
+    },
+    {
+      "type": "select",
+      "id": "carousel_nav_icon",
+      "label": "t:shared.carousel.nav_icon.label",
+      "options": [
+        {
+          "value": "chevron",
+          "label": "t:shared.carousel.nav_icon.options__1.label"
+        },
+        {
+          "value": "arrow",
+          "label": "t:shared.carousel.nav_icon.options__2.label"
+        },
+        {
+          "value": "play",
+          "label": "t:shared.carousel.nav_icon.options__3.label"
+        },
+        {
+          "value": "external",
+          "label": "t:shared.carousel.nav_icon.options__4.label"
+        }
+      ],
+      "default": "arrow",
+      "visible_if": "{{ section.settings.carousel_navigation }}"
+    },
+    {
+      "type": "select",
+      "id": "carousel_controls_style",
+      "label": "t:shared.carousel.controls_style.label",
+      "info": "t:shared.carousel.controls_style.info",
+      "options": [
+        {
+          "value": "split",
+          "label": "t:shared.carousel.controls_style.options__1.label"
+        },
+        {
+          "value": "ghost",
+          "label": "t:shared.carousel.controls_style.options__2.label"
+        },
+        {
+          "value": "solid",
+          "label": "t:shared.carousel.controls_style.options__3.label"
+        }
+      ],
+      "default": "split",
+      "visible_if": "{{ section.settings.carousel_navigation }}"
+    },
+    {
+      "type": "range",
+      "id": "carousel_nav_size",
+      "label": "t:shared.carousel.nav_size.label",
+      "min": 28,
+      "max": 72,
+      "step": 2,
+      "unit": "px",
+      "default": 44,
+      "visible_if": "{{ section.settings.carousel_navigation }}"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.carousel.headers.pagination"
+    },
+    {
+      "type": "select",
+      "id": "carousel_pagination",
+      "label": "t:shared.carousel.pagination.label",
+      "info": "t:shared.carousel.pagination.info",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.carousel.pagination.options__1.label"
+        },
+        {
+          "value": "dots",
+          "label": "t:shared.carousel.pagination.options__2.label"
+        },
+        {
+          "value": "numbers",
+          "label": "t:shared.carousel.pagination.options__3.label"
+        },
+        {
+          "value": "progress",
+          "label": "t:shared.carousel.pagination.options__4.label"
+        },
+        {
+          "value": "controls",
+          "label": "t:shared.carousel.pagination.options__5.label"
+        }
+      ],
+      "default": "none"
+    },
+    {
+      "type": "select",
+      "id": "carousel_controls_align",
+      "label": "t:shared.carousel.controls_align.label",
+      "options": [
+        {
+          "value": "start",
+          "label": "t:shared.carousel.controls_align.options__1.label"
+        },
+        {
+          "value": "center",
+          "label": "t:shared.carousel.controls_align.options__2.label"
+        },
+        {
+          "value": "end",
+          "label": "t:shared.carousel.controls_align.options__3.label"
+        }
+      ],
+      "default": "start",
+      "visible_if": "{{ section.settings.carousel_pagination == 'controls' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.carousel.headers.colors"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:shared.carousel.paragraphs.colors"
+    },
+    {
+      "type": "checkbox",
+      "id": "carousel_custom_colors",
+      "label": "t:shared.carousel.custom_colors.label",
+      "info": "t:shared.carousel.custom_colors.info",
+      "default": false
+    },
+    {
+      "type": "select",
+      "id": "carousel_nav_style",
+      "label": "t:shared.carousel.nav_style.label",
+      "options": [
+        {
+          "value": "solid",
+          "label": "t:shared.carousel.nav_style.options__1.label"
+        },
+        {
+          "value": "gradient",
+          "label": "t:shared.carousel.nav_style.options__2.label"
+        }
+      ],
+      "default": "solid",
+      "visible_if": "{{ section.settings.carousel_custom_colors }}"
+    },
+    {
+      "type": "color",
+      "id": "carousel_nav_bg",
+      "label": "t:shared.carousel.nav_bg.label",
+      "visible_if": "{{ section.settings.carousel_custom_colors and section.settings.carousel_nav_style == 'solid' }}"
+    },
+    {
+      "type": "color",
+      "id": "carousel_nav_bg_hover",
+      "label": "t:shared.carousel.nav_bg_hover.label",
+      "visible_if": "{{ section.settings.carousel_custom_colors and section.settings.carousel_nav_style == 'solid' }}"
+    },
+    {
+      "type": "color_background",
+      "id": "carousel_nav_gradient",
+      "label": "t:shared.carousel.nav_gradient.label",
+      "default": "linear-gradient(135deg, #1a1a1a 0%, #4a4a4a 100%)",
+      "visible_if": "{{ section.settings.carousel_custom_colors and section.settings.carousel_nav_style == 'gradient' }}"
+    },
+    {
+      "type": "color_background",
+      "id": "carousel_nav_gradient_hover",
+      "label": "t:shared.carousel.nav_gradient_hover.label",
+      "visible_if": "{{ section.settings.carousel_custom_colors and section.settings.carousel_nav_style == 'gradient' }}"
+    },
+    {
+      "type": "color",
+      "id": "carousel_nav_icon_color",
+      "label": "t:shared.carousel.nav_icon_color.label",
+      "visible_if": "{{ section.settings.carousel_custom_colors }}"
+    },
+    {
+      "type": "color",
+      "id": "carousel_nav_icon_hover",
+      "label": "t:shared.carousel.nav_icon_hover.label",
+      "visible_if": "{{ section.settings.carousel_custom_colors }}"
+    },
+    {
+      "type": "color",
+      "id": "carousel_nav_border_color",
+      "label": "t:shared.carousel.nav_border_color.label",
+      "visible_if": "{{ section.settings.carousel_custom_colors }}"
+    },
+    {
+      "type": "color",
+      "id": "carousel_nav_border_hover",
+      "label": "t:shared.carousel.nav_border_hover.label",
+      "visible_if": "{{ section.settings.carousel_custom_colors }}"
+    },
+    {
+      "type": "color",
+      "id": "carousel_dot_color",
+      "label": "t:shared.carousel.dot_color.label",
+      "visible_if": "{{ section.settings.carousel_custom_colors and section.settings.carousel_pagination != 'none' }}"
+    },
+    {
+      "type": "color",
+      "id": "carousel_dot_active_color",
+      "label": "t:shared.carousel.dot_active_color.label",
+      "visible_if": "{{ section.settings.carousel_custom_colors and section.settings.carousel_pagination != 'none' }}"
+    }
   ]
 }
 {% endschema %}

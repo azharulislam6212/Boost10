@@ -35,6 +35,7 @@
 import { BaseComponent, defineComponent } from '@theme/component';
 import { EVENTS, mediaSelectDetail } from '@theme/events';
 import { rafThrottle, debounce, themeString, prefersReducedMotion, isRTL } from '@theme/utilities';
+import { renderControls, findExternalControls, toggleControls } from '@theme/carousel-controls';
 
 /* ==========================================================================
    <media-gallery>
@@ -49,8 +50,40 @@ export class MediaGallery extends BaseComponent {
   /** @type {ResizeObserver|null} */
   #observer = null;
 
+  /**
+   * The arrows and readout rendered by `snippets/carousel-controls.liquid`.
+   *
+   * The gallery is not a Swiper carousel — it coordinates zoom, video playback
+   * and the thumbnail strip, none of which Swiper would simplify — but it
+   * renders the same control bar so the product page and the collection
+   * carousels stay visually identical. `@theme/carousel-controls` is the shared
+   * part; nothing about Swiper leaks in here.
+   *
+   * @type {import('@theme/carousel-controls').ControlRefs}
+   */
+  #external = { previous: null, next: null, current: null, total: null, bar: null };
+
   setup() {
     this.#activeId = this.media[0]?.dataset.mediaId ?? null;
+    this.#external = findExternalControls(this.id);
+
+    // Controls may be nested or detached; either way the buttons step the
+    // gallery rather than reaching into it.
+    this.on(this, 'click', (event) => {
+      const button = event.target instanceof Element ? event.target.closest('[data-ref="previous"], [data-ref="next"]') : null;
+      if (!button) return;
+
+      event.preventDefault();
+      this.step(button.dataset.ref === 'next' ? 1 : -1);
+    });
+
+    for (const button of [this.#external.previous, this.#external.next]) {
+      if (!button) continue;
+      this.on(button, 'click', (event) => {
+        event.preventDefault();
+        this.step(button.dataset.ref === 'next' ? 1 : -1);
+      });
+    }
 
     const onScroll = rafThrottle(() => this.#syncFromScroll());
     this.on(this.refs.stage, 'scroll', onScroll, { passive: true });
@@ -197,9 +230,54 @@ export class MediaGallery extends BaseComponent {
     );
   }
 
+  /**
+   * Moves by one item, clamped at both ends.
+   *
+   * Clamped rather than wrapping, because the arrows are disabled at the ends
+   * and a control that looks dead but still acts is worse than one that does
+   * neither.
+   *
+   * @param {number} delta
+   */
+  step(delta) {
+    const items = this.media;
+    const index = this.#indexOf(this.#activeId);
+    const next = Math.min(Math.max(index + delta, 0), items.length - 1);
+
+    if (next === index) return;
+    this.goToMedia(items[next]?.dataset.mediaId);
+  }
+
+  /**
+   * Nested controls win over detached ones, same rule as the carousel.
+   *
+   * @returns {import('@theme/carousel-controls').ControlRefs}
+   * @private
+   */
+  get #controls() {
+    return {
+      previous: this.refs.previous || this.#external.previous,
+      next: this.refs.next || this.#external.next,
+      current: this.refs.current || this.#external.current,
+      total: this.refs.total || this.#external.total,
+      bar: this.refs.bar || this.#external.bar,
+    };
+  }
+
   /** @private */
   #syncControls() {
     const index = this.#indexOf(this.#activeId);
+    const count = this.media.length;
+    const controls = this.#controls;
+
+    renderControls(controls, index + 1, count);
+    toggleControls(controls, count > 1);
+
+    // Disabled at the ends. The gallery does not loop unless the merchant asked
+    // for it, so the first and last item are real boundaries.
+    const loop = this.dataset.loop === 'true';
+    controls.previous?.classList.toggle('carousel-button--disabled', !loop && index <= 0);
+    controls.next?.classList.toggle('carousel-button--disabled', !loop && index >= count - 1);
 
     for (const item of this.media) {
       const current = item.dataset.mediaId === this.#activeId;

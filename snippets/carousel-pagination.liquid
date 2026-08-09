@@ -1,65 +1,63 @@
 {% doc %}
-  Pagination for `<swiper-carousel>`: dots, a slide counter, or a progress bar.
+  The mount point Swiper's Pagination module renders into.
 
-  ## Dots are markup, the other two are computed
+  ## What this replaces
 
-  Dots use `data-ref="indicators"` and `data-indicator`, which `SwiperCarousel`
-  already owns — it wires the clicks, tracks the current one and hides the whole
-  group when the track does not scroll. Nothing new is needed for them.
+  A hand-written list of `<button data-indicator>` dots, and a
+  `<carousel-pagination>` custom element backed by
+  `assets/carousel-pagination.js` that measured the track at runtime to compute
+  a page count for the numbers and the progress bar.
 
-  Numbers and the progress bar cannot be Liquid, because Liquid does not know
-  how many slides fit in the viewport and therefore cannot know how many pages
-  there are. `<carousel-pagination>` computes that at runtime from the parent
-  carousel.
+  All of it is one empty element now. Swiper's Pagination module already knows
+  the slide count, the pages, the active index and the click targets, and it
+  renders bullets, a fraction or a progress bar into whatever element it is
+  given. The type comes from `data-options`.
 
-  It is a sibling component rather than a change to `SwiperCarousel` so that
-  the carousel keeps working untouched when pagination is set to None, which is
-  the default and by far the common case.
+  **`assets/carousel-pagination.js` is deleted** along with its import map entry
+  — nothing references it any more.
+
+  ## Why the element is empty
+
+  Liquid cannot know how many slides fit in the viewport, so it cannot know how
+  many pages there are. The old dots markup guessed one dot per slide and relied
+  on the component to hide the extras. Letting Swiper render them means the
+  count is right the first time rather than corrected after a measurement.
+
+  `controls` is not handled here — it is `carousel-controls.liquid`, because it
+  carries navigation as well and Swiper has no pagination type for it.
 
   Parameters:
-    style    (string, required)  'dots' | 'numbers' | 'progress'
-    settings (object)
+    style (string, required)  dots | numbers | progress
 
   @example
-    {% render 'carousel-pagination', style: 'dots', settings: section.settings %}
+    {% render 'carousel-pagination', style: 'dots' %}
 {% enddoc %}
 
 {%- liquid
   assign style = style | default: 'none'
+
+  case style
+    when 'dots'
+      assign class = 'carousel-shell__dots'
+    when 'numbers'
+      assign class = 'carousel-shell__counter'
+    when 'progress'
+      assign class = 'carousel-shell__progress'
+    else
+      assign class = blank
+  endcase
 -%}
 
-{%- case style -%}
-  {%- when 'dots' -%}
-    {%- comment -%}
-      One dot per slide. The component hides any that turn out to be
-      unreachable once it has measured the track, so an over-count here is
-      corrected rather than left dangling.
-    {%- endcomment -%}
-    <div class="carousel-shell__dots" data-ref="indicators">
-      {%- for i in (1..slide_count) -%}
-        <button
-          type="button"
-          class="carousel-shell__dot"
-          data-indicator
-          aria-label="{{ 'accessibility.go_to_slide' | t: index: forloop.index }}"
-        ></button>
-      {%- endfor -%}
-    </div>
-
-  {%- when 'numbers' -%}
-    <carousel-pagination class="carousel-shell__counter" data-style="numbers">
-      <span class="carousel-shell__counter-current" data-ref="current">1</span>
-      <span class="carousel-shell__counter-separator" aria-hidden="true">/</span>
-      <span class="carousel-shell__counter-total" data-ref="total">1</span>
-    </carousel-pagination>
-
-  {%- when 'progress' -%}
-    <carousel-pagination class="carousel-shell__progress" data-style="progress">
-      {%- comment -%}
-        Presentational only. The slide position is already announced through the
-        carousel's `role="status"` region, and a second announcement of the same
-        change is noise, not redundancy.
-      {%- endcomment -%}
-      <span class="carousel-shell__progress-bar" data-ref="bar" aria-hidden="true"></span>
-    </carousel-pagination>
-{%- endcase -%}
+{%- if class != blank -%}
+  {%- comment -%}
+    `aria-hidden` on the non-interactive types because the position is already
+    announced through the carousel's own `role="status"` region. Bullets are
+    clickable controls, so they stay reachable; a fraction and a bar are
+    decoration, and a second announcement of the same change is noise.
+  {%- endcomment -%}
+  <div
+    class="{{ class }}"
+    data-ref="pagination"
+    {% unless style == 'dots' %}aria-hidden="true"{% endunless %}
+  ></div>
+{%- endif -%}

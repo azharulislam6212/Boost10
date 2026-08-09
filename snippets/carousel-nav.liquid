@@ -1,0 +1,100 @@
+{% doc %}
+  A bare previous/next pair for a `<swiper-carousel>`.
+
+  Use `carousel-controls` when you want the numbers and the progress bar too;
+  this is the same buttons with nothing between them.
+
+  ## Placement
+
+  Arrows do not always belong inside the carousel. A section header often wants
+  them beside the heading, a hero wants them over the image, a narrow layout
+  wants them underneath. Rendering them inside `carousel-shell` forced one
+  placement on every section.
+
+  Nested inside the carousel they are found automatically. Anywhere else, pass
+  `for:` with the carousel's id and the component resolves it from the
+  document — so they can sit before it, after it, or in a sticky bar.
+
+  ## Changing the icon
+
+  `chevron` and `arrow` are directional pairs and the snippet picks the right
+  one per side. Any other name from `snippets/icon.liquid` is used for both
+  buttons and mirrored on the previous one, which is what you want for a custom
+  glyph and means you never ship two SVGs for one arrow.
+
+  Parameters:
+    settings (object)  Section settings
+    carousel (string)  Carousel element id. Omit when nested inside it.
+    icon     (string)  Overrides `settings.carousel_nav_icon`
+    position (string)  outside | inside | bottom | inline
+    style    (string)  split | ghost | solid
+    size     (number)  Button diameter in px
+    classes  (string)  Extra classes
+
+  @example
+    {% render 'carousel-nav', settings: section.settings %}
+    {% render 'carousel-nav', carousel: carousel_id, position: 'inline', settings: section.settings %}
+{% enddoc %}
+
+{%- liquid
+  assign icon_name = icon | default: settings.carousel_nav_icon | default: 'chevron'
+  assign place = position | default: settings.carousel_nav_position | default: 'outside'
+  assign btn_style = style | default: settings.carousel_controls_style | default: 'ghost'
+  assign btn_size = size | default: settings.carousel_nav_size | default: 44
+  assign icon_size = btn_size | times: 0.4 | round
+
+  assign paired = false
+  if icon_name == 'chevron' or icon_name == 'arrow'
+    assign paired = true
+  endif
+
+  if paired
+    assign icon_previous = icon_name | append: '-left'
+    assign icon_next = icon_name | append: '-right'
+  else
+    assign icon_previous = icon_name
+    assign icon_next = icon_name
+  endif
+
+  case btn_style
+    when 'solid'
+      assign class_previous = 'carousel-button--solid'
+      assign class_next = 'carousel-button--solid'
+    when 'split'
+      assign class_previous = ''
+      assign class_next = 'carousel-button--solid'
+    else
+      assign class_previous = ''
+      assign class_next = ''
+  endcase
+
+  unless paired
+    assign class_previous = class_previous | append: ' carousel-button--mirror'
+  endunless
+-%}
+
+<div
+  class="carousel-nav carousel-nav--{{ place }} {{ classes }}"
+  data-carousel-nav
+  style="--carousel-nav-size: {{ btn_size }}px;"
+>
+  <button
+    type="button"
+    class="carousel-button {{ class_previous }}"
+    data-ref="previous"
+    {% if carousel != blank %}data-carousel-for="{{ carousel }}"{% endif %}
+    aria-label="{{ 'accessibility.previous_slide' | t }}"
+  >
+    {% render 'icon', icon: icon_previous, size: icon_size %}
+  </button>
+
+  <button
+    type="button"
+    class="carousel-button {{ class_next }}"
+    data-ref="next"
+    {% if carousel != blank %}data-carousel-for="{{ carousel }}"{% endif %}
+    aria-label="{{ 'accessibility.next_slide' | t }}"
+  >
+    {% render 'icon', icon: icon_next, size: icon_size %}
+  </button>
+</div>

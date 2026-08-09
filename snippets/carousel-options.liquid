@@ -1,0 +1,75 @@
+{% doc %}
+  Builds the `data-options` JSON that `<swiper-carousel>` reads.
+  Parameters:
+    settings   (object, required)
+    columns_desktop / columns_tablet / columns_mobile (number)
+    pagination (string)  none | dots | numbers | progress | controls
+    extra      (string)  Raw JSON fragment appended verbatim. Must start with a
+                         comma, no trailing comma.
+
+  @example
+    <swiper-carousel data-options='{% render "carousel-options", settings: section.settings %}'>
+{% enddoc %}
+
+{%- liquid
+  assign cols_desktop = columns_desktop | default: settings.columns_desktop | default: 4
+  assign cols_tablet = columns_tablet | default: settings.columns_tablet | default: 2
+  assign cols_mobile = columns_mobile | default: settings.columns_mobile | default: 1
+  assign autoplay = settings.carousel_autoplay | default: false
+
+  # Seconds in the editor, milliseconds in Swiper. A merchant thinks "five
+  # seconds"; converting here means neither side has to know about the other.
+  assign delay = settings.carousel_autoplay_delay | default: 5 | times: 1000
+
+  # Transition duration is a separate control from the autoplay interval. They
+  # were one setting before, which is why a slow fade also meant a slow
+  # slideshow.
+  assign speed = settings.carousel_speed | default: 500
+
+  assign loop = settings.carousel_loop | default: false
+  assign effect = settings.carousel_effect | default: 'slide'
+
+  # Fade cross-fades a stack, so it is only coherent with one slide showing.
+  # Left at four columns it renders four cards on top of each other, which is
+  # what "the effect setting does nothing" looks like from the outside.
+  if effect == 'fade'
+    assign cols_desktop = 1
+    assign cols_tablet = 1
+    assign cols_mobile = 1
+  endif
+
+  assign pagination_style = pagination | default: settings.carousel_pagination | default: 'none'
+  case pagination_style
+    when 'numbers'
+      assign pagination_type = 'fraction'
+    when 'progress'
+      assign pagination_type = 'progressbar'
+    when 'dots'
+      assign pagination_type = 'bullets'
+    else
+      assign pagination_type = blank
+  endcase
+-%}
+{%- capture options -%}
+{
+  "slidesPerView": {{ cols_mobile }},
+  "breakpoints": {
+    "750": { "slidesPerView": {{ cols_tablet }} },
+    "990": { "slidesPerView": {{ cols_desktop }} }
+  },
+  "speed": {{ speed }},
+  "loop": {{ loop | json }},
+  "effect": {{ effect | json }}
+  {%- if effect == 'fade' -%}
+    ,"fadeEffect": { "crossFade": true }
+  {%- endif -%}
+  {%- if autoplay -%}
+    ,"autoplay": { "delay": {{ delay }}, "disableOnInteraction": true, "pauseOnMouseEnter": true }
+  {%- endif -%}
+  {%- if pagination_type != blank -%}
+    ,"pagination": { "type": {{ pagination_type | json }} }
+  {%- endif -%}
+  {{- extra -}}
+}
+{%- endcapture -%}
+{{- options | strip_newlines | escape -}}

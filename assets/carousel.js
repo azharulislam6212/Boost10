@@ -1,395 +1,531 @@
 /**
  * carousel.js — Boost10
  *
- * `<swiper-carousel>` — a horizontal carousel built on CSS scroll snapping.
+ * `<swiper-carousel>` — a thin, opinionated adapter over Swiper.
  *
- * The tag name is a holdover from the original brief, which specified a Swiper
- * wrapper. Swiper was dropped: the theme's first rule is zero framework
- * dependencies, and everything needed here — snap points, momentum, drag,
- * indicators — is native. This implementation is around three kilobytes against
- * Swiper's hundred and forty, and the tag name is kept so section schemas and
- * saved settings do not have to change.
+ * Swiper owns the sliding. This file owns five things Swiper does not do for
+ * us, and deliberately nothing else:
  *
- * The track is a real scrolling element with `scroll-snap-type`. That means the
- * carousel works before this script runs, works if it fails, scrolls with a
- * trackpad, a touch swipe and the keyboard, and respects the customer's own
- * scrolling preferences. The script adds arrows, indicators, autoplay and the
- * announcements.
+ *   1. Turning one JSON attribute into a Swiper config, and tagging the slides
+ *      Swiper needs to find.
+ *   2. Deciding *whether* to be a carousel at the current breakpoint, so a
+ *      section can be a CSS grid on desktop and a carousel on mobile using the
+ *      same nodes.
+ *   3. Finding its arrows, whether they are nested inside it or somewhere else
+ *      in the document pointing back with `data-carousel-for`.
+ *   4. Accessibility. The bundled build has no A11y module, so the arrows are
+ *      real buttons in the markup and the position is announced from here.
+ *   5. Theme-editor lifecycle.
  *
- * Accessibility decisions worth keeping:
- *   - Arrows are real buttons with translated labels, disabled at the ends.
- *   - The track is focusable and labelled, so a keyboard user can scroll it.
- *   - Autoplay pauses on hover, on focus, when the tab is hidden, and stops for
- *     good the first time the customer interacts. It never runs under reduced
- *     motion, and there is always a pause control.
- *   - Slides outside the viewport are not hidden from assistive technology: the
- *     track is a scroll region, not a set of tabs, so everything in it should be
- *     reachable in reading order.
+ * ## The options contract
  *
- * Markup:
+ * Everything is passed as JSON in `data-options`:
  *
- *   <swiper-carousel data-autoplay="false" data-loop="false">
- *     <div data-ref="track" tabindex="0" role="group" aria-label="…">
- *       <div data-slide>…</div>
- *     </div>
- *     <button data-ref="previous" aria-label="…">…</button>
- *     <button data-ref="next" aria-label="…">…</button>
- *     <div data-ref="indicators">
- *       <button data-indicator aria-label="…"></button>
- *     </div>
- *     <button data-ref="pause" hidden>…</button>
- *     <p data-ref="status" class="visually-hidden" role="status"></p>
- *   </swiper-carousel>
+ *   <swiper-carousel data-options='{"slidesPerView":1,"loop":true}'>
+ *
+ * That is merged over the defaults below, and a small set of runtime values is
+ * merged over the result — element references for navigation and pagination,
+ * the module list, and the reduced-motion overrides. Those depend on the DOM
+ * and on the customer's OS settings rather than on a section setting, so they
+ * are not negotiable from Liquid.
+ *
+ * Precedence: defaults → data-options → runtime.
+ *
+ * ## What the bundled Swiper contains
+ *
+ * `assets/swiper.js` exports exactly: `Swiper`, `Navigation`, `Pagination`,
+ * `Autoplay`, `EffectFade`, `Mousewheel`.
+ *
+ * No Scrollbar, no Thumbs, no FreeMode, no Grid, no A11y, no Zoom, no
+ * Controller. Passing `scrollbar` or `thumbs` in `data-options` does nothing —
+ * silently, because Swiper ignores config for modules that were not registered.
+ * To add one, rebuild the bundle from swiperjs.com with that module included
+ * and add it to `MODULES`.
  *
  * @module @theme/carousel
  */
 
+import { Swiper, Navigation, Pagination, Autoplay, EffectFade, Mousewheel } from '@theme/swiper';
 import { BaseComponent, defineComponent } from '@theme/component';
 import { EVENTS } from '@theme/events';
-import { clamp, rafThrottle, debounce, themeString, isRTL, prefersReducedMotion } from '@theme/utilities';
+import { themeString, prefersReducedMotion } from '@theme/utilities';
+import { renderControls, findExternalControls, toggleControls } from '@theme/carousel-controls';
+
+/**
+ * Registered once per instance. Adding a module here without adding it to the
+ * bundle is a silent no-op, which is the failure mode this comment prevents.
+ */
+const MODULES = [Navigation, Pagination, Autoplay, EffectFade, Mousewheel];
+
+/** Matches the 750px breakpoint used throughout base.css. */
+const DESKTOP_QUERY = '(min-width: 750px)';
+
+/**
+ * Conservative defaults. Anything a section wants to change belongs in
+ * `data-options` — this is the behaviour of a carousel given no configuration.
+ */
+const DEFAULTS = {
+  slidesPerView: 1,
+  speed: 500,
+  spaceBetween: 0,
+  watchOverflow: true,
+  grabCursor: true,
+  threshold: 5,
+  longSwipesRatio: 0.25,
+  resistanceRatio: 0.85,
+  centeredSlides: false,
+  loop: false,
+
+  // Off by default. `observer` walks the subtree on every mutation, which on a
+  // product carousel means every variant swatch preview and every quick-add
+  // re-render triggers a full Swiper update.
+  observer: false,
+  observeParents: false,
+  resizeObserver: true,
+  updateOnWindowResize: true,
+};
 
 export class SwiperCarousel extends BaseComponent {
   static requiredRefs = ['track'];
 
-  /** @type {number} */
-  #index = 0;
+  /** @type {import('swiper').Swiper|null} */
+  #swiper = null;
 
-  /** @type {number|null} */
-  #timer = null;
-
-  /** Set once the customer scrolls, drags or presses an arrow. */
-  #interacted = false;
+  /** @type {MediaQueryList|null} */
+  #desktop = null;
 
   /** @type {ResizeObserver|null} */
-  #observer = null;
+  #resize = null;
+
+  /** Controls that live outside this element and point back at it. */
+  #external = { previous: null, next: null, current: null, total: null, bar: null };
+
+  /** Set once the customer interacts; autoplay never restarts after it. */
+  #interacted = false;
+
+  /* ------------------------------------------------------------ lifecycle */
 
   setup() {
-    this.#index = 0;
-    this.#interacted = false;
+    this.#desktop = window.matchMedia(DESKTOP_QUERY);
 
-    const onScroll = rafThrottle(() => this.#syncFromScroll());
-    this.on(this.refs.track, 'scroll', onScroll, { passive: true });
+    // `change` rather than a resize listener: this fires once when the
+    // breakpoint is crossed, not sixty times while a window is dragged.
+    this.on(this.#desktop, 'change', () => this.#sync());
 
-    if (this.refs.previous) this.on(this.refs.previous, 'click', () => this.previous());
-    if (this.refs.next) this.on(this.refs.next, 'click', () => this.next());
-    if (this.refs.pause) this.on(this.refs.pause, 'click', () => this.toggleAutoplay());
+    this.#external = findExternalControls(this.id);
 
-    this.on(this, 'click', (event) => {
-      const indicator = event.target instanceof Element ? event.target.closest('[data-indicator]') : null;
-      if (!indicator) return;
-      this.goTo(Array.from(this.indicators).indexOf(indicator));
-    });
+    const pause = this.refs.pause;
+    if (pause) this.on(pause, 'click', () => this.#toggleAutoplay());
 
-    this.on(this.refs.track, 'keydown', this.#onKeydown);
-
-    // Any deliberate interaction ends autoplay permanently. A carousel that
-    // starts moving again after the customer took control is hostile.
-    this.on(this.refs.track, 'pointerdown', () => this.#stopForGood(), { passive: true });
-    this.on(this.refs.track, 'wheel', () => this.#stopForGood(), { passive: true });
-
-    this.on(this, 'pointerenter', () => this.#pause());
-    this.on(this, 'pointerleave', () => this.#resume());
-    this.on(this, 'focusin', () => this.#pause());
-    this.on(this, 'focusout', (event) => {
-      if (this.contains(event.relatedTarget)) return;
-      this.#resume();
-    });
-
-    // A carousel advancing in a background tab wastes battery and is never seen.
-    this.on(document, 'visibilitychange', () => {
-      if (document.hidden) {
-        this.#pause();
-      } else {
-        this.#resume();
-      }
-    });
-
-    this.#observer = new ResizeObserver(debounce(() => this.#update(), 150));
-    this.#observer.observe(this.refs.track);
-
-    this.#update();
-    this.#startAutoplay();
+    this.#sync();
   }
 
   teardown() {
-    this.#pause();
-    this.#observer?.disconnect();
-    this.#observer = null;
+    this.#destroy();
   }
 
-  /* --------------------------------------------------------- public API -- */
+  /* -------------------------------------------------------------- editor */
 
-  /**
-   * @returns {HTMLElement[]}
-   */
-  get slides() {
-    return Array.from(this.refs.track.querySelectorAll('[data-slide]'));
+  sectionLoaded() {
+    this.#destroy();
+    this.#external = findExternalControls(this.id);
+    this.#sync();
   }
 
-  /**
-   * @returns {HTMLElement[]}
-   */
-  get indicators() {
-    return Array.from(this.querySelectorAll('[data-indicator]'));
+  sectionUnloaded() {
+    this.#destroy();
   }
 
-  /**
-   * @returns {number}
-   */
-  get index() {
-    return this.#index;
-  }
+  /* ----------------------------------------------------------- public API */
 
   /**
-   * @returns {number}
-   */
-  get count() {
-    return this.slides.length;
-  }
-
-  /**
-   * @returns {boolean} True when more than one screenful of slides exists.
-   */
-  get scrollable() {
-    return this.refs.track.scrollWidth - this.refs.track.clientWidth > 2;
-  }
-
-  /**
-   * Scroll to a slide.
+   * There is deliberately no `get swiper()` here.
    *
-   * @param {number} index
-   * @param {{ animate?: boolean }} [options]
+   * Swiper's `mount()` runs `el.swiper = swiper` on its container, and this
+   * element *is* the container. A getter with no setter makes that assignment
+   * throw — module code is strict, so the write is a `TypeError` rather than a
+   * silent no-op, and it happens inside `new Swiper()` before the instance is
+   * ever returned:
+   *
+   *   TypeError: Cannot set property swiper of #<SwiperCarousel>
+   *   which has only a getter
+   *
+   * So `element.swiper` is Swiper's own property, set by Swiper and cleared by
+   * `destroy()`. That is also the convention every Swiper integration uses, so
+   * anything reaching in from a section or an app finds what it expects.
+   *
+   * The private `#swiper` field is this component's own handle on the same
+   * instance. Do not add a public accessor with a name Swiper writes to.
+   *
+   * @returns {import('swiper').Swiper|null} The instance, or null before init.
    */
-  goTo(index, { animate = true } = {}) {
-    const slides = this.slides;
-    const target = slides[clamp(index, 0, slides.length - 1)];
-    if (!target) return;
-
-    this.#interacted = true;
-
-    this.refs.track.scrollTo({
-      left: target.offsetLeft - this.refs.track.offsetLeft,
-      behavior: animate && !prefersReducedMotion() ? 'smooth' : 'auto'
-    });
+  get instance() {
+    return this.#swiper;
   }
 
-  /**
-   * Advance one slide, wrapping when `data-loop` is set.
-   */
   next() {
-    this.#stopForGood();
-
-    const last = this.count - 1;
-    const target = this.#index >= last ? (this.loop ? 0 : last) : this.#index + 1;
-    this.goTo(target);
+    this.#swiper?.slideNext();
   }
 
-  /**
-   * Go back one slide, wrapping when `data-loop` is set.
-   */
   previous() {
-    this.#stopForGood();
-
-    const target = this.#index <= 0 ? (this.loop ? this.count - 1 : 0) : this.#index - 1;
-    this.goTo(target);
+    this.#swiper?.slidePrev();
   }
 
+  /* ----------------------------------------------------------------- nav */
+
   /**
+   * Nested controls win over external ones. A section that renders both has
+   * made a mistake, and the nested pair is the one the customer can see next
+   * to the track.
+   *
+   * @returns {import('@theme/carousel-controls').ControlRefs}
+   */
+  get #controls() {
+    return {
+      previous: this.refs.previous || this.#external.previous,
+      next: this.refs.next || this.#external.next,
+      current: this.refs.current || this.#external.current,
+      total: this.refs.total || this.#external.total,
+      bar: this.refs.bar || this.#external.bar,
+    };
+  }
+
+  /* --------------------------------------------------------------- state */
+
+  /**
+   * Whether this breakpoint should be a carousel at all.
+   *
+   * `data-layout` is the desktop behaviour and `data-layout-mobile` the phone
+   * one; either may be `grid`.
+   *
    * @returns {boolean}
    */
-  get loop() {
-    return this.dataset.loop === 'true';
+  get #shouldRun() {
+    const desktop = this.#desktop?.matches ?? true;
+    const layout = desktop
+      ? this.dataset.layout || 'carousel'
+      : this.dataset.layoutMobile || this.dataset.layout || 'carousel';
+
+    return layout === 'carousel';
   }
 
   /**
-   * @returns {number} Autoplay interval in milliseconds, or 0 when disabled.
+   * The merchant's configuration, straight from the attribute.
+   *
+   * A malformed value is logged and ignored rather than thrown: broken JSON in
+   * one section setting should not take down every other component on the page.
+   *
+   * @returns {Record<string, any>}
    */
-  get autoplayInterval() {
-    if (this.dataset.autoplay !== 'true') return 0;
-    if (prefersReducedMotion()) return 0;
-    return Number(this.dataset.autoplaySpeed) || 5000;
+  get #authored() {
+    const raw = this.dataset.options;
+    if (!raw) return {};
+
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch (error) {
+      console.error('[Boost10] <swiper-carousel> could not parse data-options.', error, raw);
+      return {};
+    }
   }
 
-  /**
-   * Start or stop autoplay from a control.
-   */
-  toggleAutoplay() {
-    if (this.#timer === null) {
-      this.#interacted = false;
-      this.#startAutoplay();
+  /* --------------------------------------------------------------- config */
+
+  /** @returns {Record<string, any>} */
+  #config() {
+    const authored = this.#authored;
+
+    /** @type {Record<string, any>} */
+    const config = {
+      ...DEFAULTS,
+      spaceBetween: this.#gap(),
+      ...authored,
+      modules: MODULES,
+    };
+
+    // ---- navigation -----------------------------------------------------
+    const { previous, next } = this.#controls;
+
+    if (previous && next) {
+      config.navigation = {
+        prevEl: previous,
+        nextEl: next,
+        disabledClass: 'carousel-button--disabled',
+        lockClass: 'carousel-button--locked',
+        ...(typeof authored.navigation === 'object' ? authored.navigation : {}),
+      };
     } else {
-      this.#stopForGood();
+      delete config.navigation;
     }
 
-    this.refs.pause?.setAttribute('aria-pressed', this.#timer === null ? 'true' : 'false');
-  }
+    // ---- pagination -----------------------------------------------------
+    if (this.refs.pagination) {
+      const authoredPagination = typeof authored.pagination === 'object' ? authored.pagination : {};
 
-  /* ---------------------------------------------------------- internals -- */
+      config.pagination = {
+        clickable: true,
+        type: 'bullets',
+        bulletClass: 'carousel-shell__dot',
+        bulletActiveClass: 'carousel-shell__dot--active',
+        lockClass: 'carousel-shell__pagination--locked',
+        ...authoredPagination,
+        el: this.refs.pagination,
+      };
 
-  /** @private */
-  #startAutoplay() {
-    if (this.autoplayInterval === 0 || this.#interacted) return;
+      // Fraction and progressbar render their own internals, so the custom
+      // bullet classes would be applied to elements that do not exist.
+      if (config.pagination.type !== 'bullets') {
+        delete config.pagination.bulletClass;
+        delete config.pagination.bulletActiveClass;
+      }
+    } else {
+      delete config.pagination;
+    }
 
-    this.refs.pause?.removeAttribute('hidden');
-    this.#pause();
-    this.#timer = window.setInterval(() => {
-      const last = this.count - 1;
-      this.goTo(this.#index >= last ? 0 : this.#index + 1, { animate: true });
-    }, this.autoplayInterval);
-  }
+    // ---- reduced motion -------------------------------------------------
+    // The carousel still works; it stops moving on its own and stops animating
+    // between slides. Removing the control entirely would be worse.
+    if (prefersReducedMotion()) {
+      config.speed = 0;
+      config.autoplay = false;
+      config.effect = 'slide';
+    }
 
-  /** @private */
-  #pause() {
-    if (this.#timer === null) return;
-    window.clearInterval(this.#timer);
-    this.#timer = null;
-  }
+    // ---- lifecycle ------------------------------------------------------
+    config.on = {
+      ...(authored.on || {}),
+      init: (swiper) => this.#onChange(swiper),
+      slideChange: (swiper) => this.#onChange(swiper),
 
-  /** @private */
-  #resume() {
-    if (this.#interacted || document.hidden) return;
-    this.#startAutoplay();
-  }
+      // `progress` fires on every translate, including mid-drag, so the bar
+      // tracks a finger rather than jumping once the slide settles. Setting one
+      // custom property is cheap enough to do at that rate.
+      progress: (swiper) => this.#onProgress(swiper),
 
-  /** @private */
-  #stopForGood() {
-    this.#interacted = true;
-    this.#pause();
+      touchStart: () => this.#onInteract(),
+    };
+
+    return config;
   }
 
   /**
-   * Work out which slide is showing from the track's scroll position.
+   * Slide spacing, taken from the merchant's grid setting rather than restated
+   * here. Swiper positions slides with transforms, so it needs the number — a
+   * CSS `gap` on the wrapper would be ignored by its measurements and the
+   * slides would overlap.
    *
-   * Reading the scroll position rather than tracking an index means the state is
-   * correct however the customer moved: arrows, drag, trackpad, keyboard, or a
-   * browser restoring a scroll offset on Back.
-   *
-   * @private
+   * @returns {number} px
    */
-  #syncFromScroll() {
+  #gap() {
+    const raw = getComputedStyle(this).getPropertyValue('--grid-gap-x').trim();
+    if (!raw) return 0;
+
+    // Values arrive in rem against a 62.5% root, so 1rem is 10px.
+    if (raw.endsWith('rem')) return Number.parseFloat(raw) * 10;
+    return Number.parseFloat(raw) || 0;
+  }
+
+  /* ---------------------------------------------------------- init / kill */
+
+  #sync() {
+    if (this.#shouldRun) this.#init();
+    else this.#destroy();
+  }
+
+  /**
+   * Puts Swiper's own class on every direct child of the track.
+   *
+   * This used to be `slideClass` in `data-options`, pointed at the theme's
+   * `carousel-shell__item`. Two things were wrong with that.
+   *
+   * `swiper.css` styles `.swiper-slide` by name — `position: relative` on the
+   * base rule, and every effect rule on top of it, including
+   * `.swiper-fade .swiper-slide { pointer-events: none; transition-property:
+   * opacity }`. Under a renamed class none of it matches, so `fade` produced a
+   * stack of fully clickable, unanimated slides.
+   *
+   * And `multicolumn` and `testimonials` pass `{% content_for 'blocks' %}`
+   * straight into the track, so their slides are block roots with no class the
+   * section can reach. Those two matched zero slides and never moved.
+   *
+   * Doing it here rather than in Liquid is what covers both cases with one
+   * mechanism. The class is removed again on destroy, so at a grid breakpoint
+   * swiper.css's `width: 100%; height: 100%` is not sitting on grid items.
+   *
+   * @param {boolean} on
+   */
+  #tagSlides(on) {
     const track = this.refs.track;
-    const slides = this.slides;
-    if (slides.length === 0) return;
+    if (!track) return;
 
-    const position = isRTL() ? Math.abs(track.scrollLeft) : track.scrollLeft;
-
-    let closest = 0;
-    let smallest = Infinity;
-
-    for (const [index, slide] of slides.entries()) {
-      const distance = Math.abs(slide.offsetLeft - track.offsetLeft - position);
-      if (distance < smallest) {
-        smallest = distance;
-        closest = index;
-      }
+    for (const child of track.children) {
+      child.classList.toggle('swiper-slide', on);
     }
+  }
 
-    if (closest === this.#index) {
-      this.#syncControls();
+  #init() {
+    if (this.#swiper && !this.#swiper.destroyed) return;
+
+    const slides = this.refs.track?.children.length ?? 0;
+    if (slides < 2) return;
+
+    this.#tagSlides(true);
+
+    try {
+      this.#swiper = new Swiper(this, this.#config());
+    } catch (error) {
+      console.error('[Boost10] <swiper-carousel> failed to initialise.', error);
+      this.#swiper = null;
+      this.#tagSlides(false);
       return;
     }
 
-    this.#index = closest;
-    this.#syncControls();
-    this.#announce();
-
-    this.dispatch(EVENTS.MEDIA_SELECT, {
-      index: closest,
-      slide: slides[closest],
-      mediaId: slides[closest]?.dataset.mediaId || null
-    });
-  }
-
-  /** @private */
-  #update() {
-    this.toggleAttribute('data-scrollable', this.scrollable);
-
-    // With everything visible there is nothing to page through, and dead arrows
-    // are worse than no arrows.
-    for (const ref of ['previous', 'next']) {
-      this.refs[ref]?.toggleAttribute('hidden', !this.scrollable);
-    }
-
-    this.refs.indicators?.toggleAttribute('hidden', !this.scrollable);
-    this.#syncControls();
-  }
-
-  /** @private */
-  #syncControls() {
-    const atStart = this.#index <= 0;
-    const atEnd = this.#index >= this.count - 1;
-
-    if (this.refs.previous instanceof HTMLButtonElement && !this.loop) {
-      this.refs.previous.disabled = atStart;
-    }
-
-    if (this.refs.next instanceof HTMLButtonElement && !this.loop) {
-      this.refs.next.disabled = atEnd;
-    }
-
-    for (const [index, indicator] of this.indicators.entries()) {
-      const current = index === this.#index;
-      indicator.toggleAttribute('data-active', current);
-      indicator.setAttribute('aria-current', current ? 'true' : 'false');
-    }
-
-    this.dataset.index = String(this.#index);
-  }
-
-  /** @private */
-  #announce() {
-    const message = themeString('carouselPosition', '', {
-      index: this.#index + 1,
-      count: this.count
-    });
-
-    if (this.refs.status instanceof HTMLElement) this.refs.status.textContent = message;
+    this.#reflectAutoplay();
+    toggleControls(this.#controls, true);
+    this.#watchForReveal();
   }
 
   /**
-   * @param {KeyboardEvent} event
-   * @private
+   * Recovers a carousel that was built inside a hidden container.
+   *
+   * The announcement bar is the case that forced this. When "show close" is on,
+   * `announcement-bar[data-dismissible]:not([data-ready])` is `display: none`
+   * until `announcement-bar.js` has checked storage. `swiper-carousel` connects
+   * before that, so Swiper measures a zero-width box, writes `width: 0px` onto
+   * every slide, and the bar reveals a carousel that will not move.
+   *
+   * The same thing happens to any carousel inside a tab panel, a drawer or a
+   * closed disclosure.
+   *
+   * A ResizeObserver fires when the box goes from zero to a real width, which
+   * is exactly the moment the measurements need redoing.
    */
-  #onKeydown = (event) => {
-    const forward = isRTL() ? 'ArrowLeft' : 'ArrowRight';
-    const backward = isRTL() ? 'ArrowRight' : 'ArrowLeft';
+  #watchForReveal() {
+    this.#resize?.disconnect();
 
-    switch (event.key) {
-      case forward:
-        event.preventDefault();
-        this.next();
-        break;
-      case backward:
-        event.preventDefault();
-        this.previous();
-        break;
-      case 'Home':
-        event.preventDefault();
-        this.goTo(0);
-        break;
-      case 'End':
-        event.preventDefault();
-        this.goTo(this.count - 1);
-        break;
-      default:
-        break;
+    let last = this.offsetWidth;
+
+    this.#resize = new ResizeObserver(() => {
+      const width = this.offsetWidth;
+      if (width === last) return;
+
+      const revealed = last === 0 && width > 0;
+      last = width;
+
+      if (revealed) this.#swiper?.update();
+    });
+
+    this.#resize.observe(this);
+  }
+
+  #destroy() {
+    if (!this.#swiper) return;
+
+    // `deleteInstance, cleanStyles` — the second argument returns the wrapper
+    // and slides to their authored styles so the CSS grid layout can take over
+    // at the other breakpoint.
+    if (!this.#swiper.destroyed) this.#swiper.destroy(true, true);
+    this.#swiper = null;
+    this.#tagSlides(false);
+
+    if (this.refs.pause) this.refs.pause.hidden = true;
+    toggleControls(this.#controls, false);
+
+    this.#resize?.disconnect();
+    this.#resize = null;
+  }
+
+  /* ---------------------------------------------------------- autoplay */
+
+  #toggleAutoplay() {
+    const autoplay = this.#swiper?.autoplay;
+    if (!autoplay) return;
+
+    if (autoplay.running) {
+      autoplay.stop();
+      this.refs.pause?.setAttribute('aria-pressed', 'true');
+    } else {
+      autoplay.start();
+      this.refs.pause?.setAttribute('aria-pressed', 'false');
     }
-  };
+  }
+
+  /**
+   * Autoplay stops permanently at the first touch or drag. A slideshow that
+   * resumes after the customer has taken control is the most common complaint
+   * about carousels, and pausing on hover does not help a touch device.
+   */
+  #onInteract() {
+    if (this.#interacted) return;
+    this.#interacted = true;
+
+    this.#swiper?.autoplay?.stop();
+    if (this.refs.pause) this.refs.pause.hidden = true;
+  }
+
+  #reflectAutoplay() {
+    if (!this.refs.pause) return;
+
+    const running = Boolean(this.#swiper?.autoplay?.running);
+    this.refs.pause.hidden = !running;
+    this.refs.pause.setAttribute('aria-pressed', running ? 'false' : 'true');
+  }
+
+  /* -------------------------------------------------------------- a11y */
+
+  /**
+   * Announces the position and publishes a change event.
+   *
+   * The bundled Swiper has no A11y module, so nothing else does this. The
+   * region is polite and carries only the position — the slide content is in
+   * the reading order already and repeating it would be noise.
+   *
+   * @param {import('swiper').Swiper} swiper
+   */
+  #onChange(swiper) {
+    const index = swiper.realIndex + 1;
+    const count = swiper.slides.length;
+
+    renderControls(this.#controls, index, count, this.#progressOf(swiper));
+
+    if (this.refs.status) {
+      this.refs.status.textContent = themeString('carouselPosition', `${index} / ${count}`, {
+        index,
+        count,
+      });
+    }
+
+    this.dispatch(EVENTS.CAROUSEL_CHANGE, { index: swiper.realIndex, count });
+  }
+
+  /**
+   * Bar-only update. Runs on every translate, so it deliberately does not touch
+   * the numbers or the live region — announcing a position sixty times a second
+   * during a drag is not an improvement.
+   *
+   * @param {import('swiper').Swiper} swiper
+   */
+  #onProgress(swiper) {
+    const bar = this.#controls.bar;
+    if (!bar) return;
+
+    const value = Math.min(Math.max(this.#progressOf(swiper), 0), 1);
+    bar.style.setProperty('--carousel-progress', String(value));
+  }
+
+  /**
+   * Swiper reports `progress: 0` forever when the slides already fit and
+   * nothing can scroll. An empty bar in that state reads as broken, so it is
+   * filled instead — there is nowhere left to go, which is what full means.
+   *
+   * @param {import('swiper').Swiper} swiper
+   * @returns {number}
+   */
+  #progressOf(swiper) {
+    if (swiper.isLocked) return 1;
+    return swiper.progress;
+  }
 }
 
 defineComponent('swiper-carousel', SwiperCarousel);
-
-/**
- * `<carousel-component>` — the same class under the name the architecture
- * document uses for the unified engine.
- *
- * An alias rather than a rename. Five sections already ship `<swiper-carousel>`
- * in their markup, and a merchant who customised one of them would find it inert
- * after a theme update. Registering the same class twice costs nothing at
- * runtime and means both names work forever.
- *
- * New markup should use `<carousel-component>`; the older name stays supported.
- */
-defineComponent('carousel-component', class CarouselComponent extends SwiperCarousel {});
-
-export default SwiperCarousel;

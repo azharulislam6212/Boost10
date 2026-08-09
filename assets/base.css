@@ -1190,65 +1190,6 @@
     transition: max-block-size var(--transition-base);
   }
 
-  /* ---- carousel -------------------------------------------------------- */
-
-  swiper-carousel {
-    position: relative;
-  }
-
-  swiper-carousel [data-ref='track'] {
-    display: flex;
-    gap: var(--grid-gap-x);
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-    scrollbar-width: none;
-  }
-
-  swiper-carousel [data-ref='track']::-webkit-scrollbar { display: none; }
-
-  swiper-carousel [data-slide] {
-    flex: 0 0 auto;
-    scroll-snap-align: start;
-  }
-
-  swiper-carousel [data-ref='previous'],
-  swiper-carousel [data-ref='next'] {
-    position: absolute;
-    inset-block-start: 50%;
-    z-index: 2;
-    display: grid;
-    place-items: center;
-    inline-size: 4rem;
-    block-size: 4rem;
-    border: 1px solid var(--color-slider-arrow-border);
-    border-radius: 50%;
-    background-color: var(--color-slider-arrow-background);
-    color: var(--color-slider-arrow-icon);
-    transform: translateY(-50%);
-  }
-
-  swiper-carousel [data-ref='previous'] { inset-inline-start: var(--space-3); }
-  swiper-carousel [data-ref='next'] { inset-inline-end: var(--space-3); }
-
-  swiper-carousel [data-ref='previous']:hover,
-  swiper-carousel [data-ref='next']:hover {
-    background-color: var(--color-slider-arrow-background-hover);
-    border-color: var(--color-slider-arrow-border-hover);
-    color: var(--color-slider-arrow-icon-hover);
-  }
-
-  swiper-carousel [data-ref='previous'][disabled],
-  swiper-carousel [data-ref='next'][disabled] { opacity: 0.35; pointer-events: none; }
-
-  [data-indicator] {
-    inline-size: 0.8rem;
-    block-size: 0.8rem;
-    border-radius: 50%;
-    background-color: var(--color-slider-indicator);
-  }
-
-  [data-indicator][data-active] { background-color: var(--color-slider-indicator-active); }
-
   /* ---- product media --------------------------------------------------- */
 
   .product-media__stage {
@@ -1820,10 +1761,8 @@
 
   /* ---- announcement bar ------------------------------------------------ */
 
-  .announcement-bar { text-align: center; font-size: var(--font-size-sm); }
+  /* .announcement-bar { text-align: center; font-size: var(--font-size-sm); }
   .announcement-bar__carousel { position: relative; }
-  .announcement-bar__track { display: flex; overflow: hidden; }
-  .announcement-bar__slide { flex: 0 0 100%; }
   .announcement__text { display: block; text-decoration: none; }
 
   .announcement-bar__arrow {
@@ -1833,7 +1772,7 @@
   }
 
   .announcement-bar__arrow:first-of-type { inset-inline-start: 0; }
-  .announcement-bar__arrow:last-of-type { inset-inline-end: 0; }
+  .announcement-bar__arrow:last-of-type { inset-inline-end: 0; } */
 
   /* ---- footer ---------------------------------------------------------- */
 
@@ -5063,21 +5002,21 @@ sticky-header[data-transparent] .header__logo-image--transparent { opacity: 1; }
 
 
 /* ==========================================================================
-   Responsive product grid (was phase3a.css)
+   Carousel — Swiper-backed
+   ==========================================================================
+   Three pieces, styled independently because they are rendered independently:
+
+     .carousel-shell     the container and its track
+     .carousel-nav       a bare previous/next pair
+     .carousel-controls  the combined bar — arrows, position, progress
+
+   None of them uses a descendant selector on the carousel, because any of them
+   can be rendered outside it. A section header holding the controls is not a
+   descendant of anything.
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
-   1. The unified grid / carousel track
-   --------------------------------------------------------------------------
-   One set of nodes, two behaviours.
-
-   Grid mode is a plain CSS grid. Carousel mode is the *same* grid switched to
-   `grid-auto-flow: column` with scroll snapping — not a flexbox, because
-   keeping the grid means the column-count custom properties mean the same
-   thing in both modes and the item widths do not have to be restated.
-
-   Mobile is the base and desktop is the override, so a section renders as its
-   mobile layout before the media query is evaluated rather than reflowing.
+   1. Container
    -------------------------------------------------------------------------- */
 
 .carousel-shell {
@@ -5085,256 +5024,496 @@ sticky-header[data-transparent] .header__logo-image--transparent { opacity: 1; }
   display: block;
 }
 
+/* Arrows sitting outside the track need room, and `overflow: hidden` from
+   swiper.css would clip them. Applied for that one placement only, so every
+   other layout stays flush with the container. */
+@media screen and (min-width: 990px) {
+  .carousel-shell--nav-outside {
+    --carousel-nav-gutter: calc(var(--carousel-nav-size, 44px) + var(--space-3));
+
+    padding-inline: var(--carousel-nav-gutter);
+  }
+}
+
+
+/* --------------------------------------------------------------------------
+   2. The track — a grid until Swiper takes it
+   --------------------------------------------------------------------------
+   One set of nodes, two behaviours, decided by whether Swiper initialised.
+
+   `swiper-initialized` is added by Swiper and removed by `destroy(true, true)`,
+   so this class is the single source of truth for which layout is live. Keying
+   off `data-layout` in CSS *and* in JS is how the two came to disagree during a
+   breakpoint change.
+
+   The grid branch has to beat swiper.css's `.swiper-wrapper { display: flex }`,
+   which is why it hangs off `:not(.swiper-initialized)` rather than the track.
+   -------------------------------------------------------------------------- */
+
 .carousel-shell__track {
-  display: grid;
-  gap: var(--grid-gap-vertical, var(--space-6)) var(--grid-gap-horizontal, var(--space-4));
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+.carousel-shell:not(.swiper-initialized) > .carousel-shell__track {
+  display: grid;
+  gap: var(--grid-gap-y) var(--grid-gap-x);
   grid-template-columns: repeat(var(--columns-mobile, 1), minmax(0, 1fr));
 }
 
 @media screen and (min-width: 750px) {
-  .carousel-shell__track {
+  .carousel-shell:not(.swiper-initialized) > .carousel-shell__track {
     grid-template-columns: repeat(var(--columns-tablet, 2), minmax(0, 1fr));
   }
 }
 
 @media screen and (min-width: 990px) {
-  .carousel-shell__track {
+  .carousel-shell:not(.swiper-initialized) > .carousel-shell__track {
     grid-template-columns: repeat(var(--columns-desktop, 4), minmax(0, 1fr));
   }
-}
-
-/* ---- carousel behaviour ---- */
-
-/* The shared declarations live in a custom property block applied by both the
-   mobile and desktop selectors, so the two can never drift. */
-.carousel-shell[data-layout-mobile='carousel'] > .carousel-shell__track {
-  grid-auto-flow: column;
-  grid-auto-columns: calc(
-    (100% - (var(--columns-mobile, 1) - 1) * var(--grid-gap-horizontal, var(--space-4))) /
-      var(--columns-mobile, 1)
-  );
-  grid-template-columns: none;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  scroll-snap-type: x mandatory;
-  scrollbar-width: none;
-}
-
-.carousel-shell[data-layout-mobile='carousel'] > .carousel-shell__track::-webkit-scrollbar {
-  display: none;
-}
-
-.carousel-shell[data-layout-mobile='carousel'] > .carousel-shell__track > * {
-  scroll-snap-align: start;
-}
-
-@media screen and (min-width: 750px) {
-  /* Tablet inherits the desktop layout choice, because a merchant picking
-     "grid on desktop, carousel on mobile" means the phone, not the iPad. */
-  .carousel-shell[data-layout='grid'] > .carousel-shell__track {
-    grid-auto-flow: row;
-    grid-template-columns: repeat(var(--columns-tablet, 2), minmax(0, 1fr));
-    overflow-x: visible;
-    scroll-snap-type: none;
-  }
-
-  .carousel-shell[data-layout='carousel'] > .carousel-shell__track {
-    grid-auto-flow: column;
-    grid-auto-columns: calc(
-      (100% - (var(--columns-tablet, 2) - 1) * var(--grid-gap-horizontal, var(--space-4))) /
-        var(--columns-tablet, 2)
-    );
-    grid-template-columns: none;
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-    scroll-snap-type: x mandatory;
-    scrollbar-width: none;
-  }
-
-  .carousel-shell[data-layout='carousel'] > .carousel-shell__track > * {
-    scroll-snap-align: start;
-  }
-}
-
-@media screen and (min-width: 990px) {
-  .carousel-shell[data-layout='grid'] > .carousel-shell__track {
-    grid-template-columns: repeat(var(--columns-desktop, 4), minmax(0, 1fr));
-  }
-
-  .carousel-shell[data-layout='carousel'] > .carousel-shell__track {
-    grid-auto-columns: calc(
-      (100% - (var(--columns-desktop, 4) - 1) * var(--grid-gap-horizontal, var(--space-4))) /
-        var(--columns-desktop, 4)
-    );
-  }
-}
-
-/* Smooth scrolling only where the customer has not asked otherwise. */
-@media (prefers-reduced-motion: no-preference) {
-  .carousel-shell__track { scroll-behavior: smooth; }
 }
 
 
 /* --------------------------------------------------------------------------
-   2. Controls — visible only where the layout is actually a carousel
+   3. Slides
    --------------------------------------------------------------------------
-   `display: none` rather than `visibility: hidden`: a hidden-but-present button
-   stays in the tab order, and a keyboard user tabbing into "next slide" on a
-   static grid has no way to understand what happened.
+   Slides carry the real `swiper-slide` class, added by the component at init
+   and removed on destroy. So swiper.css does the work: `position: relative`,
+   `flex-shrink: 0`, the transition property, and every effect rule that hangs
+   off `.swiper-fade .swiper-slide` and friends.
+
+   The theme only has to correct one thing. swiper.css sets `height: 100%` on
+   slides, which is right inside a flex track and wrong for a card whose height
+   comes from its own content — it makes every card in a row as tall as the
+   track rather than as tall as it needs to be.
    -------------------------------------------------------------------------- */
 
-.carousel-shell__arrow {
+.carousel-shell.swiper-initialized .swiper-slide {
+  block-size: auto;
+}
+
+/* At a grid breakpoint the class is gone, so nothing from swiper.css applies to
+   the items. This rule is the belt-and-braces for the frame between a
+   breakpoint change and the component reacting to it. */
+.carousel-shell:not(.swiper-initialized) > .carousel-shell__track > * {
+  inline-size: auto;
+  block-size: auto;
+}
+
+
+/* --------------------------------------------------------------------------
+   4. Shared button
+   --------------------------------------------------------------------------
+   `.carousel-nav` and `.carousel-controls` draw the same button, so it is
+   defined once and both reference it.
+
+   Two visual roles. `ghost` is an outlined circle; `solid` inverts the
+   scheme's own arrow colours, so the icon colour becomes the fill and the
+   background colour becomes the glyph. That needs no extra settings and
+   follows the scheme — in the default scheme it renders as a dark disc with a
+   white arrow.
+   -------------------------------------------------------------------------- */
+
+.carousel-button {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  inline-size: var(--carousel-nav-size, 44px);
+  block-size: var(--carousel-nav-size, 44px);
+  padding: 0;
+  border: 1px solid var(--color-slider-arrow-border);
+  border-radius: var(--carousel-nav-radius, 50%);
+  background-color: var(--color-slider-arrow-background);
+  background-image: var(--carousel-nav-background, none);
+  color: var(--color-slider-arrow-icon);
+  cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease,
+    opacity 150ms ease;
+}
+
+.carousel-button:hover {
+  border-color: var(--color-slider-arrow-border-hover);
+  background-color: var(--color-slider-arrow-background-hover);
+  background-image: var(--carousel-nav-background-hover, var(--carousel-nav-background, none));
+  color: var(--color-slider-arrow-icon-hover);
+}
+
+.carousel-button--solid {
+  border-color: var(--color-slider-arrow-icon);
+  background-color: var(--color-slider-arrow-icon);
+  color: var(--color-slider-arrow-background);
+}
+
+.carousel-button--solid:hover {
+  border-color: var(--color-slider-arrow-icon-hover);
+  background-color: var(--color-slider-arrow-icon-hover);
+  color: var(--color-slider-arrow-background-hover);
+}
+
+/* A single non-directional glyph is mirrored for "previous" rather than
+   shipping a second icon. Paired icons — chevron, arrow — set their own
+   direction and never get this class. */
+.carousel-button--mirror svg {
+  transform: scaleX(-1);
+}
+
+/* Swiper adds these at the ends and when every slide already fits. */
+.carousel-button--disabled {
+  opacity: 0.35;
+  cursor: default;
+  pointer-events: none;
+}
+
+.carousel-button--locked {
+  display: none;
+}
+
+
+/* --------------------------------------------------------------------------
+   5. Bare navigation pair
+   --------------------------------------------------------------------------
+   Hidden until Swiper is running. Nested pairs match the descendant selector;
+   detached pairs get `data-carousel-active` written by the component, because
+   no selector on the carousel can reach an element outside it.
+   -------------------------------------------------------------------------- */
+
+.carousel-nav {
+  display: none;
+  gap: var(--space-2);
+}
+
+.carousel-shell.swiper-initialized .carousel-nav,
+.carousel-nav[data-carousel-active] {
+  display: flex;
+}
+
+/* ---- outside the track ---- */
+
+/* Absolutely positioned only when nested. A header-mounted pair is laid out by
+   its own container and must not be pulled out of the flow. */
+.carousel-shell > .carousel-nav--outside,
+.carousel-shell > .carousel-nav--inside {
   position: absolute;
   inset-block-start: 50%;
   z-index: 2;
-  display: none;
-  place-items: center;
-  inline-size: 2.75rem;
-  block-size: 2.75rem;
-  border: 1px solid var(--color-border);
-  border-radius: 50%;
-  background-color: var(--color-background);
-  color: var(--color-text);
-  cursor: pointer;
+  justify-content: space-between;
+  pointer-events: none;
   transform: translateY(-50%);
-  transition: opacity 150ms ease, background-color 150ms ease;
 }
 
-.carousel-shell__arrow--previous { inset-inline-start: calc(var(--space-4) * -1); }
-.carousel-shell__arrow--next { inset-inline-end: calc(var(--space-4) * -1); }
+.carousel-shell > .carousel-nav--outside { inset-inline: 0; }
+.carousel-shell > .carousel-nav--inside { inset-inline: var(--space-3); }
 
-/* Physical property, so RTL has to swap. The chevron glyphs are swapped by the
-   component, which already knows the direction. */
-[dir='rtl'] .carousel-shell__arrow { transform: translateY(-50%) scaleX(-1); }
-
-.carousel-shell__arrow:hover { background-color: var(--color-secondary-background); }
-
-.carousel-shell__arrow[disabled] {
-  opacity: 0.35;
-  cursor: default;
+.carousel-shell > .carousel-nav--outside .carousel-button,
+.carousel-shell > .carousel-nav--inside .carousel-button {
+  pointer-events: auto;
 }
 
-.carousel-shell[data-layout-mobile='carousel'] .carousel-shell__arrow,
-.carousel-shell[data-layout-mobile='carousel'] .carousel-shell__pause,
-.carousel-shell[data-layout-mobile='carousel'] .carousel-shell__dots,
-.carousel-shell[data-layout-mobile='carousel'] carousel-pagination {
-  display: grid;
+/* Below 990px there is no gutter outside the container for the arrows to sit
+   in, so `outside` becomes `inside` rather than disappearing.
+
+   It used to be `display: none` here, which meant a merchant who picked the
+   default position saw no arrows at all on a laptop, a tablet or a phone — and
+   reported the navigation as broken, correctly. */
+@media screen and (max-width: 989px) {
+  .carousel-shell > .carousel-nav--outside {
+    inset-inline: var(--space-3);
+  }
 }
 
-@media screen and (min-width: 750px) {
-  .carousel-shell[data-layout='grid'] .carousel-shell__arrow,
-  .carousel-shell[data-layout='grid'] .carousel-shell__pause,
-  .carousel-shell[data-layout='grid'] .carousel-shell__dots,
-  .carousel-shell[data-layout='grid'] carousel-pagination {
+/* On a phone the arrows overlap a full-width slide badly and swipe is the
+   primary gesture, so they do go away — but only there. */
+@media screen and (max-width: 599px) {
+  .carousel-shell > .carousel-nav--outside,
+  .carousel-shell > .carousel-nav--inside {
     display: none;
   }
-
-  .carousel-shell[data-layout='carousel'] .carousel-shell__arrow,
-  .carousel-shell[data-layout='carousel'] .carousel-shell__pause,
-  .carousel-shell[data-layout='carousel'] .carousel-shell__dots,
-  .carousel-shell[data-layout='carousel'] carousel-pagination {
-    display: grid;
-  }
 }
 
-/* Arrows would overlap the content on narrow viewports where there is no room
-   outside the container. */
-@media screen and (max-width: 749px) {
-  .carousel-shell__arrow { display: none !important; }
+/* ---- below the track ---- */
+
+.carousel-shell > .carousel-nav--bottom {
+  position: static;
+  justify-content: center;
+  margin-block-start: var(--space-5);
+}
+
+/* ---- inline, for a section header ---- */
+
+/* No positioning at all. The section's own header lays it out. */
+.carousel-nav--inline {
+  position: static;
 }
 
 
 /* --------------------------------------------------------------------------
-   3. Pagination styles
+   6. Controls bar
+   --------------------------------------------------------------------------
+   Previous, position, progress, total, next — one row.
+
+   The numbers are zero-padded by the component rather than by CSS, because
+   `counter-reset` cannot read a value out of JavaScript and a padded string is
+   what a screen reader should hear anyway.
+
+   The bar is a scaled pseudo-track rather than a `<progress>`: progress
+   elements cannot be styled consistently across engines, and this one is
+   decoration — the real position is in the numbers beside it and in the live
+   region.
    -------------------------------------------------------------------------- */
 
-.carousel-shell__dots {
-  grid-auto-flow: column;
-  justify-content: center;
-  gap: var(--space-2);
+.carousel-controls {
+  display: none;
+  align-items: center;
+  gap: var(--space-4);
+  inline-size: 100%;
+}
+
+.carousel-shell.swiper-initialized .carousel-controls,
+.carousel-controls[data-carousel-active] {
+  display: flex;
+}
+
+.carousel-controls--center { justify-content: center; }
+.carousel-controls--end { justify-content: flex-end; }
+
+/* Below the track by default. `inline` drops the margin so a section header can
+   place it beside a heading. */
+.carousel-shell > .carousel-controls {
+  margin-block-start: var(--space-6);
+}
+
+.carousel-controls--inline {
+  inline-size: auto;
+  margin-block-start: 0;
+}
+
+.carousel-controls__count {
+  flex: 0 0 auto;
+  font-size: var(--carousel-count-size, var(--font-size-lg));
+  font-weight: var(--font-weight-bold, 700);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--color-heading);
+}
+
+/* The total is quieter than the current position — it is context, not state. */
+.carousel-controls__count--total {
+  color: var(--color-accent-text);
+}
+
+.carousel-controls__progress {
+  position: relative;
+  flex: 1 1 auto;
+  min-inline-size: 6rem;
+  max-inline-size: var(--carousel-progress-width, 40rem);
+  block-size: var(--carousel-progress-height, 6px);
+  border-radius: var(--carousel-progress-radius, 0);
+  background-color: var(--color-slider-indicator);
+  overflow: hidden;
+}
+
+/* `scaleX` on a transform rather than an animated `inline-size`, so the change
+   stays on the compositor and does not lay out the row on every slide. */
+.carousel-controls__bar {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background-color: var(--color-slider-indicator-active);
+  background-image: var(--carousel-bar-background, none);
+  transform: scaleX(var(--carousel-progress, 0));
+  transform-origin: left center;
+  transition: transform 300ms var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+}
+
+[dir='rtl'] .carousel-controls__bar {
+  transform-origin: right center;
+}
+
+/* On a phone the bar is the first thing to go: two numbers and two arrows
+   already say everything, and a 60px track says nothing. */
+@media screen and (max-width: 749px) {
+  .carousel-controls {
+    gap: var(--space-3);
+  }
+
+  .carousel-controls__progress {
+    min-inline-size: 4rem;
+  }
+}
+
+
+/* --------------------------------------------------------------------------
+   7. Pagination
+   --------------------------------------------------------------------------
+   One empty element per carousel; Swiper's Pagination module renders bullets,
+   a fraction or a progress bar into it. Which one comes from
+   `pagination.type` in `data-options`, so each block styles what Swiper made.
+   -------------------------------------------------------------------------- */
+
+.carousel-shell__dots,
+.carousel-shell__counter,
+.carousel-shell__progress {
+  display: none;
   margin-block-start: var(--space-5);
 }
 
+.carousel-shell.swiper-initialized .carousel-shell__dots,
+.carousel-shell.swiper-initialized .carousel-shell__counter,
+.carousel-shell.swiper-initialized .carousel-shell__progress {
+  display: block;
+}
+
+.carousel-shell__pagination--locked { display: none; }
+
+/* ---- bullets ---- */
+
+.carousel-shell__dots {
+  position: static;
+  text-align: center;
+}
+
 .carousel-shell__dot {
-  inline-size: 0.5rem;
-  block-size: 0.5rem;
+  display: inline-block;
+  inline-size: var(--carousel-dot-size, 0.8rem);
+  block-size: var(--carousel-dot-size, 0.8rem);
+  margin-inline: var(--space-1);
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background-color: var(--color-border);
+  background-color: var(--color-slider-indicator);
   cursor: pointer;
   transition: background-color 150ms ease, transform 150ms ease;
 }
 
-.carousel-shell__dot[aria-current='true'] {
-  background-color: var(--color-text);
+.carousel-shell__dot--active {
+  background-color: var(--color-slider-indicator-active);
   transform: scale(1.3);
 }
 
-/* ---- numbers ---- */
+/* ---- fraction ---- */
 
 .carousel-shell__counter {
-  grid-auto-flow: column;
-  justify-content: center;
-  gap: var(--space-1);
-  margin-block-start: var(--space-5);
+  position: static;
+  text-align: center;
   font-size: var(--font-size-sm);
   font-variant-numeric: tabular-nums;
   color: var(--color-accent-text);
 }
 
-.carousel-shell__counter-current { color: var(--color-text); }
+.carousel-shell__counter .swiper-pagination-current {
+  color: var(--color-slider-indicator-active);
+}
 
 /* ---- progress bar ---- */
 
 .carousel-shell__progress {
   position: relative;
   block-size: 2px;
-  margin-block-start: var(--space-5);
-  background-color: var(--color-border);
+  background-color: var(--color-slider-indicator);
   overflow: hidden;
 }
 
-.carousel-shell__progress-bar {
-  position: absolute;
-  inset: 0;
-  background-color: var(--color-text);
-  transform: scaleX(var(--progress, 0));
-  transform-origin: left center;
-  transition: transform 200ms ease;
+.carousel-shell__progress .swiper-pagination-progressbar-fill {
+  background-color: var(--color-slider-indicator-active);
 }
 
-[dir='rtl'] .carousel-shell__progress-bar { transform-origin: right center; }
 
-@media (prefers-reduced-motion: reduce) {
-  .carousel-shell__progress-bar { transition: none; }
-}
-
-/* ---- pause ---- */
+/* --------------------------------------------------------------------------
+   8. Pause control
+   -------------------------------------------------------------------------- */
 
 .carousel-shell__pause {
   position: absolute;
   inset-block-end: var(--space-3);
   inset-inline-end: var(--space-3);
   z-index: 2;
+  display: grid;
   place-items: center;
   inline-size: 2rem;
   block-size: 2rem;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-slider-arrow-border);
   border-radius: 50%;
-  background-color: var(--color-background);
+  background-color: var(--color-slider-arrow-background);
+  color: var(--color-slider-arrow-icon);
   cursor: pointer;
 }
 
-/* `[hidden]` has to beat the `display: grid` rules above. This is the one place
-   in this file where that ordering is load-bearing. */
-.carousel-shell__pause[hidden],
-.carousel-shell__dots[hidden],
-carousel-pagination[hidden] {
-  display: none !important;
+/* `[hidden]` has to beat `display: grid`. The one place in this section where
+   ordering is load-bearing. */
+.carousel-shell__pause[hidden] { display: none !important; }
+
+
+/* --------------------------------------------------------------------------
+   8b. Announcement bar slides
+   --------------------------------------------------------------------------
+   `.announcement` is the slide. swiper.css sets `display: block` on
+   `.swiper-slide` and is unlayered, so it beat the `display: flex` that
+   `@layer components` gives `.announcement` and the text lost its centring the
+   moment Swiper mounted.
+
+   Two classes rather than one, so this only applies to announcements acting as
+   slides — the same block rendered in marquee mode keeps its own rules.
+   -------------------------------------------------------------------------- */
+
+/* .announcement-bar__carousel .swiper-slide {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  block-size: auto;
+} */
+
+
+/* --------------------------------------------------------------------------
+   9. Product media gallery controls
+   --------------------------------------------------------------------------
+   The gallery is not a Swiper carousel — `media-gallery.js` coordinates zoom,
+   video and the thumbnail strip — but it renders the same controls, so it gets
+   the same look for free. Only the placement differs.
+   -------------------------------------------------------------------------- */
+
+.product-media {
+  position: relative;
+}
+
+.product-media .carousel-nav,
+.product-media .carousel-controls {
+  display: flex;
+}
+
+.product-media > .carousel-nav {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline: var(--space-3);
+  z-index: 2;
+  justify-content: space-between;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.product-media > .carousel-nav .carousel-button { pointer-events: auto; }
+
+.product-media > .carousel-controls {
+  margin-block-start: var(--space-4);
+}
+
+
+/* --------------------------------------------------------------------------
+   10. Reduced motion
+   -------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .carousel-shell__item,
+  .carousel-shell__dot,
+  .carousel-button,
+  .carousel-controls__bar,
+  .carousel-shell__progress .swiper-pagination-progressbar-fill {
+    transition: none;
+  }
 }
 
 
@@ -5695,7 +5874,7 @@ announcement-bar {
 /* Dismissible bars start hidden and are revealed by the component once it has
    checked storage. Without this a returning customer sees the bar paint and
    then vanish, which is more disruptive than the bar itself. */
-announcement-bar[data-dismissible]:not([data-ready]) { display: none; }
+/* announcement-bar[data-dismissible]:not([data-ready]) { display: none; }
 announcement-bar[data-dismissed] { display: none; }
 
 .announcement-bar__inner {
@@ -5714,9 +5893,7 @@ announcement-bar[data-dismissed] { display: none; }
   flex-shrink: 0;
   display: grid;
   place-items: center;
-  /* 24px is the WCAG 2.5.8 minimum target. The icon inside stays small; it is
-     the hit area that has to grow, which is why this is a size and not a font
-     change. */
+ 
   inline-size: 2.4rem;
   block-size: 2.4rem;
   padding: 0;
@@ -5728,7 +5905,7 @@ announcement-bar[data-dismissed] { display: none; }
   transition: opacity 150ms ease;
 }
 
-.announcement-bar__close:hover { opacity: 1; }
+.announcement-bar__close:hover { opacity: 1; } */
 
 /* ---- mobile visibility ---- */
 
@@ -5740,7 +5917,7 @@ announcement-bar[data-dismissed] { display: none; }
 
 /* The marquee viewport must clip, or the cloned track spills across the page
    before the animation starts. */
-.announcement-bar__marquee {
+/* .announcement-bar__marquee {
   overflow: hidden;
 }
 
@@ -5753,7 +5930,7 @@ announcement-bar[data-dismissed] { display: none; }
 
 .announcement-bar .marquee__track .announcement {
   flex-shrink: 0;
-}
+} */
 
 
 /* ==========================================================================

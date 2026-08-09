@@ -49,6 +49,16 @@
   assign ratio = s.gallery_image_ratio | default: 'adapt'
   assign thumbs_position = s.thumbnails_position | default: 'thumbnails-below'
   assign pagination = s.pagination_type | default: 'thumbnails'
+
+  # `navigation` offers none | arrows | chevrons; the last two differ only by
+  # glyph, so the value maps straight onto an icon name.
+  assign nav_style = s.navigation | default: 'arrows'
+  case nav_style
+    when 'chevrons'
+      assign nav_icon = 'chevron'
+    else
+      assign nav_icon = 'arrow'
+  endcase
   assign current = product.selected_or_first_available_variant
 
   assign media_items = product.media
@@ -92,6 +102,7 @@
 -%}
 
 <media-gallery
+  id="gallery-{{ section.id }}"
   class="product-media product-media--{{ layout }} product-media--{{ thumbs_position }}"
   data-layout="{{ layout }}"
   data-section-id="{{ section.id }}"
@@ -288,6 +299,30 @@
         </button>
       {%- endfor -%}
     </media-thumbnails>
+  {%- endif -%}
+
+  {%- comment -%}
+    ---------- Navigation and position ----------
+    `navigation` and two of the three `pagination_type` values had no markup at
+    all: only thumbnails were ever rendered, so a merchant choosing "arrows" or
+    "fraction" changed nothing on the page.
+
+    Both now render the shared control components, so the gallery inherits the
+    icon, size, colour and gradient settings the collection carousels use and
+    the two cannot drift apart. `media-gallery.js` drives them through
+    `@theme/carousel-controls`; no Swiper is involved.
+  {%- endcomment -%}
+  {%- if product.media.size > 1 -%}
+    {%- if pagination == 'controls' -%}
+      {% render 'carousel-controls', settings: s, align: 'center' %}
+    {%- else -%}
+      {%- if nav_style != 'none' -%}
+        {% render 'carousel-nav',
+           settings: s,
+           icon: nav_icon,
+           position: 'inside' %}
+      {%- endif -%}
+    {%- endif -%}
   {%- endif -%}
 
   {%- comment -%}

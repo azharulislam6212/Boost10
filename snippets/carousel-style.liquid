@@ -1,0 +1,76 @@
+{% doc %}
+  Emits the per-carousel colour custom properties as an inline `style` value.
+
+  ## The colour model
+
+  Arrow and dot colours already exist in every colour scheme —
+  `slider_arrow_icon`, `slider_arrow_background`, `slider_arrow_border`, their
+  hover pairs, `slider_indicator_color` and `slider_indicator_active_color`. A
+  merchant who changes a scheme changes every carousel in the store, which is
+  what a scheme is for.
+
+  So this snippet emits nothing at all unless `carousel_custom_colors` is
+  ticked. That is the point: the default path costs zero bytes per section, and
+  only a merchant who wants this one carousel to differ pays for the override.
+
+  ## Gradient
+
+  `carousel_nav_style` can be `gradient`, which paints the arrow background from
+  `carousel_nav_gradient` instead of a flat colour, and the progress bar to
+  match. Border and icon stay flat — a gradient border needs `border-image`,
+  which cannot follow a `border-radius`, and a gradient icon needs the
+  `background-clip: text` trick that makes an 18px glyph illegible.
+
+  Parameters:
+    settings (object, required)  Section settings
+
+  @example
+    <swiper-carousel style="{% render 'carousel-style', settings: section.settings %}">
+{% enddoc %}
+
+{%- if settings.carousel_custom_colors -%}
+  {%- liquid
+    assign nav_style = settings.carousel_nav_style | default: 'solid'
+  -%}
+  {%- capture custom_colors -%}
+    {%- if settings.carousel_nav_icon_color != blank -%}
+      --color-slider-arrow-icon: {{ settings.carousel_nav_icon_color }};
+    {%- endif -%}
+    {%- if settings.carousel_nav_border_color != blank -%}
+      --color-slider-arrow-border: {{ settings.carousel_nav_border_color }};
+    {%- endif -%}
+    {%- if settings.carousel_nav_icon_hover != blank -%}
+      --color-slider-arrow-icon-hover: {{ settings.carousel_nav_icon_hover }};
+    {%- endif -%}
+    {%- if settings.carousel_nav_border_hover != blank -%}
+      --color-slider-arrow-border-hover: {{ settings.carousel_nav_border_hover }};
+    {%- endif -%}
+
+    {%- comment -%}
+      Solid and gradient write different properties, so the unused one is left
+      undeclared rather than set to `none` — the stylesheet's `var()` fallback
+      is what picks the scheme colour back up.
+    {%- endcomment -%}
+    {%- case nav_style -%}
+      {%- when 'gradient' -%}
+        --carousel-nav-background: {{ settings.carousel_nav_gradient | default: 'var(--gradient-primary)' }};
+        --carousel-nav-background-hover: {{ settings.carousel_nav_gradient_hover | default: settings.carousel_nav_gradient | default: 'var(--gradient-primary)' }};
+        --carousel-bar-background: {{ settings.carousel_nav_gradient | default: 'var(--gradient-primary)' }};
+      {%- else -%}
+        {%- if settings.carousel_nav_bg != blank -%}
+          --color-slider-arrow-background: {{ settings.carousel_nav_bg }};
+        {%- endif -%}
+        {%- if settings.carousel_nav_bg_hover != blank -%}
+          --color-slider-arrow-background-hover: {{ settings.carousel_nav_bg_hover }};
+        {%- endif -%}
+    {%- endcase -%}
+
+    {%- if settings.carousel_dot_color != blank -%}
+      --color-slider-indicator: {{ settings.carousel_dot_color }};
+    {%- endif -%}
+    {%- if settings.carousel_dot_active_color != blank -%}
+      --color-slider-indicator-active: {{ settings.carousel_dot_active_color }};
+    {%- endif -%}
+  {%- endcapture -%}
+  {{- custom_colors | strip_newlines | strip -}}
+{%- endif -%}

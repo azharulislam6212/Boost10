@@ -1,0 +1,122 @@
+{% doc %}
+  Arrows, position, progress and total in one row.
+
+    ( ← )   01  ▬▬▬▬▬▬▭▭▭▭▭  05   ( → )
+
+  ## Why this is not a pagination type
+
+  Swiper's Pagination module renders bullets, a fraction *or* a progress bar
+  into one element. This is all three ideas at once plus the navigation, in a
+  fixed order, with the numbers zero-padded. There is no `type` that produces
+  it, so the component fills it in from `slideChange` instead — see
+  `assets/carousel.js`.
+
+  That also means it works on the product media gallery, which is not a Swiper
+  carousel at all. `media-gallery.js` writes the same three refs.
+
+  ## The two button roles
+
+  `split` is the design above: an outlined previous and a filled next. The
+  filled one inverts the scheme's own arrow colours — the icon colour becomes
+  the fill and the background colour becomes the glyph — so it needs no extra
+  settings and a merchant changing the scheme changes both.
+
+  `ghost` and `solid` make the pair match.
+
+  ## Placement
+
+  Rendered inside a carousel it sits under the track. Rendered anywhere else,
+  pass `carousel:` with the carousel's id and it links up from across the document —
+  a section header, a sticky bar, the opposite column.
+
+  Parameters:
+    settings (object)  Section settings
+    carousel (string)  Carousel element id. Omit when nested inside it.
+    style    (string)  split | ghost | solid. Default from settings.
+    icon     (string)  Icon name. Default from settings.
+    size     (number)  Button diameter in px. Default from settings.
+    align    (string)  start | center | end | inline
+    classes  (string)  Extra classes
+
+  @example
+    {% render 'carousel-controls', settings: section.settings %}
+    {% render 'carousel-controls', carousel: carousel_id, align: 'inline', settings: section.settings %}
+{% enddoc %}
+
+{%- liquid
+  assign icon_name = icon | default: settings.carousel_nav_icon | default: 'arrow'
+  assign btn_style = style | default: settings.carousel_controls_style | default: 'split'
+  assign btn_size = size | default: settings.carousel_nav_size | default: 44
+  assign icon_size = btn_size | times: 0.4 | round
+  assign placement = align | default: settings.carousel_controls_align | default: 'start'
+
+  # `chevron` and `arrow` are directional pairs. Anything else is one glyph used
+  # for both buttons, mirrored on the previous one by CSS.
+  assign paired = false
+  if icon_name == 'chevron' or icon_name == 'arrow'
+    assign paired = true
+  endif
+
+  if paired
+    assign icon_previous = icon_name | append: '-left'
+    assign icon_next = icon_name | append: '-right'
+  else
+    assign icon_previous = icon_name
+    assign icon_next = icon_name
+  endif
+
+  case btn_style
+    when 'solid'
+      assign class_previous = 'carousel-button--solid'
+      assign class_next = 'carousel-button--solid'
+    when 'ghost'
+      assign class_previous = ''
+      assign class_next = ''
+    else
+      assign class_previous = ''
+      assign class_next = 'carousel-button--solid'
+  endcase
+
+  unless paired
+    assign class_previous = class_previous | append: ' carousel-button--mirror'
+  endunless
+-%}
+
+<div
+  class="carousel-controls carousel-controls--{{ placement }} {{ classes }}"
+  data-carousel-nav
+  style="--carousel-nav-size: {{ btn_size }}px;"
+>
+  <button
+    type="button"
+    class="carousel-button {{ class_previous }}"
+    data-ref="previous"
+    {% if carousel != blank %}data-carousel-for="{{ carousel }}"{% endif %}
+    aria-label="{{ 'accessibility.previous_slide' | t }}"
+  >
+    {% render 'icon', icon: icon_previous, size: icon_size %}
+  </button>
+
+  {%- comment -%}
+    The numbers and the bar are decoration: the position is already announced
+    through the carousel's `role="status"` region, and a second announcement of
+    the same change is noise rather than redundancy.
+  {%- endcomment -%}
+  <span class="carousel-controls__count carousel-controls__count--current" data-ref="current" aria-hidden="true">01</span>
+
+  <div class="carousel-controls__progress" aria-hidden="true">
+    <span class="carousel-controls__bar" data-ref="bar"></span>
+  </div>
+
+  <span class="carousel-controls__count carousel-controls__count--total" data-ref="total" aria-hidden="true">01</span>
+
+  <button
+    type="button"
+    class="carousel-button {{ class_next }}"
+    data-ref="next"
+    {% if carousel != blank %}data-carousel-for="{{ carousel }}"{% endif %}
+    aria-label="{{ 'accessibility.next_slide' | t }}"
+  >
+    {% render 'icon', icon: icon_next, size: icon_size %}
+  </button>
+</div>
