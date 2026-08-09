@@ -1,0 +1,96 @@
+/* ==========================================================================
+   RTL corrections
+
+   Replaces three blocks in base.css: 2958-3004, 4956-4964, 6239-6280.
+   Paste at the end of the file.
+
+   Requires the unlayered tail of base.css (line 4623 onward) to be wrapped in
+   @layer components. Unlayered rules beat layered ones, so without that the
+   drawer, progress-bar and grid-banner rules below will not apply.
+   ========================================================================== */
+
+@layer components {
+  /* ---- directional glyphs ---------------------------------------------- */
+
+  /* Matched on icon name, not on the button, so every component rendering
+     icon.liquid is covered. Never flip a container of one of these — two
+     nested scaleX(-1) cancel out. */
+  [dir='rtl'] .icon--chevron-left,
+  [dir='rtl'] .icon--chevron-right,
+  [dir='rtl'] .icon--arrow-right,
+  [dir='rtl'] .faq-row__chevron,
+  [dir='rtl'] .main-article__nav-link .icon {
+    transform: scaleX(-1);
+  }
+
+  /* Rotates from an already-flipped start, so the flip is carried, not replaced. */
+  [dir='rtl'] .faq-row[open] > .faq-row__summary .faq-row__chevron {
+    transform: scaleX(-1) rotate(-180deg);
+  }
+
+  /* ---- breadcrumbs ------------------------------------------------------ */
+
+  [dir='rtl'] .breadcrumbs__item + .breadcrumbs__item::before {
+    content: '\\';
+  }
+
+  /* ---- numerals in RTL text --------------------------------------------- */
+
+  /* Prices, SKUs and phone numbers read left to right inside right-to-left
+     text. Without isolation the surrounding run reorders them. */
+  [dir='rtl'] .price,
+  [dir='rtl'] .gift-card__code,
+  [dir='rtl'] .order-line__sku,
+  [dir='rtl'] .product-sku__value,
+  [dir='rtl'] .store-card__actions a[href^='tel:'] {
+    direction: ltr;
+    unicode-bidi: isolate;
+  }
+
+  /* An LTR storefront with one RTL product title has the same problem. */
+  .price,
+  .product-sku__value,
+  .order-line__sku {
+    unicode-bidi: isolate;
+  }
+
+  /* ---- transforms ------------------------------------------------------- */
+
+  /* transform is physical and has no logical equivalent, so each directional
+     use needs an explicit counterpart. */
+  [dir='rtl'] .drawer[data-placement='start'] .drawer__dialog:not([open]) .drawer__panel {
+    transform: translateX(100%);
+  }
+
+  [dir='rtl'] .drawer[data-placement='end'] .drawer__dialog:not([open]) .drawer__panel {
+    transform: translateX(-100%);
+  }
+
+  [dir='rtl'] .carousel-shell__progress-bar {
+    transform-origin: right center;
+  }
+
+  /* The lens tracks the pointer in page coordinates, which do not flip. */
+  [dir='rtl'] [data-zooming] .media-zoom__lens {
+    transform: none;
+  }
+
+  /* ---- layout and flow -------------------------------------------------- */
+
+  /* carousel.js normalises scrollLeft with Math.abs(); this lays out the track. */
+  [dir='rtl'] .carousel-shell__track {
+    direction: rtl;
+  }
+
+  /* The browser handles scroll direction; source order is what stays wrong. */
+  [dir='rtl'] .marquee__track {
+    flex-direction: row-reverse;
+  }
+
+  /* Gradients paint along a physical axis. These are vertical and so neutral —
+     declared to give the first horizontal variant a place to live. */
+  [dir='rtl'] .grid-banner--top .grid-banner__content,
+  [dir='rtl'] .grid-banner--bottom .grid-banner__content {
+    background-position: right center;
+  }
+}

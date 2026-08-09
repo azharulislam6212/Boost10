@@ -1,0 +1,184 @@
+{% doc %}
+  Renders every @font-face the merchant's typography settings can actually
+  reach, and preloads only the two faces that block first paint.
+
+  Why this is not a fixed list of four faces
+  ------------------------------------------
+  The typography schema lets a merchant pick any weight from 300 to 900 for
+  paragraph, default, menu, button, h1-h6 and the custom style. A face that is
+  never declared cannot be downloaded, so the browser falls back to CSS font
+  matching: it either snaps the text to the nearest declared weight (a chosen
+  500 silently renders as 400) or synthesises a fake bold. Both look wrong on a
+  premium theme, and both are invisible in the editor, because the merchant
+  sees the same wrong rendering the customer does.
+
+  So the weights are collected from the settings themselves rather than
+  hardcoded. Declaring a face is cheap - it is CSS text in the document head,
+  nothing more. A font file is only fetched when text on the current page
+  actually matches that face, so a page with no <em> never pays for the italic.
+  Preloads are the opposite: eager and unconditional, which is why only two are
+  emitted here.
+
+  Weight resolution
+  -----------------
+  `font_modify` returns nil when the family has no such variant, so every face
+  is nil-guarded. A Google font shipping only 400 and 700 will simply not
+  produce a 500, and CSS font matching handles the fallback - the same outcome
+  as before, but now every family that *does* have the variant gets it.
+
+  Accepts:
+  - (nothing) - reads settings.type_body_font, type_header_font,
+    type_accent_font and the per-role weight settings directly.
+
+  Usage:
+  {% render 'fonts' %}
+{% enddoc %}
+
+{%- liquid
+  assign body_font = settings.type_body_font
+  assign heading_font = settings.type_header_font
+  assign accent_font = settings.type_accent_font | default: settings.type_header_font
+
+  # Accent only earns its own @font-face when it is not already the heading
+  # face. Comparing all three axes matters: a merchant can pick the same family
+  # at a different weight, and that is a genuinely different file.
+  assign accent_is_distinct = true
+  if accent_font.family == heading_font.family and accent_font.style == heading_font.style and accent_font.weight == heading_font.weight
+    assign accent_is_distinct = false
+  endif
+
+  # ---- Seed each family with the weights it always needs -------------------
+  # body: its own picked weight, 700 for <strong>/<b>, and 500 because base.css
+  # uses it for cart item titles, mega-menu headings and other UI labels. If
+  # those hardcoded 500s are ever tokenised, this seed still holds.
+  assign body_weights = body_font.weight | append: ',700,500'
+  assign heading_weights = heading_font.weight | append: ''
+  assign accent_weights = accent_font.weight | append: ''
+
+  # ---- Collect every weight the typography settings can request ------------
+  assign type_roles = 'paragraph,default,menu,button,h1,h2,h3,h4,h5,h6' | split: ','
+
+  for role in type_roles
+    assign family_key = 'type_' | append: role | append: '_font'
+    assign weight_key = 'type_' | append: role | append: '_weight'
+    assign role_family = settings[family_key]
+    assign role_weight = settings[weight_key]
+
+    # 'inherit' means the role takes whatever the cascade gives it, so it adds
+    # no new file requirement of its own.
+    if role_weight == blank or role_weight == 'inherit'
+      continue
+    endif
+
+    case role_family
+      when 'heading'
+        assign heading_weights = heading_weights | append: ',' | append: role_weight
+      when 'accent'
+        assign accent_weights = accent_weights | append: ',' | append: role_weight
+      else
+        assign body_weights = body_weights | append: ',' | append: role_weight
+    endcase
+  endfor
+
+  # The custom style has a weight but no family control, so it can land on
+  # either face depending on where the merchant applies the class.
+  assign custom_weight = settings.type_custom_weight
+  if custom_weight != blank and custom_weight != 'inherit'
+    assign body_weights = body_weights | append: ',' | append: custom_weight
+    assign heading_weights = heading_weights | append: ',' | append: custom_weight
+  endif
+
+  assign body_weight_list = body_weights | split: ',' | uniq | sort
+  assign heading_weight_list = heading_weights | split: ',' | uniq | sort
+  assign accent_weight_list = accent_weights | split: ',' | uniq | sort
+
+  # ---- Italics -------------------------------------------------------------
+  # Only body needs them, and only at two weights: <em>, and <em> inside
+  # <strong>. Loading italic at all seven weights would be dead bytes on every
+  # storefront that never writes emphasised text.
+  assign body_italic = nil
+  assign body_bold_italic = nil
+  if body_font.style != 'italic'
+    assign body_italic = body_font | font_modify: 'style', 'italic'
+    assign body_bold_face = body_font | font_modify: 'weight', 'bold'
+    if body_bold_face
+      assign body_bold_italic = body_bold_face | font_modify: 'style', 'italic'
+    endif
+  endif
+
+  # ---- Preload targets -----------------------------------------------------
+  # Two files, both above the fold on every template: the paragraph face and
+  # the h1 face. Preloading the whole set would push the LCP font behind five
+  # competing requests on a cold connection, which is the exact opposite of
+  # what a preload is for.
+  assign paragraph_weight = settings.type_paragraph_weight | default: body_font.weight
+  if paragraph_weight == 'inherit'
+    assign paragraph_weight = body_font.weight
+  endif
+  assign preload_body = body_font | font_modify: 'weight', paragraph_weight
+  assign preload_body = preload_body | default: body_font
+
+  assign h1_family_key = settings.type_h1_font | default: 'heading'
+  assign h1_face_source = heading_font
+  if h1_family_key == 'accent'
+    assign h1_face_source = accent_font
+  endif
+  assign h1_weight = settings.type_h1_weight | default: 700
+  if h1_weight == 'inherit'
+    assign h1_weight = h1_face_source.weight
+  endif
+  assign preload_heading = h1_face_source | font_modify: 'weight', h1_weight
+  assign preload_heading = preload_heading | default: h1_face_source
+-%}
+
+{%- comment -%}
+  Shopify serves font files from a different origin than the CDN already
+  preconnected in the layout, so the handshake is worth opening early.
+{%- endcomment -%}
+{%- unless body_font.system? and heading_font.system? -%}
+  <link rel="preconnect" href="https://fonts.shopifycdn.com" crossorigin>
+{%- endunless -%}
+
+{%- unless body_font.system? -%}
+  <link rel="preload" as="font" href="{{ preload_body | font_url }}" type="font/woff2" crossorigin>
+{%- endunless -%}
+{%- unless h1_face_source.system? -%}
+  <link rel="preload" as="font" href="{{ preload_heading | font_url }}" type="font/woff2" crossorigin>
+{%- endunless -%}
+
+{% style %}
+  {%- unless body_font.system? -%}
+    {%- for weight in body_weight_list -%}
+      {%- assign face = body_font | font_modify: 'weight', weight -%}
+      {%- if face -%}
+        {{ face | font_face: font_display: 'swap' }}
+      {%- endif -%}
+    {%- endfor -%}
+    {%- if body_italic -%}
+      {{ body_italic | font_face: font_display: 'swap' }}
+    {%- endif -%}
+    {%- if body_bold_italic -%}
+      {{ body_bold_italic | font_face: font_display: 'swap' }}
+    {%- endif -%}
+  {%- endunless -%}
+
+  {%- unless heading_font.system? -%}
+    {%- for weight in heading_weight_list -%}
+      {%- assign face = heading_font | font_modify: 'weight', weight -%}
+      {%- if face -%}
+        {{ face | font_face: font_display: 'swap' }}
+      {%- endif -%}
+    {%- endfor -%}
+  {%- endunless -%}
+
+  {%- if accent_is_distinct -%}
+    {%- unless accent_font.system? -%}
+      {%- for weight in accent_weight_list -%}
+        {%- assign face = accent_font | font_modify: 'weight', weight -%}
+        {%- if face -%}
+          {{ face | font_face: font_display: 'swap' }}
+        {%- endif -%}
+      {%- endfor -%}
+    {%- endunless -%}
+  {%- endif -%}
+{% endstyle %}
