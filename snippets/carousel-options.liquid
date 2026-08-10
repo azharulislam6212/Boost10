@@ -1,41 +1,121 @@
 {% doc %}
   Builds the `data-options` JSON that `<swiper-carousel>` reads.
+
+  ## The contract
+
+  One snippet is the only place in the theme that turns merchant settings into
+  Swiper configuration. Everything it emits is valid JSON — no trailing commas,
+  no bare Liquid values, no `nil` leaking through as an empty token — because a
+  single malformed character makes `JSON.parse` throw and the component falls
+  back to its defaults with the merchant's every setting silently discarded.
+  That is what "the carousel works but none of the settings do" looks like.
+
+  Fragments are collected into an array and joined with a comma at the end
+  rather than each one guessing whether it needs a leading comma. The old
+  version made that guess in five places and `extra` had to be documented as
+  "must start with a comma", which is the kind of contract that breaks the first
+  time somebody uses it.
+
+  ## Units
+
+  `carousel_speed` is the transition duration in **milliseconds** (100–1500) and
+  `carousel_autoplay_delay` is the pause between slides in **seconds** (2–15).
+  They are different controls: a slow fade should not also mean a slow
+  slideshow. Every section schema must define them with those ranges — the
+  announcement bar used to declare `carousel_speed` as 3–12 seconds, so it fed
+  Swiper a five *millisecond* transition and its slides snapped instantly.
+
+  ## Loop
+
+  Swiper needs at least twice `slidesPerView` slides to loop; below that it logs
+  "Not enough slides for loop mode" and turns looping off itself, leaving a
+  carousel that stops dead at the last slide with a merchant setting that says
+  otherwise. Pass `count` and this refuses the setting up front instead.
+
   Parameters:
-    settings   (object, required)
+    settings   (object, required)  Section or block settings
+    count      (number)   Slide count. Enables the loop guard.
     columns_desktop / columns_tablet / columns_mobile (number)
-    pagination (string)  none | dots | numbers | progress | controls
-    extra      (string)  Raw JSON fragment appended verbatim. Must start with a
-                         comma, no trailing comma.
+    pagination (string)   none | dots | numbers | progress | controls
+    autoplay   (boolean)  Overrides `settings.carousel_autoplay`
+    loop       (boolean)  Overrides `settings.carousel_loop`
+    effect     (string)   Overrides `settings.carousel_effect`
+    space_between (number) Gap between slides in px. Omit to let the component
+                          read the grid's own `--grid-gap-x`, which is what
+                          every section wants; pass `0` for a full-bleed strip
+                          such as the product card's image slider.
+    extra      (string)   Raw JSON fragment, **without** a leading or trailing
+                          comma. Joined like every other fragment.
 
   @example
-    <swiper-carousel data-options='{% render "carousel-options", settings: section.settings %}'>
+    <swiper-carousel data-options="{% render 'carousel-options', settings: section.settings, count: 5 %}">
 {% enddoc %}
 
 {%- liquid
   assign cols_desktop = columns_desktop | default: settings.columns_desktop | default: 4
   assign cols_tablet = columns_tablet | default: settings.columns_tablet | default: 2
   assign cols_mobile = columns_mobile | default: settings.columns_mobile | default: 1
-  assign autoplay = settings.carousel_autoplay | default: false
 
-  # Seconds in the editor, milliseconds in Swiper. A merchant thinks "five
-  # seconds"; converting here means neither side has to know about the other.
-  assign delay = settings.carousel_autoplay_delay | default: 5 | times: 1000
-
-  # Transition duration is a separate control from the autoplay interval. They
-  # were one setting before, which is why a slow fade also meant a slow
-  # slideshow.
-  assign speed = settings.carousel_speed | default: 500
-
-  assign loop = settings.carousel_loop | default: false
-  assign effect = settings.carousel_effect | default: 'slide'
+  assign effect_name = effect | default: settings.carousel_effect | default: 'slide'
 
   # Fade cross-fades a stack, so it is only coherent with one slide showing.
   # Left at four columns it renders four cards on top of each other, which is
   # what "the effect setting does nothing" looks like from the outside.
-  if effect == 'fade'
+  if effect_name == 'fade'
     assign cols_desktop = 1
     assign cols_tablet = 1
     assign cols_mobile = 1
+  endif
+
+  # Milliseconds, clamped rather than trusted. A stored value can predate the
+  # current schema: the announcement bar used to declare this setting in
+  # seconds, so live stores hold a `carousel_speed` of 3–12 that would reach
+  # Swiper as a transition no customer could see. Anything under 20 is read as
+  # one of those and falls back to the default rather than being clamped to a
+  # 100ms flick.
+  assign raw_speed = settings.carousel_speed | default: 500 | plus: 0
+  if raw_speed < 20
+    assign raw_speed = 500
+  endif
+  assign speed = raw_speed | at_least: 100 | at_most: 3000
+
+  # Seconds in the editor, milliseconds in Swiper. Converting here means neither
+  # the merchant nor the component has to know about the other.
+  assign delay_seconds = settings.carousel_autoplay_delay | default: 5 | at_least: 1
+  assign delay = delay_seconds | times: 1000
+
+  assign use_autoplay = autoplay
+  if use_autoplay == nil
+    assign use_autoplay = settings.carousel_autoplay
+  endif
+
+  assign use_loop = loop
+  if use_loop == nil
+    assign use_loop = settings.carousel_loop
+  endif
+
+  # The loop guard. `count` is optional, so a caller that cannot count its
+  # slides — a section passing content_for 'blocks' straight through — keeps
+  # the merchant's setting and lets Swiper make the call.
+  # `| default: 0 | plus: 0` is what makes the comparison safe when the caller
+  # omitted `count`: an unset variable compared with `<` is a type error in a
+  # strict Liquid engine, and silently false in a lenient one. Coercing to a
+  # number first means the guard is simply skipped instead.
+  assign slide_count = count | default: 0 | plus: 0
+  if use_loop and slide_count > 0
+    assign loop_minimum = cols_desktop | times: 2
+    if slide_count < loop_minimum
+      assign use_loop = false
+    endif
+  endif
+
+  # Fade animates opacity on a stack that Swiper does not re-order, so looping
+  # it flickers back through every slide on the wrap. Rewind reaches the same
+  # place — back to the first slide — with one transition.
+  assign use_rewind = false
+  if effect_name == 'fade' and use_loop
+    assign use_loop = false
+    assign use_rewind = true
   endif
 
   assign pagination_style = pagination | default: settings.carousel_pagination | default: 'none'
@@ -50,26 +130,72 @@
       assign pagination_type = blank
   endcase
 -%}
-{%- capture options -%}
-{
-  "slidesPerView": {{ cols_mobile }},
-  "breakpoints": {
-    "750": { "slidesPerView": {{ cols_tablet }} },
-    "990": { "slidesPerView": {{ cols_desktop }} }
-  },
-  "speed": {{ speed }},
-  "loop": {{ loop | json }},
-  "effect": {{ effect | json }}
-  {%- if effect == 'fade' -%}
-    ,"fadeEffect": { "crossFade": true }
-  {%- endif -%}
-  {%- if autoplay -%}
-    ,"autoplay": { "delay": {{ delay }}, "disableOnInteraction": true, "pauseOnMouseEnter": true }
-  {%- endif -%}
-  {%- if pagination_type != blank -%}
-    ,"pagination": { "type": {{ pagination_type | json }} }
-  {%- endif -%}
-  {{- extra -}}
-}
+
+{%- comment -%}
+  ---- fragments ----
+  Each `capture` is one complete `"key": value` pair with no punctuation of its
+  own. `join: ','` supplies every comma exactly once.
+{%- endcomment -%}
+
+{%- capture fragment_slides -%}
+"slidesPerView":{{ cols_mobile }},"breakpoints":{"750":{"slidesPerView":{{ cols_tablet }}},"990":{"slidesPerView":{{ cols_desktop }}}}
 {%- endcapture -%}
-{{- options | strip_newlines | escape -}}
+
+{%- capture fragment_motion -%}
+"speed":{{ speed }},"loop":{{ use_loop | default: false | json }},"rewind":{{ use_rewind | json }},"effect":{{ effect_name | json }}
+{%- endcapture -%}
+
+{%- assign fragments = fragment_slides | append: '|' | append: fragment_motion -%}
+
+{%- comment -%}
+  Only emitted when the caller asked for one. Left out, `assets/carousel.js`
+  measures `--grid-gap-x` off the element so the carousel's spacing matches the
+  grid it turns into at the other breakpoint — Swiper positions with transforms
+  and cannot read a CSS `gap` itself.
+{%- endcomment -%}
+{%- comment -%}
+  `-1` is the sentinel for "the caller said nothing", because `0` is a real and
+  meaningful value here and `nil == blank` is engine-dependent. Comparing a
+  coerced number against a sentinel behaves the same in every Liquid.
+{%- endcomment -%}
+{%- assign gap = space_between | default: -1 | plus: 0 -%}
+{%- if gap >= 0 -%}
+  {%- assign fragments = fragments | append: '|"spaceBetween":' | append: gap -%}
+{%- endif -%}
+
+{%- if effect_name == 'fade' -%}
+  {%- assign fragments = fragments | append: '|"fadeEffect":{"crossFade":true}' -%}
+{%- endif -%}
+
+{%- if use_autoplay -%}
+  {%- capture fragment_autoplay -%}
+"autoplay":{"delay":{{ delay }},"disableOnInteraction":true,"pauseOnMouseEnter":true}
+  {%- endcapture -%}
+  {%- assign fragments = fragments | append: '|' | append: fragment_autoplay -%}
+{%- endif -%}
+
+{%- if pagination_type != blank -%}
+  {%- capture fragment_pagination -%}
+"pagination":{"type":{{ pagination_type | json }}}
+  {%- endcapture -%}
+  {%- assign fragments = fragments | append: '|' | append: fragment_pagination -%}
+{%- endif -%}
+
+{%- assign extra_clean = extra | strip | remove_first: ',' | strip -%}
+{%- if extra_clean != blank -%}
+  {%- assign fragments = fragments | append: '|' | append: extra_clean -%}
+{%- endif -%}
+
+{%- comment -%}
+  `escape` is what makes this safe inside a double-quoted attribute: it turns
+  every `"` into `&quot;`, which the browser decodes back to real JSON before
+  `dataset.options` ever sees it. Emitting raw quotes would end the attribute at
+  the first key.
+{%- endcomment -%}
+{% comment %} {%- assign options = fragments | split: '|' | join: ',' | strip_newlines -%}
+{{- '{' | append: options | append: '}' | escape -}} {% endcomment %}
+{%- assign options = fragments | split: '|' | join: ',' | strip_newlines -%}
+{%- capture output -%}
+  { "options": [{{ options }}] }
+{%- endcapture -%}
+{{ output | escape }}

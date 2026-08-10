@@ -57,6 +57,9 @@
     classes       (string)  Extra classes for the outer element
     track_classes (string)  Extra classes for the track
     columns_desktop / columns_tablet / columns_mobile (number)
+    count         (number)  Slide count. Enables the loop guard in
+                            `carousel-options`. Omit when the caller passes
+                            `{% content_for 'blocks' %}` and cannot count.
     nav           (boolean) Render controls inside. Default true.
     settings      (object, required)  Section settings
 
@@ -92,6 +95,11 @@
   assign pagination = settings.carousel_pagination | default: 'none'
   assign nav_place = settings.carousel_nav_position | default: 'outside'
 
+  # `count` arrives from the caller and is passed straight through to
+  # `carousel-options`, where it decides whether the merchant's loop setting is
+  # achievable. Swiper silently disables looping below twice `slidesPerView`,
+  # which reads as the setting doing nothing.
+
   # Controls and pagination are only ever reachable when at least one
   # breakpoint is actually a carousel. Rendering them for a grid-at-every-width
   # section would put focusable buttons in the tab order that do nothing.
@@ -119,6 +127,7 @@
   data-options="
     {%- render 'carousel-options',
         settings: settings,
+        count: count,
         columns_desktop: cols_desktop,
         columns_tablet: cols_tablet,
         columns_mobile: cols_mobile,
@@ -138,6 +147,11 @@
   </{{ track_tag }}>
 
   {%- if is_carousel and use_controls -%}
+    {%- comment -%}
+      `controls` is arrows *and* readouts in one row, so it replaces the bare
+      pair rather than joining it. A merchant who has turned arrows off still
+      gets the numbers and the bar.
+    {%- endcomment -%}
     {% render 'carousel-controls', settings: settings %}
   {%- else -%}
     {%- if is_carousel and show_nav -%}

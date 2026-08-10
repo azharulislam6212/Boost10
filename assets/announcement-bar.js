@@ -50,10 +50,34 @@ export class AnnouncementBar extends BaseComponent {
     }
 
     this.#reveal();
+    this.#bindClose();
+  }
 
-    if (this.refs.close) {
-      this.on(this.refs.close, 'click', () => this.dismiss());
+  /**
+   * The theme editor re-renders this section in place, which replaces the close
+   * button with a new node while this element stays connected. Without
+   * re-binding, closing the bar works once and then stops for the rest of the
+   * editing session.
+   */
+  sectionLoaded() {
+    this.refreshRefs();
+
+    if (!this.hasAttribute('data-dismissible')) {
+      this.#reveal();
+      return;
     }
+
+    // A merchant editing the wording is publishing something new, so the key
+    // changes and the bar should come back even if it was dismissed a moment
+    // ago. That is the point of hashing the content.
+    if (this.#isDismissed()) {
+      this.setAttribute('data-dismissed', '');
+      return;
+    }
+
+    this.removeAttribute('data-dismissed');
+    this.#reveal();
+    this.#bindClose();
   }
 
   /* --------------------------------------------------------- public API -- */
@@ -75,6 +99,15 @@ export class AnnouncementBar extends BaseComponent {
   /* ---------------------------------------------------------- internals -- */
 
   /** @private */
+  #bindClose() {
+    const close = this.refs.close;
+    if (!close || close.dataset.bound === 'true') return;
+
+    close.dataset.bound = 'true';
+    this.on(close, 'click', () => this.dismiss());
+  }
+
+  /** @private */
   #reveal() {
     this.setAttribute('data-ready', '');
   }
@@ -90,7 +123,22 @@ export class AnnouncementBar extends BaseComponent {
    * @private
    */
   get #contentHash() {
-    const text = (this.textContent ?? '').replace(/\s+/g, ' ').trim();
+    // Only the announcements themselves. `this.textContent` swept up the close
+    // button's label and, in marquee mode, every `aria-hidden` clone the effect
+    // appends — so the key changed between the first paint and the moment the
+    // marquee finished building, and a dismissal made against the later key
+    // never matched on the next page view.
+    const source = this.querySelectorAll('.announcement__text');
+    const text = (
+      source.length > 0
+        ? Array.from(source)
+            .filter((node) => !node.closest('[data-marquee-clone]'))
+            .map((node) => node.textContent ?? '')
+            .join(' ')
+        : (this.textContent ?? '')
+    )
+      .replace(/\s+/g, ' ')
+      .trim();
 
     let hash = 0;
     for (let i = 0; i < text.length; i++) {

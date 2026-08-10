@@ -151,7 +151,7 @@ export class MotionEffect extends BaseComponent {
    * @private
    */
   #setupContinuous(effect) {
-    const target = this.#targets()[0] || this.firstElementChild || this;
+    const target = effect === 'marquee' ? this.#marqueeTrack() : this.#targets()[0] || this.firstElementChild || this;
 
     if (effect === 'parallax') {
       this.#instance = parallax(target, {
@@ -167,6 +167,34 @@ export class MotionEffect extends BaseComponent {
     }
 
     this.setAttribute('data-motion-revealed', '');
+  }
+
+  /**
+   * The element a marquee actually translates.
+   *
+   * `marquee()` moves the element it is handed and treats that element's
+   * *parent* as the clipping viewport. `#targets()` returns the host when no
+   * `data-target` is set, which made the host itself the moving part and its
+   * parent — the section wrapper, which does not clip — the viewport. The
+   * result was the whole bar sliding off the page once and never coming back.
+   *
+   * So a marquee resolves its track explicitly: an opted-in `[data-marquee-track]`
+   * first, then a `data-target` if the section gave one, then the single child
+   * that is doing the job anyway. The host is never returned.
+   *
+   * @returns {HTMLElement}
+   * @private
+   */
+  #marqueeTrack() {
+    const opted = /** @type {HTMLElement|null} */ (this.querySelector('[data-marquee-track]'));
+    if (opted) return opted;
+
+    if (this.dataset.target) {
+      const found = /** @type {HTMLElement|null} */ (this.querySelector(this.dataset.target));
+      if (found) return found;
+    }
+
+    return /** @type {HTMLElement} */ (this.firstElementChild ?? this);
   }
 
   /* ------------------------------------------------------------ helpers -- */

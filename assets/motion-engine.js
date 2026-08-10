@@ -903,38 +903,102 @@ export function marquee(track, { speed = 60, direction = 'left', pauseOnHover = 
   const container = track.parentElement;
   if (!container) return { play() {}, pause() {}, destroy() {} };
 
-  const originals = Array.from(track.children);
+  const originals = Array.from(track.children).filter(
+    (node) => !node.hasAttribute('data-marquee-clone')
+  );
   if (originals.length === 0) return { play() {}, pause() {}, destroy() {} };
 
-  const clones = [];
+  /** @type {Element[]} */
+  let clones = [];
+  /** @type {Animation|null} */
+  let animation = null;
+  /** @type {ResizeObserver|null} */
+  let observer = null;
+  let paused = false;
 
-  let guard = 0;
-  while (track.scrollWidth < container.offsetWidth * 2 && guard < 20) {
-    for (const node of originals) {
-      const clone = node.cloneNode(true);
-      clone.setAttribute('aria-hidden', 'true');
-      clone.setAttribute('data-marquee-clone', '');
-      track.appendChild(clone);
-      clones.push(clone);
+  const clearClones = () => {
+    for (const clone of clones) clone.remove();
+    clones = [];
+  };
+
+  /**
+   * One "cycle" is the distance from the first original item to the first item
+   * of the next copy. Measuring it from real offsets rather than dividing
+   * `scrollWidth` in half is what makes the loop seamless: `scrollWidth` does
+   * not tell you where the seam is once flex `gap` and a variable number of
+   * copies are involved, which is why the old maths drifted a gap-width per
+   * lap and eventually showed a blank stretch.
+   */
+  const build = () => {
+    clearClones();
+
+    const viewport = container.offsetWidth || track.offsetWidth;
+    const baseWidth = track.scrollWidth;
+    if (baseWidth === 0) return 0;
+
+    // At least one extra copy, plus however many are needed to cover twice the
+    // viewport so there is always content queued off the leading edge.
+    const copies = Math.max(2, Math.ceil((viewport * 2) / baseWidth) + 1);
+
+    for (let copy = 1; copy < copies; copy += 1) {
+      for (const node of originals) {
+        const clone = /** @type {Element} */ (node.cloneNode(true));
+        clone.setAttribute('aria-hidden', 'true');
+        clone.setAttribute('data-marquee-clone', '');
+        // A cloned link must not be a second tab stop for the same destination.
+        for (const focusable of clone.querySelectorAll('a, button, input, select, textarea')) {
+          focusable.setAttribute('tabindex', '-1');
+        }
+        if (clone.matches('a, button, input, select, textarea')) {
+          clone.setAttribute('tabindex', '-1');
+        }
+        track.appendChild(clone);
+        clones.push(clone);
+      }
     }
-    guard += 1;
-  }
 
-  if (!motionEnabled()) {
-    return { play() {}, pause() {}, destroy: () => clones.forEach((clone) => clone.remove()) };
-  }
+    const first = /** @type {HTMLElement} */ (track.children[0]);
+    const second = /** @type {HTMLElement} */ (track.children[originals.length]);
 
-  const distance = track.scrollWidth / 2;
-  const duration = (distance / speed) * 1000;
-  const sign = direction === 'right' ? 1 : -1;
+    return second && first ? second.offsetLeft - first.offsetLeft : baseWidth;
+  };
 
-  const animation = track.animate(
-    [{ transform: 'translate3d(0, 0, 0)' }, { transform: `translate3d(${sign * distance}px, 0, 0)` }],
-    { duration, easing: EASING.linear, iterations: Infinity }
-  );
+  const start = () => {
+    animation?.cancel();
+    animation = null;
 
-  const onEnter = () => animation.pause();
-  const onLeave = () => animation.play();
+    const distance = build();
+    if (!distance || !motionEnabled()) return;
+
+    const duration = (distance / Math.max(speed, 1)) * 1000;
+
+    // Right-scrolling starts one cycle back and travels to zero, so the strip
+    // enters from the left edge instead of leaving a gap while it catches up.
+    const from = direction === 'right' ? -distance : 0;
+    const to = direction === 'right' ? 0 : -distance;
+
+    animation = track.animate(
+      [
+        { transform: `translate3d(${from}px, 0, 0)` },
+        { transform: `translate3d(${to}px, 0, 0)` }
+      ],
+      { duration, easing: EASING.linear, iterations: Infinity }
+    );
+
+    if (paused) animation.pause();
+  };
+
+  start();
+
+  const onEnter = () => {
+    paused = true;
+    animation?.pause();
+  };
+
+  const onLeave = () => {
+    paused = false;
+    animation?.play();
+  };
 
   if (pauseOnHover) {
     container.addEventListener('pointerenter', onEnter);
@@ -943,16 +1007,38 @@ export function marquee(track, { speed = 60, direction = 'left', pauseOnHover = 
     container.addEventListener('focusout', onLeave);
   }
 
+  // A marquee built inside a hidden container — the announcement bar before it
+  // is revealed, a closed drawer, an inactive tab — measures zero and would
+  // otherwise never move. Rebuilding when the box gains a real width is the
+  // same recovery `<swiper-carousel>` makes.
+  let lastWidth = container.offsetWidth;
+  observer = new ResizeObserver(() => {
+    const width = container.offsetWidth;
+    if (width === lastWidth) return;
+    lastWidth = width;
+    start();
+  });
+  observer.observe(container);
+
   return {
-    play: () => animation.play(),
-    pause: () => animation.pause(),
+    play: () => {
+      paused = false;
+      animation?.play();
+    },
+    pause: () => {
+      paused = true;
+      animation?.pause();
+    },
     destroy() {
-      animation.cancel();
+      observer?.disconnect();
+      observer = null;
+      animation?.cancel();
+      animation = null;
       container.removeEventListener('pointerenter', onEnter);
       container.removeEventListener('pointerleave', onLeave);
       container.removeEventListener('focusin', onEnter);
       container.removeEventListener('focusout', onLeave);
-      for (const clone of clones) clone.remove();
+      clearClones();
     }
   };
 }

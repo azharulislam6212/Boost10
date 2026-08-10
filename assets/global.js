@@ -58,6 +58,12 @@ import '@theme/page-transition';
  * @type {Array<{ specifier: string, tags: string[] }>}
  */
 const LAZY_MODULES = [
+  // The announcement bar is the one module where a missing entry is not a
+  // degraded feature but a blank section: `announcement-bar[data-dismissible]`
+  // is `display: none` until the component writes `data-ready`, so a bar with
+  // "show close" enabled never painted at all while this line was absent.
+  { specifier: '@theme/announcement-bar', tags: ['announcement-bar'] },
+
   { specifier: '@theme/search', tags: ['predictive-search', 'search-drawer', 'search-list'] },
   { specifier: '@theme/results-list', tags: ['results-list'] },
   { specifier: '@theme/localization', tags: ['localization-form'] },
@@ -83,7 +89,22 @@ const LAZY_MODULES = [
   },
   { specifier: '@theme/gift-card-recipient-form', tags: ['gift-card-recipient-form'] },
 
+  // Same class of bug as the announcement bar, found while auditing the rest of
+  // the tag registry. `<validated-form>` wraps the contact, login, register,
+  // reset-password, activate-account, comment, newsletter and back-in-stock
+  // forms, and `<variant-swatch>` is the colour swatch on every product card.
+  // Neither module was reachable, so both features were inert theme-wide.
+  { specifier: '@theme/form-validation', tags: ['validated-form'] },
+  { specifier: '@theme/variant-swatch', tags: ['variant-swatch'] },
+
   { specifier: '@theme/carousel', tags: ['swiper-carousel'] },
+
+  // `<collection-tabs>` hides all but the first panel, and a carousel inside a
+  // hidden panel measures zero. Without this the mega menu's product carousels
+  // were both unswitchable and unmeasurable.
+  { specifier: '@theme/collection-tabs', tags: ['collection-tabs'] },
+  { specifier: '@theme/facet-dropdown', tags: ['facet-dropdown'] },
+
   { specifier: '@theme/media-gallery', tags: ['media-gallery', 'media-thumbnails'] },
   { specifier: '@theme/media-coordinator', tags: ['media-coordinator'] },
   { specifier: '@theme/media-zoom', tags: ['media-zoom', 'media-zoom-modal'] },

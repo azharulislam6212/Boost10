@@ -3592,7 +3592,10 @@
 
   .marquee { overflow: hidden; }
   .marquee__viewport { display: block; overflow: hidden; }
-  .marquee__track { display: flex; gap: var(--space-8); white-space: nowrap; }
+  /* `max-content` is what lets the cloned copies extend past the viewport. A
+     track that shrinks to the viewport width has nowhere to scroll to, so the
+     animation runs and nothing appears to move. */
+  .marquee__track { display: flex; gap: var(--space-8); white-space: nowrap; inline-size: max-content; will-change: transform; }
   .marquee__item { display: inline-flex; align-items: center; gap: var(--space-2); }
   .marquee__item--image { flex: 0 0 auto; }
   .marquee__image { inline-size: 16rem; }
@@ -5884,9 +5887,36 @@ announcement-bar[data-dismissed] { display: none; }
 }
 
 .announcement-bar__carousel,
-.announcement-bar__marquee {
+.announcement-bar__marquee,
+.announcement-bar__single {
   flex: 1;
   min-inline-size: 0;
+}
+
+/* One announcement is not a carousel. The slider branch used to render nothing
+   at all below two blocks, so a bar with a single message came out empty; this
+   is the static case it now falls back to. */
+.announcement-bar__single {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+/* The bar is a single line, so pagination sits inline with the text rather than
+   below it — the shell's block margin would double the section's height. */
+.announcement-bar__carousel .carousel-shell__dots,
+.announcement-bar__carousel .carousel-shell__counter,
+.announcement-bar__carousel .carousel-shell__progress {
+  margin-block-start: 0;
+  margin-block-end: 0;
+}
+
+.announcement-bar__carousel .carousel-shell__pause {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-end: 0;
+  transform: translateY(-50%);
 }
 
 .announcement-bar__close {
@@ -5928,6 +5958,9 @@ announcement-bar[data-dismissed] { display: none; }
   align-items: center;
   gap: var(--space-8);
   inline-size: max-content;
+  /* The track is translated by a Web Animation running for the life of the
+     page. Without its own layer every frame repaints the bar's text. */
+  will-change: transform;
 }
 
 .announcement-bar .marquee__track .announcement {
@@ -6582,4 +6615,73 @@ announcement-bar[data-dismissed] { display: none; }
    the disclosure. */
 .facets__group--flat > .facets__group-content {
   padding: 0;
+}
+
+
+/* ==========================================================================
+   Swiper adoption for the four formerly scroll-snap tracks
+   ==========================================================================
+   The hero product strip, the product-card image slider, the recommendations
+   row and recently viewed were all `<carousel-component>` — a tag nothing ever
+   registered — laid out as native scroll-snap tracks. They are `<swiper-carousel>`
+   now, like every other carousel in the theme.
+
+   The scroll-snap rules stay exactly as they were, because they are the correct
+   no-JS and pre-hydration presentation: the row is readable and swipeable
+   before Swiper loads, and stays that way if it never does. These rules undo
+   them only once Swiper has actually mounted, which is what `.swiper-initialized`
+   means.
+
+   Two properties have to go or Swiper fights the browser:
+
+   `overflow-x` — a scroll container under a transformed wrapper gives a track
+   that can be both scrolled and slid, landing between slides.
+
+   `scroll-snap-type` — snapping fires against Swiper's own translate and drags
+   the track back mid-transition.
+
+   `display` is not reset here: `swiper.css` is unlayered and sets
+   `.swiper-wrapper { display: flex }`, which already beats the layered `grid`
+   these tracks were given. The flex-basis on the items does have to go, because
+   Swiper writes each slide's width inline and a `flex: 0 0 calc(…)` overrides it.
+   -------------------------------------------------------------------------- */
+
+.swiper-initialized .hero__carousel-track,
+.swiper-initialized.product-card__slider .product-card__slides,
+.swiper-initialized .product-grid--carousel,
+.swiper-initialized .recently-viewed__grid--carousel {
+  overflow: visible;
+  scroll-snap-type: none;
+  gap: 0;
+}
+
+.swiper-initialized .hero__carousel-item,
+.swiper-initialized .product-card__slide,
+.swiper-initialized .product-grid--carousel > *,
+.swiper-initialized .recently-viewed__grid--carousel > * {
+  flex: 0 0 auto;
+  scroll-snap-align: none;
+}
+
+/* The arrows in these four are hand-written rather than `carousel-nav`, so they
+   do not get the shell's `display: none` until initialised. Hiding them when
+   there is nothing to scroll keeps a single-image card from carrying a pair of
+   dead controls, and Swiper writes `--locked` on both buttons in that state. */
+.carousel-button--locked,
+.hero__arrow.carousel-button--locked,
+.product-card__slider-arrow.carousel-button--locked,
+.product-recommendations__arrow.carousel-button--locked,
+.recently-viewed__arrow.carousel-button--locked {
+  display: none;
+}
+
+/* Swiper's disabled class, applied at either end when `loop` is off. Dimmed
+   rather than hidden: a control that disappears at the end of a row moves the
+   remaining one, and the customer's cursor is already over the gap. */
+.hero__arrow.carousel-button--disabled,
+.product-card__slider-arrow.carousel-button--disabled,
+.product-recommendations__arrow.carousel-button--disabled,
+.recently-viewed__arrow.carousel-button--disabled {
+  opacity: 0.35;
+  pointer-events: none;
 }

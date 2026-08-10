@@ -97,6 +97,9 @@ export class SwiperCarousel extends BaseComponent {
   /** @type {ResizeObserver|null} */
   #resize = null;
 
+  /** @type {MutationObserver|null} */
+  #slides = null;
+
   /** Controls that live outside this element and point back at it. */
   #external = { previous: null, next: null, current: null, total: null, bar: null };
 
@@ -117,10 +120,13 @@ export class SwiperCarousel extends BaseComponent {
     const pause = this.refs.pause;
     if (pause) this.on(pause, 'click', () => this.#toggleAutoplay());
 
+    this.#watchForSlides();
     this.#sync();
   }
 
   teardown() {
+    this.#slides?.disconnect();
+    this.#slides = null;
     this.#destroy();
   }
 
@@ -128,7 +134,9 @@ export class SwiperCarousel extends BaseComponent {
 
   sectionLoaded() {
     this.#destroy();
+    this.refreshRefs();
     this.#external = findExternalControls(this.id);
+    this.#watchForSlides();
     this.#sync();
   }
 
@@ -239,10 +247,30 @@ export class SwiperCarousel extends BaseComponent {
     /** @type {Record<string, any>} */
     const config = {
       ...DEFAULTS,
+      // The measured gap is a *default*, so `authored` spreading after it is
+      // what lets a section opt out with an explicit `spaceBetween: 0` — the
+      // product card's image slider is full-bleed and must not inherit the
+      // product grid's column gap.
       spaceBetween: this.#gap(),
       ...authored,
       modules: MODULES,
     };
+
+    // ---- loop ------------------------------------------------------------
+    // Swiper needs at least twice `slidesPerView` slides to loop. Given fewer
+    // it logs "Not enough slides for loop mode", turns looping off itself, and
+    // — with `loopAdditionalSlides` unset — can leave a duplicated slide behind
+    // in the DOM. `carousel-options` already refuses the setting when the
+    // caller can count its slides, but two sections pass
+    // `{% content_for 'blocks' %}` straight through and cannot, so the same
+    // check is repeated here against the real children.
+    if (config.loop && !this.#canLoop(config)) {
+      config.loop = false;
+
+      // Rewind reaches the same place the merchant asked for — back to the
+      // first slide from the last — without needing the duplicates.
+      config.rewind = true;
+    }
 
     // ---- navigation -----------------------------------------------------
     const { previous, next } = this.#controls;
@@ -307,6 +335,31 @@ export class SwiperCarousel extends BaseComponent {
     };
 
     return config;
+  }
+
+  /**
+   * Whether there are enough slides for Swiper's loop to be coherent at the
+   * widest breakpoint this carousel will reach.
+   *
+   * The widest is what matters: four columns on desktop needs eight slides, and
+   * checking against the mobile value would let a carousel loop on a phone and
+   * silently stop looping when the same page is opened on a laptop.
+   *
+   * @param {Record<string, any>} config
+   * @returns {boolean}
+   */
+  #canLoop(config) {
+    const counts = [Number(config.slidesPerView) || 1];
+
+    for (const breakpoint of Object.values(config.breakpoints ?? {})) {
+      const perView = Number(/** @type {any} */ (breakpoint)?.slidesPerView);
+      if (Number.isFinite(perView)) counts.push(perView);
+    }
+
+    const widest = Math.max(...counts);
+    const slides = this.refs.track?.children.length ?? 0;
+
+    return slides >= widest * 2;
   }
 
   /**
@@ -417,6 +470,46 @@ export class SwiperCarousel extends BaseComponent {
     });
 
     this.#resize.observe(this);
+  }
+
+  /**
+   * Builds — or rebuilds — the carousel when the track's children change.
+   *
+   * Three sections render an empty track and fill it later:
+   * `product-recommendations` and `recently-viewed` fetch their cards after the
+   * page loads, and the collection grid morphs new results in after a filter.
+   * `#init()` refuses to run on fewer than two slides, so on connect all three
+   * correctly did nothing — and then nothing ever told them to try again. Their
+   * arrows stayed dead for the life of the page.
+   *
+   * Already running, the same signal means the slide set changed underneath
+   * Swiper: the new children need `swiper-slide` and Swiper needs to re-measure,
+   * or the carousel scrolls a stale list.
+   *
+   * Deliberately not Swiper's own `observer` option, which walks the whole
+   * subtree on every mutation — every variant swatch preview and quick-add
+   * re-render inside a card would trigger a full update. This watches one
+   * element's direct children only.
+   */
+  #watchForSlides() {
+    const track = this.refs.track;
+    if (!track) return;
+
+    this.#slides?.disconnect();
+
+    this.#slides = new MutationObserver(() => {
+      if (!this.#shouldRun) return;
+
+      if (this.#swiper && !this.#swiper.destroyed) {
+        this.#tagSlides(true);
+        this.#swiper.update();
+        this.#reflectAutoplay();
+      } else {
+        this.#init();
+      }
+    });
+
+    this.#slides.observe(track, { childList: true });
   }
 
   #destroy() {
