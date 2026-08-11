@@ -628,14 +628,32 @@
     }
   }
 
-  /* Section and block spacing. Values arrive as custom properties from
-     snippets/spacing.liquid; the media query reads a different property rather
-     than a different rule, so one inline style drives both breakpoints. */
+  /* Section and block spacing.
+     ------------------------------------------------------------------------
+     Values arrive as custom properties from `snippets/spacing.liquid`; the
+     media query reads a different property rather than a different rule, so one
+     inline style drives both breakpoints.
+
+     Two hooks, either works:
+
+       class="section-spacing"     write it yourself on a section root
+       data-section-spacing        emitted by snippets/spacing.liquid
+
+     The class is the one to reach for in new markup — it reads as layout,
+     which is what it is. The attribute stays because sixty-eight call sites
+     already render the snippet, and dropping it would mean editing every
+     section root in the theme to change nothing about the result.
+
+     Worth saying plainly: neither hook involves JavaScript. `[data-*]` here is
+     an ordinary CSS attribute selector, the same cascade and the same cost as a
+     class. Nothing reads these in JS. */
+  .section-spacing,
   [data-section-spacing] {
     padding-block-start: var(--section-padding-block-start, 0px);
     padding-block-end: var(--section-padding-block-end, 0px);
   }
 
+  .block-spacing,
   [data-block-spacing] {
     padding-block-start: var(--block-padding-block-start, 0px);
     padding-inline-end: var(--block-padding-inline-end, 0px);
@@ -648,11 +666,13 @@
   }
 
   @media screen and (max-width: 749px) {
+    .section-spacing,
     [data-section-spacing] {
       padding-block-start: var(--section-padding-block-start-mobile, var(--section-padding-block-start, 0px));
       padding-block-end: var(--section-padding-block-end-mobile, var(--section-padding-block-end, 0px));
     }
 
+    .block-spacing,
     [data-block-spacing] {
       padding-block-start: calc(var(--block-padding-block-start, 0px) * var(--block-padding-scale-mobile, 0.75));
       padding-inline-end: calc(var(--block-padding-inline-end, 0px) * var(--block-padding-scale-mobile, 0.75));
@@ -708,6 +728,11 @@
     display: contents;
   }
 
+  responsive-image svg{
+   inline-size: 100%;
+    block-size: 100%;
+    object-fit: cover;
+  }
 
   responsive-image img {
     inline-size: 100%;
@@ -716,11 +741,7 @@
     opacity: 0;
     transition: opacity var(--transition-base);
   }
-  responsive-image svg{
-    inline-size: 100%;
-    block-size: 100%;
-    object-fit: cover;
-  }
+
   responsive-image[data-loaded] img,
   html.no-js responsive-image img {
     opacity: 1;

@@ -100,6 +100,17 @@ export class SwiperCarousel extends BaseComponent {
   /** @type {MutationObserver|null} */
   #slides = null;
 
+  /**
+   * True while Swiper is rearranging the track itself.
+   *
+   * `loopCreate` clones slides on init and `loopFix` moves them on every wrap,
+   * both through `appendSlide` / `prependSlide` — which are `childList`
+   * mutations on the very element `#watchForSlides` is watching.
+   *
+   * @type {boolean}
+   */
+  #swiperIsMutating = false;
+
   /** Controls that live outside this element and point back at it. */
   #external = { previous: null, next: null, current: null, total: null, bar: null };
 
@@ -501,7 +512,12 @@ export class SwiperCarousel extends BaseComponent {
     this.#tagSlides(true);
 
     try {
-      this.#swiper = new Swiper(this, this.#config());
+      // `loopCreate` clones slides during construction. Without this the
+      // observer fires before `#swiper` is even assigned and calls `#init()`
+      // again, re-entering construction on a half-built carousel.
+      this.#withSwiperMutation(() => {
+        this.#swiper = new Swiper(this, this.#config());
+      });
     } catch (error) {
       console.error('[Boost10] <swiper-carousel> failed to initialise.', error);
       this.#swiper = null;
@@ -573,12 +589,33 @@ export class SwiperCarousel extends BaseComponent {
 
     this.#slides?.disconnect();
 
-    this.#slides = new MutationObserver(() => {
+    this.#slides = new MutationObserver((records) => {
+      if (this.#swiperIsMutating) return;
       if (!this.#shouldRun) return;
 
+      // Swiper's own slides carry `data-swiper-slide-index`. Loop mode moves and
+      // clones them on every wrap, so reacting to that meant calling `update()`
+      // from inside `loopFix` — which rearranges the track again, which fires
+      // this observer again. The carousel ended up wedged on its first slide
+      // with a dead position readout and a dead progress bar, and only ever on
+      // sections with looping on. Testimonials defaults to loop, which is why it
+      // was the one that broke.
+      //
+      // Content arriving from a fetch or a morph has no such attribute, and that
+      // is the only thing this observer exists for.
+      const isContent = records.some((record) =>
+        [...record.addedNodes, ...record.removedNodes].some(
+          (node) => node instanceof Element && !node.hasAttribute('data-swiper-slide-index')
+        )
+      );
+
+      if (!isContent) return;
+
       if (this.#swiper && !this.#swiper.destroyed) {
-        this.#tagSlides(true);
-        this.#swiper.update();
+        this.#withSwiperMutation(() => {
+          this.#tagSlides(true);
+          this.#swiper?.update();
+        });
         this.#reflectAutoplay();
       } else {
         this.#init();
@@ -588,13 +625,36 @@ export class SwiperCarousel extends BaseComponent {
     this.#slides.observe(track, { childList: true });
   }
 
+  /**
+   * Runs work that rearranges the track without the observer answering it.
+   *
+   * The flag is cleared in a microtask rather than synchronously: the observer's
+   * callback is itself delivered as a microtask queued at mutation time, so it
+   * runs before this one and still sees the flag set.
+   *
+   * @param {() => void} work
+   */
+  #withSwiperMutation(work) {
+    this.#swiperIsMutating = true;
+
+    try {
+      work();
+    } finally {
+      queueMicrotask(() => {
+        this.#swiperIsMutating = false;
+      });
+    }
+  }
+
   #destroy() {
     if (!this.#swiper) return;
 
     // `deleteInstance, cleanStyles` — the second argument returns the wrapper
     // and slides to their authored styles so the CSS grid layout can take over
     // at the other breakpoint.
-    if (!this.#swiper.destroyed) this.#swiper.destroy(true, true);
+    // `destroy` unwinds the loop clones, which is another burst of childList
+    // mutations on a track the observer is still watching.
+    if (!this.#swiper.destroyed) this.#withSwiperMutation(() => this.#swiper?.destroy(true, true));
     this.#swiper = null;
     this.#tagSlides(false);
     this.#tagTrack(false);

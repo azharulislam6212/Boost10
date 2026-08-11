@@ -1,7 +1,23 @@
 {% doc %}
   Emits padding as custom properties, for a section or for a block.
 
-  ## The hook attribute is the whole point
+  ## Class or attribute — both work
+
+  `base.css` matches either:
+
+      .section-spacing        /  .block-spacing         write it yourself
+      [data-section-spacing]  /  [data-block-spacing]   emitted below
+
+  Reach for the class in new markup. This snippet keeps emitting the attribute
+  because it cannot merge a class into an element that already has a `class`
+  attribute — two `class` attributes on one tag and the browser takes the first,
+  silently dropping every other class on the section root.
+
+  Neither hook involves JavaScript. `[data-*]` in a stylesheet is an ordinary
+  attribute selector: same cascade, same cost as a class, nothing reading it at
+  runtime.
+
+  ## The hook is the whole point
 
   `base.css` applies this padding through attribute selectors:
 
@@ -52,7 +68,10 @@
   Parameters:
     section  (object, optional)  A section settings object
     block    (object, optional)  A block settings object
-    settings (object, optional)  Alias for `block`, for older call sites
+
+  Pass one or the other. `settings` is not accepted — it is a global drop in
+  Shopify, so a snippet sees it whether or not the caller passed it, and using
+  it as a fallback made every section claim to be a block as well.
 
   @example
     <div {% render 'spacing', block: block.settings %}>
@@ -62,11 +81,41 @@
 {% enddoc %}
 
 {%- liquid
-  assign b = block | default: settings
+  comment
+    `settings` is deliberately NOT accepted as an alias for `block`.
+
+    In Shopify Liquid, `settings` is a global drop — the theme's own settings —
+    and a snippet sees globals even when the caller passes nothing. So
+    `block | default: settings` never fell through to nil on a section call: it
+    fell through to the *theme settings object*, which is always truthy. Every
+    section root in the theme came out with both hooks on it:
+
+      class="announcement-bar section-spacing …"
+      data-section-spacing data-block-spacing
+
+    and the stray one is not cosmetic. `[data-block-spacing]` sets all four
+    paddings to `var(--block-padding-*, 0px)`, so it overrode whatever padding
+    the section's own stylesheet gave it with zero — on every section on the
+    page. The one caller that used the alias, `snippets/group.liquid`, now
+    passes `block:` instead.
+
+    The two scopes are mutually exclusive by construction below rather than by
+    the caller remembering to pass only one.
+  endcomment
+  assign is_section = false
+  assign is_block = false
+
+  if section
+    assign is_section = true
+  elsif block
+    assign is_block = true
+  endif
+
+  assign b = block
 
   assign out = ''
 
-  if section
+  if is_section
     assign s_top = section.padding_top | default: 0 | plus: 0
     assign s_bottom = section.padding_bottom | default: 0 | plus: 0
     assign s_top_mobile = section.padding_top_mobile | default: 0 | plus: 0
@@ -92,7 +141,7 @@
     endif
   endif
 
-  if b
+  if is_block
     comment
       Both spellings are accepted. Most blocks use padding_top; a few newer ones
       use the CSS-shaped padding-block-start. Reading either means a block does
@@ -132,6 +181,6 @@
   endif
 -%}
 
-{%- if section -%}data-section-spacing {% endif -%}
-{%- if b -%}data-block-spacing {% endif -%}
+{%- if is_section -%}data-section-spacing {% endif -%}
+{%- if is_block -%}data-block-spacing {% endif -%}
 {%- if out != blank %}style="{{ out }}"{% endif -%}
