@@ -22,6 +22,14 @@
   the progress bar, the loop guard and the pre-init CSS all keep working with no
   special cases — a peek is just a number with a decimal in it.
 
+  ## No effect handling
+
+  This used to force `columns` to 1 when the transition was `fade`, because a
+  cross-fade of a stack is only coherent with one slide showing. That is what
+  silently collapsed a three-across testimonials carousel to one the moment fade
+  was selected. The setting is gone — every carousel slides — so the branch is
+  gone with it.
+
   Peek is split at 750px, not per breakpoint. A phone almost always wants one and
   a wide multi-column grid almost never does; a third control for tablets would
   be a setting merchants have to reason about for a difference nobody sees.
@@ -31,7 +39,6 @@
     settings (object, required)  Section or block settings
     viewport (string, required)  mobile | tablet | desktop
     columns_mobile / columns_tablet / columns_desktop (number)  Overrides
-    effect       (string)   Overrides `settings.carousel_effect`
     peek_mobile  (number)   Overrides `settings.carousel_peek_mobile`
     peek_desktop (number)   Overrides `settings.carousel_peek_desktop`
 
@@ -40,8 +47,6 @@
 {% enddoc %}
 
 {%- liquid
-  assign effect_name = effect | default: settings.carousel_effect | default: 'slide'
-
   case viewport
     when 'desktop'
       assign columns = columns_desktop | default: settings.columns_desktop | default: 4
@@ -66,13 +71,6 @@
   assign columns = columns | plus: 0
   if columns < 1
     assign columns = 1
-  endif
-
-  # Fade cross-fades a stack, so it is only coherent with one whole slide.
-  # A peek would show the edge of a slide that is not sliding anywhere.
-  if effect_name == 'fade'
-    assign columns = 1
-    assign peek = 0
   endif
 
   assign peek = peek | default: 0 | plus: 0

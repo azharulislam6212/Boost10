@@ -39,7 +39,6 @@
     pagination (string)   none | dots | numbers | progress | controls
     autoplay   (boolean)  Overrides `settings.carousel_autoplay`
     loop       (boolean)  Overrides `settings.carousel_loop`
-    effect     (string)   Overrides `settings.carousel_effect`
     peek_mobile / peek_desktop (number)  Partial-slide percentage. See
                           `carousel-slides`, which owns the arithmetic.
     space_between (number) Gap between slides in px. Omit to let the component
@@ -61,17 +60,17 @@
 {%- endcomment -%}
 {%- capture spv_mobile -%}
   {%- render 'carousel-slides', settings: settings, viewport: 'mobile',
-      columns_mobile: columns_mobile, effect: effect,
+      columns_mobile: columns_mobile,
       peek_mobile: peek_mobile, peek_desktop: peek_desktop -%}
 {%- endcapture -%}
 {%- capture spv_tablet -%}
   {%- render 'carousel-slides', settings: settings, viewport: 'tablet',
-      columns_tablet: columns_tablet, effect: effect,
+      columns_tablet: columns_tablet,
       peek_mobile: peek_mobile, peek_desktop: peek_desktop -%}
 {%- endcapture -%}
 {%- capture spv_desktop -%}
   {%- render 'carousel-slides', settings: settings, viewport: 'desktop',
-      columns_desktop: columns_desktop, effect: effect,
+      columns_desktop: columns_desktop,
       peek_mobile: peek_mobile, peek_desktop: peek_desktop -%}
 {%- endcapture -%}
 
@@ -79,8 +78,6 @@
   assign spv_mobile = spv_mobile | strip
   assign spv_tablet = spv_tablet | strip
   assign spv_desktop = spv_desktop | strip
-
-  assign effect_name = effect | default: settings.carousel_effect | default: 'slide'
 
   # The loop guard counts whole slides. `ceil`, not `floor`, because that is what
   # Swiper itself does with a fractional value — `Math.ceil(parseFloat(...))` —
@@ -139,13 +136,6 @@
     endif
   endif
 
-  # Fade animates opacity on a stack that Swiper does not re-order, so looping
-  # it flickers back through every slide on the wrap. Rewind reaches the same
-  # place — back to the first slide — with one transition.
-  if effect_name == 'fade' and use_loop
-    assign use_loop = false
-    assign use_rewind = true
-  endif
 
   assign pagination_style = pagination | default: settings.carousel_pagination | default: 'none'
   case pagination_style
@@ -171,7 +161,7 @@
 {%- endcapture -%}
 
 {%- capture fragment_motion -%}
-"speed":{{ speed }},"loop":{{ use_loop | default: false | json }},"rewind":{{ use_rewind | json }},"effect":{{ effect_name | json }}
+"speed":{{ speed }},"loop":{{ use_loop | default: false | json }},"rewind":{{ use_rewind | json }}
 {%- endcapture -%}
 
 {%- assign fragments = fragment_slides | append: '|' | append: fragment_motion -%}
@@ -192,15 +182,6 @@
   {%- assign fragments = fragments | append: '|"spaceBetween":' | append: gap -%}
 {%- endif -%}
 
-{%- if effect_name == 'fade' -%}
-  {%- capture fragment_fade -%}
-"fadeEffect":
-{
-"crossFade": true
-}
-{%- endcapture -%}
-  {%- assign fragments = fragments | append: '|' | append: fragment_fade -%}
-{%- endif -%}
 
 {%- if use_autoplay -%}
   {%- capture fragment_autoplay -%}

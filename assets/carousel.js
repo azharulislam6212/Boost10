@@ -34,7 +34,7 @@
  * ## What the bundled Swiper contains
  *
  * `assets/swiper.js` exports exactly: `Swiper`, `Navigation`, `Pagination`,
- * `Autoplay`, `EffectFade`, `Mousewheel`.
+ * `Autoplay`, `Mousewheel`.
  *
  * No Scrollbar, no Thumbs, no FreeMode, no Grid, no A11y, no Zoom, no
  * Controller. Passing `scrollbar` or `thumbs` in `data-options` does nothing —
@@ -45,7 +45,7 @@
  * @module @theme/carousel
  */
 
-import { Swiper, Navigation, Pagination, Autoplay, EffectFade, Mousewheel } from '@theme/swiper';
+import { Swiper, Navigation, Pagination, Autoplay, Mousewheel } from '@theme/swiper';
 import { BaseComponent, defineComponent } from '@theme/component';
 import { EVENTS } from '@theme/events';
 import { themeString, prefersReducedMotion } from '@theme/utilities';
@@ -55,7 +55,7 @@ import { renderControls, findExternalControls, toggleControls } from '@theme/car
  * Registered once per instance. Adding a module here without adding it to the
  * bundle is a silent no-op, which is the failure mode this comment prevents.
  */
-const MODULES = [Navigation, Pagination, Autoplay, EffectFade, Mousewheel];
+const MODULES = [Navigation, Pagination, Autoplay, Mousewheel];
 
 /** Matches the 750px breakpoint used throughout base.css. */
 const DESKTOP_QUERY = '(min-width: 750px)';
@@ -311,19 +311,36 @@ export class SwiperCarousel extends BaseComponent {
       delete config.pagination;
     }
 
+    // ---- transition -----------------------------------------------------
+    // Always `slide`. The theme used to expose a Transition setting with a fade
+    // option, and fade cross-fades a stack of absolutely positioned slides — so
+    // choosing it silently collapsed a three-across carousel to one, because
+    // showing three stacked slides at once is not a thing fade can do. That is
+    // a setting whose only honest label would have been "also change your
+    // column count", so it is gone, and `EffectFade` is no longer bundled.
+    //
+    // Forced here rather than trusted from `data-options` so a stored `fade`
+    // from before this change cannot reach Swiper without the module present.
+    config.effect = 'slide';
+    delete config.fadeEffect;
+
     // ---- reduced motion -------------------------------------------------
     // The carousel still works; it stops moving on its own and stops animating
     // between slides. Removing the control entirely would be worse.
     if (prefersReducedMotion()) {
       config.speed = 0;
       config.autoplay = false;
-      config.effect = 'slide';
     }
 
     // ---- lifecycle ------------------------------------------------------
     config.on = {
       ...(authored.on || {}),
       init: (swiper) => this.#onChange(swiper),
+      autoplayTimeLeft: (_swiper, _time, progress) => this.#reflectAutoplayProgress(progress),
+      autoplayStart: () => this.#reflectAutoplay(),
+      autoplayStop: () => this.#reflectAutoplay(),
+      autoplayPause: () => this.#reflectAutoplay(),
+      autoplayResume: () => this.#reflectAutoplay(),
       slideChange: (swiper) => this.#onChange(swiper),
 
       // `progress` fires on every translate, including mid-drag, so the bar
@@ -623,6 +640,31 @@ export class SwiperCarousel extends BaseComponent {
     const running = Boolean(this.#swiper?.autoplay?.running);
     this.refs.pause.hidden = !running;
     this.refs.pause.setAttribute('aria-pressed', running ? 'false' : 'true');
+
+    // Paused, the ring stays full rather than freezing mid-sweep: a partial arc
+    // that never moves reads as a broken control rather than a stopped one.
+    if (!running) this.refs.pause.style.setProperty('--carousel-autoplay-progress', '1');
+  }
+
+  /**
+   * Drives the ring around the pause button.
+   *
+   * Swiper's `autoplayTimeLeft` fires on every frame of the delay with the
+   * remaining milliseconds, so the ring is the real countdown to the next slide
+   * rather than a CSS animation guessing at the same duration — which would
+   * drift out of step the first time a customer hovered and paused.
+   *
+   * `progress` arrives as 1 → 0 (time *left*), so it is inverted: the ring
+   * fills as the slide runs out.
+   *
+   * @param {number} progress Swiper's remaining fraction, 1 down to 0.
+   */
+  #reflectAutoplayProgress(progress) {
+    const pause = this.refs.pause;
+    if (!pause || pause.hidden) return;
+
+    const filled = 1 - Math.min(Math.max(progress, 0), 1);
+    pause.style.setProperty('--carousel-autoplay-progress', String(filled));
   }
 
   /* -------------------------------------------------------------- a11y */

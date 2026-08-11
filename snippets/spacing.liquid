@@ -1,38 +1,53 @@
 {% doc %}
   Emits padding as custom properties, for a section or for a block.
 
-  The file was empty. Sixty-eight call sites rendered it and got nothing back,
-  so every padding control in the theme editor moved a slider that changed no
-  pixels. `base.css` was already reading these properties with `0px` fallbacks,
-  which is why the omission produced no error and no visible breakage — only
-  settings that quietly did nothing.
+  ## The hook attribute is the whole point
+
+  `base.css` applies this padding through attribute selectors:
+
+      [data-section-spacing] {
+        padding-block-start: var(--section-padding-block-start, 0px);
+        padding-block-end:   var(--section-padding-block-end, 0px);
+      }
+
+  This snippet emitted only the `style` attribute. The custom properties landed
+  on elements that no rule ever selected, so every padding slider in the theme
+  editor moved a value nothing read — present in the UI, dead on the page, in
+  sections and blocks alike. The attribute is what connects them.
 
   ## Two property sets, not one
 
-  A section pads block-start and block-end only, and takes an explicit mobile
+  A section pads block-start and block-end and takes an explicit mobile
   override. A block pads all four sides and scales the desktop value down on
-  small screens by a percentage. They are different shapes, so they get
-  different property names, matching what `base.css` reads:
+  small screens by a percentage. Different shapes, so different property names,
+  matching what `base.css` reads:
 
       --section-padding-block-start / -end          (+ `-mobile` variants)
       --block-padding-block-start / -end / -inline-start / -inline-end
       --block-padding-scale-mobile
 
-  ## Why inline properties and not classes
+  ## Truthiness, not blank comparisons
 
-  Padding is a continuous range, so a class per value is not possible. Emitting
-  the `style` attribute here rather than at each call site keeps the property
-  names in one file: they have to match `base.css` exactly, and sixty-eight
-  hand-written copies is sixty-eight chances to misspell one.
+  Every guard here is either an `if object` test or a number coerced with
+  `| default: 0 | plus: 0`. Neither depends on how a Liquid engine compares an
+  absent value to `blank` — and that comparison is exactly where this went
+  wrong before: an unset `padding_top_mobile` passed the blank test and emitted
+  `--section-padding-block-start-mobile:px`, an invalid declaration that takes
+  the whole rule down with it.
 
-  ## Zero values are omitted
+  A hash is truthy and nil is falsy in every Liquid, so `if section` is a
+  reliable "was a section passed" test where a blank comparison is not.
 
-  A declaration is only written when the value is non-zero. The fallbacks in
-  `base.css` already resolve to `0px`, so writing `--block-padding-block-end: 0px`
-  adds bytes to every block on the page to say what the stylesheet already says.
+  ## Zero values are omitted, the attribute is not
+
+  A declaration is only written when the value is non-zero: the fallbacks in
+  `base.css` already resolve to `0px`, so writing `0px` adds bytes to every
+  block on the page to restate the stylesheet. The attribute is emitted either
+  way, because a merchant can drag a slider back to zero and the element still
+  has to be selectable.
 
   Left and right are spelled `inline-start` and `inline-end` so they follow the
-  text direction and flip automatically in right-to-left languages.
+  text direction and flip in right-to-left languages.
 
   Parameters:
     section  (object, optional)  A section settings object
@@ -47,53 +62,62 @@
 {% enddoc %}
 
 {%- liquid
-  assign s = section
   assign b = block | default: settings
 
   assign out = ''
 
-  if s != blank
-    if s.padding_top != blank and s.padding_top != 0
-      assign out = out | append: '--section-padding-block-start:' | append: s.padding_top | append: 'px;'
+  if section
+    assign s_top = section.padding_top | default: 0 | plus: 0
+    assign s_bottom = section.padding_bottom | default: 0 | plus: 0
+    assign s_top_mobile = section.padding_top_mobile | default: 0 | plus: 0
+    assign s_bottom_mobile = section.padding_bottom_mobile | default: 0 | plus: 0
+
+    if s_top > 0
+      assign out = out | append: '--section-padding-block-start:' | append: s_top | append: 'px;'
     endif
-    if s.padding_bottom != blank and s.padding_bottom != 0
-      assign out = out | append: '--section-padding-block-end:' | append: s.padding_bottom | append: 'px;'
+    if s_bottom > 0
+      assign out = out | append: '--section-padding-block-end:' | append: s_bottom | append: 'px;'
     endif
 
     comment
       Mobile is only emitted when the merchant set it. Left at 0 the stylesheet
-      falls back to the desktop value, which is the documented behaviour of the
-      "Leave at 0 to use 60% of the desktop value" hint on those settings.
+      falls back to the desktop value, which is what the "leave at 0 to use the
+      desktop value" hint on those settings promises.
     endcomment
-    if s.padding_top_mobile != blank and s.padding_top_mobile != 0
-      assign out = out | append: '--section-padding-block-start-mobile:' | append: s.padding_top_mobile | append: 'px;'
+    if s_top_mobile > 0
+      assign out = out | append: '--section-padding-block-start-mobile:' | append: s_top_mobile | append: 'px;'
     endif
-    if s.padding_bottom_mobile != blank and s.padding_bottom_mobile != 0
-      assign out = out | append: '--section-padding-block-end-mobile:' | append: s.padding_bottom_mobile | append: 'px;'
+    if s_bottom_mobile > 0
+      assign out = out | append: '--section-padding-block-end-mobile:' | append: s_bottom_mobile | append: 'px;'
     endif
   endif
 
-  if b != blank
+  if b
     comment
-      Both spellings are accepted. Most blocks use `padding_top`; a few newer
-      ones use the CSS-shaped `padding-block-start`. Reading either means a
-      block does not have to be rewritten to gain working padding.
-    endcomment
-    assign b_top = b.padding_top | default: b['padding-block-start']
-    assign b_bottom = b.padding_bottom | default: b['padding-block-end']
-    assign b_left = b.padding_left | default: b['padding-inline-start']
-    assign b_right = b.padding_right | default: b['padding-inline-end']
+      Both spellings are accepted. Most blocks use padding_top; a few newer ones
+      use the CSS-shaped padding-block-start. Reading either means a block does
+      not have to be rewritten to gain working padding.
 
-    if b_top != blank and b_top != 0
+      The default filter does not replace 0, only nil, false and empty string —
+      so a merchant's deliberate 0 survives the chain rather than falling
+      through to the other spelling.
+    endcomment
+    assign b_top = b.padding_top | default: b['padding-block-start'] | default: 0 | plus: 0
+    assign b_bottom = b.padding_bottom | default: b['padding-block-end'] | default: 0 | plus: 0
+    assign b_left = b.padding_left | default: b['padding-inline-start'] | default: 0 | plus: 0
+    assign b_right = b.padding_right | default: b['padding-inline-end'] | default: 0 | plus: 0
+    assign b_scale = b.padding_scale_mobile | default: 0 | plus: 0
+
+    if b_top > 0
       assign out = out | append: '--block-padding-block-start:' | append: b_top | append: 'px;'
     endif
-    if b_bottom != blank and b_bottom != 0
+    if b_bottom > 0
       assign out = out | append: '--block-padding-block-end:' | append: b_bottom | append: 'px;'
     endif
-    if b_left != blank and b_left != 0
+    if b_left > 0
       assign out = out | append: '--block-padding-inline-start:' | append: b_left | append: 'px;'
     endif
-    if b_right != blank and b_right != 0
+    if b_right > 0
       assign out = out | append: '--block-padding-inline-end:' | append: b_right | append: 'px;'
     endif
 
@@ -101,11 +125,13 @@
       The setting is a percentage; the stylesheet multiplies by it, so it has to
       arrive as a unitless fraction.
     endcomment
-    if b.padding_scale_mobile != blank and b.padding_scale_mobile != 0
-      assign scale = b.padding_scale_mobile | divided_by: 100.0
+    if b_scale > 0
+      assign scale = b_scale | divided_by: 100.0
       assign out = out | append: '--block-padding-scale-mobile:' | append: scale | append: ';'
     endif
   endif
 -%}
 
+{%- if section -%}data-section-spacing {% endif -%}
+{%- if b -%}data-block-spacing {% endif -%}
 {%- if out != blank %}style="{{ out }}"{% endif -%}

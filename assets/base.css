@@ -204,6 +204,20 @@
     --space-11: 8rem;
     --space-12: 10rem;
 
+    /* Grid gaps. Referenced in five places in this file and defined in none of
+       them, which is not a harmless omission: a declaration that references an
+       undefined custom property is invalid at computed-value time, so the whole
+       `gap` was dropped and computed to `normal` — zero. That is why choosing
+       Grid instead of Carousel produced a row of cards touching each other, and
+       why `carousel.js` measured a `spaceBetween` of 0 for every carousel in
+       the theme.
+
+       Row gap is larger than column gap on purpose: cards carry text below the
+       image, so vertical neighbours need more separation than horizontal ones
+       to stop the eye reading down a column as one block. */
+    --grid-gap-x: var(--space-4);
+    --grid-gap-y: var(--space-6);
+
     /* Every type size, weight, line height and tracking is emitted by
        snippets/css-variables.liquid, which resolves the merchant's preset or
        their granular choices. The fallbacks here exist only so this stylesheet
@@ -607,6 +621,13 @@
     }
   }
 
+  @media screen and (max-width: 749px) {
+    :root {
+      --grid-gap-x: var(--space-3);
+      --grid-gap-y: var(--space-5);
+    }
+  }
+
   /* Section and block spacing. Values arrive as custom properties from
      snippets/spacing.liquid; the media query reads a different property rather
      than a different rule, so one inline style drives both breakpoints. */
@@ -687,6 +708,7 @@
     display: contents;
   }
 
+
   responsive-image img {
     inline-size: 100%;
     block-size: 100%;
@@ -694,7 +716,11 @@
     opacity: 0;
     transition: opacity var(--transition-base);
   }
-
+  responsive-image svg{
+    inline-size: 100%;
+    block-size: 100%;
+    object-fit: cover;
+  }
   responsive-image[data-loaded] img,
   html.no-js responsive-image img {
     opacity: 1;
@@ -5243,18 +5269,40 @@ sticky-header[data-transparent] .header__logo-image--transparent { opacity: 1; }
    It used to be `display: none` here, which meant a merchant who picked the
    default position saw no arrows at all on a laptop, a tablet or a phone — and
    reported the navigation as broken, correctly. */
-@media screen and (max-width: 989px) {
+@media screen and (min-width: 750px) and (max-width: 989px) {
   .carousel-shell > .carousel-nav--outside {
     inset-inline: var(--space-3);
   }
 }
 
-/* On a phone the arrows overlap a full-width slide badly and swipe is the
-   primary gesture, so they do go away — but only there. */
-@media screen and (max-width: 599px) {
-  .carousel-shell > .carousel-nav--outside,
-  .carousel-shell > .carousel-nav--inside {
-    display: none;
+/* Below 750px — the same breakpoint where `layout_mobile` takes over — a slide
+   is close to the full width of the screen, so an overlaid arrow sits on the
+   content. On a peek layout it lands squarely on the partial slide it exists to
+   reveal, which is what the testimonials row looked like: a card cut in half
+   behind a black circle.
+
+   They drop below the track rather than disappearing. The old rule hid them
+   outright under 600px, which leaves a keyboard or switch user with no way to
+   advance the carousel at all — swipe is the primary gesture on a phone, not the
+   only one. Between 600 and 750 it hid nothing and they overlapped instead,
+   which is the band the screenshot was taken in.
+
+   Only `outside` — the default every section uses. `inside` is an explicit
+   choice by whoever wrote the section that the arrows belong over the content,
+   and the announcement bar makes it: that is a one-line bar, and dropping its
+   arrows underneath would double its height on every phone. */
+@media screen and (max-width: 749px) {
+  .carousel-shell > .carousel-nav--outside {
+    position: static;
+    inset-inline: auto;
+    justify-content: center;
+    gap: var(--space-3);
+    margin-block-start: var(--space-4);
+    transform: none;
+    /* The overlay version disables pointer events on the container so a drag
+       can pass through to the slide underneath. In flow there is nothing
+       underneath, and leaving it off would make the buttons unclickable. */
+    pointer-events: auto;
   }
 }
 
@@ -5457,13 +5505,69 @@ sticky-header[data-transparent] .header__logo-image--transparent { opacity: 1; }
   z-index: 2;
   display: grid;
   place-items: center;
-  inline-size: 2rem;
-  block-size: 2rem;
-  border: 1px solid var(--color-slider-arrow-border);
+  /* Was 2rem, which is 20px — below the 24px minimum target size of WCAG 2.5.8
+     and, at that size against a photograph, genuinely hard to find. A variable
+     because the announcement bar is a single line of text and cannot give a
+     34px control the room a testimonials card can. */
+  --carousel-pause-size: 3.4rem;
+
+  inline-size: var(--carousel-pause-size);
+  block-size: var(--carousel-pause-size);
+  padding: 0;
+  border: 0;
   border-radius: 50%;
   background-color: var(--color-slider-arrow-background);
   color: var(--color-slider-arrow-icon);
   cursor: pointer;
+  /* A ring drawn on a light slide needs its own separation from the slide, not
+     just from the ring. */
+  box-shadow: 0 1px 6px rgb(0 0 0 / 0.28);
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+.carousel-shell__pause:hover { transform: scale(1.08); }
+
+.carousel-shell__pause:focus-visible {
+  outline: 2px solid var(--color-accent-text, currentColor);
+  outline-offset: 2px;
+}
+
+/* The countdown ring.
+   ------------------------------------------------------------------------
+   `--carousel-autoplay-progress` is written by `carousel.js` on every frame of
+   Swiper's `autoplayTimeLeft`, so this is the real time to the next slide
+   rather than a CSS animation running its own duration alongside — which would
+   drift the first time a customer hovered and paused, and then disagree with
+   the slide it is supposedly counting down to.
+
+   `conic-gradient` on a pseudo-element rather than an SVG circle: no extra
+   markup, no `stroke-dasharray` arithmetic, and it interpolates smoothly
+   because only the angle changes. */
+.carousel-shell__pause::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  background: conic-gradient(
+    var(--color-accent-text, currentColor) calc(var(--carousel-autoplay-progress, 0) * 360deg),
+    rgb(255 255 255 / 0.25) 0
+  );
+  /* Punch out the middle so the gradient reads as a ring rather than a pie. The
+     mask is what keeps the button's own background visible through it. */
+  mask: radial-gradient(circle, transparent 0 calc(50% - 3px), black calc(50% - 3px) 100%);
+  -webkit-mask: radial-gradient(circle, transparent 0 calc(50% - 3px), black calc(50% - 3px) 100%);
+  pointer-events: none;
+}
+
+/* The icon has to sit above the ring's stacking context. */
+.carousel-shell__pause > * {
+  position: relative;
+  z-index: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .carousel-shell__pause { transition: none; }
+  .carousel-shell__pause:hover { transform: none; }
 }
 
 /* `[hidden]` has to beat `display: grid`. The one place in this section where
@@ -5934,6 +6038,10 @@ announcement-bar[data-dismissed] { display: none; }
 }
 
 .announcement-bar__carousel .carousel-shell__pause {
+  /* 26px: still over the 24px target-size floor, but it fits the bar's line
+     height instead of setting it. */
+  --carousel-pause-size: 2.6rem;
+
   position: absolute;
   inset-block-start: 50%;
   inset-inline-end: 0;
@@ -6667,19 +6775,41 @@ announcement-bar[data-dismissed] { display: none; }
    Swiper writes each slide's width inline and a `flex: 0 0 calc(…)` overrides it.
    -------------------------------------------------------------------------- */
 
-.swiper-initialized .hero__carousel-track,
-.swiper-initialized.product-card__slider .product-card__slides,
-.swiper-initialized .product-grid--carousel,
-.swiper-initialized .recently-viewed__grid--carousel {
+/* Named by position, not by class. The previous version listed four track
+   classes — hero, product card, recommendations, recently viewed — and every
+   section added since inherited none of it. `.testimonials__grid` and
+   `.multicolumn__grid` carry the same `overflow-x: auto; scroll-snap-type: x
+   mandatory` on mobile, so their tracks stayed native scroll containers while
+   Swiper transformed them: the carousel dragged, snapped back, and a peek never
+   settled where it was supposed to. That is the "partial slider not working"
+   report, and it was going to keep happening once per new section.
+
+   `swiper-carousel.swiper-initialized > [data-ref~='track']` is every carousel
+   in the theme, present and future, and nothing else. `~=` because the
+   recommendations and recently-viewed lists answer to two names, `content
+   track`. */
+swiper-carousel.swiper-initialized > [data-ref~='track'] {
+  /* A scroll container under a transformed wrapper can be both scrolled and
+     slid, so it lands between slides. */
   overflow: visible;
+  /* Snapping fires against Swiper's own translate and drags the track back
+     mid-transition. */
   scroll-snap-type: none;
+  /* Swiper spaces slides with `margin-right`, computed from `spaceBetween`. A
+     CSS `gap` left in place is added on top of it, so every section that
+     styled its own gap got double spacing the moment the carousel mounted —
+     and Swiper's measurements, which know nothing about `gap`, drifted further
+     from the truth with every slide. */
   gap: 0;
+  /* A grid track that becomes a carousel keeps `grid-auto-columns` and
+     `grid-template-columns` in the cascade. Harmless once the wrapper is flex,
+     but only because swiper.css wins that fight — this makes it explicit. */
+  display: flex;
 }
 
-.swiper-initialized .hero__carousel-item,
-.swiper-initialized .product-card__slide,
-.swiper-initialized .product-grid--carousel > *,
-.swiper-initialized .recently-viewed__grid--carousel > * {
+swiper-carousel.swiper-initialized > [data-ref~='track'] > * {
+  /* Swiper writes each slide's width inline; a `flex-basis` from the section's
+     own grid CSS would override it. */
   flex: 0 0 auto;
   scroll-snap-align: none;
 }
