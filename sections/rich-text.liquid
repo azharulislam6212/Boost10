@@ -14,10 +14,27 @@
   class="rich-text color-{{ section.settings.color_scheme }}"
   {% render 'spacing', section: section.settings %}
 >
-  <div class="container">
+  <div class="{% render 'container', width: section.settings.container_width %}">
+    {%- comment -%}
+      Two independent widths. The container above decides how far this sits from
+      the edge of the screen; this decides how long a line of text runs. A
+      rich-text section in a Wide container with a Narrow measure is a common
+      and correct combination — the background spans the page, the prose stays
+      readable.
+
+      `max_width` is still honoured for stores that already set it, but only
+      while the merchant leaves the measure on Standard. Anything else means
+      they chose a measure deliberately and a stale pixel value should not
+      override it.
+    {%- endcomment -%}
     <div
-      class="rich-text__inner rich-text__inner--{{ section.settings.alignment }}"
-      style="--rich-text-width: {{ section.settings.max_width }}px;"
+      class="{% render 'content-width',
+                measure: section.settings.content_measure,
+                align: section.settings.alignment,
+                classes: 'rich-text__inner' %}"
+      {% if section.settings.content_measure == 'standard' and section.settings.max_width != blank %}
+        style="--content-measure: {{ section.settings.max_width }}px;"
+      {% endif %}
     >
       {% content_for 'blocks' %}
     </div>
@@ -29,32 +46,165 @@
   "name": "t:sections.rich_text.name",
   "tag": "section",
   "class": "section",
-  "blocks": [{ "type": "@theme" }, { "type": "@app" }],
+  "blocks": [
+    {
+      "type": "@theme"
+    },
+    {
+      "type": "@app"
+    }
+  ],
   "settings": [
     {
-      "type": "select", "id": "alignment", "label": "t:blocks.group.settings.alignment.label",
+      "type": "select",
+      "id": "container_width",
+      "label": "t:shared.container.width.label",
+      "info": "t:shared.container.width.info",
       "options": [
-        { "value": "start", "label": "t:blocks.group.settings.alignment.options__1.label" },
-        { "value": "center", "label": "t:blocks.group.settings.alignment.options__2.label" },
-        { "value": "end", "label": "t:blocks.group.settings.alignment.options__3.label" }
+        {
+          "value": "edge",
+          "label": "t:shared.container.width.options__1.label"
+        },
+        {
+          "value": "wide",
+          "label": "t:shared.container.width.options__2.label"
+        },
+        {
+          "value": "standard",
+          "label": "t:shared.container.width.options__3.label"
+        },
+        {
+          "value": "compact",
+          "label": "t:shared.container.width.options__4.label"
+        },
+        {
+          "value": "custom",
+          "label": "t:shared.container.width.options__5.label"
+        }
+      ],
+      "default": "standard"
+    },
+    {
+      "type": "select",
+      "id": "content_measure",
+      "label": "t:shared.content_width.measure.label",
+      "info": "t:shared.content_width.measure.info",
+      "options": [
+        {
+          "value": "narrow",
+          "label": "t:shared.content_width.measure.options__1.label"
+        },
+        {
+          "value": "standard",
+          "label": "t:shared.content_width.measure.options__2.label"
+        },
+        {
+          "value": "wide",
+          "label": "t:shared.content_width.measure.options__3.label"
+        },
+        {
+          "value": "full",
+          "label": "t:shared.content_width.measure.options__4.label"
+        }
+      ],
+      "default": "standard"
+    },
+    {
+      "type": "select",
+      "id": "alignment",
+      "label": "t:blocks.group.settings.alignment.label",
+      "options": [
+        {
+          "value": "start",
+          "label": "t:blocks.group.settings.alignment.options__1.label"
+        },
+        {
+          "value": "center",
+          "label": "t:blocks.group.settings.alignment.options__2.label"
+        },
+        {
+          "value": "end",
+          "label": "t:blocks.group.settings.alignment.options__3.label"
+        }
       ],
       "default": "center"
     },
-    { "type": "range", "id": "max_width", "label": "t:blocks.group.settings.max_width.label", "min": 400, "max": 1200, "step": 20, "unit": "px", "default": 720 },
-    { "type": "color_scheme", "id": "color_scheme", "label": "t:shared.color_scheme.label", "default": "scheme-1" },
-    { "type": "header", "content": "t:shared.spacing.section_header" },
-    { "type": "range", "id": "padding_top", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 48 },
-    { "type": "range", "id": "padding_bottom", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 48 },
-    { "type": "range", "id": "padding_top_mobile", "label": "t:shared.spacing.padding_top_mobile.label", "info": "t:shared.spacing.padding_top_mobile.info", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 0 },
-    { "type": "range", "id": "padding_bottom_mobile", "label": "t:shared.spacing.padding_bottom_mobile.label", "info": "t:shared.spacing.padding_bottom_mobile.info", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 0 }
+    {
+      "type": "range",
+      "id": "max_width",
+      "label": "t:blocks.group.settings.max_width.label",
+      "min": 400,
+      "max": 1200,
+      "step": 20,
+      "unit": "px",
+      "default": 720
+    },
+    {
+      "type": "color_scheme",
+      "id": "color_scheme",
+      "label": "t:shared.color_scheme.label",
+      "default": "scheme-1"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.spacing.section_header"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 160,
+      "step": 4,
+      "unit": "px",
+      "default": 48
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 160,
+      "step": 4,
+      "unit": "px",
+      "default": 48
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "label": "t:shared.spacing.padding_top_mobile.label",
+      "info": "t:shared.spacing.padding_top_mobile.info",
+      "min": 0,
+      "max": 120,
+      "step": 4,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "label": "t:shared.spacing.padding_bottom_mobile.label",
+      "info": "t:shared.spacing.padding_bottom_mobile.info",
+      "min": 0,
+      "max": 120,
+      "step": 4,
+      "unit": "px",
+      "default": 0
+    }
   ],
   "presets": [
     {
       "name": "t:sections.rich_text.name",
       "blocks": [
-        { "type": "heading" },
-        { "type": "text" },
-        { "type": "button" }
+        {
+          "type": "heading"
+        },
+        {
+          "type": "text"
+        },
+        {
+          "type": "button"
+        }
       ]
     }
   ]

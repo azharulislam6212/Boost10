@@ -3,12 +3,42 @@
 
       @layer tokens {
         :root {
-          --container-max: {{ settings.page_width | default: 1440 }}px;
+          /* ---- layout ---------------------------------------------------------
+             Only two numbers come from theme settings: the side padding, and
+             the custom width if the merchant asked for one.
+
+             Compact, Standard and Wide are constants in `assets/base.css`, not
+             sliders. A merchant setting three widths independently can put them
+             in the wrong order — Wide narrower than Standard — and every section
+             using them silently disagrees with its own label. Three fixed steps
+             plus one Custom escape hatch is the same flexibility without that
+             failure mode. */
+          --container-custom-width: {{ settings.container_custom_width | default: 1280 }}px;
+
           --container-gutter: {{ settings.container_gutter | default: 20 }}px;
           --container-gutter-desktop: {{ settings.container_gutter_desktop | default: 40 }}px;
 
+          /* ---- grid gaps ----------------------------------------------------
+             `grid_horizontal_space` and `grid_vertical_space` have been in the
+             schema all along with nothing reading them, so both sliders moved a
+             value that changed no pixels. They drive the gaps now.
+
+             Mobile scales rather than taking its own pair of sliders: a
+             merchant who wants 16px on desktop almost never wants 16px on a
+             390px screen, and two more numbers to keep in proportion is a worse
+             control than one percentage. */
+          --grid-gap-x-base: {{ settings.grid_horizontal_space | default: 16 }}px;
+          --grid-gap-y-base: {{ settings.grid_vertical_space | default: 32 }}px;
+          --grid-gap-scale-mobile: {{ settings.grid_space_scale_mobile | default: 75 | divided_by: 100.0 }};
+          --grid-gap-x: var(--grid-gap-x-base);
+          --grid-gap-y: var(--grid-gap-y-base);
+
             --grid-gap-horizontal: var(--grid-gap-x);
             --grid-gap-vertical: var(--grid-gap-y);
+
+          /* Was declared in the schema and read nowhere, so "Space between
+             sections" did nothing. `base.css` already had the rule waiting. */
+          --section-gap: {{ settings.spacing_sections | default: 0 }}px;
             --duration-drawer: 300ms;
             --shadow-header: 0 1px 3px rgb(0 0 0 / 0.08);
             --card-border-style: solid;
@@ -70,6 +100,13 @@
 
 
 
+        }
+
+        @media screen and (max-width: 749px) {
+          :root {
+            --grid-gap-x: calc(var(--grid-gap-x-base) * var(--grid-gap-scale-mobile));
+            --grid-gap-y: calc(var(--grid-gap-y-base) * var(--grid-gap-scale-mobile));
+          }
         }
 
         @supports (height: 100dvh) {
@@ -229,16 +266,21 @@
           display: block;
         }
 
-        .container {
-          width: 100%;
-          max-width: var(--container-max);
-          margin-inline: auto;
-          padding-inline: var(--container-gutter);
-        }
+        /* `.container` is defined once, in `assets/base.css`.
 
-        @media screen and (min-width: 990px) {
-          .container { padding-inline: var(--container-gutter-desktop); }
-        }
+           It used to be defined here as well, with `max-width:
+           var(--container-max)`. Two definitions of one class is bad enough;
+           the `max-width` made it a real bug. `max-width` and `max-inline-size`
+           are the same property, so once the width variants moved to padding —
+           and base.css stopped declaring a cap — this copy was the only
+           declaration left standing, and it capped every container at the
+           standard width. A section set to Compact or Wide got a 1440px box no
+           matter which variant it asked for, which is exactly what a DevTools
+           badge reading `1440 × 46.4` on a `.container--compact` was reporting.
+
+           base.css is a render-blocking `<link>` emitted immediately below
+           this block, so nothing paints before it arrives and there is no
+           flash to protect against. */
 
         /* Section and block spacing.
            Values arrive as custom properties from snippets/spacing.liquid. The

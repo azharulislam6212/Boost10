@@ -1,0 +1,72 @@
+{% doc %}
+  The class list for a reading-width wrapper.
+
+  ## Not the same thing as a container
+
+  A container decides how far content sits from the edge of the *screen*. This
+  decides how long a *line of text* runs before it wraps. They are independent:
+  a rich-text section can sit in a wide container and still hold its paragraphs
+  to a readable measure, which is exactly what you want when the section has a
+  background that should span the page.
+
+  Because of that they use different mechanisms, and it is worth knowing which
+  is which when reading `base.css`:
+
+    container      padding-inline, so the box still spans the viewport and a
+                   child can bleed out to the edge
+    content-width  max-inline-size, because a measure is about the text, not
+                   the viewport
+
+  Sized in `ch` — characters — so the value tracks whatever font the merchant
+  picked instead of a pixel guess that goes wrong the moment they switch to a
+  wider typeface. The three measures are constants in `assets/base.css`, not
+  theme settings: they are something a store sets once, and three sliders that
+  can be dragged out of order is a worse control than three named steps.
+
+  ## Alignment
+
+  Centred by default, which is what a standalone rich-text block wants. `start`
+  and `end` move the free space instead of the box, so the measure still holds;
+  they are for text set alongside an image, where centring inside the column
+  reads as a mistake.
+
+  Parameters:
+    measure (string)  narrow | standard | wide | full. Defaults to standard.
+    align   (string)  start | center | end. Defaults to center.
+    classes (string)  Extra classes to append.
+
+  @example
+    <div class="{% render 'content-width', measure: 'narrow' %}">
+
+  @example
+    <div class="{% render 'content-width', measure: section.settings.content_measure, align: section.settings.alignment %}">
+{% enddoc %}
+
+{%- liquid
+  case measure
+    when 'narrow'
+      assign measure_class = 'content-width content-width--narrow'
+    when 'wide'
+      assign measure_class = 'content-width content-width--wide'
+    when 'full'
+      assign measure_class = 'content-width content-width--full'
+    else
+      assign measure_class = 'content-width'
+  endcase
+
+  assign out = measure_class
+
+  # `center` is the default and has no class of its own, so an unrecognised
+  # value lands there rather than on a class that does not exist.
+  case align
+    when 'start'
+      assign out = out | append: ' content-width--start'
+    when 'end'
+      assign out = out | append: ' content-width--end'
+  endcase
+
+  if classes != blank
+    assign out = out | append: ' ' | append: classes
+  endif
+-%}
+{{- out -}}

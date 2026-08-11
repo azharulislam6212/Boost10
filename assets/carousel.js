@@ -101,6 +101,23 @@ export class SwiperCarousel extends BaseComponent {
   #slides = null;
 
   /**
+   * The `style` attributes Liquid wrote, kept so they can be put back.
+   *
+   * Swiper's `destroy(deleteInstance, cleanStyles)` does
+   * `el.removeAttribute('style')` and `wrapperEl.removeAttribute('style')` when
+   * `cleanStyles` is true — the whole attribute, not just the properties it
+   * added. That attribute is where `carousel-vars` puts `--carousel-gap` and
+   * `--carousel-slides-*`, where `carousel-shell` puts `--columns-*`, and where
+   * `carousel-style` puts the nav colours.
+   *
+   * @type {string|null}
+   */
+  #authoredStyle = null;
+
+  /** @type {string|null} */
+  #authoredTrackStyle = null;
+
+  /**
    * True while Swiper is rearranging the track itself.
    *
    * `loopCreate` clones slides on init and `loopFix` moves them on every wrap,
@@ -421,21 +438,43 @@ export class SwiperCarousel extends BaseComponent {
    * @returns {number} px
    */
   #gap() {
-    const track = this.refs.track;
-    if (!track) return 0;
-
-    // `normal` is what an unset gap computes to, and it is not a length.
-    const used = getComputedStyle(track).columnGap;
+    // The host, not the track. `base.css` sets `column-gap` on
+    // `swiper-carousel` unconditionally for exactly this reason: the track's
+    // gap is switched off by the post-init reset, so measuring it there gave a
+    // different answer before and after initialisation. Re-measuring in place —
+    // which is what the theme editor does on every setting change — read 0 and
+    // the carousel lost its spacing until the next full page load.
+    const used = getComputedStyle(this).columnGap;
     const measured = Number.parseFloat(used);
     if (Number.isFinite(measured)) return measured;
 
-    // Last resort for a section that sizes itself entirely from the token.
+    // `normal` is what an unset gap computes to, and it is not a length. Fall
+    // back to the token for a section that sizes itself entirely from it.
     const token = getComputedStyle(this).getPropertyValue('--grid-gap-x').trim();
     if (!token) return 0;
 
     // Values arrive in rem against a 62.5% root, so 1rem is 10px.
     if (token.endsWith('rem')) return Number.parseFloat(token) * 10;
     return Number.parseFloat(token) || 0;
+  }
+
+  /**
+   * Re-applies the gap when the resolved value has changed.
+   *
+   * `spaceBetween` is fixed when Swiper is constructed, but `--grid-gap-x` is
+   * not: it steps down below 750px. Without this, a carousel built on desktop
+   * and then narrowed kept the wider desktop spacing, and its slide widths were
+   * computed from it.
+   */
+  #syncGap() {
+    const swiper = this.#swiper;
+    if (!swiper || swiper.destroyed) return;
+
+    const gap = this.#gap();
+    if (gap === swiper.params.spaceBetween) return;
+
+    swiper.params.spaceBetween = gap;
+    swiper.update();
   }
 
   /* ---------------------------------------------------------- init / kill */
@@ -512,6 +551,12 @@ export class SwiperCarousel extends BaseComponent {
     this.#tagSlides(true);
 
     try {
+      // Captured before Swiper can touch either element. Swiper writes only
+      // classes to the host and transforms to the wrapper, so what is here now
+      // is what Liquid rendered.
+      this.#authoredStyle = this.getAttribute('style');
+      this.#authoredTrackStyle = this.refs.track?.getAttribute('style') ?? null;
+
       // `loopCreate` clones slides during construction. Without this the
       // observer fires before `#swiper` is even assigned and calls `#init()`
       // again, re-entering construction on a half-built carousel.
@@ -559,6 +604,7 @@ export class SwiperCarousel extends BaseComponent {
       last = width;
 
       if (revealed) this.#swiper?.update();
+      else this.#syncGap();
     });
 
     this.#resize.observe(this);
@@ -626,6 +672,24 @@ export class SwiperCarousel extends BaseComponent {
   }
 
   /**
+   * Puts back the `style` attributes Swiper's `cleanStyles` removed.
+   *
+   * Removing the attribute rather than restoring an empty one matters: an empty
+   * `style=""` is harmless but it is not what Liquid rendered, and a later
+   * capture would then record it as authored.
+   */
+  #restoreAuthoredStyles() {
+    if (this.#authoredStyle === null) this.removeAttribute('style');
+    else this.setAttribute('style', this.#authoredStyle);
+
+    const track = this.refs.track;
+    if (!track) return;
+
+    if (this.#authoredTrackStyle === null) track.removeAttribute('style');
+    else track.setAttribute('style', this.#authoredTrackStyle);
+  }
+
+  /**
    * Runs work that rearranges the track without the observer answering it.
    *
    * The flag is cleared in a microtask rather than synchronously: the observer's
@@ -656,6 +720,13 @@ export class SwiperCarousel extends BaseComponent {
     // mutations on a track the observer is still watching.
     if (!this.#swiper.destroyed) this.#withSwiperMutation(() => this.#swiper?.destroy(true, true));
     this.#swiper = null;
+
+    // Put the authored properties back. Without this, switching Layout from
+    // Carousel to Grid and back in the theme editor left the element with no
+    // `--carousel-gap`, so the gap measured 0 and the slides came back touching
+    // — the grid in between looked fine only because `--columns-desktop` falls
+    // back to 4 and the grid gap comes from `:root`.
+    this.#restoreAuthoredStyles();
     this.#tagSlides(false);
     this.#tagTrack(false);
 

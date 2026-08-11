@@ -608,24 +608,165 @@
     display: block;
   }
 
+  /* ==========================================================================
+     Section container
+     ==========================================================================
+     Five widths, one mechanism, no `max-inline-size` anywhere.
+
+     Below 750px the padding is just the gutter. From there up it is the larger
+     of the gutter and the distance from the viewport edge to where the content
+     should start:
+
+         50vw − scrollbar/2 − target/2
+
+     `max()` is what lets one rule serve every width. On a viewport narrower
+     than the target the second term goes to zero or below and the gutter wins;
+     on a wider one the centring wins. No breakpoint needs to know which width a
+     section chose, and `edge` needs no rule of its own — a 100vw target can
+     never beat the gutter.
+
+     ---- why padding and not max-width ----
+
+     With `max-width` the box stops at the content edge, so anything that needs
+     to bleed past it — a full-width image inside a contained section, a
+     carousel whose slides should run to the screen edge — escapes with negative
+     margins and has to guess the gutter at every breakpoint. With padding the
+     box still spans the viewport, so `.container__bleed` below reaches the true
+     edge in one declaration, whichever width is in play.
+
+     There is a second reason, learned the hard way: `max-width` and
+     `max-inline-size` are the same property, so a single stray declaration
+     anywhere in the theme caps every container silently. That is exactly what a
+     duplicate `.container` in `snippets/critical-style.liquid` was doing — a
+     `.container--compact` measured 1440px because the cap from the standard
+     width was the only declaration left standing. `max-inline-size: none` is
+     stated explicitly here so a leftover cap from an app block or a custom
+     stylesheet cannot do it again.
+
+     ---- the scrollbar term ----
+
+     `vw` includes the scrollbar; the element's box does not. Without
+     subtracting it, content on a desktop browser with a classic scrollbar sits
+     about 8px off centre — small enough to read as sloppiness rather than a
+     bug. `--scrollbar-width` is published by `assets/global.js` and defaults to
+     `0px`, which is right for the overlay scrollbars on macOS and mobile.
+     -------------------------------------------------------------------------- */
+
+  :root {
+    /* Fixed steps, not settings. Three independent sliders can be put in the
+       wrong order — Wide narrower than Standard — and then every section using
+       them disagrees with its own label. One Custom escape hatch gives the same
+       flexibility without that failure mode. */
+    --container-width-compact: 1100px;
+    --container-width-standard: 1440px;
+    --container-width-wide: 1700px;
+
+    /* Kept as an alias so anything already reading it still resolves. */
+    --container-max: var(--container-width-standard);
+  }
+
   .container {
+    --container-width: var(--container-width-standard);
+
     inline-size: 100%;
-    max-inline-size: var(--container-max);
+    max-inline-size: none;
     margin-inline: auto;
     padding-inline: var(--container-gutter);
   }
 
-  @media screen and (min-width: 990px) {
+  @media screen and (min-width: 750px) {
     .container {
-      padding-inline: var(--container-gutter-desktop);
+      padding-inline: max(
+        var(--container-gutter-desktop),
+        calc(50vw - var(--scrollbar-width, 0px) / 2 - var(--container-width) / 2)
+      );
     }
   }
 
-  @media screen and (max-width: 749px) {
-    :root {
-      --grid-gap-x: var(--space-3);
-      --grid-gap-y: var(--space-5);
+  /* ---- the widths ----
+     `--container-custom-width` comes from theme settings; the rest are the
+     constants above. */
+  .container--compact { --container-width: var(--container-width-compact); }
+  .container--standard { --container-width: var(--container-width-standard); }
+  .container--wide { --container-width: var(--container-width-wide); }
+  .container--custom { --container-width: var(--container-custom-width, var(--container-width-standard)); }
+  .container--edge { --container-width: 100vw; }
+
+  /* Nothing at all: no width, no gutter. For a section that paints its own
+     background to the screen edge and holds its own container inside. */
+  .container--flush {
+    --container-gutter: 0px;
+    --container-gutter-desktop: 0px;
+    --container-width: 100vw;
+
+    padding-inline: 0;
+  }
+
+  /* ---- breaking out ----
+     `100%` of a padded box is the content width, so a child reaches the true
+     viewport edge by cancelling the padding it inherited. Reading the same
+     expression back is what keeps it exact at every breakpoint and every
+     width. */
+  .container__bleed {
+    margin-inline: calc(var(--container-gutter) * -1);
+  }
+
+  @media screen and (min-width: 750px) {
+    .container__bleed {
+      margin-inline: calc(
+        max(
+          var(--container-gutter-desktop),
+          calc(50vw - var(--scrollbar-width, 0px) / 2 - var(--container-width) / 2)
+        ) * -1
+      );
     }
+  }
+
+  /* ==========================================================================
+     Content container
+     ==========================================================================
+     A different job, so a different mechanism. This constrains a *measure* —
+     how far the eye travels before it has to find the start of the next line —
+     and a measure has nothing to do with the viewport edge. So
+     `max-inline-size` is correct here where it was wrong above.
+
+     In `ch` so the value follows whichever font the merchant picked rather than
+     a pixel guess that goes wrong the moment they switch to a wider typeface.
+     Around 66ch is the comfortable range for body copy.
+
+     Not merchant-editable for the same reason as the widths: three sliders that
+     can be put out of order, controlling something most merchants would set
+     once and never touch.
+     -------------------------------------------------------------------------- */
+
+  :root {
+    --content-width-narrow: 48ch;
+    --content-width: 66ch;
+    --content-width-wide: 82ch;
+  }
+
+  .content-width {
+    --content-measure: var(--content-width);
+
+    inline-size: 100%;
+    max-inline-size: var(--content-measure);
+    margin-inline: auto;
+  }
+
+  .content-width--narrow { --content-measure: var(--content-width-narrow); }
+  .content-width--wide { --content-measure: var(--content-width-wide); }
+  .content-width--full { --content-measure: none; }
+
+  /* Aligned to the start of the container instead of centred. The free space
+     moves, not the box, so the measure still holds. */
+  .content-width--start {
+    margin-inline-start: 0;
+    margin-inline-end: auto;
+  }
+
+  .content-width--end {
+    margin-inline-start: auto;
+    margin-inline-end: 0;
   }
 
   /* Section and block spacing.
