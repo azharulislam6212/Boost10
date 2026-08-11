@@ -356,27 +356,58 @@ export class SwiperCarousel extends BaseComponent {
       if (Number.isFinite(perView)) counts.push(perView);
     }
 
-    const widest = Math.max(...counts);
+    // `ceil` matches Swiper's own handling of a fractional `slidesPerView`: a
+    // peek of 2.3 is three slides' worth of viewport as far as looping is
+    // concerned, and asking for the fraction would let a carousel through that
+    // Swiper then warns about and un-loops anyway.
+    const widest = Math.ceil(Math.max(...counts));
     const slides = this.refs.track?.children.length ?? 0;
 
     return slides >= widest * 2;
   }
 
   /**
-   * Slide spacing, taken from the merchant's grid setting rather than restated
-   * here. Swiper positions slides with transforms, so it needs the number — a
-   * CSS `gap` on the wrapper would be ignored by its measurements and the
-   * slides would overlap.
+   * Slide spacing, measured rather than restated. Swiper positions slides with
+   * transforms, so it needs a number — a CSS `gap` on the wrapper is ignored by
+   * its measurements and the slides would overlap.
+   *
+   * ## Why this reads `column-gap` and not a custom property
+   *
+   * It used to read `--grid-gap-x`, which is referenced in four places in
+   * `base.css` and **defined in none of them**. An undefined custom property
+   * makes every declaration that references it invalid at computed-value time,
+   * so those `gap` rules were already resolving to `normal`, and this returned
+   * `0` for every carousel in the theme.
+   *
+   * Reading the track's used `column-gap` asks the browser what the spacing
+   * actually is, after all the cascade and all the fallbacks. It is right when
+   * the token is defined, right when it is not, and right for a section that
+   * sets its own gap in px, rem or anything else — and it is the same number
+   * `carousel-vars` puts behind the pre-init slide width, so the slides do not
+   * move when Swiper mounts.
+   *
+   * Called from `#config()`, which runs before `swiper-initialized` lands on the
+   * element, so the pre-init `gap` rule is still applying at this moment. That
+   * ordering is load-bearing.
    *
    * @returns {number} px
    */
   #gap() {
-    const raw = getComputedStyle(this).getPropertyValue('--grid-gap-x').trim();
-    if (!raw) return 0;
+    const track = this.refs.track;
+    if (!track) return 0;
+
+    // `normal` is what an unset gap computes to, and it is not a length.
+    const used = getComputedStyle(track).columnGap;
+    const measured = Number.parseFloat(used);
+    if (Number.isFinite(measured)) return measured;
+
+    // Last resort for a section that sizes itself entirely from the token.
+    const token = getComputedStyle(this).getPropertyValue('--grid-gap-x').trim();
+    if (!token) return 0;
 
     // Values arrive in rem against a 62.5% root, so 1rem is 10px.
-    if (raw.endsWith('rem')) return Number.parseFloat(raw) * 10;
-    return Number.parseFloat(raw) || 0;
+    if (token.endsWith('rem')) return Number.parseFloat(token) * 10;
+    return Number.parseFloat(token) || 0;
   }
 
   /* ---------------------------------------------------------- init / kill */
@@ -384,6 +415,32 @@ export class SwiperCarousel extends BaseComponent {
   #sync() {
     if (this.#shouldRun) this.#init();
     else this.#destroy();
+  }
+
+  /**
+   * Puts Swiper's wrapper class on the track, and takes it off again.
+   *
+   * ## Why Liquid does not write this class
+   *
+   * `swiper.css` is unlayered, so `.swiper-wrapper { display: flex }` beats the
+   * `display: grid` that `@layer components` gives `.product-grid`,
+   * `.multicolumn__grid` and `.testimonials__grid`. A section set to *Grid* on
+   * desktop and *Carousel* on mobile is the same nodes at both widths, so with
+   * the class in the markup its desktop grid rendered as a flex row — every
+   * card the same height, no column count, no row gap.
+   *
+   * Fighting that from the theme's own stylesheet means either `!important` or
+   * `revert-layer`, and both are a workaround for a class that simply should not
+   * be there yet. So the class arrives with Swiper and leaves with it. At a grid
+   * breakpoint the track keeps its own layout and there is nothing to override.
+   *
+   * Swiper finds its wrapper by this class in `mount()`, which runs inside
+   * `new Swiper()` — after this call. The ordering is load-bearing.
+   *
+   * @param {boolean} on
+   */
+  #tagTrack(on) {
+    this.refs.track?.classList.toggle('swiper-wrapper', on);
   }
 
   /**
@@ -423,6 +480,7 @@ export class SwiperCarousel extends BaseComponent {
     const slides = this.refs.track?.children.length ?? 0;
     if (slides < 2) return;
 
+    this.#tagTrack(true);
     this.#tagSlides(true);
 
     try {
@@ -431,6 +489,7 @@ export class SwiperCarousel extends BaseComponent {
       console.error('[Boost10] <swiper-carousel> failed to initialise.', error);
       this.#swiper = null;
       this.#tagSlides(false);
+      this.#tagTrack(false);
       return;
     }
 
@@ -521,6 +580,7 @@ export class SwiperCarousel extends BaseComponent {
     if (!this.#swiper.destroyed) this.#swiper.destroy(true, true);
     this.#swiper = null;
     this.#tagSlides(false);
+    this.#tagTrack(false);
 
     if (this.refs.pause) this.refs.pause.hidden = true;
     toggleControls(this.#controls, false);

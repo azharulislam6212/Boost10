@@ -10,11 +10,13 @@
       .carousel-shell__track     wrapper
         .carousel-shell__item    slides   ← rendered by the calling section
 
-  The wrapper carries `swiper-wrapper` in the markup, because it is a fixed
-  element this snippet owns. The slides are not: two of the five callers pass
-  `{% content_for 'blocks' %}` straight through, so there is no element here to
-  put a class on. `assets/carousel.js` tags the track's children with
-  `swiper-slide` at init and removes it on destroy.
+  Neither `swiper-wrapper` nor `swiper-slide` appears in this markup.
+  `assets/carousel.js` adds both at init and removes them on destroy, because
+  `swiper.css` is unlayered and its `.swiper-wrapper { display: flex }` would
+  beat the `display: grid` a section's own stylesheet gives the track — so a
+  section set to Grid on desktop rendered as a flex row. The class arrives with
+  Swiper and leaves with it, and at a grid breakpoint there is nothing to
+  override.
 
   That matters beyond tidiness. `swiper.css` styles `.swiper-slide` by name —
   `position: relative`, and every effect rule including
@@ -133,10 +135,14 @@
         columns_mobile: cols_mobile,
         pagination: pagination -%}
   "
-  style="{{ inline_style }}{% render 'carousel-style', settings: settings %}"
+  style="{{ inline_style }}{% render 'carousel-vars',
+      settings: settings,
+      columns_desktop: cols_desktop,
+      columns_tablet: cols_tablet,
+      columns_mobile: cols_mobile %}{% render 'carousel-style', settings: settings %}"
 >
   <{{ track_tag }}
-    class="carousel-shell__track swiper-wrapper {{ track_classes }}"
+    class="carousel-shell__track {{ track_classes }}"
     data-ref="track"
     {% if track_tag == 'ul' %}role="list"{% endif %}
     {%- if is_carousel %}

@@ -5049,8 +5049,15 @@ sticky-header[data-transparent] .header__logo-image--transparent { opacity: 1; }
    off `data-layout` in CSS *and* in JS is how the two came to disagree during a
    breakpoint change.
 
-   The grid branch has to beat swiper.css's `.swiper-wrapper { display: flex }`,
-   which is why it hangs off `:not(.swiper-initialized)` rather than the track.
+   The grid branch used to be `.carousel-shell:not(.swiper-initialized) >
+   .carousel-shell__track`, with no test for *which* layout the breakpoint is —
+   it out-specified swiper.css by accident and applied at carousel breakpoints
+   too. That is what made a mobile carousel render as a one-column stack of
+   every slide until the module loaded: twelve announcements, twelve rows.
+
+   Each branch now names its own breakpoint, so grid and carousel are symmetric
+   and neither depends on beating the other. The carousel half lives at the end
+   of this file with the pre-init slide sizing.
    -------------------------------------------------------------------------- */
 
 .carousel-shell__track {
@@ -5059,20 +5066,24 @@ sticky-header[data-transparent] .header__logo-image--transparent { opacity: 1; }
   list-style: none;
 }
 
-.carousel-shell:not(.swiper-initialized) > .carousel-shell__track {
-  display: grid;
-  gap: var(--grid-gap-y) var(--grid-gap-x);
-  grid-template-columns: repeat(var(--columns-mobile, 1), minmax(0, 1fr));
+@media screen and (max-width: 749px) {
+  swiper-carousel[data-layout-mobile='grid']:not(.swiper-initialized) > .carousel-shell__track {
+    display: grid;
+    gap: var(--grid-gap-y) var(--grid-gap-x);
+    grid-template-columns: repeat(var(--columns-mobile, 1), minmax(0, 1fr));
+  }
 }
 
 @media screen and (min-width: 750px) {
-  .carousel-shell:not(.swiper-initialized) > .carousel-shell__track {
+  swiper-carousel[data-layout='grid']:not(.swiper-initialized) > .carousel-shell__track {
+    display: grid;
+    gap: var(--grid-gap-y) var(--grid-gap-x);
     grid-template-columns: repeat(var(--columns-tablet, 2), minmax(0, 1fr));
   }
 }
 
 @media screen and (min-width: 990px) {
-  .carousel-shell:not(.swiper-initialized) > .carousel-shell__track {
+  swiper-carousel[data-layout='grid']:not(.swiper-initialized) > .carousel-shell__track {
     grid-template-columns: repeat(var(--columns-desktop, 4), minmax(0, 1fr));
   }
 }
@@ -5096,12 +5107,22 @@ sticky-header[data-transparent] .header__logo-image--transparent { opacity: 1; }
   block-size: auto;
 }
 
-/* At a grid breakpoint the class is gone, so nothing from swiper.css applies to
-   the items. This rule is the belt-and-braces for the frame between a
-   breakpoint change and the component reacting to it. */
-.carousel-shell:not(.swiper-initialized) > .carousel-shell__track > * {
-  inline-size: auto;
-  block-size: auto;
+/* Belt-and-braces for the frame between a breakpoint change and the component
+   reacting to it: Swiper writes an inline `width` on every slide, and at a grid
+   breakpoint that width is meaningless. Scoped to the grid branches, so it does
+   not undo the pre-init `flex-basis` a carousel breakpoint depends on. */
+@media screen and (max-width: 749px) {
+  swiper-carousel[data-layout-mobile='grid']:not(.swiper-initialized) > .carousel-shell__track > * {
+    inline-size: auto;
+    block-size: auto;
+  }
+}
+
+@media screen and (min-width: 750px) {
+  swiper-carousel[data-layout='grid']:not(.swiper-initialized) > .carousel-shell__track > * {
+    inline-size: auto;
+    block-size: auto;
+  }
 }
 
 
@@ -6684,4 +6705,120 @@ announcement-bar[data-dismissed] { display: none; }
 .recently-viewed__arrow.carousel-button--disabled {
   opacity: 0.35;
   pointer-events: none;
+}
+
+
+/* ==========================================================================
+   Pre-init slide sizing — the one rule every carousel inherits
+   ==========================================================================
+   Between first paint and Swiper mounting, a carousel has no styling of its own:
+   `assets/carousel.js` is a lazily loaded module and it is what adds both
+   `swiper-wrapper` and `swiper-slide`. Left alone the track is a block element
+   and the slides stack, or — with the wrapper class written in Liquid, as it
+   used to be — they become flex items with the browser default `flex: 0 1 auto`
+   and twelve announcements squeeze into one row, then snap to one when the
+   module lands.
+
+   So the pre-hydration presentation is owned here, from the custom properties
+   `snippets/carousel-vars.liquid` writes onto the element. Two things follow
+   from that:
+
+   **It is keyed on `data-layout`, not on a class.** A breakpoint that is a grid
+   never matches these rules at all, so a section set to Grid on desktop and
+   Carousel on mobile keeps its own grid untouched — no override, no
+   `!important`, no `revert-layer`. That is also why `swiper-wrapper` is no
+   longer in the markup: see `#tagTrack` in `assets/carousel.js`.
+
+   **It survives JavaScript failing.** The row is laid out by this stylesheet,
+   not by `swiper.css`, so a carousel whose module never loads is still a
+   readable, swipeable row rather than a stack.
+
+   Everything is scoped to `:not(.swiper-initialized)`, so the instant Swiper
+   mounts and starts writing inline widths, none of it matches. Nothing here can
+   fight Swiper, because nothing here is still applying once Swiper is running.
+
+   This is deliberately the only place in the theme that sizes a slide. A new
+   section needs `carousel-vars` in its `style` attribute and nothing else — no
+   per-section CSS, now or later.
+
+   `[data-ref~='track']` rather than `[data-ref='track']`: the recommendations
+   and recently-viewed lists answer to two names, `content track`, so an exact
+   match would miss them.
+   -------------------------------------------------------------------------- */
+
+/* The breakpoints match `carousel-options`, which writes the same 750/990 pair
+   into Swiper's `breakpoints`. One set of numbers, two consumers. */
+swiper-carousel {
+  --carousel-slides: var(--carousel-slides-mobile, 1);
+}
+
+@media screen and (min-width: 750px) {
+  swiper-carousel {
+    --carousel-slides: var(--carousel-slides-tablet, var(--carousel-slides-mobile, 1));
+  }
+}
+
+@media screen and (min-width: 990px) {
+  swiper-carousel {
+    --carousel-slides: var(--carousel-slides-desktop, var(--carousel-slides-tablet, 1));
+  }
+}
+
+/* ---- below 750px, if this breakpoint is a carousel ---- */
+@media screen and (max-width: 749px) {
+  swiper-carousel[data-layout-mobile='carousel']:not(.swiper-initialized) > [data-ref~='track'] {
+    display: flex;
+    /* `gap` rather than a margin per slide: no `:last-child` exception, and it
+       disappears with this rule the moment Swiper starts setting `margin-right`
+       itself. `carousel.js` measures this exact value for `spaceBetween`. */
+    gap: var(--carousel-gap, 0px);
+  }
+
+  swiper-carousel[data-layout-mobile='carousel']:not(.swiper-initialized) > [data-ref~='track'] > * {
+    flex: 0 0 calc(
+      (100% - (var(--carousel-slides, 1) - 1) * var(--carousel-gap, 0px))
+      / var(--carousel-slides, 1)
+    );
+    min-inline-size: 0;
+  }
+}
+
+/* ---- 750px and up, if this breakpoint is a carousel ---- */
+@media screen and (min-width: 750px) {
+  swiper-carousel[data-layout='carousel']:not(.swiper-initialized) > [data-ref~='track'] {
+    display: flex;
+    gap: var(--carousel-gap, 0px);
+  }
+
+  swiper-carousel[data-layout='carousel']:not(.swiper-initialized) > [data-ref~='track'] > * {
+    /* The same arithmetic Swiper does in `updateSlides()`: the track minus the
+       gaps between slides, divided by how many are showing. A fractional count
+       is what produces a peek, and this handles 2.3 exactly as it handles 2. */
+    flex: 0 0 calc(
+      (100% - (var(--carousel-slides, 1) - 1) * var(--carousel-gap, 0px))
+      / var(--carousel-slides, 1)
+    );
+    /* A flex item's automatic minimum size is its content, so one long unbroken
+       word would push a slide past the width just computed. */
+    min-inline-size: 0;
+  }
+}
+
+/* ---- grid breakpoints ----
+   `swiper.css` gives `.swiper` `overflow: hidden`, which is right for a carousel
+   and wrong for a grid: it clips card hover shadows, focus rings and quick-add
+   popovers at the edge of the section. The class stays on the element at both
+   breakpoints — it is what clips the row before Swiper mounts — so the grid case
+   opts back out here. This is the only rule in the theme that needs to know a
+   breakpoint is a grid. */
+@media screen and (max-width: 749px) {
+  swiper-carousel[data-layout-mobile='grid']:not(.swiper-initialized) {
+    overflow: visible;
+  }
+}
+
+@media screen and (min-width: 750px) {
+  swiper-carousel[data-layout='grid']:not(.swiper-initialized) {
+    overflow: visible;
+  }
 }

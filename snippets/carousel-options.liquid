@@ -40,6 +40,8 @@
     autoplay   (boolean)  Overrides `settings.carousel_autoplay`
     loop       (boolean)  Overrides `settings.carousel_loop`
     effect     (string)   Overrides `settings.carousel_effect`
+    peek_mobile / peek_desktop (number)  Partial-slide percentage. See
+                          `carousel-slides`, which owns the arithmetic.
     space_between (number) Gap between slides in px. Omit to let the component
                           read the grid's own `--grid-gap-x`, which is what
                           every section wants; pass `0` for a full-bleed strip
@@ -51,21 +53,40 @@
     <swiper-carousel data-options="{% render 'carousel-options', settings: section.settings, count: 5 %}">
 {% enddoc %}
 
+{%- comment -%}
+  Slides per breakpoint comes from `carousel-slides`, never from arithmetic
+  here. `carousel-vars` renders the same snippet for the CSS custom properties
+  that size the slides before this JSON is ever parsed, and the two must agree
+  exactly — if they drift, the slides resize the moment Swiper mounts.
+{%- endcomment -%}
+{%- capture spv_mobile -%}
+  {%- render 'carousel-slides', settings: settings, viewport: 'mobile',
+      columns_mobile: columns_mobile, effect: effect,
+      peek_mobile: peek_mobile, peek_desktop: peek_desktop -%}
+{%- endcapture -%}
+{%- capture spv_tablet -%}
+  {%- render 'carousel-slides', settings: settings, viewport: 'tablet',
+      columns_tablet: columns_tablet, effect: effect,
+      peek_mobile: peek_mobile, peek_desktop: peek_desktop -%}
+{%- endcapture -%}
+{%- capture spv_desktop -%}
+  {%- render 'carousel-slides', settings: settings, viewport: 'desktop',
+      columns_desktop: columns_desktop, effect: effect,
+      peek_mobile: peek_mobile, peek_desktop: peek_desktop -%}
+{%- endcapture -%}
+
 {%- liquid
-  assign cols_desktop = columns_desktop | default: settings.columns_desktop | default: 4
-  assign cols_tablet = columns_tablet | default: settings.columns_tablet | default: 2
-  assign cols_mobile = columns_mobile | default: settings.columns_mobile | default: 1
+  assign spv_mobile = spv_mobile | strip
+  assign spv_tablet = spv_tablet | strip
+  assign spv_desktop = spv_desktop | strip
 
   assign effect_name = effect | default: settings.carousel_effect | default: 'slide'
 
-  # Fade cross-fades a stack, so it is only coherent with one slide showing.
-  # Left at four columns it renders four cards on top of each other, which is
-  # what "the effect setting does nothing" looks like from the outside.
-  if effect_name == 'fade'
-    assign cols_desktop = 1
-    assign cols_tablet = 1
-    assign cols_mobile = 1
-  endif
+  # The loop guard counts whole slides. `ceil`, not `floor`, because that is what
+  # Swiper itself does with a fractional value — `Math.ceil(parseFloat(...))` —
+  # so a 2.3-slide carousel needs six slides to loop, the same number Swiper
+  # would demand before printing its own warning.
+  assign cols_desktop = spv_desktop | plus: 0 | ceil
 
   # Milliseconds, clamped rather than trusted. A stored value can predate the
   # current schema: the announcement bar used to declare this setting in
@@ -101,18 +122,26 @@
   # omitted `count`: an unset variable compared with `<` is a type error in a
   # strict Liquid engine, and silently false in a lenient one. Coercing to a
   # number first means the guard is simply skipped instead.
+  assign use_rewind = false
+
   assign slide_count = count | default: 0 | plus: 0
   if use_loop and slide_count > 0
     assign loop_minimum = cols_desktop | times: 2
     if slide_count < loop_minimum
       assign use_loop = false
+
+      # Rewind rather than nothing. The merchant asked to get back to the first
+      # slide from the last; looping is one way to do that and rewind is the
+      # other, and refusing the setting outright would leave the carousel
+      # stopping dead at the end with the box still ticked. This is the same
+      # fallback `assets/carousel.js` applies when it cannot count slides here.
+      assign use_rewind = true
     endif
   endif
 
   # Fade animates opacity on a stack that Swiper does not re-order, so looping
   # it flickers back through every slide on the wrap. Rewind reaches the same
   # place — back to the first slide — with one transition.
-  assign use_rewind = false
   if effect_name == 'fade' and use_loop
     assign use_loop = false
     assign use_rewind = true
@@ -138,7 +167,7 @@
 {%- endcomment -%}
 
 {%- capture fragment_slides -%}
-"slidesPerView":{{ cols_mobile }},"breakpoints":{"750":{"slidesPerView":{{ cols_tablet }}},"990":{"slidesPerView":{{ cols_desktop }}}}
+"slidesPerView":{{ spv_mobile }},"breakpoints":{"750":{"slidesPerView":{{ spv_tablet }}},"990":{"slidesPerView":{{ spv_desktop }}}}
 {%- endcapture -%}
 
 {%- capture fragment_motion -%}
@@ -164,7 +193,13 @@
 {%- endif -%}
 
 {%- if effect_name == 'fade' -%}
-  {%- assign fragments = fragments | append: '|"fadeEffect":{"crossFade":true}' -%}
+  {%- capture fragment_fade -%}
+"fadeEffect":
+{
+"crossFade": true
+}
+{%- endcapture -%}
+  {%- assign fragments = fragments | append: '|' | append: fragment_fade -%}
 {%- endif -%}
 
 {%- if use_autoplay -%}
@@ -187,15 +222,43 @@
 {%- endif -%}
 
 {%- comment -%}
-  `escape` is what makes this safe inside a double-quoted attribute: it turns
-  every `"` into `&quot;`, which the browser decodes back to real JSON before
-  `dataset.options` ever sees it. Emitting raw quotes would end the attribute at
-  the first key.
+  ---- output ----
+
+  The braces are literal template text inside a `capture`, never a quoted string
+  passed through `append`. Building them with a quoted open-brace and
+  close-brace, appended around the value, reads perfectly well and is what this
+  used to be — but Shopify's parser rejects it:
+
+    Liquid syntax error: Variable ... was not properly terminated
+    with regexp: /\}\}/
+
+  A variable tag is tokenised by scanning forward for the first close-brace
+  pair, and that happens before any string quoting is understood. So a
+  close-brace inside quotes is read as the start of the terminator rather than
+  as content, and the tag ends in the middle of itself. The same hazard applies
+  to an open-brace in an `assign`, which is why the fade fragment above is a
+  capture too.
+
+  Note that this comment cannot quote the offending syntax either: a comment
+  body is still tokenised, so an example written out in full would reintroduce
+  the error it is describing.
+
+  Every brace in this file is therefore either template text on its own line, or
+  part of a real output tag. None is ever inside quotes.
+
+  The line breaks between the open brace, the value and the close brace below
+  are load-bearing for the same reason: on one line, a literal open brace
+  immediately followed by an output tag would tokenise as the start of that tag
+  instead. `strip_newlines` removes them again before the attribute is written.
+
+  `escape` is what makes the result safe inside a double-quoted attribute: it
+  turns every `"` into `&quot;`, which the browser decodes back to real JSON
+  before `dataset.options` ever sees it. Emitting raw quotes would end the
+  attribute at the first key.
 {%- endcomment -%}
-{% comment %} {%- assign options = fragments | split: '|' | join: ',' | strip_newlines -%}
-{{- '{' | append: options | append: '}' | escape -}} {% endcomment %}
-{%- assign options = fragments | split: '|' | join: ',' | strip_newlines -%}
-{%- capture output -%}
-  { "options": [{{ options }}] }
+{%- capture options_json -%}
+{
+{{- fragments | split: '|' | join: ',' -}}
+}
 {%- endcapture -%}
-{{ output | escape }}
+{{- options_json | strip_newlines | strip | escape -}}

@@ -1,0 +1,93 @@
+{% doc %}
+  The CSS custom properties that size a carousel's slides before Swiper loads.
+
+  ## The problem this solves
+
+  `swiper.css` sets `.swiper-wrapper { display: flex }`, and it applies the
+  moment the stylesheet parses. `.swiper-slide { flex-shrink: 0; width: 100% }`
+  does *not* apply yet, because `assets/carousel.js` is what puts the
+  `swiper-slide` class on the track's children, and it is a lazily loaded module.
+
+  So between first paint and Swiper mounting, every slide is a flex item with the
+  browser default `flex: 0 1 auto` — free to shrink. Twelve announcements squeeze
+  into one row, and then snap to one slide when the module lands. That is the
+  "it shows all 12 on page load" report, and no amount of Swiper configuration
+  fixes it: Swiper is not running yet.
+
+  The fix is to tell CSS what the slide width will be, in Liquid, in the markup.
+  `base.css` has one generic rule that reads these properties; a section adds no
+  CSS of its own, now or in future.
+
+  ## Why these are not the `--columns-*` properties the grid already uses
+
+  `--columns-desktop` is a whole-number column count for a CSS grid. These are
+  Swiper's `slidesPerView`, which is a *fraction* whenever there is a peek. Same
+  idea, different values, and overloading one name for both is how a 2.3-slide
+  carousel ends up rendering as a 2-column grid for the first 200ms.
+
+  ## Parameters
+
+  Identical to `carousel-options` so a caller passes the same arguments to both:
+
+    settings (object, required)
+    columns_mobile / columns_tablet / columns_desktop (number)
+    effect (string), peek_mobile (number), peek_desktop (number)
+    space_between (number)  px. Omit to inherit the grid's own `--grid-gap-x`.
+
+  @example
+    <swiper-carousel
+      style="{% render 'carousel-vars', settings: section.settings %}"
+      data-options="{% render 'carousel-options', settings: section.settings %}">
+{% enddoc %}
+
+{%- capture slides_mobile -%}
+  {%- render 'carousel-slides',
+      settings: settings,
+      viewport: 'mobile',
+      columns_mobile: columns_mobile,
+      effect: effect,
+      peek_mobile: peek_mobile,
+      peek_desktop: peek_desktop -%}
+{%- endcapture -%}
+
+{%- capture slides_tablet -%}
+  {%- render 'carousel-slides',
+      settings: settings,
+      viewport: 'tablet',
+      columns_tablet: columns_tablet,
+      effect: effect,
+      peek_mobile: peek_mobile,
+      peek_desktop: peek_desktop -%}
+{%- endcapture -%}
+
+{%- capture slides_desktop -%}
+  {%- render 'carousel-slides',
+      settings: settings,
+      viewport: 'desktop',
+      columns_desktop: columns_desktop,
+      effect: effect,
+      peek_mobile: peek_mobile,
+      peek_desktop: peek_desktop -%}
+{%- endcapture -%}
+
+{%- liquid
+  assign gap = space_between | default: -1 | plus: 0
+
+  # `-1` is the sentinel for "the caller said nothing", because `0` is a real
+  # value here. Unset, the gap falls through to the grid's own spacing, which is
+  # the same number `carousel.js` measures for Swiper's `spaceBetween` — so the
+  # slides do not resize when it mounts.
+  if gap >= 0
+    assign gap_value = gap | append: 'px'
+  else
+    assign gap_value = 'var(--grid-gap-x, 0rem)'
+  endif
+-%}
+
+{%- capture vars -%}
+  --carousel-slides-mobile: {{ slides_mobile | strip }};
+  --carousel-slides-tablet: {{ slides_tablet | strip }};
+  --carousel-slides-desktop: {{ slides_desktop | strip }};
+  --carousel-gap: {{ gap_value }};
+{%- endcapture -%}
+{{- vars | strip_newlines | strip -}}
