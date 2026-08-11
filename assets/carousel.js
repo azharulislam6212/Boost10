@@ -672,13 +672,12 @@ export class SwiperCarousel extends BaseComponent {
     const autoplay = this.#swiper?.autoplay;
     if (!autoplay) return;
 
-    if (autoplay.running) {
-      autoplay.stop();
-      this.refs.pause?.setAttribute('aria-pressed', 'true');
-    } else {
-      autoplay.start();
-      this.refs.pause?.setAttribute('aria-pressed', 'false');
-    }
+    if (autoplay.running) autoplay.stop();
+    else autoplay.start();
+
+    // One place decides how the control looks, so pressing it and autoplay
+    // stopping on its own cannot disagree.
+    this.#reflectAutoplay();
   }
 
   /**
@@ -697,13 +696,33 @@ export class SwiperCarousel extends BaseComponent {
   #reflectAutoplay() {
     if (!this.refs.pause) return;
 
+    const pause = this.refs.pause;
+
+    // Visible whenever the carousel was configured with autoplay at all, not
+    // only while it happens to be running. Hiding it on the first click meant
+    // the control removed itself the moment it was used, with nothing left to
+    // start playback again.
+    pause.hidden = !this.#hasAutoplay;
+
     const running = Boolean(this.#swiper?.autoplay?.running);
-    this.refs.pause.hidden = !running;
-    this.refs.pause.setAttribute('aria-pressed', running ? 'false' : 'true');
+    // The icon and the accessible name are both swapped by CSS off this
+    // attribute, so the label stays translated rather than being rebuilt in JS.
+    pause.setAttribute('aria-pressed', running ? 'false' : 'true');
 
     // Paused, the ring stays full rather than freezing mid-sweep: a partial arc
     // that never moves reads as a broken control rather than a stopped one.
-    if (!running) this.refs.pause.style.setProperty('--carousel-autoplay-progress', '1');
+    if (!running) pause.style.setProperty('--carousel-autoplay-progress', '1');
+  }
+
+  /**
+   * Whether this carousel has an autoplay module at all — which is what decides
+   * if a pause control belongs on the page, independent of whether autoplay is
+   * currently running.
+   *
+   * @returns {boolean}
+   */
+  get #hasAutoplay() {
+    return Boolean(this.#swiper?.params?.autoplay);
   }
 
   /**
