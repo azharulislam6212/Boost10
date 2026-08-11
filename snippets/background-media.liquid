@@ -1,0 +1,124 @@
+{% doc %}
+  Background media for any section or block: none, an image, or a video, with an
+  optional overlay.
+
+  ## One entry point
+
+  A section that wants a background should not have to know whether the merchant
+  picked an image or a video, nor the order the layers stack in, nor that the
+  overlay must sit above the media and below the content. It renders this and
+  passes the settings through.
+
+  That matters most for the thing that is easy to get wrong: the media layer has
+  to be `position: absolute` inside a `position: relative` host, and the content
+  has to establish a stacking context above it. Every section that hand-rolls
+  this gets it right once and then breaks it the next time a dropdown inside the
+  section renders behind the overlay.
+
+  ## Ordering
+
+      background-media          absolute, fills the host, `z-index: 0`
+        ├─ image or video       the layer itself
+        └─ overlay              on top of the media
+      …section content…         must be `position: relative`
+
+  The host needs `position: relative` and the content needs to sit above this.
+  `.has-background-media` in `base.css` does both, so a caller adds that class
+  and nothing else.
+
+  ## Reuse
+
+  Nothing here knows about groups. Any section can render it:
+
+      <div class="my-section has-background-media">
+        {% render 'background-media', settings: section.settings %}
+        <div class="my-section__content">…</div>
+      </div>
+
+  Parameters:
+    settings (object)  A settings object carrying the keys below. Passing the
+                       whole object means a section adds background support by
+                       adding settings, with no change to its markup.
+    priority (boolean) Eager-load the image. Above-the-fold only.
+    classes  (string)  Extra classes on the wrapper.
+
+  Settings read:
+    background_media    none | image | video
+    image, image_mobile, image_position, image_parallax, image_parallax_speed
+    video, video_url, video_position, video_loop
+    overlay_enabled, overlay_style, overlay_color, overlay_gradient,
+    overlay_opacity
+
+  @example
+    {% render 'background-media', settings: block.settings %}
+
+  @example
+    {% render 'background-media', settings: section.settings, priority: true %}
+{% enddoc %}
+
+{%- liquid
+  assign media = settings.background_media | default: 'none'
+
+  # An overlay with no media underneath is a flat tint over the section's own
+  # background colour, which the colour scheme already does better. So the
+  # overlay is tied to the media rather than offered independently.
+  assign show_overlay = false
+  if media != 'none' and settings.overlay_enabled
+    assign show_overlay = true
+  endif
+
+  # Objects are tested for truthiness, strings against `''`. Neither uses
+  # `!= blank`: an unset setting is nil in Shopify and Undefined in other Liquid
+  # engines, and the two disagree about whether that is blank — which is how a
+  # merchant who picked Video but uploaded nothing still got an empty positioned
+  # wrapper laid over the content. nil is falsy in every engine.
+  assign has_layer = false
+  case media
+    when 'image'
+      if settings.image
+        assign has_layer = true
+      endif
+    when 'video'
+      assign video_url = settings.video_url | default: ''
+      if settings.video or video_url != ''
+        assign has_layer = true
+      endif
+  endcase
+-%}
+
+{%- comment -%}
+  Nothing selected, or selected but never filled in — a merchant who chose Video
+  and has not uploaded one yet. Rendering an empty positioned wrapper would put
+  a stacking context over the content for no reason.
+{%- endcomment -%}
+{%- if has_layer -%}
+  <div class="background-media {{ classes }}" aria-hidden="true">
+    {%- case media -%}
+      {%- when 'image' -%}
+        {% render 'background-image',
+           image: settings.image,
+           mobile_image: settings.image_mobile,
+           position: settings.image_position,
+           parallax: settings.image_parallax,
+           speed: settings.image_parallax_speed,
+           priority: priority %}
+
+      {%- when 'video' -%}
+        {% render 'background-video',
+           video: settings.video,
+           video_url: settings.video_url,
+           image: settings.image,
+           mobile_image: settings.image_mobile,
+           position: settings.video_position,
+           loop: settings.video_loop %}
+    {%- endcase -%}
+
+    {%- if show_overlay -%}
+      {% render 'overlay',
+         style: settings.overlay_style,
+         color: settings.overlay_color,
+         gradient: settings.overlay_gradient,
+         opacity: settings.overlay_opacity %}
+    {%- endif -%}
+  </div>
+{%- endif -%}

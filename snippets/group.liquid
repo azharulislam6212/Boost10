@@ -1,12 +1,227 @@
+{% doc %}
+  A group: a flex container that holds other blocks and carries its own size,
+  background, border and link.
+
+  ## Alignment always means the same thing
+
+  The hardest part of a layout control is that "Left" has to mean left whether
+  the group stacks or sits side by side — but in CSS it is `align-items` in one
+  case and `justify-content` in the other. Exposing the CSS properties directly
+  is why so many builders have an Alignment control that moves things vertically
+  half the time.
+
+  So the merchant gets two controls with fixed meanings:
+
+    Alignment  always the horizontal axis
+    Position   always the vertical axis
+
+  and this snippet writes them to two custom properties, `--group-inline` and
+  `--group-block`. `base.css` then decides which CSS property reads which, based
+  on direction. One place knows about the swap; the merchant never does.
+
+  ## Distribution is separate from alignment
+
+  "Space between" is not an alignment — it is what happens to the *gaps*, and it
+  only exists on the main axis. Rather than adding a fourth option to Alignment
+  that silently does nothing when the group is stacked, it is its own control,
+  shown only when the group is horizontal. No option in this block is ever
+  inert.
+
+  ## Width, and why Fill is not 100%
+
+  Inside a horizontal parent, "Fill" has to mean *take the space that is left*,
+  which is `flex: 1`, not `width: 100%` — the latter overflows as soon as there
+  is a sibling. Fit is `flex: 0 0 auto`, Custom is `flex: 0 0 <n>%`. All three
+  behave correctly in a stacked parent too, where there is no space to compete
+  for.
+
+  Mobile takes its own width because the desktop answer is usually wrong on a
+  phone: two 50% columns want to be one 100% column, and that is a different
+  value rather than a scale of the same one.
+
+  ## The link
+
+  A group that is a link cannot be an `<a>`: it contains blocks, and blocks
+  contain buttons and links of their own — an `<a>` inside an `<a>` is invalid
+  and browsers recover from it unpredictably.
+
+  Instead the group stays a `<div>` and an absolutely positioned `<a>` covers
+  it. Anything genuinely interactive inside raises itself above that overlay in
+  `base.css`, so a button inside a linked group is still a button and the rest
+  of the surface is still the link.
+
+  Parameters:
+    settings           (object, required) Block settings
+    children           (string)  Rendered child blocks
+    shopify_attributes (string)  Editor attributes
+
+  @example
+    {% render 'group', children: children, settings: block.settings,
+       shopify_attributes: block.shopify_attributes %}
+{% enddoc %}
+
+{%- liquid
+  assign direction = settings.direction | default: 'column'
+  assign is_row = false
+  if direction == 'row'
+    assign is_row = true
+  endif
+
+  # ---- axes -------------------------------------------------------------
+  # Written as flexbox keywords here so the stylesheet does not need a lookup
+  # table of its own. `start` and `end` rather than `flex-start`: the modern
+  # keywords work for both `align-items` and `justify-content`, which is what
+  # lets one property serve both axes.
+  case settings.alignment
+    when 'center'
+      assign inline_axis = 'center'
+    when 'end'
+      assign inline_axis = 'end'
+    else
+      assign inline_axis = 'start'
+  endcase
+
+  case settings.position
+    when 'center'
+      assign block_axis = 'center'
+    when 'end'
+      assign block_axis = 'end'
+    else
+      assign block_axis = 'start'
+  endcase
+
+  # Distribution replaces the inline alignment, because both land on
+  # `justify-content` and the later one would win arbitrarily. Only meaningful
+  # on a row, so ignored entirely on a column.
+  #
+  # Coerced with `default` and compared against a real string rather than tested
+  # with `!= blank`. An unset setting is nil in Shopify and Undefined in other
+  # Liquid engines, and only one of those is blank — a difference that silently
+  # emitted `--group-inline:` with no value.
+  assign distribution = settings.distribution | default: 'none'
+  if is_row and distribution != 'none'
+    assign inline_axis = distribution
+  endif
+
+  # ---- size -------------------------------------------------------------
+  assign width_pct = settings.width_custom | default: 100 | plus: 0
+  assign width_mobile_pct = settings.width_custom_mobile | default: 100 | plus: 0
+
+  case settings.width
+    when 'fill'
+      assign width_value = '1 1 0%'
+    when 'custom'
+      assign width_value = '0 0 ' | append: width_pct | append: '%'
+    else
+      assign width_value = '0 0 auto'
+  endcase
+
+  case settings.width_mobile
+    when 'fill'
+      assign width_mobile_value = '1 1 0%'
+    when 'custom'
+      assign width_mobile_value = '0 0 ' | append: width_mobile_pct | append: '%'
+    else
+      assign width_mobile_value = '0 0 auto'
+  endcase
+
+  case settings.height
+    when 'fill'
+      assign height_value = '100%'
+    when 'custom'
+      assign custom_height = settings.height_custom | default: 300 | plus: 0
+      assign height_value = custom_height | append: 'px'
+    else
+      assign height_value = 'auto'
+  endcase
+
+  # ---- border -----------------------------------------------------------
+  assign border_width = 0
+  if settings.border_style == 'solid'
+    assign border_width = settings.border_width | default: 1 | plus: 0
+  endif
+
+  assign radius = settings.border_radius | default: 0 | plus: 0
+
+  # ---- flags ------------------------------------------------------------
+  assign background_media = settings.background_media | default: 'none'
+  assign has_media = false
+  if background_media != 'none'
+    assign has_media = true
+  endif
+
+  assign link_url = settings.link | default: ''
+  assign has_link = false
+  if link_url != ''
+    assign has_link = true
+  endif
+
+  # ---- classes ----------------------------------------------------------
+  assign classes = 'block-group'
+  assign classes = classes | append: ' block-group--' | append: direction
+  if settings.stack_on_mobile and is_row
+    assign classes = classes | append: ' block-group--stack-mobile'
+  endif
+  if has_media
+    assign classes = classes | append: ' has-background-media'
+  endif
+  if has_link
+    assign classes = classes | append: ' block-group--linked'
+  endif
+  assign scheme = settings.color_scheme | default: ''
+  if scheme != ''
+    assign classes = classes | append: ' color-' | append: scheme
+  endif
+-%}
+
+{%- capture group_style -%}
+  --group-gap: {{ settings.gap | default: 16 }}px;
+  --group-inline: {{ inline_axis }};
+  --group-block: {{ block_axis }};
+  --group-width: {{ width_value }};
+  --group-width-mobile: {{ width_mobile_value }};
+  --group-height: {{ height_value }};
+  --group-radius: {{ radius }}px;
+  {%- if border_width > 0 -%}
+    --group-border-width: {{ border_width }}px;
+    --group-border-color: {{ settings.border_color | default: 'currentColor' }};
+  {%- endif -%}
+  {%- assign background_color = settings.background_color | default: '' -%}
+  {%- if background_color != '' and has_media == false -%}
+    --group-background: {{ background_color }};
+  {%- endif -%}
+{%- endcapture -%}
+
 <div
-  class="block-group block-group--{{ settings.direction }} block-group--{{ settings.alignment }}
-    {%- if settings.color_scheme != blank %} color-{{ settings.color_scheme }}{% endif -%}"
-  style="
-    --group-gap: {{ settings.gap }}px;
-    {%- if settings.width != 'full' %}--group-width: {{ settings.max_width }}px;{% endif -%}"
+  class="{{ classes }}"
+  style="{{ group_style | strip_newlines | strip }}"
   {% render 'spacing', block: settings %}
   {{ shopify_attributes }}
 >
-  {{- children -}}
-</div>
+  {%- if has_media -%}
+    {% render 'background-media', settings: settings %}
+  {%- endif -%}
 
+  {%- comment -%}
+    The children sit in their own layer so they stay above the background media
+    and above the link overlay. Without it a group with a background would put
+    its own backdrop over its contents.
+  {%- endcomment -%}
+  <div class="block-group__content">
+    {{- children -}}
+  </div>
+
+  {%- if has_link -%}
+    {%- comment -%}
+      `aria-label` falls back to the URL only if the merchant left it blank,
+      which is worse than a real label but far better than a link a screen
+      reader announces as nothing at all.
+    {%- endcomment -%}
+    <a
+      class="block-group__link"
+      href="{{ link_url }}"
+      {% if settings.link_new_tab %}target="_blank" rel="noopener"{% endif %}
+      aria-label="{{ settings.link_label | default: link_url | escape }}"
+    ></a>
+  {%- endif -%}
+</div>

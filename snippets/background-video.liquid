@@ -1,0 +1,141 @@
+{% doc %}
+  A background video that fills its container.
+
+  ## What this renders
+
+  A `<background-video>` element wrapping a poster image and a `<template>`
+  holding the real video. `assets/background-video.js` moves the template's
+  contents into the DOM when the element scrolls into view.
+
+  The template is not an optimisation detail — it is what stops a video that is
+  three screens down from downloading on page load. Markup inside `<template>`
+  is inert: no fetch, no decode, no autoplay. A `<video preload="none">` still
+  costs a request for metadata, and an iframe embed costs considerably more.
+
+  ## Poster first
+
+  The poster renders immediately and stays behind the video. Without it the
+  first paint is a black rectangle while the video buffers, which on a slow
+  connection is most of the time a visitor spends looking at the section.
+
+  Shopify's `video` object carries its own `preview_image`, so a merchant who
+  uploads a video gets a poster without being asked for one. Passing `image`
+  overrides it — worth doing when the first frame is a fade from black.
+
+  ## Hosted or external
+
+  A `video` setting is a file in Shopify's CDN: real `<video>`, real control
+  over playback, and `video_tag` handles the sources.
+
+  A `video_url` is YouTube or Vimeo: an iframe, no playback control from our
+  side beyond the URL parameters, and a third-party script. Supported because
+  merchants have their footage there, but the hosted path is better in every
+  measurable way and the schema should say so.
+
+  Parameters:
+    video        (video)     A Shopify-hosted video
+    video_url    (video_url) A YouTube or Vimeo URL
+    image        (image)     Poster override
+    mobile_image (image)     Poster art direction below 767px
+    position     (string)    cover | contain. Default cover.
+    loop         (boolean)   Default true.
+    classes      (string)    Extra classes on the wrapper.
+
+  @example
+    {% render 'background-video', video: block.settings.video,
+       video_url: block.settings.video_url,
+       position: block.settings.video_position %}
+{% enddoc %}
+
+{%- liquid
+  assign fit = position | default: 'cover'
+
+  assign should_loop = loop
+  if should_loop == nil
+    assign should_loop = true
+  endif
+
+  # Truthiness for the object, `''` for the string. nil is falsy in every Liquid
+  # engine; `nil != blank` is not consistently false in all of them, and that
+  # difference decides whether a merchant with only a YouTube URL gets an iframe
+  # or an empty `<video>`.
+  assign hosted = false
+  if video
+    assign hosted = true
+  endif
+
+  assign external = video_url | default: ''
+
+  assign has_video = false
+  if hosted or external != ''
+    assign has_video = true
+  endif
+
+  # Only reach into `video` once it is known to exist.
+  if image
+    assign poster = image
+  elsif hosted
+    assign poster = video.preview_image
+  endif
+-%}
+
+{%- if has_video -%}
+  <background-video
+    class="background-media__layer background-media__layer--{{ fit }} background-media__video {{ classes }}"
+    data-fit="{{ fit }}"
+  >
+    {%- if poster -%}
+      <div class="background-media__poster" data-ref="poster">
+        {% render 'image',
+           image: poster,
+           mobile_image: mobile_image,
+           alt: '',
+           ratio: 'none',
+           sizes: '100vw',
+           mobile_sizes: '100vw',
+           class: 'background-media__image' %}
+      </div>
+    {%- endif -%}
+
+    <template data-ref="template">
+      {%- if hosted -%}
+        {%- comment -%}
+          `controls: false` and no `tabindex`: a background video is decoration.
+          Giving it controls puts a focus stop in the tab order before the
+          content it sits behind, for a video with no audio and nothing to seek.
+          The component still pauses it off-screen and honours reduced motion.
+        {%- endcomment -%}
+        {{ video
+           | video_tag:
+               autoplay: true,
+               loop: should_loop,
+               muted: true,
+               controls: false,
+               playsinline: true,
+               preload: 'none',
+               image_size: '1920x',
+               class: 'background-media__el' }}
+      {%- else -%}
+        {%- comment -%}
+          `external_video_url` builds the embed with the flags a background needs
+          — muted so autoplay is permitted at all, no chrome, no related videos
+          at the end. `loop` on YouTube additionally requires `playlist` set to
+          the same id, which the filter handles.
+        {%- endcomment -%}
+        {{ video_url
+           | external_video_url:
+               autoplay: true,
+               loop: should_loop,
+               muted: true,
+               controls: false,
+               playsinline: true,
+               modestbranding: true,
+               rel: 0
+           | external_video_tag:
+               class: 'background-media__el',
+               loading: 'lazy',
+               title: '' }}
+      {%- endif -%}
+    </template>
+  </background-video>
+{%- endif -%}

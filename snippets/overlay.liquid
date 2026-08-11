@@ -1,0 +1,79 @@
+{% doc %}
+  A tint laid over background media.
+
+  ## Why this is a snippet and not three lines in each section
+
+  An overlay is the difference between white text that reads and white text that
+  disappears over the light half of a photograph. Every section with background
+  media needs one, and every one of them needs the same three things right: it
+  must cover the media and nothing else, it must sit under the content, and it
+  must never intercept a click meant for the button beneath it. Written inline
+  that is three chances per section to get one of them wrong.
+
+  ## Solid or gradient
+
+  A solid tint darkens everything equally, which is right when text is centred
+  over the whole image. A gradient darkens one edge and leaves the rest alone,
+  which is right when text sits at the bottom and the top of the image is the
+  part worth showing — the usual case for a hero.
+
+  The gradient comes from Shopify's `color_background` setting, so the merchant
+  edits it with the real gradient picker rather than typing CSS. That value is
+  already a complete `linear-gradient(...)`, so it goes straight into
+  `background` with no parsing.
+
+  ## Opacity is on the element, not baked into the colour
+
+  `rgba()` mixed in Liquid would need the colour split into channels and
+  recombined, and it makes the gradient case impossible — a gradient has many
+  colours and one opacity. Setting `opacity` on the overlay element covers both
+  with one mechanism, and it animates if a section ever wants it to.
+
+  Parameters:
+    style     (string)   solid | gradient. Default solid.
+    color     (color)    For `solid`.
+    gradient  (string)   A `color_background` value, for `gradient`.
+    opacity   (number)   0–100. Default 40.
+    classes   (string)   Extra classes.
+
+  @example
+    {% render 'overlay',
+       style: block.settings.overlay_style,
+       color: block.settings.overlay_color,
+       gradient: block.settings.overlay_gradient,
+       opacity: block.settings.overlay_opacity %}
+{% enddoc %}
+
+{%- liquid
+  assign overlay_style = style | default: 'solid'
+
+  # Clamped and coerced, so a stored value outside the current schema range
+  # cannot emit `opacity: 140` — which is not invalid CSS, merely ignored, and
+  # then the overlay is silently missing.
+  assign overlay_opacity = opacity | default: 40 | plus: 0
+  if overlay_opacity < 0
+    assign overlay_opacity = 0
+  endif
+  if overlay_opacity > 100
+    assign overlay_opacity = 100
+  endif
+  assign alpha = overlay_opacity | divided_by: 100.0
+
+  if overlay_style == 'gradient'
+    assign paint = gradient | default: ''
+  else
+    assign paint = color | default: ''
+  endif
+-%}
+
+{%- comment -%}
+  Nothing to paint means nothing to render. An empty `<div>` here would still
+  create a stacking context over the media for no reason.
+{%- endcomment -%}
+{%- if paint != '' and alpha > 0 -%}
+  <div
+    class="background-overlay {{ classes }}"
+    style="--overlay-paint: {{ paint }}; --overlay-opacity: {{ alpha }};"
+    aria-hidden="true"
+  ></div>
+{%- endif -%}

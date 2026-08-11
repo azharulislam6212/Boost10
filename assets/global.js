@@ -99,6 +99,11 @@ const LAZY_MODULES = [
 
   { specifier: '@theme/carousel', tags: ['swiper-carousel'] },
 
+  // Background video. Lazy like everything else here: a page with no background
+  // video never fetches the module, and a page with one below the fold fetches
+  // it only when the element is registered.
+  { specifier: '@theme/background-video', tags: ['background-video'] },
+
   // `<collection-tabs>` hides all but the first panel, and a carousel inside a
   // hidden panel measures zero. Without this the mega menu's product carousels
   // were both unswitchable and unmeasurable.

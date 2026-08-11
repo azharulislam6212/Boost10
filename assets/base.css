@@ -4182,17 +4182,272 @@
 
   /* ---- theme blocks ---------------------------------------------------- */
 
+  /* ==========================================================================
+     Group
+     ==========================================================================
+     A flex container that holds other blocks and carries its own size,
+     background, border and link.
+
+     ---- the axis swap ----
+
+     `snippets/group.liquid` writes two properties and never mentions
+     `align-items` or `justify-content`:
+
+         --group-inline    the horizontal axis, always
+         --group-block     the vertical axis, always
+
+     Which CSS property reads which depends on the direction, and this is the
+     only place that knows it. That is what lets the merchant's "Alignment"
+     control mean *left and right* whether the group stacks or sits side by
+     side — the usual bug in a layout builder is an Alignment control that
+     moves things vertically half the time, and it comes from exposing the CSS
+     property instead of the axis.
+
+     `start` / `end` rather than `flex-start` / `flex-end`: the modern keywords
+     are valid on both properties, which is what makes one value usable on
+     either axis without a lookup table.
+     -------------------------------------------------------------------------- */
+
   .block-group {
+    position: relative;
     display: flex;
     gap: var(--group-gap, var(--space-4));
+
+    flex: var(--group-width, 0 0 auto);
+    block-size: var(--group-height, auto);
+    min-inline-size: 0;
+
+    border-radius: var(--group-radius, 0px);
+    background: var(--group-background, transparent);
   }
 
-  .block-group--column { flex-direction: column; }
-  .block-group--row { flex-direction: row; flex-wrap: wrap; align-items: center; }
-  .block-group--start { align-items: flex-start; }
-  .block-group--center { align-items: center; text-align: center; }
-  .block-group--end { align-items: flex-end; text-align: end; }
-  .block-group[style*='--group-width'] { max-inline-size: var(--group-width); }
+  /* Only painted when the merchant chose a style; `0px` of border still
+     computes a border box and shifts layout by a hair. */
+  .block-group[style*='--group-border-width'] {
+    border: var(--group-border-width) solid var(--group-border-color, currentColor);
+  }
+
+  .block-group--column {
+    flex-direction: column;
+    align-items: var(--group-inline, start);
+    justify-content: var(--group-block, start);
+  }
+
+  .block-group--row {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: var(--group-inline, start);
+    align-items: var(--group-block, start);
+  }
+
+  /* Text follows the box. A group aligned right whose paragraphs stayed
+     left-aligned reads as a mistake rather than a choice. */
+  .block-group--column:where([style*='--group-inline: center']) { text-align: center; }
+  .block-group--column:where([style*='--group-inline: end']) { text-align: end; }
+
+  /* ---- content layer ----
+     Children live above the background media and above the link overlay. A
+     stacking context here rather than a `z-index` on each child, so blocks
+     inside a group need to know nothing about it. */
+  .block-group__content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: inherit;
+    flex-wrap: inherit;
+    align-items: inherit;
+    justify-content: inherit;
+    gap: inherit;
+    inline-size: 100%;
+    min-inline-size: 0;
+  }
+
+  /* A group with a fixed or filled height passes it down, so a background sits
+     behind the whole box rather than behind only the text. */
+  .block-group:where([style*='--group-height: 100%']) .block-group__content,
+  .block-group:where([style*='--group-height:'][style*='px']) .block-group__content {
+    block-size: 100%;
+  }
+
+  /* ---- the link ----
+     A stretched anchor rather than wrapping the group in an `<a>`: the group
+     contains blocks, and those blocks contain their own buttons and links. An
+     `<a>` inside an `<a>` is invalid and browsers recover from it
+     unpredictably. */
+  .block-group__link {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    border-radius: inherit;
+  }
+
+  /* Anything genuinely interactive inside the group rises above the overlay, so
+     a button in a linked group is still that button and the rest of the surface
+     is still the link. */
+  .block-group--linked .block-group__content :where(a, button, input, select, textarea, summary, [tabindex]) {
+    position: relative;
+    z-index: 3;
+  }
+
+  /* Only the anchor takes the focus ring; the group is not focusable itself. */
+  .block-group__link:focus-visible {
+    outline: 2px solid var(--color-link, currentColor);
+    outline-offset: 2px;
+  }
+
+  @media screen and (max-width: 749px) {
+    .block-group {
+      flex: var(--group-width-mobile, var(--group-width, 0 0 auto));
+    }
+
+    /* A row of columns on a phone is a stack, unless the merchant said
+       otherwise — two 40% columns at 390px is two unreadable columns. */
+    .block-group--row.block-group--stack-mobile {
+      flex-direction: column;
+      justify-content: var(--group-block, start);
+      align-items: var(--group-inline, start);
+    }
+  }
+
+  /* ==========================================================================
+     Background media
+     ==========================================================================
+     Rendered by `snippets/background-media.liquid`. Any section can use it:
+     add `.has-background-media` to a wrapper, render the snippet inside, and
+     put the content in an element that establishes its own stacking context.
+
+     The layering is the part worth centralising, because it is the part every
+     hand-rolled version eventually gets wrong — usually the day a dropdown
+     inside the section starts rendering behind the overlay.
+
+         .background-media     absolute, fills the host, z-index 0
+           ├─ layer            the image or video
+           └─ overlay          above the media, below everything else
+         …content…             z-index 1 or above
+     -------------------------------------------------------------------------- */
+
+  .has-background-media {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .background-media {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    border-radius: inherit;
+    pointer-events: none;
+  }
+
+  .background-media__layer {
+    position: absolute;
+    inset: 0;
+  }
+
+  /* ---- parallax overscan ----
+     `parallax()` in `assets/motion-engine.js` clamps its translation to ±120px.
+     A layer at `inset: 0` moved 120px up leaves 120px of empty container at the
+     bottom — the classic parallax bug. So the layer is given exactly that much
+     material to move into, above and below.
+
+     The number is coupled to the engine's `max`. If that changes, this changes;
+     the comment on both sides is the only thing holding them together, which is
+     worth knowing before editing either.
+
+     Gated on the same conditions the engine gates itself on — `isTouchDevice()`
+     is `(hover: none) and (pointer: coarse)`, and `motionEnabled()` checks
+     reduced motion — so nothing is oversized on a phone, where nothing moves. */
+  @media (prefers-reduced-motion: no-preference) {
+    @media not all and (hover: none) and (pointer: coarse) {
+      .background-media__layer--parallax {
+        --parallax-overscan: 120px;
+
+        inset-block: calc(var(--parallax-overscan) * -1);
+      }
+    }
+  }
+
+  .background-media__image,
+  .background-media__el {
+    inline-size: 100%;
+    block-size: 100%;
+    display: block;
+  }
+
+  /* `cover` crops to fill; the focal point keeps the subject in frame rather
+     than centring blindly and cutting a head off. */
+  .background-media__layer--cover :where(.background-media__image, .background-media__el) {
+    object-fit: cover;
+    object-position: var(--background-focal, 50% 50%);
+  }
+
+  .background-media__layer--fit :where(.background-media__image, .background-media__el),
+  .background-media__layer--contain :where(.background-media__image, .background-media__el) {
+    object-fit: contain;
+    object-position: var(--background-focal, 50% 50%);
+  }
+
+  /* `<responsive-image>` is a custom element and therefore inline by default,
+     which leaves a descender gap under a full-bleed background. */
+  .background-media responsive-image {
+    display: block;
+    block-size: 100%;
+  }
+
+  /* ---- video ----
+     The poster covers the video until there is a frame to show, so there is
+     never a black rectangle between load and first paint. `data-playing` is set
+     by the component on the video's own `playing` event — not on `load`, which
+     fires before anything is decoded. */
+  .background-media__video .background-media__poster {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    opacity: 1;
+    transition: opacity var(--duration-slow, 450ms) var(--ease-out-expo, ease);
+  }
+
+  .background-media__video[data-playing] .background-media__poster {
+    opacity: 0;
+  }
+
+  /* An embed cannot be object-fitted — an iframe has no intrinsic content box —
+     so it is scaled to cover the container instead. 100vh/100vw sizing keeps a
+     16:9 player filling a box of any ratio without letterboxing. */
+  .background-media__video iframe {
+    position: absolute;
+    inset-block-start: 50%;
+    inset-inline-start: 50%;
+    inline-size: max(100%, 177.78vh);
+    block-size: max(100%, 56.25vw);
+    transform: translate(-50%, -50%);
+    border: 0;
+  }
+
+  .background-media__layer--contain iframe {
+    inline-size: 100%;
+    block-size: 100%;
+    transform: translate(-50%, -50%);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .background-media__video[data-motion-blocked] .background-media__poster {
+      opacity: 1;
+    }
+  }
+
+  /* ---- overlay ----
+     `opacity` on the element rather than an alpha baked into the colour: a
+     gradient has many colours and one opacity, and mixing `rgba()` in Liquid
+     would need every stop split into channels and recombined. */
+  .background-overlay {
+    position: absolute;
+    inset: 0;
+    background: var(--overlay-paint, transparent);
+    opacity: var(--overlay-opacity, 0.4);
+    pointer-events: none;
+  }
 
   /* ---- block typography -------------------------------------------------
      Driven by `snippets/block-typography.liquid`. Every property falls back to

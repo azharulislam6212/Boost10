@@ -1,0 +1,112 @@
+{% doc %}
+  A background image that fills its container.
+
+  ## Not a CSS background
+
+  This renders a real `<img>` rather than `background-image`, for three reasons
+  that all matter more than the one line of CSS it saves:
+
+    - `srcset` works. A CSS background downloads one file at one size to every
+      device; an `<img>` lets the browser pick, which is the difference between
+      a 200KB and a 900KB hero on a phone.
+    - `loading` and `fetchpriority` work, so a below-the-fold background is
+      lazy and an above-the-fold one is not.
+    - It goes through `snippets/image.liquid` like every other image in the
+      theme, so the width/height attributes that keep cumulative layout shift at
+      zero are applied in one place rather than remembered here.
+
+  ## Cover or fit
+
+  `cover` crops to fill — the right default for a decorative backdrop, where
+  losing the edges costs nothing. `fit` shows the whole image and lets the
+  container's background show around it, which is what a logo or a product
+  cut-out needs.
+
+  Focal point is honoured in both cases: Shopify's `image.presentation.focal_point`
+  is where the merchant said the subject is, so a crop keeps it in frame instead
+  of centring blindly and cutting a head off.
+
+  ## Parallax
+
+  Pass `parallax: true` and the wrapper becomes `<motion-effect
+  data-effect="parallax">`, the theme's existing motion element — no new
+  component, no second scroll listener. `assets/motion-engine.js` already runs
+  one shared ticker that every parallax on the page subscribes to.
+
+  The engine clamps its offset to ±120px, so the layer is given 120px of
+  overscan above and below in `base.css`. Without it a background moved 120px up
+  leaves 120px of empty container at the bottom — the usual parallax bug, and
+  the reason it is worth doing here rather than in each section.
+
+  The engine sits out on touch devices and under reduced motion, so the overscan
+  is behind a media query matching the same conditions. Nothing is oversized on
+  a phone, where nothing would move anyway.
+
+  Parameters:
+    image        (image, required)
+    mobile_image (image)    Art direction below 767px
+    position     (string)   cover | fit. Default cover.
+    parallax     (boolean)  Drift on scroll. Ignored on touch and reduced motion.
+    speed        (number)   Parallax strength, 0.05–0.5. Default 0.25.
+    priority     (boolean)  Eager load. Above-the-fold backgrounds only.
+    classes      (string)   Extra classes on the wrapper.
+
+  @example
+    {% render 'background-image', image: block.settings.image,
+       position: block.settings.image_position %}
+{% enddoc %}
+
+{%- liquid
+  assign fit = position | default: 'cover'
+
+  assign use_parallax = false
+  if parallax
+    assign use_parallax = true
+  endif
+
+  # The element differs, the classes do not, so the rest of the stylesheet does
+  # not need to know which one it got.
+  if use_parallax
+    assign tag = 'motion-effect'
+    assign layer_classes = 'background-media__layer background-media__layer--parallax'
+  else
+    assign tag = 'div'
+    assign layer_classes = 'background-media__layer'
+  endif
+  assign layer_classes = layer_classes | append: ' background-media__layer--' | append: fit
+
+  # `default` rather than a blank test: an unset focal point is nil in Shopify
+  # and Undefined elsewhere, and comparing either to `blank` is engine-specific.
+  # `default` replaces nil, false and empty string in every engine.
+  assign focal = image.presentation.focal_point | default: '50% 50%'
+-%}
+
+{%- if image -%}
+  <{{ tag }}
+    class="{{ layer_classes }} {{ classes }}"
+    style="--background-focal: {{ focal }};"
+    {%- if use_parallax %}
+      data-effect="parallax"
+      data-speed="{{ speed | default: 0.25 }}"
+      data-axis="y"
+    {%- endif %}
+  >
+    {%- comment -%}
+      `alt: ''` deliberately. A background is decoration: the section's own
+      heading carries the meaning, and announcing the filename after it is noise
+      to a screen reader rather than information.
+
+      `sizes: '100vw'` because the container is as wide as whatever holds it and
+      Liquid cannot know that. Guessing narrower would ship a blurry image.
+    {%- endcomment -%}
+    {% render 'image',
+       image: image,
+       mobile_image: mobile_image,
+       alt: '',
+       ratio: 'none',
+       sizes: '100vw',
+       mobile_sizes: '100vw',
+       priority: priority,
+       class: 'background-media__image' %}
+  </{{ tag }}>
+{%- endif -%}
