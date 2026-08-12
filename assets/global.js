@@ -21,7 +21,6 @@
  *
  * @module @theme/global
  */
-
 import { BaseComponent, defineComponent } from '@theme/component';
 import { EVENTS } from '@theme/events';
 import {

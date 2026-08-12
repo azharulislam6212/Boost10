@@ -51,8 +51,9 @@
   `--section-padding-block-start-mobile:px`, an invalid declaration that takes
   the whole rule down with it.
 
-  A hash is truthy and nil is falsy in every Liquid, so `if section` is a
-  reliable "was a section passed" test where a blank comparison is not.
+  A hash is truthy and nil is falsy in every Liquid — but truthiness alone is
+  not enough here, because `section` is a global object and is therefore truthy
+  inside every block too. See the note on `section.settings` below.
 
   ## Zero values are omitted, the attribute is not
 
@@ -102,13 +103,40 @@
     The two scopes are mutually exclusive by construction below rather than by
     the caller remembering to pass only one.
   endcomment
+  comment
+    `section` is a GLOBAL object in Shopify, not just a parameter.
+
+    A snippet rendered from inside a section sees it whether or not the caller
+    passed it, so `if section` was true for every block on the page and every
+    block came out carrying `data-section-spacing` as well as its own hook. The
+    section rule then applied `--section-padding-*` to a block, which resolves
+    to `0px` and flattened whatever padding the block's own stylesheet gave it.
+
+    Exactly the bug the `settings` alias caused, from exactly the same cause:
+    a parameter name that collides with a global.
+
+    The discriminator is `section.settings`. A real Shopify `section` object has
+    it; a settings hash passed as `section:` does not, because a setting cannot
+    be named `settings`. So the global leaking in is distinguishable from a
+    caller genuinely passing one, without renaming the parameter at sixty call
+    sites.
+  endcomment
+  assign section_is_global = false
+  if section.settings
+    assign section_is_global = true
+  endif
+
   assign is_section = false
   assign is_block = false
 
-  if section
-    assign is_section = true
-  elsif block
+  comment
+    Block wins when both are present, which is the case inside every block: the
+    caller passed `block:` and the global `section` came along for the ride.
+  endcomment
+  if block
     assign is_block = true
+  elsif section and section_is_global == false
+    assign is_section = true
   endif
 
   assign b = block

@@ -107,22 +107,40 @@
   assign width_pct = settings.width_custom | default: 100 | plus: 0
   assign width_mobile_pct = settings.width_custom_mobile | default: 100 | plus: 0
 
+  # Two properties, not one.
+  #
+  # `flex` only means anything to a flex *item*, and a group is only a flex item
+  # when its parent is another group. At the top level of a section — inside
+  # `.rich-text__inner`, a `.container`, anywhere that is not `display: flex` —
+  # a `flex` declaration is inert, so Fit and Custom did nothing and every group
+  # rendered full width. That is the bug.
+  #
+  # So each option also writes an `inline-size`. Inside a flex row the
+  # `flex-basis` wins for the initial main size and the width is ignored; outside
+  # one the width is all there is. Both agree, so neither context is a special
+  # case.
   case settings.width
     when 'fill'
       assign width_value = '1 1 0%'
+      assign width_size = '100%'
     when 'custom'
       assign width_value = '0 0 ' | append: width_pct | append: '%'
+      assign width_size = width_pct | append: '%'
     else
       assign width_value = '0 0 auto'
+      assign width_size = 'fit-content'
   endcase
 
   case settings.width_mobile
     when 'fill'
       assign width_mobile_value = '1 1 0%'
+      assign width_mobile_size = '100%'
     when 'custom'
       assign width_mobile_value = '0 0 ' | append: width_mobile_pct | append: '%'
+      assign width_mobile_size = width_mobile_pct | append: '%'
     else
       assign width_mobile_value = '0 0 auto'
+      assign width_mobile_size = 'fit-content'
   endcase
 
   case settings.height
@@ -179,7 +197,9 @@
   --group-inline: {{ inline_axis }};
   --group-block: {{ block_axis }};
   --group-width: {{ width_value }};
+  --group-width-size: {{ width_size }};
   --group-width-mobile: {{ width_mobile_value }};
+  --group-width-mobile-size: {{ width_mobile_size }};
   --group-height: {{ height_value }};
   --group-radius: {{ radius }}px;
   {%- if border_width > 0 -%}

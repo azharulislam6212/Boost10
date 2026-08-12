@@ -42,12 +42,24 @@
   is behind a media query matching the same conditions. Nothing is oversized on
   a phone, where nothing would move anyway.
 
+  ## Speed is a percentage here and a fraction in the engine
+
+  The schema stores 5–40 with a `%` unit, because "20%" is a strength a merchant
+  can reason about. `parallax()` wants a multiplier — 0.2 — and hands the result
+  to a ±120px clamp.
+
+  Passing the percentage straight through is what made parallax *jump*: at
+  `speed: 25` every offset in normal scroll range lands outside the clamp, so
+  the transform snaps between exactly −120px and +120px with nothing in between.
+  It looked like the effect was broken; it was running perfectly on a value 100×
+  too large. The conversion happens here, once.
+
   Parameters:
     image        (image, required)
     mobile_image (image)    Art direction below 767px
     position     (string)   cover | fit. Default cover.
     parallax     (boolean)  Drift on scroll. Ignored on touch and reduced motion.
-    speed        (number)   Parallax strength, 0.05–0.5. Default 0.25.
+    speed        (number)   Strength as a percentage, 5–40. Default 15.
     priority     (boolean)  Eager load. Above-the-fold backgrounds only.
     classes      (string)   Extra classes on the wrapper.
 
@@ -66,6 +78,17 @@
 
   # The element differs, the classes do not, so the rest of the stylesheet does
   # not need to know which one it got.
+  # Percentage in, multiplier out. Clamped first so a stored value from an older
+  # schema cannot reach the engine unconverted — that is the failure this had.
+  assign speed_pct = speed | default: 15 | plus: 0
+  if speed_pct < 5
+    assign speed_pct = 5
+  endif
+  if speed_pct > 40
+    assign speed_pct = 40
+  endif
+  assign speed_value = speed_pct | divided_by: 100.0
+
   if use_parallax
     assign tag = 'motion-effect'
     assign layer_classes = 'background-media__layer background-media__layer--parallax'
@@ -87,7 +110,7 @@
     style="--background-focal: {{ focal }};"
     {%- if use_parallax %}
       data-effect="parallax"
-      data-speed="{{ speed | default: 0.25 }}"
+      data-speed="{{ speed_value }}"
       data-axis="y"
     {%- endif %}
   >
