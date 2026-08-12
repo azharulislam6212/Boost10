@@ -2976,22 +2976,6 @@
   .text-gradient--secondary { --text-gradient: var(--gradient-secondary); }
   .text-gradient--custom { --text-gradient: var(--gradient-custom); }
 
-  /* On a text block the class lands on the wrapper, not on the text itself,
-     because the paragraphs inside are merchant markup this block does not own.
-     `background-clip: text` on a container clips against the box rather than
-     the glyphs, which renders as a solid rectangle — so the wrapper hands the
-     gradient down to the runs of text instead of painting itself. */
-  .block-text.text-gradient {
-    background-image: none;
-    color: inherit;
-  }
-
-  .block-text.text-gradient :is(p, h1, h2, h3, h4, h5, h6, li, strong, em) {
-    background-image: var(--text-gradient, var(--gradient-primary));
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-  }
 
   /* In forced-colours mode the clip is ignored and transparent text disappears
      entirely, so the colour is handed back to the system. */
@@ -4454,48 +4438,6 @@
     background: var(--overlay-paint, transparent);
     opacity: var(--overlay-opacity, 0.4);
     pointer-events: none;
-  }
-
-  /* ---- block typography -------------------------------------------------
-     Driven by `snippets/block-typography.liquid`. Every property falls back to
-     the global scale, so a block that overrode nothing renders exactly as it
-     did before these settings existed.
-
-     Custom properties rather than direct inline declarations, because an inline
-     `font-size` beats the mobile media query and there is no way to write a
-     breakpoint into a style attribute. */
-
-  .block-heading__text,
-  .block-text {
-    font-family: var(--block-font-family, inherit);
-    font-weight: var(--block-font-weight, inherit);
-    line-height: var(--block-line-height, inherit);
-    letter-spacing: var(--block-letter-spacing, inherit);
-    text-transform: var(--block-text-transform, inherit);
-    color: var(--block-text-color, inherit);
-  }
-
-  .block-heading__text { font-size: var(--block-font-size, var(--font-size-h2)); }
-  .block-text { font-size: var(--block-font-size, var(--font-size-md)); }
-
-  .block-heading--center { text-align: center; }
-  .block-heading--end { text-align: end; }
-  .block-text--center { text-align: center; }
-  .block-text--end { text-align: end; }
-
-  @media screen and (max-width: 749px) {
-    .block-heading__text,
-    .block-text { font-size: var(--block-font-size-mobile, var(--block-font-size)); }
-  }
-
-  /* The rich text inside a text block is markup the merchant wrote, so the
-     block controls inherit down into it — but colour does not, or a link would
-     stop looking like a link the moment someone set a heading colour. */
-  .block-text.rte :is(p, li, span) {
-    font-family: inherit;
-    font-size: inherit;
-    line-height: inherit;
-    letter-spacing: inherit;
   }
 
   .block-buttons { display: flex; flex-wrap: wrap; gap: var(--space-3); }
@@ -7542,4 +7484,430 @@ swiper-carousel {
   swiper-carousel[data-layout='grid']:not(.swiper-initialized) {
     overflow: visible;
   }
+}
+
+
+/* ==========================================================================
+   Text block
+   ==========================================================================
+   One block renders every run of text in the theme, headings included, so
+   everything a heading used to need lives here too. Driven by
+   `blocks/text.liquid` and `snippets/block-typography.liquid`.
+
+   ## Why this section is unlayered
+
+   It used to sit in `@layer components`, and unlayered rules beat every layer
+   no matter how specific the layered one is. The `.rte` rules further up this
+   file are unlayered — `.rte a`, `.rte :is(h1…h6)` — so they won every conflict
+   with this block, which is why the highlight styles did nothing to an
+   emphasised word inside a link and why heading margins would not reset.
+
+   Same reason `swiper.css` forced the announcement bar rules out of the layer
+   in section 8b. Everything here is scoped to `.block-text`, so leaving the
+   layer costs nothing elsewhere.
+
+   ## Why the named presets are classes
+
+   Each one points `--block-font-*` at the theme tokens that
+   `css-variables.liquid` already writes from Theme settings › Typography.
+   Resolving them in Liquid instead would be a second copy of that map, free to
+   drift the moment somebody edits one and not the other. Here, changing H2 in
+   theme settings moves every block on the Heading 2 preset with no re-render.
+
+   Custom properties rather than direct inline declarations, because an inline
+   `font-size` beats the mobile media query and there is no way to write a
+   breakpoint into a style attribute.
+   -------------------------------------------------------------------------- */
+
+.block-text {
+  flex: var(--block-text-flex, 1 1 0%);
+  inline-size: var(--block-text-width, 100%);
+  max-inline-size: 100%;
+
+  font-family: var(--block-font-family, inherit);
+  font-size: var(--block-font-size, inherit);
+  font-weight: var(--block-font-weight, inherit);
+  line-height: var(--block-line-height, inherit);
+  letter-spacing: var(--block-letter-spacing, inherit);
+  text-transform: var(--block-text-transform, inherit);
+  color: var(--block-text-color, inherit);
+}
+
+@media screen and (max-width: 749px) {
+  .block-text {
+    flex: var(--block-text-flex-mobile, var(--block-text-flex, 1 1 0%));
+    inline-size: var(--block-text-width-mobile, var(--block-text-width, 100%));
+    font-size: var(--block-font-size-mobile, var(--block-font-size, inherit));
+  }
+}
+
+/* ---- what the preset does and does not reach ----
+   A preset is the merchant saying "make all of this look like an H2", so it has
+   to override the tags inside the rich text — otherwise an `<h3>` they typed
+   would keep its own size and the preset would look ignored.
+
+   `Default` is the opposite promise: it means "leave my markup alone". So the
+   override is scoped away from it, and an `<h1>`…`<h6>` written into the field
+   renders at its own size from the global scale, exactly as it would anywhere
+   else on the page. That is the whole distinction between the two:
+
+     Default   the tags in the text decide       — an h2 looks like an h2
+     H1…H6     the preset decides                — an h1 inside an H2 preset
+                                                   comes out at H2 size
+
+   `font-style` is deliberately not in the list. It carries the emphasis in
+   `<em>`, and inheriting it down would flatten every italic in the block. */
+.block-text:not(.block-text--default).rte :is(p, li, span, h1, h2, h3, h4, h5, h6) {
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+}
+
+/* Colour cascades on every preset, Default included — but only once the
+   merchant actually picked one. Left on the colour scheme, a heading inside the
+   text has to keep `--color-heading`, and forcing `inherit` unconditionally
+   would quietly repaint it with the body text colour instead.
+
+   Links are excluded on purpose: a link that stops looking like a link the
+   moment someone colours the paragraph around it is a worse default than a
+   link that ignores the colour. */
+.block-text--colored.rte :is(p, li, span, h1, h2, h3, h4, h5, h6) {
+  color: inherit;
+}
+
+/* A heading preset renders real heading tags, and `.rte :is(h1…h6)` gives those
+   the margins meant for headings inside long-form copy. Inside a block whose
+   entire content is the heading, that is a gap the merchant did not ask for and
+   cannot see the source of. */
+.block-text.rte > :is(h1, h2, h3, h4, h5, h6):first-child { margin-block-start: 0; }
+.block-text.rte > :is(h1, h2, h3, h4, h5, h6):last-child { margin-block-end: 0; }
+
+/* ---- presets ----
+   `default` is deliberately absent: it emits nothing and inherits from whatever
+   contains it, which is what makes it safe as the default value. */
+
+.block-text--paragraph {
+  --block-font-family: var(--font-paragraph-family);
+  --block-font-size: var(--font-paragraph-size);
+  --block-font-size-mobile: var(--font-paragraph-size-mobile);
+  --block-font-weight: var(--font-paragraph-weight);
+  --block-line-height: var(--font-paragraph-line-height);
+  --block-letter-spacing: var(--font-paragraph-tracking);
+  --block-text-transform: var(--font-paragraph-transform);
+}
+
+/* Subheading is the theme's small-text token set in caps — the eyebrow above a
+   heading. It has no token family of its own because it is a treatment of the
+   default text rather than a separate step on the scale. */
+.block-text--subheading {
+  --block-font-family: var(--font-default-family);
+  --block-font-size: var(--font-default-size);
+  --block-font-size-mobile: var(--font-default-size-mobile);
+  --block-font-weight: var(--font-weight-semibold);
+  --block-line-height: var(--font-default-line-height);
+  --block-letter-spacing: 0.08em;
+  --block-text-transform: uppercase;
+}
+
+.block-text--h1 {
+  --block-font-family: var(--font-h1-family);
+  --block-font-size: var(--font-h1-size);
+  --block-font-size-mobile: var(--font-h1-size-mobile);
+  --block-font-weight: var(--font-h1-weight);
+  --block-line-height: var(--font-h1-line-height);
+  --block-letter-spacing: var(--font-h1-tracking);
+  --block-text-transform: var(--font-h1-transform);
+}
+
+.block-text--h2 {
+  --block-font-family: var(--font-h2-family);
+  --block-font-size: var(--font-h2-size);
+  --block-font-size-mobile: var(--font-h2-size-mobile);
+  --block-font-weight: var(--font-h2-weight);
+  --block-line-height: var(--font-h2-line-height);
+  --block-letter-spacing: var(--font-h2-tracking);
+  --block-text-transform: var(--font-h2-transform);
+}
+
+.block-text--h3 {
+  --block-font-family: var(--font-h3-family);
+  --block-font-size: var(--font-h3-size);
+  --block-font-size-mobile: var(--font-h3-size-mobile);
+  --block-font-weight: var(--font-h3-weight);
+  --block-line-height: var(--font-h3-line-height);
+  --block-letter-spacing: var(--font-h3-tracking);
+  --block-text-transform: var(--font-h3-transform);
+}
+
+.block-text--h4 {
+  --block-font-family: var(--font-h4-family);
+  --block-font-size: var(--font-h4-size);
+  --block-font-size-mobile: var(--font-h4-size-mobile);
+  --block-font-weight: var(--font-h4-weight);
+  --block-line-height: var(--font-h4-line-height);
+  --block-letter-spacing: var(--font-h4-tracking);
+  --block-text-transform: var(--font-h4-transform);
+}
+
+.block-text--h5 {
+  --block-font-family: var(--font-h5-family);
+  --block-font-size: var(--font-h5-size);
+  --block-font-size-mobile: var(--font-h5-size-mobile);
+  --block-font-weight: var(--font-h5-weight);
+  --block-line-height: var(--font-h5-line-height);
+  --block-letter-spacing: var(--font-h5-tracking);
+  --block-text-transform: var(--font-h5-transform);
+}
+
+.block-text--h6 {
+  --block-font-family: var(--font-h6-family);
+  --block-font-size: var(--font-h6-size);
+  --block-font-size-mobile: var(--font-h6-size-mobile);
+  --block-font-weight: var(--font-h6-weight);
+  --block-line-height: var(--font-h6-line-height);
+  --block-letter-spacing: var(--font-h6-tracking);
+  --block-text-transform: var(--font-h6-transform);
+}
+
+/* ---- layout ----
+   Measure is `max-inline-size` in `ch`, not a container width: it governs how
+   long a line runs before it wraps, which is about the text rather than the
+   viewport. Same constants the `content-width` helper uses, so a block set to
+   Narrow and a section set to Narrow agree. */
+
+.block-text--measure-narrow { max-inline-size: var(--content-width-narrow, 48ch); }
+.block-text--measure-normal { max-inline-size: var(--content-width, 66ch); }
+
+/* Alignment moves the text inside the box *and* the box inside its container,
+   because with a measure or a Fit width the box is narrower than what holds it
+   and text-align alone would leave it sitting on the left.
+
+   `align-self` covers the case where the block is a flex item — inside a group —
+   and `margin-inline` covers the case where it is not, at the top level of a
+   section. All three sides are written out on all three classes rather than
+   only where they differ from the default, so the mobile rules below have
+   something to override. A `center` desktop with a `start` mobile needs the
+   auto margin actively cancelled, not merely left unset. */
+.block-text--align-start {
+  text-align: start;
+  align-self: flex-start;
+  margin-inline-start: 0;
+  margin-inline-end: auto;
+}
+
+.block-text--align-center {
+  text-align: center;
+  align-self: center;
+  margin-inline: auto;
+}
+
+.block-text--align-end {
+  text-align: end;
+  align-self: flex-end;
+  margin-inline-start: auto;
+  margin-inline-end: 0;
+}
+
+/* Mobile alignment is its own setting rather than a scale of the desktop one:
+   a heading set beside an image on desktop usually wants centring once it
+   stacks above it, and that is a different value, not a smaller one. */
+@media screen and (max-width: 749px) {
+  .block-text--align-mobile-start {
+    text-align: start;
+    align-self: flex-start;
+    margin-inline-start: 0;
+    margin-inline-end: auto;
+  }
+
+  .block-text--align-mobile-center {
+    text-align: center;
+    align-self: center;
+    margin-inline: auto;
+  }
+
+  .block-text--align-mobile-end {
+    text-align: end;
+    align-self: flex-end;
+    margin-inline-start: auto;
+    margin-inline-end: 0;
+  }
+}
+
+/* Keeps short text on one line where the merchant wrote it that way. `balance`
+   goes with it, because balancing is a wrap strategy and there is nothing left
+   to wrap. */
+@media screen and (max-width: 749px) {
+  .block-text--no-wrap-mobile,
+  .block-text--no-wrap-mobile :is(p, h1, h2, h3, h4, h5, h6) {
+    text-wrap: nowrap;
+    white-space: nowrap;
+  }
+}
+
+/* ---- background ----
+   Padding appears with the background, because a background box flush against
+   its own text reads as a mistake and making every merchant go find the spacing
+   sliders to fix it would make the toggle feel broken.
+
+   It is written as the spacing snippet's own custom properties rather than as
+   `padding`: `[data-block-spacing]` reads those properties, so a `padding`
+   shorthand here would win outright and the four padding sliders would go dead
+   the moment someone turned a background on. As properties they are only
+   defaults — the snippet emits its own the instant a slider leaves zero, and an
+   inline declaration beats a class every time. */
+.block-text--has-background {
+  --block-padding-block-start: var(--space-4);
+  --block-padding-block-end: var(--space-4);
+  --block-padding-inline-start: var(--space-5);
+  --block-padding-inline-end: var(--space-5);
+
+  background: var(--block-text-background, transparent);
+  border-radius: var(--block-text-radius, 0);
+}
+
+/* ---- gradient text ----
+   Clipping a gradient to text needs `background-image` and a transparent colour
+   together; either alone is invisible text. The class lands on the wrapper, but
+   `background-clip: text` on a container clips against the box and renders as a
+   solid rectangle — so the wrapper hands the gradient down to the runs of text
+   instead of painting itself. */
+.block-text--gradient :is(p, h1, h2, h3, h4, h5, h6, li, strong, em) {
+  background-image: var(--block-text-gradient, var(--gradient-primary));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* A gradient clipped to text takes the decoration with it, so underlines on
+   links inside gradient text would vanish silently. */
+.block-text--gradient a { text-decoration-color: var(--color-heading); }
+
+@media (forced-colors: active) {
+  .block-text--gradient :is(p, h1, h2, h3, h4, h5, h6, li, strong, em) {
+    background-image: none;
+    color: CanvasText;
+  }
+}
+
+/* ==========================================================================
+   Text block — highlight
+   ==========================================================================
+   A highlight marks *part* of the text, so something has to say which part.
+   Italic is the default because it is a button already sitting in the rich text
+   toolbar, and marking the words in the copy keeps them attached to the copy —
+   a separate "words to highlight" field goes stale the first time the merchant
+   rewrites the sentence.
+
+   That default is also the thing that made this look broken: with no italics in
+   the field there is nothing to paint, and the setting appears to do nothing at
+   all. Hence **Highlight** › *Apply to*, with Bold and Entire text alongside
+   Italic. Entire text needs no markup whatsoever, so the merchant can always
+   see the style working and then narrow it down.
+
+   ## One target rule, eight tiny style classes
+
+   The three targets differ only in which elements they select, and the eight
+   styles differ only in which properties they set. Written out longhand that is
+   twenty-four near-identical blocks, and the first time somebody adjusts the
+   marker sweep in two of the three targets they diverge for good.
+
+   So the selector list appears exactly once and reads its values from custom
+   properties, and each style class is four lines that set those properties on
+   the block. Custom properties inherit, so setting them on the wrapper reaches
+   whichever elements the target rule matched.
+   -------------------------------------------------------------------------- */
+
+.block-text--highlight {
+  --highlight-paint: var(--block-highlight-color, var(--color-accent-text));
+
+  /* The italics are turned off wherever a highlight is active: the emphasis is
+     being carried by the highlight now, and leaving both on reads as shouting.
+     Set on the wrapper rather than in the target rule so the Bold and Entire
+     text targets do not need their own copy of it. */
+  --hl-font-style: normal;
+}
+
+.block-text--hl-em :is(em, i),
+.block-text--hl-strong :is(strong, b),
+.block-text--hl-all :is(p, li, h1, h2, h3, h4, h5, h6) {
+  font-style: var(--hl-font-style, inherit);
+  color: var(--hl-color, inherit);
+  background-color: var(--hl-background, transparent);
+  background-image: var(--hl-background-image, none);
+  text-decoration-line: var(--hl-decoration-line, none);
+  text-decoration-style: var(--hl-decoration-style, solid);
+  text-decoration-color: var(--hl-decoration-color, currentColor);
+  text-decoration-thickness: var(--hl-decoration-thickness, auto);
+  text-underline-offset: var(--hl-underline-offset, auto);
+  padding: var(--hl-padding, 0);
+  border-radius: var(--hl-radius, 0);
+  box-shadow: var(--hl-shadow, none);
+
+  /* Keeps the padding and the rounded corners on both fragments when a
+     highlighted phrase wraps across two lines. Without it the second line
+     starts flush and unrounded. */
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+/* A highlighted run that happens to be inside a link would otherwise keep
+   `--color-link` from the unlayered `.rte a` rule and ignore the highlight
+   colour entirely. */
+.block-text--highlight :is(em, i, strong, b) a { color: inherit; }
+
+.block-text--highlight-standard {
+  --hl-color: var(--highlight-paint);
+}
+
+.block-text--highlight-wavy {
+  --hl-decoration-line: underline;
+  --hl-decoration-style: wavy;
+  --hl-decoration-color: var(--highlight-paint);
+  --hl-decoration-thickness: 0.05em;
+  --hl-underline-offset: 0.22em;
+}
+
+.block-text--highlight-solid {
+  --hl-background: var(--highlight-paint);
+  --hl-color: var(--color-background);
+  --hl-padding: 0.05em 0.25em;
+  --hl-radius: 0.15em;
+}
+
+/* The sweep sits behind the lower half of the text rather than behind all of
+   it, so the letterforms stay legible over it and it reads as a highlighter
+   rather than a label. */
+.block-text--highlight-marker {
+  --hl-background-image: linear-gradient(to top, var(--highlight-paint) 0.42em, transparent 0.42em);
+  --hl-padding: 0 0.1em;
+}
+
+.block-text--highlight-underline {
+  --hl-decoration-line: underline;
+  --hl-decoration-color: var(--highlight-paint);
+  --hl-decoration-thickness: 0.08em;
+  --hl-underline-offset: 0.2em;
+}
+
+.block-text--highlight-outline {
+  --hl-shadow: inset 0 0 0 1px var(--highlight-paint);
+  --hl-padding: 0.05em 0.3em;
+  --hl-radius: 2em;
+}
+
+.block-text--highlight-strikethrough {
+  --hl-decoration-line: line-through;
+  --hl-decoration-color: var(--highlight-paint);
+  --hl-decoration-thickness: 0.08em;
+}
+
+/* Backgrounds and decoration are both dropped in forced-colours mode, along
+   with the colour that carried them. The italics come back so the emphasis
+   survives in some form. */
+@media (forced-colors: active) {
+  .block-text--highlight { --hl-font-style: italic; }
+  .block-text--hl-all { --hl-font-style: normal; }
 }

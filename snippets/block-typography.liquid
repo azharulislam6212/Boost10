@@ -1,63 +1,75 @@
 {% doc %}
-  Resolves block-level typography and colour settings into CSS custom properties.
+  Resolves a text block's typography and colour settings into CSS custom
+  properties.
 
-  ## Why this is a snippet and not copy-pasted into each block
+  ## What lives here and what lives in CSS
 
-  `heading` and `text` need the same override machinery, and any block added
-  later (`_product-title`, `announcement`, `testimonial`) will need it too.
-  Duplicating twenty lines of `case` statements per block is how the keyword
-  mappings drift apart — a "loose" line height meaning 1.9 in one block and 1.8
-  in another is the kind of bug nobody reports and everybody notices.
+  The named presets — Paragraph, Subheading, Heading 1–6 — are **not** resolved
+  here. Each one is a class in `assets/base.css` that points `--block-font-*` at
+  the matching theme token:
 
-  ## The override contract
+      .block-text--h2 { --block-font-size: var(--font-h2-size); … }
 
-  Every property is emitted **only when the merchant overrode it**. A block that
-  leaves `type_preset` on `inherit` emits nothing at all, so the element falls
-  through to the global type scale from `css-variables.liquid`. That is the
-  point: theme settings stay the single source of truth, and a block override is
-  a deliberate exception rather than a silent shadow copy.
+  That is deliberate. Those tokens are already written by
+  `snippets/css-variables.liquid` from Theme settings › Typography, so a preset
+  that referenced them through Liquid would be a second copy of the same map,
+  free to drift. A class hands the resolution to the cascade and keeps Theme
+  settings the single source of truth: change H2 in theme settings and every
+  block on the Heading 2 preset follows, with no re-render of anything.
 
-  This is also why the values are custom properties rather than direct
-  declarations. `font-size: 2.4rem` inline beats every stylesheet including the
-  mobile media query; `--block-font-size: 2.4rem` is read by a rule in
-  `base.css` that can still swap it out below 750px.
+  This snippet therefore emits **only** what a class cannot know:
 
-  ## Colour and gradient are mutually exclusive
+    * the Custom preset's per-block overrides
+    * the colour the merchant chose, including a literal gradient
 
-  Gradient text needs `background-image` plus `color: transparent` set together —
-  one without the other is invisible text. So when a gradient is chosen the
-  solid colour is not emitted at all, and the `text-gradient` class in
-  `base.css` owns both halves. The schema enforces the same thing with
-  `visible_if`, but a merchant who set a colour *before* switching to gradient
-  still has that value stored, and this guard is what stops it applying.
+  A block on any other preset emits nothing from the typography half, so it
+  inherits the class and the global scale underneath it.
+
+  ## Why custom properties rather than declarations
+
+  `font-size: 2.4rem` written inline beats every stylesheet including the mobile
+  media query, and there is no way to write a breakpoint into a style attribute.
+  `--block-font-size: 2.4rem` is read by a rule in `base.css` that can still swap
+  it below 750px.
+
+  ## Colour is one setting, four outcomes
+
+  `color` replaces the old pair of `gradient` + `text_color` selects, which could
+  contradict each other — a stored colour still applying underneath a gradient
+  the merchant switched to later. One select cannot:
+
+    inherit   nothing emitted; the colour scheme wins
+    muted     the scheme's accent/muted text colour
+    custom    the merchant's swatch, from Appearance › Text colour
+    gradient  no colour at all — `--block-text-gradient` instead, and
+              `.block-text--gradient` in `base.css` owns the clip
+
+  Gradient text needs `background-image` plus `color: transparent` set together;
+  one without the other is invisible text. So the solid colour is not emitted in
+  that branch at all.
 
   Parameters:
-    block    (object, required)  `block.settings`
-    fallback (string, optional)  CSS var name for the unoverridden size,
-                                 e.g. 'var(--font-size-h2)'. Emitted as
-                                 `--block-font-size` only when no override.
+    block (object, required)  `block.settings`
 
   Setting ids read:
-    type_preset, font_family, font_weight, font_size, font_size_mobile,
-    line_height, letter_spacing, text_transform, text_color, gradient
+    preset, font_family, font_weight, font_size, font_size_mobile,
+    line_height, letter_spacing, text_transform, color, text_color_custom,
+    text_gradient
 
-  Returns: a semicolon-terminated declaration list, no `style=` wrapper, so the
-  caller can concatenate it with its own properties.
+  Returns: a semicolon-terminated declaration list with no `style=` wrapper, so
+  the caller can concatenate it with its own properties into one attribute.
 
   @example
-    <h2 class="block-heading__text"
-        style="{% render 'block-typography', block: block.settings %}">
+    <div class="block-text" style="{% render 'block-typography', block: block.settings %}">
 {% enddoc %}
 
 {%- liquid
   assign out = ''
 
-  # ---- Typography overrides ------------------------------------------------
-  # Gated as a group. A merchant on `inherit` gets nothing emitted, which is
-  # what lets the global scale keep working.
+  # ---- Custom preset overrides ---------------------------------------------
+  # Gated as a group. Every other preset is a class, and leaves this untouched.
 
-  if block.type_preset == 'custom'
-
+  if block.preset == 'custom'
     case block.font_family
       when 'heading'
         assign out = out | append: '--block-font-family:var(--font-heading-family);'
@@ -84,7 +96,7 @@
     comment
       Mobile falls back to the desktop value rather than to the global scale.
       A merchant who set 72px desktop and left mobile alone wants 72px, not the
-      theme's h2 — surprising them with a third value is worse than being large.
+      theme's H2 — surprising them with a third value is worse than being large.
     endcomment
     if block.font_size_mobile != blank
       assign size_mobile_rem = block.font_size_mobile | divided_by: 10.0
@@ -120,37 +132,35 @@
     endif
   endif
 
-  # ---- Colour --------------------------------------------------------------
-  # Deliberately outside the `type_preset` gate. Wanting one heading in the
-  # accent colour is a common, reasonable ask that should not require opting
-  # into a full typography override first.
+  # ---- Colour ---------------------------------------------------------------
+  # Deliberately outside the preset gate. Wanting one line in the accent colour
+  # is a common, reasonable ask that should not require opting into a full
+  # typography override first.
 
-  assign gradient = block.gradient | default: 'none'
+  assign color_mode = block.color | default: 'inherit'
 
-  if gradient == 'none' or gradient == blank
-    case block.text_color
-      when 'text'
-        assign out = out | append: '--block-text-color:var(--color-text);'
-      when 'subtext'
-        assign out = out | append: '--block-text-color:var(--color-subtext);'
-      when 'heading'
-        assign out = out | append: '--block-text-color:var(--color-heading);'
-      when 'accent'
-        assign out = out | append: '--block-text-color:var(--color-accent-text);'
-      when 'sale'
-        assign out = out | append: '--block-text-color:var(--color-sale-price);'
-    endcase
-  endif
-
-  # ---- Unoverridden size fallback ------------------------------------------
-  # So base.css can read one property instead of nesting three var() fallbacks.
-
-  if block.type_preset != 'custom' or block.font_size == blank
-    if fallback != blank
-      assign out = out | append: '--block-font-size:' | append: fallback | append: ';'
-      assign out = out | append: '--block-font-size-mobile:' | append: fallback | append: ';'
-    endif
-  endif
+  case color_mode
+    when 'muted'
+      comment
+        The scheme's muted text colour is `--color-accent-text`. An earlier
+        version of this snippet emitted `var(--color-subtext)`, which no colour
+        scheme defines — so "Subtext" silently did nothing at all.
+      endcomment
+      assign out = out | append: '--block-text-color:var(--color-accent-text);'
+    when 'custom'
+      if block.text_color_custom != blank
+        assign out = out | append: '--block-text-color:' | append: block.text_color_custom | append: ';'
+      endif
+    when 'gradient'
+      comment
+        No solid colour in this branch — see the note above. `color_background`
+        returns a gradient string, or a flat colour if the merchant picked one,
+        and either is a valid `background-image` value.
+      endcomment
+      if block.text_gradient != blank
+        assign out = out | append: '--block-text-gradient:' | append: block.text_gradient | append: ';'
+      endif
+  endcase
 -%}
 
 {{- out -}}

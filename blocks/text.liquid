@@ -1,47 +1,198 @@
-{% comment %}
+{% doc %}
   blocks/text.liquid
 
-  Rich text.
+  Every run of text in the theme, headings included.
 
-  Typography overrides mirror `blocks/heading.liquid` exactly — same setting ids,
-  same `type_preset` gate, same shared `block-typography` resolver. A merchant
-  who learns the controls on one block already knows the other, and the keyword
-  mappings cannot drift apart because there is only one copy of them.
+  ## Why there is no separate heading block
 
-  The properties land on the wrapper rather than on the paragraphs inside,
-  because `richtext` output is `<p>` and `<a>` and `<strong>` that the merchant
-  wrote and this block does not own. Inheriting down through `.rte` lets a link
-  keep its own colour while still picking up the family and size.
-{% endcomment %}
+  There used to be one, and the two files were near-identical: the same
+  typography controls, the same colour controls, the same spacing controls, kept
+  in step by hand. A merchant who learned one still had to guess which of the two
+  a given piece of text was, and the answer was usually "whichever the section
+  preset happened to add".
+
+  So the heading block is gone and this block does both jobs. **Heading** and
+  **Text** are two `presets` on this one file, which is why both still appear as
+  separate entries when adding a block — the merchant's mental model is
+  unchanged, there is simply one implementation underneath instead of two.
+
+  ## Preset chooses the tag as well as the look
+
+  `Default` means "leave my markup alone". An `<h2>` typed into the field stays
+  an `<h2>` and takes its size from Theme settings › Typography, exactly as it
+  would anywhere else on the page — so a merchant can write a small heading and
+  a paragraph in one block and have both look right without touching a setting.
+
+  Every other preset is the merchant overriding that. `Heading 1`–`Heading 6`
+  restyle *everything* in the field to that level and normalise the tags to
+  match, so an `<h1>` inside a block set to Heading 2 comes out at H2 size and
+  as an `<h2>` element. Size and outline saying different things is the failure
+  mode worth avoiding here: the outline is the half nobody can see, and it is
+  the half screen readers and search engines navigate by.
+
+  `Paragraph` and `Subheading` point at the theme's body and small text tokens.
+  `Custom` is the escape hatch and opens the full override set.
+
+  ## Presets are classes, overrides are inline properties
+
+  Only the Custom preset and the colour reach Liquid — see
+  `snippets/block-typography.liquid` for why the named presets resolve in CSS
+  instead. The short version: the theme's type tokens already exist as custom
+  properties, and pointing a class at them means Theme settings › Typography
+  stays the one place the scale is defined.
+
+  ## Highlight
+
+  Highlight styles paint part of the text, and **Apply to** says which part —
+  the italic runs by default, or the bold runs, or the whole block. Marking the
+  words with the editor's own buttons keeps them attached to the copy, so a
+  rewrite cannot leave a separate "words to highlight" field pointing at words
+  that are no longer there.
+
+  Italic being the default is also what made this look broken: with no italics
+  in the field there is nothing to paint. `Entire text` needs no markup at all,
+  so the style can always be seen working first and narrowed down after.
+
+  ## One style attribute
+
+  Spacing is pulled in as declarations rather than as its own attribute. Two
+  `style` attributes on one element is invalid HTML, the browser keeps the first
+  and discards the rest, and that is how the padding sliders here used to move a
+  value that never reached the page.
+{% enddoc %}
 
 {%- liquid
-  assign gradient = block.settings.gradient | default: 'none'
+  assign s = block.settings
 
-  assign size_fallback = 'var(--font-size-' | append: block.settings.size | append: ')'
+  assign preset = s.preset | default: 'default'
+  assign alignment = s.alignment | default: 'start'
+  assign alignment_mobile = s.alignment_mobile | default: 'start'
+  assign color_mode = s.color | default: 'inherit'
+  assign highlight = s.highlight_style | default: 'none'
 
-  assign text_classes = 'block-text rte block-text--' | append: block.settings.alignment
-  if gradient != 'none' and gradient != blank
-    assign text_classes = text_classes | append: ' text-gradient text-gradient--' | append: gradient
+  # ---- tag ----------------------------------------------------------------
+  # `Default` leaves the merchant's markup exactly as typed — an `<h2>` written
+  # into the field stays an `<h2>` and takes its size from the global scale,
+  # same as it would anywhere else on the page.
+  #
+  # Any heading preset is the merchant saying "all of this is a heading at this
+  # level", so it normalises the tags to match: paragraphs become that heading,
+  # and a heading typed at some other level is moved to it. Otherwise the size
+  # would say H2 while the document outline still said H1, and the outline is
+  # the half nobody can see.
+  assign heading_levels = 'h1 h2 h3 h4 h5 h6'
+  assign is_heading = false
+  if heading_levels contains preset
+    assign is_heading = true
+  endif
+
+  assign body = s.text
+
+  if is_heading
+    assign open_tag = '<' | append: preset | append: '>'
+    assign close_tag = '</' | append: preset | append: '>'
+    assign body = body | replace: '<p>', open_tag | replace: '</p>', close_tag
+
+    assign levels = heading_levels | split: ' '
+    for level in levels
+      unless level == preset
+        assign find_open = '<' | append: level | append: '>'
+        assign find_close = '</' | append: level | append: '>'
+        assign body = body | replace: find_open, open_tag | replace: find_close, close_tag
+      endunless
+    endfor
+  endif
+
+  # ---- width --------------------------------------------------------------
+  # Both a `flex` and an `inline-size`, for the same reason the image and group
+  # blocks need both: a text block is only a flex item when its parent is a
+  # group. At the top level of a section `flex` is inert, so Fit on its own did
+  # nothing there and every block came out full width.
+  if s.width == 'fit'
+    assign width_flex = '0 0 auto'
+    assign width_size = 'fit-content'
+  else
+    assign width_flex = '1 1 0%'
+    assign width_size = '100%'
+  endif
+
+  if s.width_mobile == 'fit'
+    assign width_flex_mobile = '0 0 auto'
+    assign width_size_mobile = 'fit-content'
+  else
+    assign width_flex_mobile = '1 1 0%'
+    assign width_size_mobile = '100%'
+  endif
+
+  # ---- classes ------------------------------------------------------------
+  assign classes = 'block-text rte'
+  assign classes = classes | append: ' block-text--' | append: preset
+  assign classes = classes | append: ' block-text--align-' | append: alignment
+  assign classes = classes | append: ' block-text--align-mobile-' | append: alignment_mobile
+
+  case s.max_width
+    when 'narrow'
+      assign classes = classes | append: ' block-text--measure-narrow'
+    when 'normal'
+      assign classes = classes | append: ' block-text--measure-normal'
+  endcase
+
+  if color_mode == 'gradient'
+    assign classes = classes | append: ' block-text--gradient'
+  elsif color_mode != 'inherit' and color_mode != blank
+    comment
+      Only once the merchant actually picked a colour. The rule this turns on
+      hands the colour down to the headings and paragraphs inside the rich text,
+      and doing that unconditionally would repaint a heading that was meant to
+      keep `--color-heading` from the colour scheme.
+    endcomment
+    assign classes = classes | append: ' block-text--colored'
+  endif
+
+  if highlight != 'none' and highlight != blank
+    assign highlight_target = s.highlight_target | default: 'em'
+    assign classes = classes | append: ' block-text--highlight block-text--highlight-' | append: highlight
+    assign classes = classes | append: ' block-text--hl-' | append: highlight_target
+  endif
+
+  if s.background
+    assign classes = classes | append: ' block-text--has-background'
+  endif
+
+  if s.disable_line_break_mobile
+    assign classes = classes | append: ' block-text--no-wrap-mobile'
   endif
 -%}
 
-{%- if block.settings.text != blank -%}
+{%- capture block_style -%}
+  {%- render 'spacing', block: s, declarations: true -%}
+  {%- render 'block-typography', block: s -%}
+  --block-text-flex: {{ width_flex }};
+  --block-text-width: {{ width_size }};
+  --block-text-flex-mobile: {{ width_flex_mobile }};
+  --block-text-width-mobile: {{ width_size_mobile }};
+  {%- if highlight != 'none' and s.highlight_color != blank -%}
+    --block-highlight-color: {{ s.highlight_color }};
+  {%- endif -%}
+  {%- if s.background -%}
+    {%- if s.background_color != blank -%}
+      --block-text-background: {{ s.background_color }};
+    {%- endif -%}
+    --block-text-radius: {{ s.border_radius | default: 0 }}px;
+  {%- endif -%}
+{%- endcapture -%}
+
+{%- if s.text != blank -%}
   <motion-effect
-    {% render 'motion-attrs', kind: 'text', block: block.settings %}
-    class="{{ text_classes }}"
-    style="{% render 'block-typography', block: block.settings, fallback: size_fallback %}"
-    {% render 'spacing', block: block.settings %}
+    {% render 'motion-attrs', kind: 'text', block: s %}
+    class="{{ classes }}"
+    data-block-spacing
+    style="{{ block_style | strip_newlines | strip }}"
     {{ block.shopify_attributes }}
   >
-    {{ block.settings.text }}
+    {{ body }}
   </motion-effect>
 {%- endif -%}
-
-{% comment %}
-  Note that `spacing` emits its own `style` attribute. Two `style` attributes on
-  one element is invalid HTML and the second is discarded, so the typography
-  properties are written into the first one above rather than rendered after it.
-{% endcomment %}
 
 {% schema %}
 {
@@ -49,34 +200,24 @@
   "tag": null,
   "settings": [
     { "type": "richtext", "id": "text", "label": "t:shared.text.label", "default": "<p>Share information about your brand, a product detail, or a promotion.</p>" },
-    {
-      "type": "select", "id": "size", "label": "t:blocks.heading.settings.size.label",
-      "options": [
-        { "value": "sm", "label": "t:blocks.text.settings.size.options__1.label" },
-        { "value": "md", "label": "t:blocks.text.settings.size.options__2.label" },
-        { "value": "lg", "label": "t:blocks.text.settings.size.options__3.label" }
-      ],
-      "default": "md"
-    },
-    {
-      "type": "select", "id": "alignment", "label": "t:blocks.group.settings.alignment.label",
-      "options": [
-        { "value": "start", "label": "t:blocks.group.settings.alignment.options__1.label" },
-        { "value": "center", "label": "t:blocks.group.settings.alignment.options__2.label" },
-        { "value": "end", "label": "t:blocks.group.settings.alignment.options__3.label" }
-      ],
-      "default": "start"
-    },
 
     { "type": "header", "content": "t:shared.typography.header" },
     { "type": "paragraph", "content": "t:shared.typography.paragraph" },
     {
-      "type": "select", "id": "type_preset", "label": "t:shared.typography.type_preset.label", "info": "t:shared.typography.type_preset.info",
+      "type": "select", "id": "preset", "label": "t:shared.typography.preset.label", "info": "t:shared.typography.preset.info",
       "options": [
-        { "value": "inherit", "label": "t:shared.typography.type_preset.options__1.label" },
-        { "value": "custom", "label": "t:shared.typography.type_preset.options__2.label" }
+        { "value": "default", "label": "t:shared.typography.preset.options__1.label" },
+        { "value": "paragraph", "label": "t:shared.typography.preset.options__2.label" },
+        { "value": "subheading", "label": "t:shared.typography.preset.options__3.label" },
+        { "value": "h1", "label": "t:shared.typography.preset.options__4.label" },
+        { "value": "h2", "label": "t:shared.typography.preset.options__5.label" },
+        { "value": "h3", "label": "t:shared.typography.preset.options__6.label" },
+        { "value": "h4", "label": "t:shared.typography.preset.options__7.label" },
+        { "value": "h5", "label": "t:shared.typography.preset.options__8.label" },
+        { "value": "h6", "label": "t:shared.typography.preset.options__9.label" },
+        { "value": "custom", "label": "t:shared.typography.preset.options__10.label" }
       ],
-      "default": "inherit"
+      "default": "default"
     },
     {
       "type": "select", "id": "font_family", "label": "t:shared.typography.font_family.label",
@@ -86,7 +227,7 @@
         { "value": "accent", "label": "t:shared.typography.font_family.options__3.label" }
       ],
       "default": "body",
-      "visible_if": "{{ block.settings.type_preset == 'custom' }}"
+      "visible_if": "{{ block.settings.preset == 'custom' }}"
     },
     {
       "type": "select", "id": "font_weight", "label": "t:shared.typography.font_weight.label",
@@ -94,32 +235,39 @@
         { "value": "inherit", "label": "t:shared.typography.font_weight.options__1.label" },
         { "value": "300", "label": "300" }, { "value": "400", "label": "400" },
         { "value": "500", "label": "500" }, { "value": "600", "label": "600" },
-        { "value": "700", "label": "700" }
+        { "value": "700", "label": "700" }, { "value": "800", "label": "800" },
+        { "value": "900", "label": "900" }
       ],
       "default": "inherit",
-      "visible_if": "{{ block.settings.type_preset == 'custom' }}"
+      "visible_if": "{{ block.settings.preset == 'custom' }}"
     },
     {
       "type": "select", "id": "font_size", "label": "t:shared.typography.font_size.label",
       "options": [
-        { "value": "14", "label": "14px" }, { "value": "15", "label": "15px" },
+        { "value": "12", "label": "12px" }, { "value": "14", "label": "14px" },
         { "value": "16", "label": "16px" }, { "value": "18", "label": "18px" },
         { "value": "20", "label": "20px" }, { "value": "24", "label": "24px" },
-        { "value": "28", "label": "28px" }, { "value": "32", "label": "32px" }
+        { "value": "28", "label": "28px" }, { "value": "32", "label": "32px" },
+        { "value": "40", "label": "40px" }, { "value": "48", "label": "48px" },
+        { "value": "56", "label": "56px" }, { "value": "64", "label": "64px" },
+        { "value": "72", "label": "72px" }, { "value": "80", "label": "80px" },
+        { "value": "96", "label": "96px" }
       ],
       "default": "16",
-      "visible_if": "{{ block.settings.type_preset == 'custom' }}"
+      "visible_if": "{{ block.settings.preset == 'custom' }}"
     },
     {
       "type": "select", "id": "font_size_mobile", "label": "t:shared.typography.font_size_mobile.label", "info": "t:shared.typography.font_size_mobile.info",
       "options": [
-        { "value": "13", "label": "13px" }, { "value": "14", "label": "14px" },
-        { "value": "15", "label": "15px" }, { "value": "16", "label": "16px" },
-        { "value": "18", "label": "18px" }, { "value": "20", "label": "20px" },
-        { "value": "24", "label": "24px" }
+        { "value": "12", "label": "12px" }, { "value": "13", "label": "13px" },
+        { "value": "14", "label": "14px" }, { "value": "15", "label": "15px" },
+        { "value": "16", "label": "16px" }, { "value": "18", "label": "18px" },
+        { "value": "20", "label": "20px" }, { "value": "24", "label": "24px" },
+        { "value": "28", "label": "28px" }, { "value": "32", "label": "32px" },
+        { "value": "40", "label": "40px" }, { "value": "48", "label": "48px" }
       ],
       "default": "15",
-      "visible_if": "{{ block.settings.type_preset == 'custom' }}"
+      "visible_if": "{{ block.settings.preset == 'custom' }}"
     },
     {
       "type": "select", "id": "line_height", "label": "t:shared.typography.line_height.label",
@@ -129,7 +277,7 @@
         { "value": "loose", "label": "t:shared.typography.line_height.options__3.label" }
       ],
       "default": "normal",
-      "visible_if": "{{ block.settings.type_preset == 'custom' }}"
+      "visible_if": "{{ block.settings.preset == 'custom' }}"
     },
     {
       "type": "select", "id": "letter_spacing", "label": "t:shared.typography.letter_spacing.label",
@@ -139,7 +287,7 @@
         { "value": "wide", "label": "t:shared.typography.letter_spacing.options__3.label" }
       ],
       "default": "normal",
-      "visible_if": "{{ block.settings.type_preset == 'custom' }}"
+      "visible_if": "{{ block.settings.preset == 'custom' }}"
     },
     {
       "type": "select", "id": "text_transform", "label": "t:shared.typography.text_transform.label",
@@ -151,32 +299,120 @@
         { "value": "lowercase", "label": "t:shared.typography.text_transform.options__5.label" }
       ],
       "default": "inherit",
-      "visible_if": "{{ block.settings.type_preset == 'custom' }}"
+      "visible_if": "{{ block.settings.preset == 'custom' }}"
+    },
+    {
+      "type": "select", "id": "color", "label": "t:shared.typography.color.label", "info": "t:shared.typography.color.info",
+      "options": [
+        { "value": "inherit", "label": "t:shared.typography.color.options__1.label" },
+        { "value": "muted", "label": "t:shared.typography.color.options__2.label" },
+        { "value": "custom", "label": "t:shared.typography.color.options__3.label" },
+        { "value": "gradient", "label": "t:shared.typography.color.options__4.label" }
+      ],
+      "default": "inherit"
+    },
+    {
+      "type": "checkbox", "id": "disable_line_break_mobile", "label": "t:shared.typography.disable_line_break_mobile.label", "info": "t:shared.typography.disable_line_break_mobile.info",
+      "default": false
     },
 
-    { "type": "header", "content": "t:shared.typography.colour_header" },
+    { "type": "header", "content": "t:blocks.group.headers.appearance" },
     {
-      "type": "select", "id": "gradient", "label": "t:blocks.heading.settings.gradient.label", "info": "t:blocks.heading.settings.gradient.info",
+      "type": "color", "id": "text_color_custom", "label": "t:shared.typography.text_color.label", "info": "t:shared.typography.text_color.info",
+      "visible_if": "{{ block.settings.color == 'custom' }}"
+    },
+    {
+      "type": "color_background", "id": "text_gradient", "label": "t:shared.typography.text_gradient.label", "info": "t:shared.typography.text_gradient.info",
+      "visible_if": "{{ block.settings.color == 'gradient' }}"
+    },
+    { "type": "checkbox", "id": "background", "label": "t:shared.appearance.background.label", "info": "t:shared.appearance.background.info", "default": false },
+    {
+      "type": "color_background", "id": "background_color", "label": "t:shared.appearance.background_color.label",
+      "default": "#000000",
+      "visible_if": "{{ block.settings.background }}"
+    },
+    {
+      "type": "range", "id": "border_radius", "label": "t:shared.appearance.border_radius.label",
+      "min": 0, "max": 60, "step": 2, "unit": "px", "default": 0,
+      "visible_if": "{{ block.settings.background }}"
+    },
+
+    { "type": "header", "content": "t:shared.highlight.header" },
+    { "type": "paragraph", "content": "t:shared.highlight.paragraph" },
+    {
+      "type": "select", "id": "highlight_style", "label": "t:shared.highlight.style.label",
       "options": [
-        { "value": "none", "label": "t:settings_schema.typography.options.case_default" },
-        { "value": "primary", "label": "t:settings_schema.typography.options.gradient_primary" },
-        { "value": "secondary", "label": "t:settings_schema.typography.options.gradient_secondary" },
-        { "value": "custom", "label": "t:settings_schema.typography.options.gradient_custom" }
+        { "value": "none", "label": "t:shared.highlight.style.options__1.label" },
+        { "value": "standard", "label": "t:shared.highlight.style.options__2.label" },
+        { "value": "wavy", "label": "t:shared.highlight.style.options__3.label" },
+        { "value": "solid", "label": "t:shared.highlight.style.options__4.label" },
+        { "value": "marker", "label": "t:shared.highlight.style.options__5.label" },
+        { "value": "underline", "label": "t:shared.highlight.style.options__6.label" },
+        { "value": "outline", "label": "t:shared.highlight.style.options__7.label" },
+        { "value": "strikethrough", "label": "t:shared.highlight.style.options__8.label" }
       ],
       "default": "none"
     },
     {
-      "type": "select", "id": "text_color", "label": "t:shared.typography.text_color.label", "info": "t:shared.typography.text_color.info",
+      "type": "select", "id": "highlight_target", "label": "t:shared.highlight.target.label", "info": "t:shared.highlight.target.info",
       "options": [
-        { "value": "inherit", "label": "t:shared.typography.text_color.options__1.label" },
-        { "value": "text", "label": "t:settings_schema.typography.options.color_text" },
-        { "value": "subtext", "label": "t:settings_schema.typography.options.color_subtext" },
-        { "value": "heading", "label": "t:settings_schema.typography.options.color_heading" },
-        { "value": "accent", "label": "t:shared.typography.text_color.options__2.label" },
-        { "value": "sale", "label": "t:shared.typography.text_color.options__3.label" }
+        { "value": "em", "label": "t:shared.highlight.target.options__1.label" },
+        { "value": "strong", "label": "t:shared.highlight.target.options__2.label" },
+        { "value": "all", "label": "t:shared.highlight.target.options__3.label" }
       ],
-      "default": "inherit",
-      "visible_if": "{{ block.settings.gradient == 'none' }}"
+      "default": "em",
+      "visible_if": "{{ block.settings.highlight_style != 'none' }}"
+    },
+    {
+      "type": "color", "id": "highlight_color", "label": "t:shared.highlight.color.label", "info": "t:shared.highlight.color.info",
+      "visible_if": "{{ block.settings.highlight_style != 'none' }}"
+    },
+
+    { "type": "header", "content": "t:shared.layout.header" },
+    {
+      "type": "select", "id": "width", "label": "t:shared.layout.width.label", "info": "t:shared.layout.width.info",
+      "options": [
+        { "value": "fit", "label": "t:blocks.group.settings.width.options__1.label" },
+        { "value": "fill", "label": "t:blocks.group.settings.width.options__2.label" }
+      ],
+      "default": "fill"
+    },
+    {
+      "type": "select", "id": "max_width", "label": "t:shared.layout.max_width.label", "info": "t:shared.layout.max_width.info",
+      "options": [
+        { "value": "narrow", "label": "t:shared.layout.max_width.options__1.label" },
+        { "value": "normal", "label": "t:shared.layout.max_width.options__2.label" },
+        { "value": "none", "label": "t:shared.layout.max_width.options__3.label" }
+      ],
+      "default": "none"
+    },
+    {
+      "type": "select", "id": "alignment", "label": "t:blocks.group.settings.alignment.label",
+      "options": [
+        { "value": "start", "label": "t:blocks.group.settings.alignment.options__1.label" },
+        { "value": "center", "label": "t:blocks.group.settings.alignment.options__2.label" },
+        { "value": "end", "label": "t:blocks.group.settings.alignment.options__3.label" }
+      ],
+      "default": "start",
+      "visible_if": "{{ block.settings.width == 'fill' }}"
+    },
+    {
+      "type": "select", "id": "width_mobile", "label": "t:shared.layout.width_mobile.label",
+      "options": [
+        { "value": "fit", "label": "t:blocks.group.settings.width.options__1.label" },
+        { "value": "fill", "label": "t:blocks.group.settings.width.options__2.label" }
+      ],
+      "default": "fill"
+    },
+    {
+      "type": "select", "id": "alignment_mobile", "label": "t:shared.layout.alignment_mobile.label",
+      "options": [
+        { "value": "start", "label": "t:blocks.group.settings.alignment.options__1.label" },
+        { "value": "center", "label": "t:blocks.group.settings.alignment.options__2.label" },
+        { "value": "end", "label": "t:blocks.group.settings.alignment.options__3.label" }
+      ],
+      "default": "start",
+      "visible_if": "{{ block.settings.width_mobile == 'fill' }}"
     },
 
     { "type": "header", "content": "t:shared.animation.header" },
@@ -202,6 +438,21 @@
       ],
       "default": "inherit"
     },
+    {
+      "type": "range", "id": "animation_duration", "label": "t:shared.animation.animation_duration.label", "info": "t:shared.animation.animation_duration.info",
+      "min": 0, "max": 1600, "step": 50, "unit": "ms", "default": 0,
+      "visible_if": "{{ block.settings.animation_text != 'none' }}"
+    },
+    {
+      "type": "range", "id": "animation_delay", "label": "t:shared.animation.animation_delay.label", "info": "t:shared.animation.animation_delay.info",
+      "min": 0, "max": 1200, "step": 50, "unit": "ms", "default": 0,
+      "visible_if": "{{ block.settings.animation_text != 'none' }}"
+    },
+    {
+      "type": "range", "id": "animation_stagger", "label": "t:shared.animation.animation_stagger.label", "info": "t:shared.animation.animation_stagger.info",
+      "min": 0, "max": 300, "step": 10, "unit": "ms", "default": 0,
+      "visible_if": "{{ block.settings.animation_text != 'none' }}"
+    },
 
     { "type": "header", "content": "t:shared.spacing.block_header" },
     { "type": "range", "id": "padding_top", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
@@ -210,6 +461,22 @@
     { "type": "range", "id": "padding_left", "label": "t:shared.spacing.padding_left.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
     { "type": "range", "id": "padding_scale_mobile", "label": "t:shared.spacing.padding_scale_mobile.label", "info": "t:shared.spacing.padding_scale_mobile.info", "min": 25, "max": 100, "step": 5, "unit": "%", "default": 75 }
   ],
-  "presets": [{ "name": "t:blocks.text.name" }]
+  "presets": [
+    {
+      "name": "t:blocks.text.presets.heading.name",
+      "settings": {
+        "text": "<p>Heading</p>",
+        "preset": "h2",
+        "max_width": "none"
+      }
+    },
+    {
+      "name": "t:blocks.text.presets.text.name",
+      "settings": {
+        "preset": "paragraph",
+        "max_width": "normal"
+      }
+    }
+  ]
 }
 {% endschema %}

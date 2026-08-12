@@ -66,9 +66,22 @@
   Left and right are spelled `inline-start` and `inline-end` so they follow the
   text direction and flip in right-to-left languages.
 
+  ## `declarations: true` — properties only, no attributes
+
+  By default this emits its own `style` attribute. An element that already needs
+  a `style` attribute of its own therefore ends up with two, and a browser keeps
+  the first and silently drops the second — which is how the padding sliders on
+  the text and image blocks moved a value that never reached the page.
+
+  Passing `declarations: true` returns the bare declaration list instead, so the
+  caller can concatenate it into its single attribute. The caller then writes
+  `data-block-spacing` itself, because the hook is what `base.css` selects on.
+
   Parameters:
-    section  (object, optional)  A section settings object
-    block    (object, optional)  A block settings object
+    section      (object, optional)  A section settings object
+    block        (object, optional)  A block settings object
+    declarations (boolean, optional) Return properties only, no `style=` and no
+                                     `data-*` hook. Defaults to false.
 
   Pass one or the other. `settings` is not accepted — it is a global drop in
   Shopify, so a snippet sees it whether or not the caller passed it, and using
@@ -209,6 +222,10 @@
   endif
 -%}
 
-{%- if is_section -%}data-section-spacing {% endif -%}
-{%- if is_block -%}data-block-spacing {% endif -%}
-{%- if out != blank %}style="{{ out }}"{% endif -%}
+{%- if declarations -%}
+  {{- out -}}
+{%- else -%}
+  {%- if is_section -%}data-section-spacing {% endif -%}
+  {%- if is_block -%}data-block-spacing {% endif -%}
+  {%- if out != blank %}style="{{ out }}"{% endif -%}
+{%- endif -%}
