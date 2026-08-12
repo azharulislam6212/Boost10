@@ -59,22 +59,30 @@
   endif
 
   # ---- cascade: block › section › theme ----------------------------------
+  #
+  # Every optional parameter is coerced with `default` before it is compared.
+  # An unset one is nil in Shopify and Undefined elsewhere, and the two disagree
+  # about whether that is blank — so `if effect != blank` was true for a caller
+  # that never passed an override, and `resolved` came out as the empty string.
+  # `data-effect=""` means "no animation" to the component, which is how a whole
+  # cascade can resolve to nothing while looking correct in the source.
   assign resolved = 'inherit'
 
-  if effect != blank
-    assign resolved = effect
+  assign effect_override = effect | default: ''
+  if effect_override != ''
+    assign resolved = effect_override
   endif
 
-  if resolved == 'inherit' and block != blank
-    assign block_value = block[setting_key]
-    if block_value != blank and block_value != 'inherit'
+  if resolved == 'inherit' and block
+    assign block_value = block[setting_key] | default: 'inherit'
+    if block_value != 'inherit' and block_value != ''
       assign resolved = block_value
     endif
   endif
 
-  if resolved == 'inherit' and section != blank
-    assign section_value = section[setting_key]
-    if section_value != blank and section_value != 'inherit'
+  if resolved == 'inherit' and section
+    assign section_value = section[setting_key] | default: 'inherit'
+    if section_value != 'inherit' and section_value != ''
       assign resolved = section_value
     endif
   endif
@@ -84,7 +92,8 @@
   endif
 
   # An empty theme-level image setting means "no image animation".
-  if resolved == blank
+  assign resolved = resolved | default: 'none'
+  if resolved == '' or resolved == 'inherit'
     assign resolved = 'none'
   endif
 
@@ -94,38 +103,37 @@
   endunless
 
   # ---- timing: explicit argument › block › section › preset default ------
-  assign resolved_duration = duration
-  if resolved_duration == blank and block != blank
-    assign resolved_duration = block.animation_duration
-  endif
-  if resolved_duration == blank and section != blank
-    assign resolved_duration = section.animation_duration
-  endif
-
-  assign resolved_delay = delay
-  if resolved_delay == blank and block != blank
-    assign resolved_delay = block.animation_delay
-  endif
-  if resolved_delay == blank and section != blank
-    assign resolved_delay = section.animation_delay
-  endif
-
-  assign resolved_stagger = stagger
-  if resolved_stagger == blank and block != blank
-    assign resolved_stagger = block.animation_stagger
-  endif
-  if resolved_stagger == blank and section != blank
-    assign resolved_stagger = section.animation_stagger
-  endif
+  # Same coercion for the timings. `0` is the "unset" value here — it is what
+  # the sliders sit at by default and what "use the theme default" means — so a
+  # chain of `default` filters resolves the cascade in one expression each.
+  assign resolved_duration = duration | default: block.animation_duration | default: section.animation_duration | default: 0 | plus: 0
+  assign resolved_delay = delay | default: block.animation_delay | default: section.animation_delay | default: 0 | plus: 0
+  assign resolved_stagger = stagger | default: block.animation_stagger | default: section.animation_stagger | default: 0 | plus: 0
 -%}
 
+{%- comment -%}
+  The timings are coerced to numbers before being compared, rather than tested
+  with `!= blank` first.
+
+  `nil != blank` is false in Shopify, so the old form short-circuited and never
+  reached the comparison — but it is true in other Liquid engines, and there the
+  next step is `nil > 0`, which is a type error rather than a false. Any tooling
+  that renders these templates outside Shopify hits it, and it is one `default`
+  filter to make the comparison mean the same thing everywhere.
+{%- endcomment -%}
+{%- liquid
+  assign target_sel = target | default: ''
+  assign speed_value = speed | default: ''
+  assign direction_value = direction | default: ''
+  assign axis_value = axis | default: ''
+-%}
 data-effect="{{ resolved | escape }}"
-{%- if target != blank %} data-target="{{ target | escape }}"{% endif -%}
+{%- if target_sel != '' %} data-target="{{ target_sel | escape }}"{% endif -%}
 {%- if children %} data-children{% endif -%}
-{%- if resolved_duration != blank and resolved_duration > 0 %} data-duration="{{ resolved_duration }}"{% endif -%}
-{%- if resolved_delay != blank and resolved_delay > 0 %} data-delay="{{ resolved_delay }}"{% endif -%}
-{%- if resolved_stagger != blank and resolved_stagger > 0 %} data-stagger="{{ resolved_stagger }}"{% endif -%}
+{%- if resolved_duration > 0 %} data-duration="{{ resolved_duration }}"{% endif -%}
+{%- if resolved_delay > 0 %} data-delay="{{ resolved_delay }}"{% endif -%}
+{%- if resolved_stagger > 0 %} data-stagger="{{ resolved_stagger }}"{% endif -%}
 {%- if once == false %} data-once="false"{% endif -%}
-{%- if speed != blank %} data-speed="{{ speed }}"{% endif -%}
-{%- if direction != blank %} data-direction="{{ direction | escape }}"{% endif -%}
-{%- if axis != blank %} data-axis="{{ axis | escape }}"{% endif -%}
+{%- if speed_value != '' %} data-speed="{{ speed_value }}"{% endif -%}
+{%- if direction_value != '' %} data-direction="{{ direction_value | escape }}"{% endif -%}
+{%- if axis_value != '' %} data-axis="{{ axis_value | escape }}"{% endif -%}

@@ -1,33 +1,163 @@
-{% comment %}
+{% doc %}
   blocks/image.liquid
 
   An image, through `snippets/image.liquid` — so it gets the full ratio list,
-  mobile art direction and the srcset cap for free rather than reimplementing
-  any of it.
-{% endcomment %}
+  mobile art direction, the srcset ladder and the fade-in on load for free
+  rather than reimplementing any of it here.
+
+  ## Size
+
+  Width is two settings, not one: a type and a value. `Fit` hugs the image's own
+  width, `Fill` takes the container, `Custom` takes a percentage. Mobile has its
+  own pair because the desktop answer is usually wrong on a phone — a 40% image
+  beside text becomes a 100% image above it, and that is a different value
+  rather than a scale of the same one.
+
+  Each type writes both a `flex` and an `inline-size`, for the same reason the
+  group block does: an image block at the top level of a section is not a flex
+  item, so `flex` alone is inert there and every image came out full width.
+
+  `Height: Fill` stretches to the tallest thing beside it — the case that makes
+  an image sit flush with a text column in a horizontal group. It needs an
+  explicit fit, because filling a box of unknown ratio means either cropping or
+  letterboxing and only the merchant knows which is wanted.
+
+  ## Borders
+
+  Thickness, colour, **opacity** and radius. Opacity is applied to the colour
+  with `color_modify` rather than to the element, because `opacity` on the
+  element would fade the image too.
+
+  ## Animation
+
+  Resolved by `snippets/motion-attrs.liquid`, so this block inherits the theme's
+  three-level cascade — block setting › section setting › theme setting — and
+  the master switch in Theme settings › Animations still turns everything off.
+
+  The block's own list is the full set the image family supports rather than the
+  five it offered before. Every value here is a real preset in
+  `assets/motion-engine.js`; nothing is offered that would silently fall back.
+
+  `target: 'img'` animates the image inside the wrapper, not the wrapper. That
+  matters for `zoom-in` and the reveals: a wrapper with `overflow: hidden` is
+  what gives a reveal something to reveal from, and animating the wrapper itself
+  would move the mask along with the content.
+{% enddoc %}
+
+{%- liquid
+  assign s = block.settings
+
+  assign width_pct = s.width | default: 100 | plus: 0
+  assign width_pct_mobile = s.width_mobile | default: 100 | plus: 0
+
+  # Both properties, because an image block is only a flex item when its parent
+  # is a group. Inside a flex row the basis wins; outside one the width is all
+  # there is. Neither context needs a special case.
+  case s.width_type
+    when 'fit'
+      assign width_flex = '0 0 auto'
+      assign width_size = 'fit-content'
+    when 'custom'
+      assign width_flex = '0 0 ' | append: width_pct | append: '%'
+      assign width_size = width_pct | append: '%'
+    else
+      assign width_flex = '1 1 0%'
+      assign width_size = '100%'
+  endcase
+
+  case s.width_type_mobile
+    when 'fit'
+      assign width_flex_mobile = '0 0 auto'
+      assign width_size_mobile = 'fit-content'
+    when 'custom'
+      assign width_flex_mobile = '0 0 ' | append: width_pct_mobile | append: '%'
+      assign width_size_mobile = width_pct_mobile | append: '%'
+    else
+      assign width_flex_mobile = '1 1 0%'
+      assign width_size_mobile = '100%'
+  endcase
+
+  assign fills_height = false
+  if s.height_type == 'fill'
+    assign fills_height = true
+  endif
+
+  # ---- border ------------------------------------------------------------
+  # Opacity goes into the colour, not onto the element: `opacity` on the block
+  # would fade the image along with its frame.
+  assign border_px = 0
+  if s.border_style == 'solid'
+    assign border_px = s.border_width | default: 1 | plus: 0
+    assign border_alpha = s.border_opacity | default: 100 | plus: 0
+    assign border_alpha = border_alpha | divided_by: 100.0
+    assign border_paint = s.border_color | default: '#000000' | color_modify: 'alpha', border_alpha
+  endif
+
+  assign radius = s.border_radius | default: 0 | plus: 0
+
+  # ---- link --------------------------------------------------------------
+  assign link_url = s.link | default: ''
+  assign has_link = false
+  if link_url != ''
+    assign has_link = true
+  endif
+
+  # ---- classes -----------------------------------------------------------
+  assign classes = 'block-image block-image--' | append: s.alignment | default: 'block-image block-image--start'
+  if fills_height
+    assign classes = classes | append: ' block-image--fill-height'
+  endif
+  if s.hover_effect != blank and s.hover_effect != 'none'
+    assign classes = classes | append: ' block-image--hover-' | append: s.hover_effect
+  endif
+-%}
+
+{%- capture block_style -%}
+  --image-flex: {{ width_flex }};
+  --image-width: {{ width_size }};
+  --image-flex-mobile: {{ width_flex_mobile }};
+  --image-width-mobile: {{ width_size_mobile }};
+  --image-fit: {{ s.image_fit | default: 'cover' }};
+  --image-radius: {{ radius }}px;
+  {%- if border_px > 0 -%}
+    --image-border-width: {{ border_px }}px;
+    --image-border-color: {{ border_paint }};
+  {%- endif -%}
+{%- endcapture -%}
 
 <motion-effect
-  {% render 'motion-attrs', kind: 'image', block: block.settings, target: 'img' %}
-  class="block-image block-image--{{ block.settings.alignment }}"
-  style="--image-width: {{ block.settings.width }}%;"
-  {% render 'spacing', block: block.settings %}
+  {% render 'motion-attrs', kind: 'image', block: s, target: 'img' %}
+  class="{{ classes }}"
+  style="{{ block_style | strip_newlines | strip }}"
+  {% render 'spacing', block: s %}
   {{ block.shopify_attributes }}
 >
-  {%- if block.settings.link != blank -%}<a href="{{ block.settings.link }}" class="block-image__link">{%- endif -%}
+  {%- comment -%}
+    The link wraps only the media, never the caption. A caption is a description
+    of the image, not part of the target, and putting it inside the anchor makes
+    a screen reader announce the whole thing as the link text.
+  {%- endcomment -%}
+  {%- if has_link -%}
+    <a
+      href="{{ link_url }}"
+      class="block-image__link"
+      {% if s.link_new_tab %}target="_blank" rel="noopener"{% endif %}
+    >
+  {%- endif -%}
 
   {% render 'image',
-     image: block.settings.image,
-     mobile_image: block.settings.image_mobile,
-     alt: block.settings.alt,
-     ratio: block.settings.ratio,
-     mobile_ratio: block.settings.ratio_mobile,
+     image: s.image,
+     mobile_image: s.image_mobile,
+     alt: s.alt,
+     ratio: s.ratio,
+     mobile_ratio: s.ratio_mobile,
      sizes: '(min-width: 990px) 50vw, 100vw',
      wrapper_class: 'block-image__media' %}
 
-  {%- if block.settings.link != blank -%}</a>{%- endif -%}
+  {%- if has_link -%}</a>{%- endif -%}
 
-  {%- if block.settings.caption != blank -%}
-    <p class="block-image__caption">{{ block.settings.caption }}</p>
+  {%- if s.caption != blank -%}
+    <p class="block-image__caption">{{ s.caption }}</p>
   {%- endif -%}
 </motion-effect>
 
@@ -39,8 +169,19 @@
     { "type": "image_picker", "id": "image", "label": "t:shared.image.label" },
     { "type": "image_picker", "id": "image_mobile", "label": "t:shared.image_mobile.label", "info": "t:shared.image_mobile.info" },
     { "type": "text", "id": "alt", "label": "t:blocks.image.settings.alt.label", "info": "t:blocks.image.settings.alt.info" },
-    { "type": "url", "id": "link", "label": "t:shared.link.label" },
     { "type": "text", "id": "caption", "label": "t:blocks.image.settings.caption.label" },
+
+    { "type": "header", "content": "t:blocks.image.headers.link" },
+    { "type": "url", "id": "link", "label": "t:shared.link.label" },
+    {
+      "type": "checkbox",
+      "id": "link_new_tab",
+      "label": "t:blocks.group.settings.link_new_tab.label",
+      "default": false,
+      "visible_if": "{{ block.settings.link != blank }}"
+    },
+
+    { "type": "header", "content": "t:blocks.image.headers.size" },
     {
       "type": "select", "id": "ratio", "label": "t:blocks.image.settings.ratio.label",
       "options": [
@@ -66,28 +207,138 @@
       ],
       "default": ""
     },
-    { "type": "range", "id": "width", "label": "t:blocks.image.settings.width.label", "min": 20, "max": 100, "step": 5, "unit": "%", "default": 100 },
+    {
+      "type": "select", "id": "width_type", "label": "t:blocks.image.settings.width_type.label",
+      "info": "t:blocks.image.settings.width_type.info",
+      "options": [
+        { "value": "fit", "label": "t:blocks.group.settings.width.options__1.label" },
+        { "value": "fill", "label": "t:blocks.group.settings.width.options__2.label" },
+        { "value": "custom", "label": "t:blocks.group.settings.width.options__3.label" }
+      ],
+      "default": "fill"
+    },
+    {
+      "type": "range", "id": "width", "label": "t:blocks.group.settings.width_custom.label",
+      "min": 10, "max": 100, "step": 5, "unit": "%", "default": 100,
+      "visible_if": "{{ block.settings.width_type == 'custom' }}"
+    },
+    {
+      "type": "select", "id": "width_type_mobile", "label": "t:blocks.image.settings.width_type_mobile.label",
+      "options": [
+        { "value": "fit", "label": "t:blocks.group.settings.width.options__1.label" },
+        { "value": "fill", "label": "t:blocks.group.settings.width.options__2.label" },
+        { "value": "custom", "label": "t:blocks.group.settings.width.options__3.label" }
+      ],
+      "default": "fill"
+    },
+    {
+      "type": "range", "id": "width_mobile", "label": "t:blocks.group.settings.width_custom.label",
+      "min": 10, "max": 100, "step": 5, "unit": "%", "default": 100,
+      "visible_if": "{{ block.settings.width_type_mobile == 'custom' }}"
+    },
+    {
+      "type": "select", "id": "height_type", "label": "t:blocks.group.settings.height.label",
+      "info": "t:blocks.image.settings.height_type.info",
+      "options": [
+        { "value": "fit", "label": "t:blocks.group.settings.height.options__1.label" },
+        { "value": "fill", "label": "t:blocks.group.settings.height.options__2.label" }
+      ],
+      "default": "fit"
+    },
+    {
+      "type": "select", "id": "image_fit", "label": "t:blocks.image.settings.image_fit.label",
+      "info": "t:blocks.image.settings.image_fit.info",
+      "options": [
+        { "value": "cover", "label": "t:blocks.image.settings.image_fit.options__1.label" },
+        { "value": "contain", "label": "t:blocks.image.settings.image_fit.options__2.label" }
+      ],
+      "default": "cover"
+    },
     {
       "type": "select", "id": "alignment", "label": "t:blocks.group.settings.alignment.label",
+      "info": "t:blocks.image.settings.alignment.info",
       "options": [
         { "value": "start", "label": "t:blocks.group.settings.alignment.options__1.label" },
         { "value": "center", "label": "t:blocks.group.settings.alignment.options__2.label" },
         { "value": "end", "label": "t:blocks.group.settings.alignment.options__3.label" }
       ],
-      "default": "start"
+      "default": "start",
+      "visible_if": "{{ block.settings.width_type != 'fill' }}"
     },
+
+    { "type": "header", "content": "t:blocks.group.headers.borders" },
+    {
+      "type": "select", "id": "border_style", "label": "t:blocks.group.settings.border_style.label",
+      "options": [
+        { "value": "none", "label": "t:blocks.group.settings.border_style.options__1.label" },
+        { "value": "solid", "label": "t:blocks.group.settings.border_style.options__2.label" }
+      ],
+      "default": "none"
+    },
+    {
+      "type": "range", "id": "border_width", "label": "t:blocks.image.settings.border_width.label",
+      "min": 1, "max": 20, "step": 1, "unit": "px", "default": 1,
+      "visible_if": "{{ block.settings.border_style == 'solid' }}"
+    },
+    {
+      "type": "range", "id": "border_opacity", "label": "t:blocks.image.settings.border_opacity.label",
+      "min": 0, "max": 100, "step": 5, "unit": "%", "default": 100,
+      "visible_if": "{{ block.settings.border_style == 'solid' }}"
+    },
+    {
+      "type": "color", "id": "border_color", "label": "t:blocks.group.settings.border_color.label",
+      "default": "#000000",
+      "visible_if": "{{ block.settings.border_style == 'solid' }}"
+    },
+    {
+      "type": "range", "id": "border_radius", "label": "t:blocks.group.settings.border_radius.label",
+      "min": 0, "max": 60, "step": 2, "unit": "px", "default": 0
+    },
+
     { "type": "header", "content": "t:shared.animation.header" },
+    { "type": "paragraph", "content": "t:blocks.image.paragraphs.animation" },
     {
       "type": "select", "id": "animation_image", "label": "t:shared.animation.animation_image.label",
       "options": [
         { "value": "inherit", "label": "t:shared.animation.animation_image.options__1.label" },
         { "value": "none", "label": "t:shared.animation.animation_image.options__2.label" },
         { "value": "fade-in", "label": "t:shared.animation.animation_image.options__3.label" },
+        { "value": "fade-up", "label": "t:blocks.image.settings.animation_image.options__1.label" },
         { "value": "zoom-in", "label": "t:shared.animation.animation_image.options__7.label" },
-        { "value": "reveal-up", "label": "t:shared.animation.animation_image.options__11.label" }
+        { "value": "zoom-out", "label": "t:blocks.image.settings.animation_image.options__2.label" },
+        { "value": "blur", "label": "t:blocks.image.settings.animation_image.options__3.label" },
+        { "value": "slide-left", "label": "t:blocks.image.settings.animation_image.options__4.label" },
+        { "value": "slide-right", "label": "t:blocks.image.settings.animation_image.options__5.label" },
+        { "value": "reveal-up", "label": "t:shared.animation.animation_image.options__11.label" },
+        { "value": "reveal-down", "label": "t:blocks.image.settings.animation_image.options__6.label" },
+        { "value": "reveal-left", "label": "t:blocks.image.settings.animation_image.options__7.label" },
+        { "value": "reveal-right", "label": "t:blocks.image.settings.animation_image.options__8.label" }
       ],
       "default": "inherit"
     },
+    {
+      "type": "range", "id": "animation_duration", "label": "t:blocks.image.settings.animation_duration.label",
+      "min": 0, "max": 1600, "step": 50, "unit": "ms", "default": 0,
+      "info": "t:blocks.image.settings.animation_duration.info",
+      "visible_if": "{{ block.settings.animation_image != 'none' }}"
+    },
+    {
+      "type": "range", "id": "animation_delay", "label": "t:blocks.image.settings.animation_delay.label",
+      "min": 0, "max": 1200, "step": 50, "unit": "ms", "default": 0,
+      "visible_if": "{{ block.settings.animation_image != 'none' }}"
+    },
+    {
+      "type": "select", "id": "hover_effect", "label": "t:blocks.image.settings.hover_effect.label",
+      "info": "t:blocks.image.settings.hover_effect.info",
+      "options": [
+        { "value": "none", "label": "t:blocks.group.settings.border_style.options__1.label" },
+        { "value": "zoom", "label": "t:blocks.image.settings.hover_effect.options__1.label" },
+        { "value": "lift", "label": "t:blocks.image.settings.hover_effect.options__2.label" },
+        { "value": "tilt", "label": "t:blocks.image.settings.hover_effect.options__3.label" }
+      ],
+      "default": "none"
+    },
+
     { "type": "header", "content": "t:shared.spacing.block_header" },
     { "type": "range", "id": "padding_top", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
     { "type": "range", "id": "padding_right", "label": "t:shared.spacing.padding_right.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },

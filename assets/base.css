@@ -4502,6 +4502,137 @@
   .block-buttons--center { justify-content: center; }
   .block-buttons--end { justify-content: flex-end; }
 
+
+    /* ==========================================================================
+     Image block
+     ==========================================================================
+     Width is a `flex` and an `inline-size` together, for the same reason the
+     group block needs both: an image block is only a flex item when its parent
+     is a group. At the top level of a section `flex` is inert, so on its own
+     Fit and Custom did nothing and every image came out full width. Inside a
+     flex row the basis wins and the width is ignored; outside one the width is
+     all there is.
+     -------------------------------------------------------------------------- */
+
+  .block-image {
+    flex: var(--image-flex, 1 1 0%);
+    inline-size: var(--image-width, 100%);
+    max-inline-size: 100%;
+    min-inline-size: 0;
+  }
+
+  .block-image__media {
+    inline-size: 100%;
+    border-radius: var(--image-radius, 0px);
+    /* Clip the image to the radius. Without it a rounded frame sits over square
+       corners, which reads as a rendering fault rather than a style. */
+    overflow: hidden;
+  }
+
+  /* Painted only when a style was chosen: a `0px` border still creates a border
+     box and shifts the layout by a hair. */
+  .block-image[style*='--image-border-width'] .block-image__media {
+    border: var(--image-border-width) solid var(--image-border-color, currentColor);
+  }
+
+  /* Alignment moves the block itself, not the text inside it. The old rule set
+     `text-align`, which centred the caption but left an image narrower than its
+     container hard against the start edge — the setting appeared to do nothing
+     on the thing it was named for. */
+  .block-image--center { margin-inline: auto; }
+  .block-image--end { margin-inline-start: auto; }
+  .block-image--center .block-image__caption { text-align: center; }
+  .block-image--end .block-image__caption { text-align: end; }
+
+  /* ---- height ----
+     `Fill` matches the tallest thing beside it, which is what makes an image sit
+     flush with a text column in a horizontal group. `aspect-ratio` has to give
+     way or it keeps forcing the height back. */
+  .block-image--fill-height,
+  .block-image--fill-height .block-image__link,
+  .block-image--fill-height .block-image__media {
+    block-size: 100%;
+  }
+
+  .block-image--fill-height .block-image__media {
+    aspect-ratio: auto;
+  }
+
+  .block-image__media img {
+    object-fit: var(--image-fit, cover);
+  }
+
+  .block-image__link {
+    display: block;
+    border-radius: inherit;
+  }
+
+  .block-image__caption {
+    margin-block-start: var(--space-2);
+    font-size: var(--font-size-xs);
+    color: var(--color-accent-text);
+  }
+
+  /* ---- hover ----
+     On the image, not the wrapper: the wrapper carries the border and the
+     radius, and scaling it would scale the frame too. `overflow: hidden` on the
+     wrapper is what turns a scaled image into a crop rather than an overflow. */
+  .block-image__media img {
+    transition: transform var(--duration-slow, 450ms) var(--ease-out-expo, ease);
+  }
+
+  .block-image--hover-zoom:hover .block-image__media img,
+  .block-image--hover-zoom:focus-within .block-image__media img {
+    transform: scale(1.06);
+  }
+
+  .block-image--hover-lift {
+    transition: transform var(--duration-base, 250ms) var(--ease-out-expo, ease),
+                box-shadow var(--duration-base, 250ms) var(--ease-out-expo, ease);
+  }
+
+  .block-image--hover-lift:hover,
+  .block-image--hover-lift:focus-within {
+    transform: translateY(-6px);
+    box-shadow: 0 12px 32px rgb(0 0 0 / 0.16);
+  }
+
+  /* `perspective` on the element rather than the parent, so the block does not
+     need a styled ancestor to tilt correctly. */
+  .block-image--hover-tilt .block-image__media {
+    transition: transform var(--duration-base, 250ms) var(--ease-out-expo, ease);
+    transform: perspective(900px) rotateX(0deg);
+  }
+
+  .block-image--hover-tilt:hover .block-image__media,
+  .block-image--hover-tilt:focus-within .block-image__media {
+    transform: perspective(900px) rotateX(4deg) translateY(-4px);
+  }
+
+  /* A hover flourish is decoration. Reduced motion turns all of it off — the
+     block keeps its focus ring, which is the part that carries meaning. */
+  @media (prefers-reduced-motion: reduce) {
+    .block-image__media img,
+    .block-image--hover-lift,
+    .block-image--hover-tilt .block-image__media {
+      transition: none;
+    }
+
+    .block-image--hover-zoom:hover .block-image__media img,
+    .block-image--hover-lift:hover,
+    .block-image--hover-tilt:hover .block-image__media {
+      transform: none;
+      box-shadow: none;
+    }
+  }
+
+  @media screen and (max-width: 749px) {
+    .block-image {
+      flex: var(--image-flex-mobile, var(--image-flex, 1 1 0%));
+      inline-size: var(--image-width-mobile, var(--image-width, 100%));
+    }
+  }
+
   .block-image__media { inline-size: var(--image-width, 100%); }
   .block-image--center { text-align: center; }
   .block-image--center .block-image__media { margin-inline: auto; }
