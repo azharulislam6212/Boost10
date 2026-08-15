@@ -1,24 +1,158 @@
-{% comment %}
+{% doc %}
   blocks/button.liquid
 
-  A single button. Renders nothing without a label, so an empty block added by
-  accident leaves no stray element on the page.
+  A single button.
+
+  Renders nothing without a label, so an empty block added by accident leaves no
+  stray element on the page.
 
   A button with no link is still rendered — as a `<button>` rather than an `<a>`
   — because a merchant may be pairing it with an app. What is never rendered is
   an `<a>` with no `href`: that is a focusable element that goes nowhere.
-{% endcomment %}
 
-{%- if block.settings.label != blank -%}
-  <div class="block-button" {% render 'spacing', block: block.settings %} {{ block.shopify_attributes }}>
+  ## Where the design comes from
+
+  Almost nothing here is a colour picker. Variant, size, radius, border
+  thickness and typography all resolve to tokens that Theme settings already
+  writes — `--color-primary-button-*`, `--height-button`, `--radius-button`,
+  `--buttons-border-thickness`, `--font-button-*`. A merchant who restyles
+  buttons once in Theme settings restyles every button in the theme, and a
+  section built before that change follows it without being touched.
+
+  `Custom` is the exception and is deliberately last in the list. It writes the
+  same six custom properties inline, so it slots into the same machinery rather
+  than being a parallel code path — the effects, the sizes and the solid icon
+  badge all keep working underneath it.
+
+  ## Icons and hover
+
+  Both icon styles put the icon in the same place: out at the end of the button,
+  on the surround, beside the label pill — never inline inside the pill next to
+  the words. That is what "the position does not change" means, and it is the
+  reason to reach for a plain icon at all: it is a badge minus the circle.
+
+  The icon style decides what crosses the button on hover:
+
+    Swap — the contents slide across on one continuous travel, and what crosses
+      the button depends on the icon style:
+
+        Solid   the label pill and the badge trade places
+        Default the glyph keeps the side it started on and travels with the
+                words; the whole group is replaced by its copy
+
+      Position and movement are separate things here. A default icon does not
+      change position — it never crosses to the other side — but it does move,
+      because the phrase it belongs to moves.
+
+    Sweep — the hover colour wipes across and the label drifts with it.
+
+  `Auto` takes the swap wherever there is an icon and the sweep for a bare
+  label. Both can be chosen outright, and both can be turned off.
+
+  Only the swap needs JavaScript, and only to measure the slide and inject the
+  duplicate — see `assets/button-element.js`. Everything renders and works
+  before that runs.
+{% enddoc %}
+
+{%- liquid
+  assign s = block.settings
+
+  assign has_icon = false
+  if s.icon != blank and s.icon != 'none'
+    assign has_icon = true
+  endif
+
+  comment
+    The six custom properties the Custom variant writes. Emitted only for that
+    variant, so every other button ships a clean tag — and named to match what
+    `base.css` reads, so nothing has to translate between the two.
+  endcomment
+  assign custom_colors = ''
+  if s.style == 'custom'
+    if s.custom_background != blank
+      assign custom_colors = custom_colors | append: '--button-custom-background:' | append: s.custom_background | append: ';'
+    endif
+    if s.custom_text != blank
+      assign custom_colors = custom_colors | append: '--button-custom-foreground:' | append: s.custom_text | append: ';'
+    endif
+    if s.custom_border != blank
+      assign custom_colors = custom_colors | append: '--button-custom-border:' | append: s.custom_border | append: ';'
+    endif
+    if s.custom_hover_background != blank
+      assign custom_colors = custom_colors | append: '--button-custom-hover-background:' | append: s.custom_hover_background | append: ';'
+    endif
+    if s.custom_hover_text != blank
+      assign custom_colors = custom_colors | append: '--button-custom-hover-foreground:' | append: s.custom_hover_text | append: ';'
+    endif
+    if s.custom_hover_border != blank
+      assign custom_colors = custom_colors | append: '--button-custom-hover-border:' | append: s.custom_hover_border | append: ';'
+    endif
+  endif
+
+  comment
+    Radius and thickness fall through to the theme unless the merchant moved
+    them off "theme" — a -1 sentinel rather than 0, because 0 is a legitimate
+    value a merchant may want and cannot otherwise express.
+  endcomment
+  assign shape_style = ''
+  assign radius = s.corner_radius | default: -1 | plus: 0
+  if radius >= 0
+    assign shape_style = shape_style | append: '--radius-button:' | append: radius | append: 'px;'
+  endif
+  assign thickness = s.border_thickness | default: -1 | plus: 0
+  if thickness >= 0
+    assign shape_style = shape_style | append: '--buttons-border-thickness:' | append: thickness | append: 'px;'
+  endif
+
+  assign inline_colors = custom_colors | append: shape_style
+
+  comment
+    The size class the stylesheet reads is `button--custom-size`, not
+    `button--custom` — that name belongs to the colour variant, and a button
+    that was both would have had one silently overwrite the other.
+  endcomment
+  assign size_class = s.size | default: 'medium'
+  if size_class == 'custom'
+    assign size_class = 'custom-size'
+  endif
+-%}
+
+{%- if s.label != blank -%}
+  {%- capture block_style -%}
+    {%- comment -%}
+      Declarations rather than the spacing snippet's own `style` attribute: two
+      `style` attributes on one tag and the browser keeps the first, which is
+      how padding sliders end up moving a value that never reaches the page.
+    {%- endcomment -%}
+    {%- render 'spacing', block: s, declarations: true -%}
+  {%- endcapture -%}
+
+  <div
+    class="block-button block-button--{{ s.alignment | default: 'start' }}"
+    data-block-spacing
+    style="{{ block_style | strip_newlines | strip }}"
+    {{ block.shopify_attributes }}
+  >
     {% render 'button',
-       label: block.settings.label,
-       href: block.settings.link,
-       variant: block.settings.style,
-       size: block.settings.size,
-       custom_height: block.settings.buttons_height_custom,
-       full: block.settings.full_width,
-       new_tab: block.settings.new_tab %}
+       label: s.label,
+       href: s.link,
+       tag: s.tag,
+       variant: s.style,
+       size: size_class,
+       custom_height: s.buttons_height_custom,
+       new_tab: s.new_tab,
+       icon: s.icon,
+       icon_position: s.icon_position,
+       icon_style: s.icon_style,
+       icon_only: s.icon_only,
+       icon_size: s.icon_size,
+       icon_radius: s.icon_radius,
+       border_style: s.border_style,
+       underline_size: s.underline_thickness,
+       width: s.width,
+       min_width: s.min_width,
+       effect: s.hover_effect,
+       colors: inline_colors %}
   </div>
 {%- endif -%}
 
@@ -28,18 +162,117 @@
   "tag": null,
   "settings": [
     { "type": "text", "id": "label", "label": "t:blocks.button.settings.label.label", "default": "Shop now" },
-    { "type": "url", "id": "link", "label": "t:shared.link.label" },
-    { "type": "checkbox", "id": "new_tab", "label": "t:blocks.button.settings.new_tab.label", "default": false },
+    { "type": "url", "id": "link", "label": "t:shared.link.label", "info": "t:blocks.button.settings.link.info" },
+    { "type": "checkbox", "id": "new_tab", "label": "t:blocks.button.settings.new_tab.label", "default": false, "visible_if": "{{ block.settings.tag != 'button' }}" },
+    {
+      "type": "select", "id": "tag", "label": "t:blocks.button.settings.tag.label", "info": "t:blocks.button.settings.tag.info",
+      "options": [
+        { "value": "auto", "label": "t:blocks.button.settings.tag.options__1.label" },
+        { "value": "a", "label": "t:blocks.button.settings.tag.options__2.label" },
+        { "value": "button", "label": "t:blocks.button.settings.tag.options__3.label" }
+      ],
+      "default": "auto"
+    },
+
+    { "type": "header", "content": "t:blocks.button.headers.style" },
     {
       "type": "select", "id": "style", "label": "t:blocks.button.settings.style.label",
       "options": [
         { "value": "primary", "label": "t:blocks.button.settings.style.options__1.label" },
         { "value": "secondary", "label": "t:blocks.button.settings.style.options__2.label" },
         { "value": "outline", "label": "t:blocks.button.settings.style.options__3.label" },
-        { "value": "link", "label": "t:blocks.button.settings.style.options__4.label" }
+        { "value": "secondary-outline", "label": "t:blocks.button.settings.style.options__5.label" },
+        { "value": "link", "label": "t:blocks.button.settings.style.options__4.label" },
+        { "value": "custom", "label": "t:blocks.button.settings.style.options__6.label" }
       ],
       "default": "primary"
     },
+    { "type": "color", "id": "custom_background", "label": "t:blocks.button.settings.custom_background.label", "visible_if": "{{ block.settings.style == 'custom' }}" },
+    { "type": "color", "id": "custom_text", "label": "t:blocks.button.settings.custom_text.label", "visible_if": "{{ block.settings.style == 'custom' }}" },
+    { "type": "color", "id": "custom_border", "label": "t:blocks.button.settings.custom_border.label", "visible_if": "{{ block.settings.style == 'custom' }}" },
+    { "type": "color", "id": "custom_hover_background", "label": "t:blocks.button.settings.custom_hover_background.label", "visible_if": "{{ block.settings.style == 'custom' }}" },
+    { "type": "color", "id": "custom_hover_text", "label": "t:blocks.button.settings.custom_hover_text.label", "visible_if": "{{ block.settings.style == 'custom' }}" },
+    { "type": "color", "id": "custom_hover_border", "label": "t:blocks.button.settings.custom_hover_border.label", "visible_if": "{{ block.settings.style == 'custom' }}" },
+
+    {
+      "type": "range", "id": "underline_thickness", "label": "t:blocks.button.settings.underline_thickness.label",
+      "min": 1, "max": 6, "step": 1, "unit": "px", "default": 2,
+      "visible_if": "{{ block.settings.style == 'link' }}"
+    },
+
+    { "type": "header", "content": "t:blocks.button.headers.icon" },
+    { "type": "paragraph", "content": "t:blocks.button.paragraphs.icon" },
+    {
+      "type": "select", "id": "icon", "label": "t:blocks.button.settings.icon.label",
+      "options": [
+        { "value": "none", "label": "t:blocks.button.settings.icon.options__none.label" },
+        { "value": "arrow-right", "label": "Arrow right" },
+        { "value": "arrow-left", "label": "Arrow left" },
+        { "value": "chevron-right", "label": "Chevron right" },
+        { "value": "chevron-left", "label": "Chevron left" },
+        { "value": "external", "label": "External" },
+        { "value": "cart", "label": "Cart" },
+        { "value": "bag", "label": "Bag" },
+        { "value": "tag", "label": "Tag" },
+        { "value": "truck", "label": "Truck" },
+        { "value": "heart", "label": "Heart" },
+        { "value": "star", "label": "Star" },
+        { "value": "play", "label": "Play" },
+        { "value": "plus", "label": "Plus" },
+        { "value": "check", "label": "Check" },
+        { "value": "search", "label": "Search" },
+        { "value": "lock", "label": "Lock" },
+        { "value": "share", "label": "Share" }
+      ],
+      "default": "none"
+    },
+    {
+      "type": "select", "id": "icon_style", "label": "t:blocks.button.settings.icon_style.label", "info": "t:blocks.button.settings.icon_style.info",
+      "options": [
+        { "value": "default", "label": "t:blocks.button.settings.icon_style.options__1.label" },
+        { "value": "solid", "label": "t:blocks.button.settings.icon_style.options__2.label" }
+      ],
+      "default": "default",
+      "visible_if": "{{ block.settings.icon != 'none' }}"
+    },
+    {
+      "type": "select", "id": "icon_position", "label": "t:blocks.button.settings.icon_position.label",
+      "options": [
+        { "value": "start", "label": "t:blocks.button.settings.icon_position.options__1.label" },
+        { "value": "end", "label": "t:blocks.button.settings.icon_position.options__2.label" }
+      ],
+      "default": "end",
+      "visible_if": "{{ block.settings.icon != 'none' and block.settings.icon_only == false }}"
+    },
+    {
+      "type": "range", "id": "icon_size", "label": "t:blocks.button.settings.icon_size.label", "info": "t:blocks.button.settings.icon_size.info",
+      "min": 10, "max": 32, "step": 1, "unit": "px", "default": 16,
+      "visible_if": "{{ block.settings.icon != 'none' }}"
+    },
+    {
+      "type": "checkbox", "id": "icon_only", "label": "t:blocks.button.settings.icon_only.label", "info": "t:blocks.button.settings.icon_only.info",
+      "default": false,
+      "visible_if": "{{ block.settings.icon != 'none' }}"
+    },
+    {
+      "type": "range", "id": "icon_radius", "label": "t:blocks.button.settings.icon_radius.label", "info": "t:blocks.button.settings.icon_radius.info",
+      "min": 0, "max": 50, "step": 5, "unit": "%", "default": 50,
+      "visible_if": "{{ block.settings.icon != 'none' and block.settings.icon_style == 'solid' }}"
+    },
+
+    { "type": "header", "content": "t:blocks.button.headers.animation" },
+    {
+      "type": "select", "id": "hover_effect", "label": "t:blocks.button.settings.hover_effect.label", "info": "t:blocks.button.settings.hover_effect.info",
+      "options": [
+        { "value": "auto", "label": "t:blocks.button.settings.hover_effect.options__1.label" },
+        { "value": "swap", "label": "t:blocks.button.settings.hover_effect.options__2.label" },
+        { "value": "sweep", "label": "t:blocks.button.settings.hover_effect.options__3.label" },
+        { "value": "none", "label": "t:blocks.button.settings.hover_effect.options__4.label" }
+      ],
+      "default": "auto"
+    },
+
+    { "type": "header", "content": "t:shared.layout.header" },
     {
       "type": "select", "id": "size", "label": "t:blocks.button.settings.size.label",
       "options": [
@@ -50,18 +283,53 @@
       ],
       "default": "medium"
     },
-      {
-        "type": "range",
-        "id": "buttons_height_custom",
-        "label": "t:settings_schema.buttons.settings.height.label",
-        "min": 30,
-        "max": 80,
-        "step": 1,
-        "unit": "px",
-        "default": 60,
-         "visible_if": "{{ block.settings.size == \"custom\" }}"
-      },
-    { "type": "checkbox", "id": "full_width", "label": "t:blocks.button.settings.full_width.label", "default": false },
+    {
+      "type": "range", "id": "buttons_height_custom", "label": "t:settings_schema.buttons.settings.height.label",
+      "min": 30, "max": 80, "step": 1, "unit": "px", "default": 60,
+      "visible_if": "{{ block.settings.size == 'custom' }}"
+    },
+    {
+      "type": "range", "id": "corner_radius", "label": "t:blocks.button.settings.corner_radius.label", "info": "t:blocks.button.settings.corner_radius.info",
+      "min": 0, "max": 100, "step": 1, "unit": "px", "default": 50
+    },
+    {
+      "type": "select", "id": "border_style", "label": "t:blocks.button.settings.border_style.label",
+      "options": [
+        { "value": "solid", "label": "t:blocks.button.settings.border_style.options__1.label" },
+        { "value": "dashed", "label": "t:blocks.button.settings.border_style.options__2.label" },
+        { "value": "dotted", "label": "t:blocks.button.settings.border_style.options__3.label" }
+      ],
+      "default": "solid"
+    },
+    {
+      "type": "range", "id": "border_thickness", "label": "t:blocks.button.settings.border_thickness.label", "info": "t:blocks.button.settings.border_thickness.info",
+      "min": -1, "max": 6, "step": 1, "unit": "px", "default": -1
+    },
+    {
+      "type": "select", "id": "width", "label": "t:blocks.button.settings.width.label", "info": "t:blocks.button.settings.width.info",
+      "options": [
+        { "value": "auto", "label": "t:blocks.button.settings.width.options__1.label" },
+        { "value": "min", "label": "t:blocks.button.settings.width.options__2.label" },
+        { "value": "full", "label": "t:blocks.button.settings.width.options__3.label" }
+      ],
+      "default": "min"
+    },
+    {
+      "type": "range", "id": "min_width", "label": "t:blocks.button.settings.min_width.label",
+      "min": 80, "max": 400, "step": 4, "unit": "px", "default": 196,
+      "visible_if": "{{ block.settings.width == 'min' }}"
+    },
+    {
+      "type": "select", "id": "alignment", "label": "t:blocks.group.settings.alignment.label",
+      "options": [
+        { "value": "start", "label": "t:blocks.group.settings.alignment.options__1.label" },
+        { "value": "center", "label": "t:blocks.group.settings.alignment.options__2.label" },
+        { "value": "end", "label": "t:blocks.group.settings.alignment.options__3.label" }
+      ],
+      "default": "start",
+      "visible_if": "{{ block.settings.width != 'full' }}"
+    },
+
     { "type": "header", "content": "t:shared.spacing.block_header" },
     { "type": "range", "id": "padding_top", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
     { "type": "range", "id": "padding_right", "label": "t:shared.spacing.padding_right.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },

@@ -98,6 +98,10 @@ const LAZY_MODULES = [
 
   { specifier: '@theme/carousel', tags: ['swiper-carousel'] },
 
+  // `<button-swap>` is only emitted for buttons whose hover effect actually
+  // needs a duplicated track, so a page of ordinary buttons never fetches this.
+  { specifier: '@theme/button-element', tags: ['button-swap'] },
+
   // Background video. Lazy like everything else here: a page with no background
   // video never fetches the module, and a page with one below the fold fetches
   // it only when the element is registered.

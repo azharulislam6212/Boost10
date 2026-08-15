@@ -917,81 +917,259 @@
 
   /* ---- button ---------------------------------------------------------- */
 
+  /* Every button in the theme resolves to six colour properties and nothing
+     else: background, foreground, border, and the same three for hover.
+     Variants set those six; sizes set the metrics; the effects read them.
+
+     That indirection is what lets the swap animation exist at all. The label
+     pill, the icon badge and the track behind them all need painting from the
+     same palette in different combinations, and a variant that wrote
+     `background-color` directly would give them nothing to combine. */
+
   .button {
     /* One indirection so a size modifier — or a block passing an inline
        `--button-height` — swaps the value without re-declaring the property.
        The theme setting is the baseline; `medium` is that baseline unchanged. */
     --button-height: var(--height-button, 44px);
     --button-padding-inline: var(--space-6);
-    --button-font-size: var(--font-size-sm);
+    /* Theme settings › Typography › Buttons writes a full token set —
+       `--font-button-family`, `-size`, `-weight`, `-tracking`, `-transform` —
+       and the button read none of it, so that panel changed nothing. Size
+       modifiers scale this rather than replacing it with a generic step, which
+       keeps a small button and a large one recognisably the same typeface at
+       the weight the merchant chose. */
+    --button-font-size: var(--font-button-size, var(--font-size-sm));
+    --button-gap: var(--space-2);
+
+    --button-border-width: var(--buttons-border-thickness, 1px);
+    --button-border-style: solid;
+
+    /* Space between the button's border and whatever sits inside it. Zero
+       everywhere except the solid-icon swap, where the surround is the design. */
+    --button-inset: 0px;
+    --button-inner: calc(
+      var(--button-height) - (var(--button-inset) * 2) - (var(--button-border-width) * 2)
+    );
+
+    --button-icon-size: 1.6rem;
+    --button-icon-radius: 50%;
+
+    /* The badge follows the glyph rather than the button height. Sized from the
+       height alone, turning the icon size down left a small arrow rattling
+       around inside an unchanged circle.
+
+       The multiplier is set so the badge reaches the full inner height at the
+       theme's default glyph size — which is the design: a circle that fills the
+       surround, not a token dot floating in it. Turn the glyph down and the
+       circle comes down with it; turn it up and `min` stops it overflowing the
+       button it sits in. */
+    --button-icon-box: min(calc(var(--button-icon-size) * 3), var(--button-inner));
+
+    --button-background: transparent;
+    --button-foreground: currentColor;
+    --button-border: transparent;
+    --button-hover-background: transparent;
+    --button-hover-foreground: currentColor;
+    --button-hover-border: transparent;
 
     position: relative;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: var(--space-2);
     min-block-size: var(--button-height);
+    /* `overflow: hidden` — which the wipe and the swap both need — sets a flex
+       item's automatic minimum size to zero, so a button beside a text input
+       could shrink below its own label and lose its padding. That is the
+       newsletter submit with no space either side of the words. This puts the
+       floor back at the size the content actually needs; the width modifiers
+       are declared later and still override it. */
+    min-inline-size: min-content;
     padding-block: 0;
     padding-inline: var(--button-padding-inline);
-    border: var(--buttons-border-thickness, 1px) solid transparent;
+    border: var(--button-border-width) var(--button-border-style) var(--button-border);
     border-radius: var(--radius-button);
+    background-color: var(--button-background);
+    color: var(--button-foreground);
+    font-family: var(--font-button-family, var(--font-body-family));
     font-size: var(--button-font-size);
-    font-weight: 500;
+    font-style: var(--font-button-style, normal);
+    font-weight: var(--font-button-weight, var(--font-weight-medium, 500));
+    letter-spacing: var(--font-button-tracking, normal);
+    text-transform: var(--font-button-transform, none);
     line-height: 1.2;
     text-align: center;
     text-decoration: none;
     cursor: pointer;
-    transition: background-color var(--transition-fast), color var(--transition-fast),
-      border-color var(--transition-fast);
+    /* One easing and one duration across the whole system. `--ease-swap` is a
+       symmetric curve: an ease-out alone makes a slide that travels a fixed
+       distance look like it slams into the end, and this is a swap rather than
+       an entrance. */
+    --ease-swap: cubic-bezier(0.65, 0, 0.35, 1);
+    --duration-swap: 520ms;
+    transition: background-color var(--duration-base, 250ms) var(--ease-swap),
+      color var(--duration-base, 250ms) var(--ease-swap),
+      border-color var(--duration-base, 250ms) var(--ease-swap);
   }
+
+  .button:hover,
+  .button:focus-visible {
+    background-color: var(--button-hover-background);
+    border-color: var(--button-hover-border);
+    color: var(--button-hover-foreground);
+  }
+
+  /* Label and icon travel as one unit. The wrapper exists even when there is no
+     icon, so the swap clones a structure that is the same shape either way. */
+  /* Both copies, not just the original. Renaming the clone to
+     `.button-text-hover` made it stop matching this rule, so it lost its
+     `display`, its gap and its stacking — the copy collapsed and the slide
+     arrived at a broken second half. Every rule describing what a group *is*
+     has to name both; only rules about which one is showing may name one. */
+  .button-text,
+  .button-text-hover {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--button-gap);
+    position: relative;
+    z-index: 1;
+  }
+
+  .button__icon {
+    display: inline-grid;
+    place-items: center;
+    flex: 0 0 auto;
+    transition: background-color var(--duration-base, 250ms) var(--ease-swap),
+      color var(--duration-base, 250ms) var(--ease-swap);
+  }
+
+  /* Beats the inline `--icon-size` the icon snippet writes on every svg, so one
+     button setting sizes the glyph without the icon snippet needing to know it
+     is inside a button. Without this the Icon size slider moved nothing. */
+  .button__icon .icon {
+    inline-size: var(--button-icon-size);
+    block-size: var(--button-icon-size);
+  }
+
+  /* ---- variants ----
+     Colours come from the colour scheme, so a merchant who restyles buttons
+     once in Theme settings restyles every button in the theme. */
 
   .button--primary {
-    background-color: var(--color-primary-button-background);
-    border-color: var(--color-primary-button-border);
-    color: var(--color-primary-button-text);
-  }
-
-  .button--primary:hover {
-    background-color: var(--color-primary-button-hover-background);
-    border-color: var(--color-primary-button-hover-border);
-    color: var(--color-primary-button-hover-text);
+    --button-background: var(--color-primary-button-background);
+    --button-foreground: var(--color-primary-button-text);
+    --button-border: var(--color-primary-button-border);
+    --button-hover-background: var(--color-primary-button-hover-background);
+    --button-hover-foreground: var(--color-primary-button-hover-text);
+    --button-hover-border: var(--color-primary-button-hover-border);
   }
 
   .button--secondary {
-    background-color: var(--color-secondary-button-background);
-    border-color: var(--color-secondary-button-border);
-    color: var(--color-secondary-button-text);
+    --button-background: var(--color-secondary-button-background);
+    --button-foreground: var(--color-secondary-button-text);
+    --button-border: var(--color-secondary-button-border);
+    --button-hover-background: var(--color-secondary-button-hover-background);
+    --button-hover-foreground: var(--color-secondary-button-hover-text);
+    --button-hover-border: var(--color-secondary-button-hover-border);
   }
 
-  .button--secondary:hover {
-    background-color: var(--color-secondary-button-hover-background);
-    border-color: var(--color-secondary-button-hover-border);
-    color: var(--color-secondary-button-hover-text);
-  }
+  /* Outline hover keeps the background transparent and moves the outline and
+     the text together.
 
+     It used to fill with the outline colour on hover while the label stayed
+     that same colour — the text vanished into the fill the moment the pointer
+     arrived. Filling with a contrasting colour would fix the contrast but not
+     the design: an outline button that turns solid stops being an outline
+     button, and the reference has the outline itself changing colour. So the
+     fill is gone and the two colours that matter move instead.
+
+     Named `outline` rather than `primary-outline` because every existing caller
+     in the theme passes `outline`, and renaming a variant to be tidier is not
+     worth silently unstyling a button on a live store. */
   .button--outline {
-    background-color: transparent;
-    border-color: var(--color-primary-button-outline);
-    color: var(--color-primary-button-outline);
+    --button-background: transparent;
+    --button-foreground: var(--color-primary-button-outline);
+    --button-border: var(--color-primary-button-outline);
+    --button-hover-background: transparent;
+    --button-hover-foreground: var(--color-primary-button-hover-outline);
+    --button-hover-border: var(--color-primary-button-hover-outline);
   }
 
-  .button--outline:hover {
-    border-color: var(--color-primary-button-hover-outline);
-    color: var(--color-primary-button-hover-outline);
+  .button--secondary-outline {
+    --button-background: transparent;
+    --button-foreground: var(--color-secondary-button-outline);
+    --button-border: var(--color-secondary-button-outline);
+    --button-hover-background: transparent;
+    --button-hover-foreground: var(--color-secondary-button-hover-outline);
+    --button-hover-border: var(--color-secondary-button-hover-outline);
   }
 
+  /* The block writes the six properties inline. Falling back to the scheme's
+     own text colour means a merchant who picks Custom and has not touched a
+     swatch yet gets a readable button rather than an invisible one. */
+  .button--custom {
+    --button-background: var(--button-custom-background, transparent);
+    --button-foreground: var(--button-custom-foreground, var(--color-text));
+    --button-border: var(--button-custom-border, transparent);
+    --button-hover-background: var(--button-custom-hover-background, var(--button-custom-background, transparent));
+    --button-hover-foreground: var(--button-custom-hover-foreground, var(--button-custom-foreground, var(--color-text)));
+    --button-hover-border: var(--button-custom-hover-border, var(--button-custom-border, transparent));
+  }
+
+  /* A run of text, not a shape: no box metrics, and the underline animates. */
   .button--link {
+    --button-background: transparent;
+    --button-foreground: var(--color-link);
+    --button-border: transparent;
+    --button-hover-background: transparent;
+    --button-hover-foreground: var(--color-link-hover, var(--color-link));
+    --button-hover-border: transparent;
+
+    min-block-size: 0;
+    /* The token, not just the property: the swap moves inline padding onto the
+       group, so zeroing only `padding-inline` here would have the group put it
+       straight back. A link is a run of text and wants neither. */
+    --button-padding-inline: 0px;
     padding-inline: 0;
-    background: none;
+    border-radius: 0;
     border-color: transparent;
-    color: var(--color-link);
-    text-decoration: underline;
+    text-decoration: none;
   }
+
+  .button--link:hover,
+  .button--link:focus-visible {
+    border-color: transparent;
+  }
+
+  /* The underline is drawn as a background rather than `text-decoration` so it
+     can be positioned and sized independently of the text metrics — and so it
+     stays put while the words slide out from under it.
+
+     It no longer animates on its own. The link's hover is the text slide now,
+     the same travel every other variant uses, and a rule sweeping in the
+     opposite direction at the same time fought it. The rule holds its place and
+     changes colour with the label. */
+  .button--link .button-text,
+  .button--link .button-text-hover {
+    background-image: linear-gradient(currentColor, currentColor);
+    background-repeat: no-repeat;
+    background-position: 0 100%;
+    background-size: 100% var(--button-underline-size, 2px);
+    padding-block-end: 0.3em;
+  }
+
+  /* The link is the one variant with no box, so the track has nothing to be
+     clipped by. It gets the clip itself, at the text's own size. */
+  button-swap .button--link {
+    overflow: hidden;
+  }
+
+  /* ---- sizes ---- */
 
   .button--small {
     --button-height: var(--height-button-small);
     --button-padding-inline: var(--space-4);
-    --button-font-size: var(--font-size-xs);
+    --button-font-size: calc(var(--font-button-size, var(--font-size-sm)) * 0.875);
   }
 
   .button--medium {
@@ -1003,32 +1181,685 @@
   .button--large {
     --button-height: var(--height-button-large);
     --button-padding-inline: var(--space-8);
-    --button-font-size: var(--font-size-md);
+    --button-font-size: calc(var(--font-button-size, var(--font-size-sm)) * 1.125);
   }
 
-  .button--custom {
+  .button--custom-size {
     /* The block writes `--button-custom-height` inline. Without it the button
        falls back to the theme height rather than collapsing, so a block set to
-       "custom" before the merchant moves the slider still renders correctly. */
+       "custom" before the merchant moves the slider still renders correctly.
+
+       Named `custom-size` because `button--custom` is the custom *colour*
+       variant — one class for two independent choices meant whichever rule came
+       second silently won, and a custom-height button lost its background. */
     --button-height: var(--button-custom-height, var(--height-button, 44px));
+  }
+
+  /* ---- width ----
+     Three modes, because the right answer genuinely differs by placement. A
+     button under a hero wants a comfortable minimum so a two-word label does not
+     read as a chip; the same button in a card row wants to be exactly as wide as
+     its text.
+
+     `min` is the default at 196px — the width the label pill needs before a
+     short label starts looking cramped against the badge. */
+  .button--width-min {
+    min-inline-size: var(--button-min-width, 19.6rem);
   }
 
   .button--full {
     inline-size: 100%;
   }
 
+  /* Auto needs no rule at all: the swap's copy is out of flow, so the button is
+     already exactly as wide as its real contents. It used to need a measured
+     `--button-auto-width` because both copies were in flow and counted toward
+     intrinsic sizing — see the swap section for why that is gone. */
+
+  /* A link is a run of text. A minimum width on it would pad the text out with
+     dead space and leave the rule hanging past the words. */
+  .button--link {
+    min-inline-size: 0;
+    inline-size: auto;
+  }
+
   .button--icon-only {
-    inline-size: 4rem;
-    block-size: 4rem;
+    inline-size: var(--button-height);
+    block-size: var(--button-height);
+    min-inline-size: var(--button-height);
     padding: 0;
+  }
+
+  .button--icon-only .button-text {
+    inline-size: 100%;
+    justify-content: center;
   }
 
   .button[disabled],
   .button[aria-disabled='true'] {
     opacity: 0.5;
-    cursor: not-allowed;
     pointer-events: none;
   }
+
+  .button-swap:has(.button[aria-disabled='true']),
+  .button[disabled],
+  .button[aria-disabled='true'] {
+    cursor: not-allowed;
+  }
+
+  /* A disabled link is still focusable, so it still needs a visible ring — and
+     it must not run the hover animation, which would suggest it works. */
+  .button[aria-disabled='true'] .button__track {
+    transform: translateX(0) !important;
+  }
+
+  /* The reset layer already gives every focusable element a ring; repeating it
+     here only redefined the offset for buttons and would have drifted from it.
+     Removed on purpose — see the `:focus-visible` rule in @layer reset. */
+
+  /* ==========================================================================
+     Effect: sweep
+     ==========================================================================
+     The hover colour wipes across from one side and the contents drift with it.
+
+     A scaled pseudo-element rather than a background-position animation:
+     `transform` is composited, `background-position` is not, and this runs on
+     every button on the page. `transform-origin` is the only thing that changes
+     with direction, so the two directions share one rule.
+
+     Direction follows the icon. An icon at the end means the eye is already
+     travelling that way, so the colour arrives from the right to meet it; with
+     the icon at the start, or no icon, it runs left to right with the text.
+     -------------------------------------------------------------------------- */
+
+  /* The sweep is what a button does by default, so it needs no class of its own.
+     A `button--fx-sweep` marker was a second way of saying something the markup
+     already said — and the moment it was dropped from the Liquid, every rule
+     that still named it went dead silently, which is how outline icons ended up
+     transparent. Stating it once, here, removes that whole class of failure.
+
+     Buttons that swap neutralise the wipe from inside the wrapper; the one
+     button that does neither carries `data-fx="none"`, an attribute rather than
+     a class because it is a rare exception rather than a mode. */
+  .button {
+    overflow: hidden;
+    isolation: isolate;
+  }
+
+  /* `z-index: -1`, not 0. A positioned pseudo-element at z-index 0 paints ABOVE
+     non-positioned inline content, so on a button whose label is a bare text
+     node — which is most of the hand-written ones in this theme — the wipe
+     covered the words instead of passing behind them. At -1 it paints above the
+     button's own background and below its content, which is true whether or not
+     the label is wrapped in anything.
+
+     `isolation: isolate` on the button is what keeps it there: it makes a
+     stacking context, so a negative index cannot drop behind an ancestor's
+     background and disappear. */
+  .button::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background-color: var(--button-hover-background);
+    transform: scaleX(0);
+    transform-origin: left center;
+    transition: transform var(--duration-base, 250ms) var(--ease-swap);
+  }
+
+  .button.button--icon-end::before {
+    transform-origin: right center;
+  }
+
+  .button:hover::before,
+  .button:focus-visible::before {
+    transform: scaleX(1);
+  }
+
+  /* The wipe supplies the hover colour, so the button underneath must NOT also
+     cross-fade to it — two things arriving at the same colour is just a slower
+     wipe. The base rule further up already sets the hover background, so this
+     puts it back to the resting colour and lets the pseudo-element do the work.
+
+     Scoped, because "the wipe supplies it" is only true where there is a wipe.
+     Unscoped, this pinned every button's background to its resting colour on
+     hover while the text still went to `--button-hover-foreground` — and on
+     primary that is green text on an unchanged green background. That is the
+     blank pill: the label was there the whole time, painted in the colour behind
+     it. Same for the icon-only buttons, whose glyph vanished the same way. */
+  .button:not([data-fx='none']):hover,
+  .button:not([data-fx='none']):focus-visible {
+    background-color: var(--button-background);
+  }
+
+  /* Buttons that swap have no wipe, so their background change is real and has
+     to happen on the element itself. The `:not()` is repeated only to outweigh
+     the rule above — an element selector counts for almost nothing, so
+     `button-swap .button:hover` on its own is *lower* specificity than
+     `.button:not(…):hover` despite reading as more specific. */
+  button-swap .button:not([data-fx='none']):hover,
+  button-swap .button:not([data-fx='none']):focus-visible {
+    background-color: var(--button-hover-background);
+  }
+
+  /* The contents drift a little in the direction the colour is travelling.
+     Small on purpose — the wipe should look like it is carrying them, not like
+     the label is escaping the button. */
+  .button .button-text {
+    transition: transform var(--duration-base, 250ms) var(--ease-swap);
+  }
+
+  .button:hover .button-text,
+  .button:focus-visible .button-text {
+    transform: translateX(0.3rem);
+  }
+
+  .button.button--icon-end:hover .button-text,
+  .button.button--icon-end:focus-visible .button-text {
+    transform: translateX(-0.3rem);
+  }
+
+  /* An outline button has a transparent hover background, so there is nothing
+     to wipe; the link variant has no box for a colour to cross; and a button
+     that swaps paints its own surround. */
+  .button--outline::before,
+  .button--secondary-outline::before,
+  .button--link::before,
+  button-swap .button::before,
+  .button[data-fx='none']::before {
+    content: none;
+  }
+
+  /* A plain glyph holds its position — that is the whole point of choosing it
+     over a badge. The drift moves the group, icon included, so it is switched
+     off here: these buttons react through colour alone and nothing shifts. */
+  .button--has-icon:not(.button--icon-solid):hover .button-text,
+  .button--has-icon:not(.button--icon-solid):focus-visible .button-text,
+  .button--link:hover .button-text,
+  .button--link:focus-visible .button-text,
+  .button[data-fx='none']:hover .button-text,
+  .button[data-fx='none']:focus-visible .button-text {
+    transform: none;
+  }
+
+  /* ==========================================================================
+     Effect: swap
+     ==========================================================================
+     The contents slide across and come back in the opposite order:
+
+       solid badge   the label pill and the badge trade places
+       plain icon    the whole group leaves and its copy arrives, icon keeping
+                     its side
+       no icon       the same, with only words to move
+
+     ## Why the copy is out of flow
+
+     Both copies used to be flex items at `flex: 0 0 100%`, and that one
+     declaration caused every sizing bug this button had. A percentage basis
+     needs a definite container, and the container was a shrink-to-fit button
+     whose width was what we were trying to work out — so the button fell back to
+     intrinsic sizing, counted *both* copies, and came out roughly twice as wide
+     as its label. Removing the declaration was no better: with no basis the two
+     copies simply sat side by side and the second one was visible at rest.
+
+     The copy is absolutely positioned now. Out-of-flow boxes do not contribute
+     to intrinsic sizing, so the button is exactly as wide as its real contents —
+     which is what makes `width: auto` work, makes `min-inline-size` mean what it
+     says, and lets the link variant size to its text.
+
+     ## Why there is no measurement any more
+
+     With the copy pinned one track-width away, the two positions are expressible
+     in the track's own percentage units: a whole group is `100%`, and the badge
+     trade is `100%` minus the badge. Both are known to CSS, so the component no
+     longer measures anything — it only injects the copy. That removes the whole
+     class of bugs where a measurement was taken before a font loaded, or after a
+     container changed, or never re-taken at all.
+
+     Everything is gated on `.is-swap-ready`, which the script adds once the copy
+     exists. Clipping a button before there is anything to clip is a visible
+     flash of a broken control on a slow connection, and a permanent one if the
+     script never arrives.
+     -------------------------------------------------------------------------- */
+
+  button-swap .button.is-swap-ready {
+    overflow: hidden;
+  }
+
+  /* ---- the two copies share one grid cell ----
+     Both copies sit in the same single-cell grid and are stretched to it, so
+     they are the same width by construction rather than by two rules agreeing.
+
+     That is the whole point. The previous arrangement moved a track and placed
+     the copy with `inset-inline-start`, and those two resolve their percentages
+     against different boxes — a transform percentage against the element's own
+     border box, an inset percentage against the containing block's padding box.
+     Whenever those differed by so much as a pixel the copy landed off the
+     window, which is why the label kept arriving off-centre and why chasing it
+     with new inset values never held.
+
+     Stacked in one cell there is nothing to disagree: each copy translates by a
+     percentage of its own width, and the two widths are the same number because
+     the grid gave it to them.
+
+     Both copies are in flow, which also fixes sizing — a grid column is sized by
+     the *largest* item in it, not the sum, so two identical copies make the
+     button exactly one copy wide. */
+  .button__track {
+    display: grid;
+    grid-template-areas: 'copy';
+    inline-size: 100%;
+  }
+
+  .button__track > .button-text,
+  .button__track > .button-text-hover {
+    grid-area: copy;
+    transition: transform var(--duration-swap, 520ms) var(--ease-swap);
+    /* The label crosses the button's own edge, so the copy must not be
+       antialiased against a subpixel offset — that is what makes a slide look
+       soft rather than crisp. */
+    backface-visibility: hidden;
+  }
+
+  /* At rest the copy waits one width plus one gap away, on the side the contents
+     travel from — the same gap that separates the label from the icon inside a
+     copy.
+
+     Direction comes off `.button--icon-start` / `.button--icon-end`, which the
+     markup already carries. The wrapper used to repeat it as
+     `data-icon-position`, along with `data-icon-style` and `data-icon-only`, and
+     three attributes restating three classes is three chances for the two to
+     disagree — which is exactly what happened when a button with no icon
+     announced `data-icon-style="solid"` and took a travel meant for a badge it
+     did not have. */
+  button-swap .button:not(.button--icon-start) .button-text-hover {
+    transform: translateX(calc(100% + var(--button-gap)));
+  }
+
+  button-swap .button--icon-start .button-text-hover {
+    transform: translateX(calc((100% + var(--button-gap)) * -1));
+  }
+
+  /* ---- travel: a whole group ----
+     Everything leaves and the copy arrives in the same arrangement. Used where
+     there is nothing for the icon to trade places with:
+
+       no icon      nothing to trade
+       icon-only    the button *is* the badge
+       link         its glyph is inline punctuation, not a box — the trade
+                    distance is a whole group minus `--button-icon-box`, and a
+                    link's arrow is nowhere near that wide, so the trade left it
+                    stopped halfway through the slide with both copies showing */
+
+  button-swap .button:is(:not(.button--has-icon), .button--icon-only, .button--link):not(.button--icon-start):is(:hover, :focus-visible) .button-text {
+    transform: translateX(calc((100% + var(--button-gap)) * -1));
+  }
+
+  button-swap .button:is(:not(.button--has-icon), .button--icon-only, .button--link).button--icon-start:is(:hover, :focus-visible) .button-text {
+    transform: translateX(calc(100% + var(--button-gap)));
+  }
+
+  button-swap .button:is(:not(.button--has-icon), .button--icon-only, .button--link):is(:hover, :focus-visible) .button-text-hover {
+    transform: translateX(0);
+  }
+
+  /* ---- travel: trading places ----
+     The travel stops one icon box short of a whole group, which lands the icon
+     where the label began; the copy keeps its constant offset of one width plus
+     a gap, so it comes to rest an icon and a gap in — right behind the icon that
+     just arrived.
+
+     Both icon styles do this, and that is the point of the surround layout: a
+     plain glyph occupies the same box in the same place as a badge, so it has
+     the same thing to trade with. Gating this on `.button--icon-solid` left a
+     plain icon travelling a whole group while the label divider was placed for
+     a trade, and the two disagreed about which side the label had arrived on. */
+
+  button-swap .button--has-icon:not(.button--icon-only):not(.button--link):not(.button--icon-start):is(:hover, :focus-visible) .button-text {
+    transform: translateX(calc((100% - var(--button-icon-box)) * -1));
+  }
+
+  button-swap .button--has-icon:not(.button--icon-only):not(.button--link):not(.button--icon-start):is(:hover, :focus-visible) .button-text-hover {
+    transform: translateX(calc(var(--button-gap) + var(--button-icon-box)));
+  }
+
+  button-swap .button--has-icon:not(.button--icon-only):not(.button--link).button--icon-start:is(:hover, :focus-visible) .button-text {
+    transform: translateX(calc(100% - var(--button-icon-box)));
+  }
+
+  button-swap .button--has-icon:not(.button--icon-only):not(.button--link).button--icon-start:is(:hover, :focus-visible) .button-text-hover {
+    transform: translateX(calc((var(--button-gap) + var(--button-icon-box)) * -1));
+  }
+
+  /* ---- the handoff, where both copies are words ----
+     With an icon in a box the two copies stay distinguishable mid-slide: a badge
+     and a pill are different shapes, so a moment of both reads as one thing
+     passing another. With only words — no icon, or a link, whose glyph is
+     punctuation rather than a shape — both halves are text, and the window shows
+     the tail of one label beside the head of another. That reads as garbled text
+     rather than as motion.
+
+     So those crossfade as they travel. Nothing is added at either end: at rest
+     and at the end of the travel exactly one copy is visible either way.
+
+     This existed before and was lost when the track was rewritten around the
+     grid — the block sat inside the range that got replaced. */
+  button-swap .button:is(:not(.button--has-icon), .button--link) :is(.button-text, .button-text-hover) {
+    transition: transform var(--duration-swap, 520ms) var(--ease-swap),
+      opacity var(--duration-swap, 520ms) var(--ease-swap);
+  }
+
+  button-swap .button:is(:not(.button--has-icon), .button--link) .button-text-hover {
+    opacity: 0;
+  }
+
+  button-swap .button:is(:not(.button--has-icon), .button--link):is(:hover, :focus-visible) .button-text {
+    opacity: 0;
+  }
+
+  button-swap .button:is(:not(.button--has-icon), .button--link):is(:hover, :focus-visible) .button-text-hover {
+    opacity: 1;
+  }
+
+  /* Promoted only while the pointer is on it. `will-change` left on permanently
+     keeps a compositor layer alive for every button on the page. */
+  button-swap .button:hover :is(.button-text, .button-text-hover) {
+    will-change: transform;
+  }
+
+  /* The colour inversion is tied to the same duration and curve as the travel.
+     Left on the shorter base transition, the button finished changing colour
+     roughly halfway through the slide and the two read as separate events. */
+  button-swap .button:not(.button--icon-solid) {
+    transition: background-color var(--duration-swap, 520ms) var(--ease-swap),
+      color var(--duration-swap, 520ms) var(--ease-swap),
+      border-color var(--duration-swap, 520ms) var(--ease-swap);
+  }
+
+  /* ---- swap layout: the surround ----
+     Any icon — badge or bare glyph — puts the button into the surround layout:
+     the button root becomes the panel, the label becomes a pill sitting on it,
+     and the icon sits in the space left over at the end.
+
+     This used to be scoped to the solid badge, and a plain icon fell back to
+     sitting inline next to the words *inside* the pill. That moved it, which is
+     the one thing it must not do — the whole reason to pick a plain icon over a
+     badge is that it stays exactly where a badge would be, minus the circle. So
+     the layout is decided by whether there is an icon, and the icon style
+     decides only whether that icon is wearing a badge.
+
+     The hover colour is painted at rest because here it is the panel behind the
+     two shapes rather than a state. All of it is unconditional, so the button is
+     what the merchant designed whether or not the script arrives. */
+
+  button-swap .button.button--has-icon:not(.button--icon-only):not(.button--link) {
+    --button-inset: 0.4rem;
+
+    /* `flex` is block-level, so every surround button stretched to the full
+       width of whatever held it. `inline-flex` shrinks to fit, and width is then
+       the width setting's job rather than an accident of the display value. */
+    display: inline-flex;
+    padding: var(--button-inset);
+    background-color: var(--button-hover-background);
+    border-color: var(--button-hover-border);
+    transition: none;
+  }
+
+  button-swap .button.button--has-icon:not(.button--icon-only):not(.button--link):hover,
+  button-swap .button.button--has-icon:not(.button--icon-only):not(.button--link):focus-visible {
+    background-color: var(--button-hover-background);
+    border-color: var(--button-hover-border);
+    color: var(--button-foreground);
+  }
+
+  button-swap .button.button--has-icon:not(.button--icon-only):not(.button--link) :is(.button-text, .button-text-hover) {
+    justify-content: flex-start;
+  }
+
+  /* The label becomes a pill in its own right, painted in the variant's resting
+     colours against the surround. */
+  button-swap .button.button--has-icon:not(.button--icon-only):not(.button--link) .button__label {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-block-size: var(--button-inner);
+    padding-inline: var(--button-padding-inline);
+    border-radius: var(--radius-button);
+    background-color: var(--button-background);
+    color: var(--button-foreground);
+  }
+
+  /* With no icon there is no surround and no pill — the button is the shape, and
+     the label just crosses it. */
+  button-swap .button:not(.button--has-icon) :is(.button-text, .button-text-hover) {
+    justify-content: center;
+  }
+
+  /* An outline button has no fill to make a pill out of, so the label keeps the
+     outline's own treatment and the surround stays transparent — which is what
+     the dashed reference buttons are. */
+  button-swap .button--outline.button--has-icon,
+  button-swap .button--secondary-outline.button--has-icon {
+    background-color: transparent;
+    border-color: var(--button-border);
+  }
+
+  button-swap .button--outline.button--has-icon:hover,
+  button-swap .button--outline.button--has-icon:focus-visible,
+  button-swap .button--secondary-outline.button--has-icon:hover,
+  button-swap .button--secondary-outline.button--has-icon:focus-visible {
+    background-color: transparent;
+    border-color: var(--button-hover-border);
+    color: var(--button-hover-foreground);
+  }
+
+  /* ---- a plain glyph in the surround ----
+     Same box as a badge, so it lands on exactly the same spot — that is the
+     point of it. Only the circle behind it is gone.
+
+     `--button-icon-background` is zeroed out explicitly rather than merely left
+     unset: it can still be sitting on the element from a caller or a previous
+     variant, and a plain icon must never come out wearing a badge. */
+  .button--has-icon:not(.button--icon-solid) .button__icon {
+    background-color: transparent;
+    border-radius: 0;
+    box-shadow: none;
+    color: inherit;
+  }
+
+  /* The box is claimed only inside the surround layout. Everywhere else — a
+     sweep button, an icon-only button — the glyph is inline with the words and
+     takes no box of its own, so it reads as punctuation against the text.
+
+     The colour is the important half. `inherit` gives the glyph the label's
+     colour, which is correct while it sits inside the pill and wrong the moment
+     it moves out onto the surround: on primary the label is ink and the
+     surround is ink, so the arrow was painted in exactly the colour behind it
+     and vanished. It takes the badge's own colour rule instead — the same one
+     that makes a solid badge's arrow legible — so both styles are readable
+     against the same background for the same reason. */
+  button-swap .button.button--has-icon:not(.button--icon-solid):not(.button--icon-only):not(.button--link) .button__icon {
+    inline-size: var(--button-icon-box);
+    block-size: var(--button-icon-box);
+    color: var(--button-icon-foreground, var(--button-background));
+  }
+
+  /* An outline button's surround is transparent, so the glyph is sitting on the
+     page — and painting it from `--button-background` means painting it in
+     `transparent`, which is how the arrow disappeared entirely on every outline
+     button. It takes the label's colour, which is the one that is legible there.
+
+     The `:not()`s are repeated so this outweighs the rule above rather than
+     merely following it. That rule carries five class-weight selectors; an
+     override that reads as more specific in English but not in the cascade is
+     the kind that stops working the next time either one is edited. */
+  button-swap .button--outline.button--has-icon:not(.button--icon-solid):not(.button--icon-only):not(.button--link) .button__icon,
+  button-swap .button--secondary-outline.button--has-icon:not(.button--icon-solid):not(.button--icon-only):not(.button--link) .button__icon {
+    color: inherit;
+  }
+
+  /* ---- outline in the surround layout ----
+     The outer pill carries the full outline. The label inside does NOT get one
+     of its own — an outline drawn all the way round the label sits directly on
+     top of the outer one along three of its four sides, which doubles the
+     dashes and reads as a drawing mistake.
+
+     It takes one edge: the one facing the icon. Because the label keeps the
+     pill radius, that single border renders as the curved dash separating the
+     label from the icon — the divider in the reference, and the only part of an
+     inner outline doing any work.
+
+     ## Why the two copies take opposite edges
+
+     Which side faces the icon is not a fixed fact about the button, it is a
+     fact about which copy you are looking at. At rest the window shows the real
+     group — label then icon — so its divider faces the end. At the end of the
+     slide the window shows the real group's icon followed by the *copy's*
+     label, so the copy's divider faces the start.
+
+     Giving each copy its own edge is what makes this correct without a hover
+     rule: the divider does not move, the copy that owns the correct one simply
+     comes into view. A `:hover` rule flipping the border on both labels would
+     flip it on the outgoing one too, mid-slide, in full view. */
+  button-swap .button--outline.button--has-icon :is(.button__label),
+  button-swap .button--secondary-outline.button--has-icon :is(.button__label) {
+    background-color: transparent;
+    color: inherit;
+    border: 0;
+    border-radius: var(--radius-button);
+  }
+
+  button-swap .button--outline.button--icon-end .button-text .button__label,
+  button-swap .button--secondary-outline.button--icon-end .button-text .button__label,
+  button-swap .button--outline.button--icon-start .button-text-hover .button__label,
+  button-swap .button--secondary-outline.button--icon-start .button-text-hover .button__label {
+    border-inline-end: var(--button-border-width) var(--button-border-style) var(--button-border);
+  }
+
+  button-swap .button--outline.button--icon-start .button-text .button__label,
+  button-swap .button--secondary-outline.button--icon-start .button-text .button__label,
+  button-swap .button--outline.button--icon-end .button-text-hover .button__label,
+  button-swap .button--secondary-outline.button--icon-end .button-text-hover .button__label {
+    border-inline-start: var(--button-border-width) var(--button-border-style) var(--button-border);
+  }
+
+  button-swap .button--outline:hover .button__label,
+  button-swap .button--outline:focus-visible .button__label,
+  button-swap .button--secondary-outline:hover .button__label,
+  button-swap .button--secondary-outline:focus-visible .button__label {
+    border-color: var(--button-hover-border);
+  }
+
+  /* ---- the solid badge ---- */
+
+  /* The badge is made of the same material as the label pill: the pill's fill,
+     the pill's text colour. That is what the reference shows — sampling it, the
+     badge fill and the label fill are the same pixel value, against a surround
+     that is neither.
+
+     It used to fall back to `--button-hover-background`, which is exactly what
+     paints the surround — so the badge was the colour of the thing behind it and
+     only its arrow and a rim were visible. That is the "border shows but there
+     is nothing in the background". A rim was added to compensate; with the badge
+     now a colour of its own, there is nothing to compensate for and the rim is
+     gone rather than left as decoration.
+
+     Reading from the same two properties as the pill is also why no variant
+     needs its own badge colours: primary shows primary, secondary secondary,
+     custom whatever the merchant set. */
+  .button--icon-solid .button__icon {
+    inline-size: var(--button-icon-box);
+    block-size: var(--button-icon-box);
+    border-radius: var(--button-icon-radius);
+    background-color: var(--button-icon-background, var(--button-background));
+    color: var(--button-icon-foreground, var(--button-foreground));
+    box-shadow: none;
+  }
+
+  /* On an outline variant the background is transparent, so a badge painted
+     from it would be invisible. It takes the outline colour instead — and
+     follows it on hover, which is the badge changing colour with the border in
+     the reference. */
+  .button--outline.button--icon-solid .button__icon,
+  .button--secondary-outline.button--icon-solid .button__icon {
+    background-color: var(--button-icon-background, var(--button-foreground));
+    color: var(--button-icon-foreground, var(--color-background));
+    /* No ring: the surround here is transparent, so the badge is already a
+       solid shape against the page rather than against its own colour. */
+    box-shadow: none;
+  }
+
+  /* A link has the same problem for the same reason: its background is
+     `transparent`, so a badge painted from it is a badge painted from nothing.
+     The outline variants were given this override and the link was not, which is
+     the whole bug — solid selected, no fill.
+
+     It is sized from the glyph rather than from `--button-icon-box`. That box is
+     derived from the button's height, and a link has no height to speak of: it
+     would have put a 48px disc inline with a line of text. */
+  .button--link.button--icon-solid .button__icon {
+    inline-size: calc(var(--button-icon-size) * 1.9);
+    block-size: calc(var(--button-icon-size) * 1.9);
+    background-color: var(--button-icon-background, var(--button-foreground));
+    color: var(--button-icon-foreground, var(--color-background));
+    box-shadow: none;
+  }
+
+  /* The link's colour is the whole of its hover, so the badge has to move with
+     it — left on the resting colour it would be the one part of the link that
+     did not respond. */
+  .button--link.button--icon-solid:hover .button__icon,
+  .button--link.button--icon-solid:focus-visible .button__icon {
+    background-color: var(--button-icon-background, var(--button-hover-foreground));
+  }
+
+  /* The glyph inside an icon-only button carries nothing of its own: the button
+     is the badge, so a background, a radius or a colour on the glyph would be a
+     second badge inside the first.
+
+     `snippets/button.liquid` refuses to put `button--icon-solid` on these at
+     all, so the badge rules above should never fire — this is the backstop for
+     a caller writing classes by hand. It has to sit *after* those rules to be
+     one: at equal specificity the later rule wins, and while this sat earlier in
+     the file the badge painted over it and put a square badge inside the round
+     button. */
+  .button--icon-only .button__icon {
+    inline-size: auto;
+    block-size: auto;
+    background-color: transparent;
+    border-radius: 0;
+    box-shadow: none;
+    color: inherit;
+  }
+
+  .button--outline.button--icon-solid:hover .button__icon,
+  .button--outline.button--icon-solid:focus-visible .button__icon,
+  .button--secondary-outline.button--icon-solid:hover .button__icon,
+  .button--secondary-outline.button--icon-solid:focus-visible .button__icon {
+    background-color: var(--button-icon-background, var(--button-hover-foreground));
+  }
+
+  .button-swap {
+    display: inline-block;
+    max-inline-size: 100%;
+  }
+
+  .button-swap[data-full] {
+    display: block;
+  }
+
+  /* Reduced motion keeps every layout decision — the pill, the badge, the
+     surround — and drops only the travel. */
+  @media (prefers-reduced-motion: reduce) {
+    .button::before,
+    .button-text,
+    .button-text-hover {
+      transition: none;
+    }
+  }
+
+  /* ---- state ---- */
 
   .button__spinner {
     inline-size: 1.6rem;
@@ -4439,6 +5270,18 @@
     opacity: var(--overlay-opacity, 0.4);
     pointer-events: none;
   }
+
+  /* A single button block. `flex` rather than `text-align`, because the button
+     is an inline-flex box and `align-items: flex-start` is what stops it
+     stretching to the block's full width when it is not meant to. */
+  .block-button {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .block-button--center { align-items: center; }
+  .block-button--end { align-items: flex-end; }
 
   .block-buttons { display: flex; flex-wrap: wrap; gap: var(--space-3); }
   .block-buttons--center { justify-content: center; }
@@ -7910,4 +8753,69 @@ swiper-carousel {
 @media (forced-colors: active) {
   .block-text--highlight { --hl-font-style: italic; }
   .block-text--hl-all { --hl-font-style: normal; }
+}
+
+/* ==========================================================================
+   Shopify dynamic checkout — "Buy it now"
+   ==========================================================================
+   Shopify injects this button and its stylesheet from the platform, not from
+   the theme. Those rules are unlayered, and an unlayered rule beats every
+   `@layer` no matter how specific the layered one is — so styling this from
+   inside `@layer components` produced no visible change at all. Hence this
+   block sitting outside the layers, at the end of the file.
+
+   It is matched to `.button--secondary` on purpose rather than to primary. The
+   two sit stacked on every product page, and the theme's own Add to cart is the
+   action being recommended; giving both the primary treatment makes the pair
+   compete and leaves neither reading as the default.
+
+   The wallet buttons — Apple Pay, Shop Pay, PayPal — deliberately keep their
+   own branding. Those marks are what customers recognise and trust, and a
+   restyled Shop Pay button converts worse than an untouched one.
+   -------------------------------------------------------------------------- */
+
+.shopify-payment-button {
+  margin-block-start: var(--space-3);
+}
+
+.shopify-payment-button__button--unbranded {
+  min-block-size: var(--height-button, 44px);
+  padding-inline: var(--space-6);
+  border: var(--buttons-border-thickness, 1px) solid var(--color-secondary-button-border);
+  border-radius: var(--radius-button);
+  background-color: var(--color-secondary-button-background);
+  color: var(--color-secondary-button-text);
+  font-family: var(--font-button-family, var(--font-body-family));
+  font-size: var(--font-button-size, var(--font-size-sm));
+  font-weight: var(--font-button-weight, var(--font-weight-medium, 500));
+  letter-spacing: var(--font-button-tracking, normal);
+  text-transform: var(--font-button-transform, none);
+  line-height: 1.2;
+  transition: background-color var(--duration-base, 250ms) var(--ease-out-expo),
+    color var(--duration-base, 250ms) var(--ease-out-expo),
+    border-color var(--duration-base, 250ms) var(--ease-out-expo);
+}
+
+.shopify-payment-button__button--unbranded:hover:not([disabled]) {
+  background-color: var(--color-secondary-button-hover-background);
+  border-color: var(--color-secondary-button-hover-border);
+  color: var(--color-secondary-button-hover-text);
+}
+
+/* Shopify's own rule sets this to a fixed radius that ignores the theme. */
+.shopify-payment-button__button {
+  border-radius: var(--radius-button);
+}
+
+/* The "More payment options" link, which Shopify styles as plain blue text. */
+.shopify-payment-button__more-options {
+  margin-block-start: var(--space-2);
+  color: var(--color-accent-text);
+  font-size: var(--font-size-xs);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.shopify-payment-button__more-options:hover {
+  color: var(--color-text);
 }

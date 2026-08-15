@@ -113,6 +113,15 @@
 -%}
 
 {%- capture block_style -%}
+  {%- comment -%}
+    Spacing is pulled in as declarations rather than as its own attribute.
+    `{% render 'spacing' %}` emits `style="…"` of its own, and this element
+    already has one — two `style` attributes on a tag and the browser keeps the
+    first and silently drops the rest, which is why the four padding sliders on
+    this block moved a value that never reached the page. The `data-block-spacing`
+    hook is written by hand below, because that is what `base.css` selects on.
+  {%- endcomment -%}
+  {%- render 'spacing', block: s, declarations: true -%}
   --image-flex: {{ width_flex }};
   --image-width: {{ width_size }};
   --image-flex-mobile: {{ width_flex_mobile }};
@@ -128,8 +137,8 @@
 <motion-effect
   {% render 'motion-attrs', kind: 'image', block: s, target: 'img' %}
   class="{{ classes }}"
+  data-block-spacing
   style="{{ block_style | strip_newlines | strip }}"
-  {% render 'spacing', block: s %}
   {{ block.shopify_attributes }}
 >
   {%- comment -%}
@@ -152,6 +161,7 @@
      ratio: s.ratio,
      mobile_ratio: s.ratio_mobile,
      sizes: '(min-width: 990px) 50vw, 100vw',
+     placeholder: s.placeholder,
      wrapper_class: 'block-image__media' %}
 
   {%- if has_link -%}</a>{%- endif -%}
@@ -337,6 +347,29 @@
         { "value": "tilt", "label": "t:blocks.image.settings.hover_effect.options__3.label" }
       ],
       "default": "none"
+    },
+
+    {
+      "type": "select", "id": "placeholder", "label": "t:blocks.image.settings.placeholder.label", "info": "t:blocks.image.settings.placeholder.info",
+      "options": [
+        { "value": "product-apparel-1", "label": "Product apparel 1" },
+        { "value": "product-apparel-2", "label": "Product apparel 2" },
+        { "value": "product-apparel-3", "label": "Product apparel 3" },
+        { "value": "product-apparel-4", "label": "Product apparel 4" },
+        { "value": "collection-apparel-1", "label": "Collection apparel 1" },
+        { "value": "collection-apparel-2", "label": "Collection apparel 2" },
+        { "value": "collection-apparel-3", "label": "Collection apparel 3" },
+        { "value": "collection-apparel-4", "label": "Collection apparel 4" },
+        { "value": "hero-apparel-1", "label": "Hero apparel 1" },
+        { "value": "hero-apparel-2", "label": "Hero apparel 2" },
+        { "value": "hero-apparel-3", "label": "Hero apparel 3" },
+        { "value": "blog-apparel-1", "label": "Blog apparel 1" },
+        { "value": "blog-apparel-2", "label": "Blog apparel 2" },
+        { "value": "blog-apparel-3", "label": "Blog apparel 3" },
+        { "value": "detailed-apparel-1", "label": "Detailed apparel 1" }
+      ],
+      "default": "hero-apparel-1",
+      "visible_if": "{{ block.settings.image == blank }}"
     },
 
     { "type": "header", "content": "t:shared.spacing.block_header" },

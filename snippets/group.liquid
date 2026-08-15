@@ -193,6 +193,15 @@
 -%}
 
 {%- capture group_style -%}
+  {%- comment -%}
+    Declarations, not an attribute. `{% render 'spacing' %}` emits its own
+    `style="…"`, and this element already has one — a tag with two `style`
+    attributes keeps the first and the browser drops the rest, so every padding
+    slider on the group block was moving a value the page never saw. The
+    `data-block-spacing` hook goes on by hand below, since that is the selector
+    `base.css` applies the padding through.
+  {%- endcomment -%}
+  {%- render 'spacing', block: settings, declarations: true -%}
   --group-gap: {{ settings.gap | default: 16 }}px;
   --group-inline: {{ inline_axis }};
   --group-block: {{ block_axis }};
@@ -214,8 +223,8 @@
 
 <div
   class="{{ classes }}"
+  data-block-spacing
   style="{{ group_style | strip_newlines | strip }}"
-  {% render 'spacing', block: settings %}
   {{ shopify_attributes }}
 >
   {%- if has_media -%}

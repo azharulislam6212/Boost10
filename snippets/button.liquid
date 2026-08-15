@@ -1,15 +1,62 @@
 {% doc %}
-  Renders a button or a link styled as one.
+  Renders a button, or a link styled as one.
 
   The distinction matters and is decided by the `href` parameter, not by a style
   choice: something that navigates is an `<a>`, something that acts is a
   `<button>`. Styling a link as a button is fine; making a `<div>` behave like
   one is not, and it is the most common accessibility failure in Shopify themes.
 
+  ## Markup contract
+
+      <a class="button button--primary …">
+        <span class="button-text">
+          <span class="button__label">Shop now</span>
+          <span class="button__icon">…svg…</span>
+        </span>
+      </a>
+
+  Label and icon travel together inside one `.button-text`. That wrapper is not
+  decoration: the swap animation moves label and icon as a single unit, and
+  `assets/button-element.js` clones exactly this element to build the track. A
+  label and an icon as loose siblings cannot be moved together without a
+  wrapper, and adding one at runtime would mean rewriting the button's contents
+  after paint.
+
+  ## Hover effects
+
+  `effect` picks how the button reacts, and `auto` picks for it:
+
+    swap   The contents slide across on one continuous travel. A solid badge
+           trades places with the label pill; a plain glyph keeps the side it
+           started on and travels with the words, the whole group replaced by
+           its copy. Either way both label and icon are fully visible at each
+           end of the slide.
+    sweep  The hover colour wipes across from one side and the contents drift
+           with it. Works with any icon or none.
+    none
+
+  `auto` takes the swap wherever there is an icon to trade places with, and the
+  sweep for a bare label — a label that slides out and back with nothing else
+  moving reads as a glitch rather than a response.
+
+  Only `swap` needs JavaScript. `sweep` is a pseudo-element and a transform, so
+  it survives a failed script load, and a `swap` button with no script is an
+  ordinary button that simply does not move.
+
   Parameters:
     label     (string, required)  Already translated
-    href      (string, optional)  Renders an `<a>` when present, a `<button>` otherwise
-    variant   (string, optional)  'primary' | 'secondary' | 'outline' | 'link'. Default primary
+    href      (string, optional)  The URL. With `tag: 'auto'` its presence also
+                                  picks the element
+    tag       (string, optional)  'auto' | 'a' | 'button'. Default 'auto', which
+                                  is an `<a>` when there is an `href` and a
+                                  `<button>` otherwise. `'a'` without an `href`
+                                  falls back to `<button>` — an anchor with no
+                                  href is unreachable by keyboard
+    variant   (string, optional)  'primary' | 'secondary' | 'outline' |
+                                  'secondary-outline' | 'link' | 'custom'.
+                                  Default primary. 'outline' is the primary
+                                  outline; it keeps its old name because every
+                                  existing caller passes it
     size      (string, optional)  'small' | 'medium' | 'large' | 'custom'.
                                   Default medium. Sizes are relative to Theme
                                   settings > Buttons > Height, so raising that
@@ -23,7 +70,21 @@
     loading   (boolean, optional) Shows a spinner and sets aria-busy
     icon      (string, optional)  Icon name from snippets/icon.liquid
     icon_position (string, optional) 'start' | 'end'. Default 'end'
+    icon_style (string, optional) 'default' | 'solid'. Solid puts the icon in a
+                                  filled circular badge. Default 'default'
+    icon_size (number, optional)  Glyph size in px. The solid badge is derived
+                                  from it, so both scale together
+    icon_radius (number, optional) Badge corner radius as a percentage. 50 is a
+                                  circle; 0 is a square
+    border_style (string, optional) 'solid' | 'dashed' | 'dotted'
+    underline_size (number, optional) Link variant only. Underline thickness in px
+    width     (string, optional)  'auto' | 'min' | 'full'. Default 'min'. Auto
+                                  hugs the label; min holds a comfortable
+                                  minimum; full fills the container
+    min_width (number, optional)  Pixels, used when width is 'min'. Default 196
     icon_only (boolean, optional) Hides the label visually. `label` becomes the aria-label
+    effect    (string, optional)  'auto' | 'swap' | 'sweep' | 'none'. Default 'auto'
+    colors    (string, optional)  Extra custom properties for variant 'custom'
     class     (string, optional)
     id        (string, optional)
     aria_label (string, optional) Overrides the accessible name
@@ -38,19 +99,139 @@
        label: 'general.actions.view_all' | t,
        href: collection.url,
        variant: 'secondary',
-       icon: 'arrow-right' %}
+       icon: 'arrow-right',
+       icon_style: 'solid' %}
 {% enddoc %}
 
 {%- liquid
   assign resolved_variant = variant | default: 'primary'
   assign resolved_size = size | default: 'medium'
+  comment
+    `button--custom` is the custom *colour* variant. A caller asking for the
+    custom *height* used to get that same class, so a button set to a custom
+    size silently lost its background — two independent choices sharing one
+    name, with whichever rule came second winning. The size class is
+    `button--custom-size`; callers may pass either spelling.
+  endcomment
+  if resolved_size == 'custom'
+    assign resolved_size = 'custom-size'
+  endif
   assign resolved_icon_position = icon_position | default: 'end'
+  assign resolved_icon_style = icon_style | default: 'default'
   assign resolved_type = type | default: 'button'
   assign accessible_name = aria_label | default: label
 
+  assign has_icon = false
+  if icon != blank and icon != 'none'
+    assign has_icon = true
+  endif
+
+  comment
+    An icon style is a fact about an icon, so with no icon there is no style —
+    and claiming one is not harmless. `button--icon-solid` is what tells the
+    stylesheet to draw a badge, and a button with no icon that still claimed it
+    would be styling a circle around nothing.
+
+    The stylesheet cannot defend against this, because from its side the claim
+    looks true. So it is settled here, once, where the answer is known.
+  endcomment
+  unless has_icon
+    assign resolved_icon_style = 'default'
+  endunless
+
+  comment
+    An icon-only button is already the badge: it is a circle the size of the
+    button with a glyph in the middle. Claiming `solid` on top asks for a second
+    badge inside the first, and the two rule sets then argue over the glyph's
+    background, radius and colour — which came out as a square badge floating in
+    a round button, and on the filled variants as a glyph painted in the colour
+    behind it.
+
+    Settled here for the same reason as above: the stylesheet cannot tell that
+    the claim is redundant, but this can.
+  endcomment
+  if icon_only
+    assign resolved_icon_style = 'default'
+  endif
+
+  comment
+    The swap works with a solid badge, a plain glyph and no icon at all — the
+    track is the same in every case, and only what is in the window differs.
+    It used to be gated on a solid icon and silently downgraded to the sweep
+    otherwise, so choosing "Swap" with a plain arrow appeared to do nothing.
+
+    Auto still prefers the swap wherever there is an icon to trade places with,
+    and falls to the sweep for a bare label — a label that slides out and back
+    with no colour change reads as a glitch rather than a response.
+  endcomment
+  assign resolved_effect = effect | default: 'auto'
+  if resolved_effect == 'auto'
+    if has_icon
+      assign resolved_effect = 'swap'
+    else
+      assign resolved_effect = 'sweep'
+    endif
+  endif
+
+  comment
+    "The icon does not change position" and "the icon does not move" are two
+    different requirements, and conflating them is what made this wrong twice.
+
+    A plain glyph keeps its SIDE. It is punctuation on the end of the phrase, so
+    pulling it round to the other side breaks the phrase apart — only a solid
+    badge is a shape in its own right that can trade places with the label.
+
+    But it still travels. The whole group slides out and its copy slides in,
+    icon and words together in the arrangement they started in, so the button
+    reads as one thing moving rather than as its parts rearranging.
+
+    The distance is chosen in `assets/base.css` off the classes already on the
+    button: a button with an icon stops one icon-box short of a whole group, so
+    the icon lands where the label began; a button with nothing to trade with —
+    no icon, or icon-only — travels a whole group.
+  endcomment
+
+  comment
+    The link variant rides the same track as everything else. It used to be
+    forced to the sweep and animate its underline instead, which meant the one
+    variant merchants reach for most often was the only one that behaved
+    differently — and a rule sweeping one way while the words slid the other was
+    two animations arguing.
+
+    Its underline now holds still and the text slides under it, so a link reads
+    as the same gesture as a button, at the scale of a run of text.
+  endcomment
+
   assign classes = 'button button--' | append: resolved_variant | append: ' button--' | append: resolved_size
+  comment
+    Neither effect gets a class. The sweep is what a button does by default, so
+    it needs no marker; the swap is scoped off the `<button-swap>` wrapper that
+    has to exist for it anyway. A class alongside either was a second way of
+    saying something the markup already said — and when `button--fx-swap` was
+    dropped, every rule still naming it went dead in silence, which is how
+    outline icons ended up painted in `transparent`.
+
+    Only "no effect at all" needs stating, and it gets an attribute rather than
+    a class: it is a rare exception, not a mode the stylesheet organises around.
+  endcomment
+
+  if has_icon
+    assign classes = classes | append: ' button--has-icon button--icon-' | append: resolved_icon_position
+    if resolved_icon_style == 'solid'
+      assign classes = classes | append: ' button--icon-solid'
+    endif
+  endif
+
+  comment
+    Width is a placement decision, not a style one, so it is its own setting
+    rather than something inferred from the variant. `full` is kept as a
+    separate boolean because thirteen existing callers already pass it.
+  endcomment
+  assign resolved_width = width | default: 'min'
   if full
     assign classes = classes | append: ' button--full'
+  else
+    assign classes = classes | append: ' button--width-' | append: resolved_width
   endif
   if icon_only
     assign classes = classes | append: ' button--icon-only'
@@ -68,62 +249,182 @@
     focus and the responsive rules keep working. Nothing is emitted for the
     other sizes, which keeps the markup clean on the common path.
   endcomment
-  assign size_style = ''
-  if resolved_size == 'custom' and custom_height != blank
-    assign size_style = '--button-custom-height:' | append: custom_height | append: 'px;'
+  assign inline_style = ''
+  comment
+    The block sends `custom-size` because `button--custom` already means the
+    custom *colour* variant, and one class name for two independent choices
+    meant whichever came second silently won. Both spellings are accepted so a
+    direct caller passing `custom` still gets its height.
+  endcomment
+  if resolved_size == 'custom-size'
+    if custom_height != blank
+      assign inline_style = inline_style | append: '--button-custom-height:' | append: custom_height | append: 'px;'
+    endif
+  endif
+  if icon_size != blank
+    assign inline_style = inline_style | append: '--button-icon-size:' | append: icon_size | append: 'px;'
+  endif
+  comment
+    The badge is derived from the glyph size, so a merchant turning the icon
+    down gets a smaller circle rather than a small arrow rattling around inside
+    an unchanged one. Only the radius needs stating.
+  endcomment
+  if icon_radius != blank
+    assign inline_style = inline_style | append: '--button-icon-radius:' | append: icon_radius | append: '%;'
+  endif
+  if border_style != blank and border_style != 'default'
+    assign inline_style = inline_style | append: '--button-border-style:' | append: border_style | append: ';'
+  endif
+  comment
+    The link variant has no border, so Border thickness would otherwise be a
+    dead control on it. It drives the underline instead, which is the only rule
+    that variant draws.
+  endcomment
+  if min_width != blank and resolved_width == 'min'
+    assign inline_style = inline_style | append: '--button-min-width:' | append: min_width | append: 'px;'
+  endif
+  if resolved_variant == 'link' and underline_size != blank
+    assign inline_style = inline_style | append: '--button-underline-size:' | append: underline_size | append: 'px;'
+  endif
+  if colors != blank
+    assign inline_style = inline_style | append: colors
   endif
 -%}
 
 {%- capture button_content -%}
-  {%- if icon != blank and resolved_icon_position == 'start' -%}
-    {% render 'icon', icon: icon, class: 'button__icon button__icon--start' %}
-  {%- endif -%}
+  {%- comment -%}
+    One wrapper around both, always — including when there is no icon. The swap
+    clones this element, and a structure that changes shape depending on whether
+    an icon happens to be present is a structure the stylesheet has to guess at.
+  {%- endcomment -%}
+  <span class="button-text">
+    {%- if has_icon and resolved_icon_position == 'start' -%}
+      <span class="button__icon button__icon--start">
+        {% render 'icon', icon: icon %}
+      </span>
+    {%- endif -%}
 
-  <span class="button__label{% if icon_only %} visually-hidden{% endif %}">{{ label }}</span>
+    <span class="button__label{% if icon_only %} visually-hidden{% endif %}">{{ label }}</span>
 
-  {%- if icon != blank and resolved_icon_position == 'end' -%}
-    {% render 'icon', icon: icon, class: 'button__icon button__icon--end' %}
-  {%- endif -%}
+    {%- if has_icon and resolved_icon_position == 'end' -%}
+      <span class="button__icon button__icon--end">
+        {% render 'icon', icon: icon %}
+      </span>
+    {%- endif -%}
+  </span>
 
   {%- if loading -%}
     {%- comment -%}
-      The spinner is decorative. The state is announced by aria-busy on the
-      control itself, so a screen reader is told the button is working rather
-      than being read a spinning graphic.
+      The spinner is decorative and sits outside `.button-text`, so a cloned
+      track never carries two of them. The state is announced by aria-busy on
+      the control itself, so a screen reader is told the button is working
+      rather than being read a spinning graphic.
     {%- endcomment -%}
     <span class="button__spinner" aria-hidden="true"></span>
   {%- endif -%}
 {%- endcapture -%}
 
-{%- if href != blank -%}
-  <a
-    {% if id != blank %}id="{{ id }}"{% endif %}
-    class="{{ classes }}"
-    {% if size_style != blank %}style="{{ size_style }}"{% endif %}
-    href="{{ href }}"
-    {% if icon_only %}aria-label="{{ accessible_name | escape }}"{% endif %}
-    {% if new_tab %}target="_blank" rel="noopener"{% endif %}
-    {% if disabled %}aria-disabled="true" tabindex="-1"{% endif %}
-    {{ attributes }}
-  >
-    {{ button_content }}
-    {%- if new_tab -%}
-      <span class="visually-hidden">{{ 'accessibility.new_window' | t }}</span>
-    {%- endif -%}
-  </a>
+{%- liquid
+  comment
+    Which element gets rendered is its own decision, made once, here.
+
+    It used to be inferred from whether `href` was present, which quietly tied
+    two unrelated things together: a caller who had no URL yet got a `<button>`
+    they did not ask for, and a caller who wanted a real `<button>` had to make
+    sure they passed no URL. `tag` states it instead, and `auto` keeps the old
+    convenience for the callers that are happy with it.
+
+    The one combination that is never rendered is an `<a>` with no `href`. That
+    is not a link and not a button: it is invisible to the keyboard, has no
+    role, and does nothing when activated. Asking for it gets a `<button>`,
+    because a control the keyboard cannot reach is the failure this snippet
+    exists to prevent.
+  endcomment
+  assign resolved_tag = tag | default: 'auto'
+  if resolved_tag == 'auto'
+    if href != blank
+      assign resolved_tag = 'a'
+    else
+      assign resolved_tag = 'button'
+    endif
+  endif
+  if resolved_tag == 'a' and href == blank
+    assign resolved_tag = 'button'
+  endif
+-%}
+
+{%- capture button_markup -%}
+  {%- if resolved_tag == 'a' -%}
+    {%- comment -%}
+      A disabled link keeps its place in the tab order. `tabindex="-1"` was
+      taking it out, which is the standard way to make a control impossible to
+      find with a keyboard: it vanishes from the sequence with nothing
+      announcing why, and a customer tabbing through the page simply never
+      reaches it. `aria-disabled` announces the state and leaves it reachable;
+      the stylesheet blocks the pointer, and pointer-events does not affect
+      keyboard focus.
+    {%- endcomment -%}
+    <a
+      {% if id != blank %}id="{{ id }}"{% endif %}
+      class="{{ classes }}"
+      {% if inline_style != blank %}style="{{ inline_style }}"{% endif %}
+      href="{{ href }}"
+      {% if icon_only %}aria-label="{{ accessible_name | escape }}"{% endif %}
+      {% if new_tab %}target="_blank" rel="noopener"{% endif %}
+      {% if disabled %}aria-disabled="true"{% endif %}
+      {% if resolved_effect == 'none' %}data-fx="none"{% endif %}
+      {{ attributes }}
+    >
+      {{ button_content }}
+      {%- if new_tab -%}
+        <span class="visually-hidden">{{ 'accessibility.new_window' | t }}</span>
+      {%- endif -%}
+    </a>
+  {%- else -%}
+    {%- comment -%}
+      `disabled` rather than `aria-disabled` here, because a native disabled
+      button is already handled correctly by every browser and assistive
+      technology — it is skipped, announced, and cannot be submitted.
+
+      An `href` on a `<button>` is not a mistake worth silently dropping: it
+      usually means the caller wanted a link. It becomes a `data-href` so an
+      app or a listener can still find it, rather than being lost.
+    {%- endcomment -%}
+    <button
+      {% if id != blank %}id="{{ id }}"{% endif %}
+      class="{{ classes }}"
+      {% if inline_style != blank %}style="{{ inline_style }}"{% endif %}
+      type="{{ resolved_type }}"
+      {% if name != blank %}name="{{ name }}"{% endif %}
+      {% if value != blank %}value="{{ value | escape }}"{% endif %}
+      {% if href != blank %}data-href="{{ href }}"{% endif %}
+      {% if icon_only %}aria-label="{{ accessible_name | escape }}"{% endif %}
+      {% if disabled %}disabled{% endif %}
+      {% if loading %}aria-busy="true"{% endif %}
+      {% if resolved_effect == 'none' %}data-fx="none"{% endif %}
+      {{ attributes }}
+    >
+      {{ button_content }}
+    </button>
+  {%- endif -%}
+{%- endcapture -%}
+
+{%- comment -%}
+  The custom element wraps rather than replaces. Everything inside is a working
+  button before the script runs and stays one if it never does — the element
+  only measures the track and injects the clone. Buttons that do not swap are
+  not wrapped at all, so no page pays for a component it does not use.
+{%- endcomment -%}
+{%- if resolved_effect == 'swap' -%}
+  {%- comment -%}
+    The wrapper carries no icon information any more. It used to repeat position,
+    style and icon-only as data attributes, and the stylesheet read those instead
+    of the classes already on the button — three restatements of three facts, and
+    three chances to disagree. They did: a button with no icon still announced
+    `data-icon-style="solid"` and took a travel meant for a badge it did not
+    have, which is what put the label off-centre.
+  {%- endcomment -%}
+  <button-swap class="button-swap"{% if full %} data-full{% endif %}>{{ button_markup }}</button-swap>
 {%- else -%}
-  <button
-    {% if id != blank %}id="{{ id }}"{% endif %}
-    class="{{ classes }}"
-    {% if size_style != blank %}style="{{ size_style }}"{% endif %}
-    type="{{ resolved_type }}"
-    {% if name != blank %}name="{{ name }}"{% endif %}
-    {% if value != blank %}value="{{ value | escape }}"{% endif %}
-    {% if icon_only %}aria-label="{{ accessible_name | escape }}"{% endif %}
-    {% if disabled %}disabled{% endif %}
-    {% if loading %}aria-busy="true"{% endif %}
-    {{ attributes }}
-  >
-    {{ button_content }}
-  </button>
+  {{ button_markup }}
 {%- endif -%}
