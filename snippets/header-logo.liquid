@@ -1,38 +1,79 @@
 {% doc %}
-  Renders the shop logo or name.
+  The shop logo, in up to two versions.
 
-  On the home page the logo is wrapped in an `<h1>`, and everywhere else in a
-  plain `<div>`. A site-wide logo marked up as the page's only level-one heading
-  makes every page announce itself as the shop name rather than as its own
-  content.
+  ## Why both logos are always in the DOM
+
+  A transparent header over a dark hero usually needs a light logo, and the same
+  header turns solid the moment the page scrolls. Swapping the `src` at that
+  point costs a network request at exactly the moment the customer is looking at
+  it, and the header visibly flashes empty while the second file downloads.
+
+  Both images are rendered instead, stacked on each other, and only opacity
+  changes. Two files download once, on first paint, and the swap after that is
+  free. The stack is also why the header never changes height mid-scroll: the
+  inverse logo is absolutely positioned, so it contributes nothing to layout.
+
+  When no inverse logo is set the wrapper does not get `--has-inverse`, the
+  stack collapses to a single image, and nothing is downloaded twice.
+
+  ## The heading is only a heading on the home page
+
+  A site-wide logo marked up as every page's only `<h1>` makes each page
+  announce itself as the shop name rather than as its own content.
 
   Parameters:
-    section (object, required)
+    inverse (boolean, optional) The template is using the inverse logo
 
   @example
-    {% render 'header-logo', section: section %}
+    {% render 'header-logo', inverse: true %}
 {% enddoc %}
 
+{%- liquid
+  assign st = section.settings
+  assign has_inverse = false
+  if st.logo_inverse != blank
+    assign has_inverse = true
+  endif
+-%}
+
 {%- capture logo_content -%}
-  <a class="header__logo-link" href="{{ routes.root_url }}">
-    {%- if section.settings.logo != blank -%}
+  <a class="site-header__logo-link" href="{{ routes.root_url }}">
+    {%- if st.logo != blank -%}
       {% render 'image',
-         image: section.settings.logo,
-         alt: shop.name,
-         ratio: 'adapt',
-         priority: true,
-         sizes: section.settings.logo_width | append: 'px',
-         wrapper_class: 'header__logo-image',
-         class: 'header__logo-img' %}
+        image: st.logo,
+        alt: shop.name,
+        ratio: 'adapt',
+        priority: true,
+        widths: '120,160,240,320,480,640',
+        sizes: st.logo_width | append: 'px',
+        wrapper_class: 'site-header__logo-image site-header__logo-image--solid',
+        class: 'site-header__logo-img'
+      %}
+
+      {%- if has_inverse -%}
+        {% render 'image',
+          image: st.logo_inverse,
+          alt: '',
+          ratio: 'adapt',
+          priority: true,
+          widths: '120,160,240,320,480,640',
+          sizes: st.logo_width | append: 'px',
+          wrapper_class: 'site-header__logo-image site-header__logo-image--inverse',
+          class: 'site-header__logo-img'
+        %}
+      {%- endif -%}
     {%- else -%}
-      <span class="header__logo-text">{{ shop.name }}</span>
+      <span class="site-header__logo-text">{{ shop.name }}</span>
     {%- endif -%}
   </a>
 {%- endcapture -%}
 
-<div class="header__logo" style="--logo-width: {{ section.settings.logo_width }}px;">
+<div
+  class="site-header__logo{% if has_inverse %} site-header__logo--has-inverse{% endif %}{% if inverse %} site-header__logo--prefers-inverse{% endif %}"
+  style="--logo-width: {{ st.logo_width }}px; --logo-width-mobile: {{ st.logo_width_mobile }}px;"
+>
   {%- if request.page_type == 'index' -%}
-    <h1 class="header__logo-heading">{{ logo_content }}</h1>
+    <h1 class="site-header__logo-heading">{{ logo_content }}</h1>
   {%- else -%}
     {{ logo_content }}
   {%- endif -%}

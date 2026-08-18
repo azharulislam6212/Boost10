@@ -1,0 +1,63 @@
+{% doc %}
+  The dropdown built automatically from a menu item's own children.
+
+  ## `<summary>` is the first child, and that is not a style choice
+
+  HTML requires the `<summary>` to be the first child of its `<details>`. Put
+  anything before it — a wrapper holding a link and a toggle, say — and the
+  browser generates its own summary instead, which renders as a disclosure
+  triangle followed by the word "Details" in the middle of the menu. It is not a
+  CSS problem and no amount of `list-style: none` removes it.
+
+  So the earlier arrangement, a heading link beside a chevron button, cannot
+  work. The disclosure is one control, and the parent's own page is reached
+  through a "View all" link at the top of the panel it opens. One target per
+  control, and the parent collection is still one click away.
+
+  ## Two levels
+
+  Shopify menus are three deep; a top-level item's children are the list and its
+  grandchildren fly out to the side. A submenu that grew the parent list
+  downwards would move the link the customer was aiming at.
+
+  Parameters:
+    link (link, required)  A top-level link from the header menu
+
+  @example
+    {% render 'nav-dropdown', link: link %}
+{% enddoc %}
+
+<ul class="dropdown" role="list">
+  {%- for child in link.links -%}
+    <li class="dropdown__item">
+      {%- if child.links.size > 0 -%}
+        <details class="dropdown__details" data-nav-details data-kind="sub">
+          <summary class="dropdown__link dropdown__link--parent" data-nav-summary aria-expanded="false">
+            <span>{{ child.title }}</span>
+            {% render 'icon', icon: 'chevron-right', size: 12, class: 'dropdown__chevron' %}
+          </summary>
+
+          <div class="nav__panel nav__panel--sub" data-nav-panel>
+            <div class="nav__panel-inner">
+              <ul class="dropdown dropdown--sub" role="list">
+                <li class="dropdown__item">
+                  <a class="dropdown__link dropdown__link--all" href="{{ child.url }}">
+                    {{ 'sections.header.view_all' | t: title: child.title }}
+                  </a>
+                </li>
+
+                {%- for grandchild in child.links -%}
+                  <li class="dropdown__item">
+                    <a class="dropdown__link" href="{{ grandchild.url }}">{{ grandchild.title }}</a>
+                  </li>
+                {%- endfor -%}
+              </ul>
+            </div>
+          </div>
+        </details>
+      {%- else -%}
+        <a class="dropdown__link" href="{{ child.url }}">{{ child.title }}</a>
+      {%- endif -%}
+    </li>
+  {%- endfor -%}
+</ul>

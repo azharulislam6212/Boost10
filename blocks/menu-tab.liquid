@@ -1,0 +1,659 @@
+{% comment %}
+  blocks/menu-tab.liquid — Boost10
+
+  One category in a `menu-tabs` rail, and whatever it shows on the right.
+
+  ## Two kinds of content from one block
+
+  **Promotions** — three authored cards. Editorial: the merchant writes the
+  headline and picks the photograph.
+
+  **Products** — cards from a collection, rendered through `snippets/product-card`.
+  Live: price, badges, swatches and availability all come from the product and
+  stay correct without anyone editing the menu.
+
+  One block rather than two because the merchant's question is "what does this
+  category show", not "which block type do I need". The two modes share the
+  category name, the column count and the tab button; only the content differs,
+  and the unused settings are the price of not making someone delete a block to
+  change their mind.
+
+  ## The product cards are the theme's own
+
+  `product-card` already handles the image swap, the swatches, the quick add and
+  the badges, all driven by the same theme settings the collection grid uses. A
+  card built here would be a second implementation that drifts from the first
+  the week either one changes.
+
+  ## Grid or carousel
+
+  Five products in a four-column panel either wrap to a second row that pushes
+  the panel past the fold, or scroll. `layout` on the parent `menu-tabs` block
+  decides which, and the carousel is the theme's own `carousel-shell`.
+
+  ## The tab button is not here
+
+  `<tab-group>` builds it from `data-tab-label` below. The button and the panel
+  belong in two different containers and `{% content_for 'blocks' %}` emits one
+  stream, so the label travels on the panel and the rail is assembled from it.
+{% endcomment %}
+
+{%- liquid
+  assign st = block.settings
+  assign panel_id = 'MegaTab-' | append: block.id
+  assign columns = st.columns | default: 3
+
+  assign products = st.collection.products
+  assign product_limit = st.products_count | default: 4
+-%}
+
+<div
+  class="tabs__panel"
+  role="tabpanel"
+  id="{{ panel_id }}"
+  data-tab-label="{{ st.title | escape }}"
+  tabindex="0"
+  style="--tab-columns: {{ columns }};"
+  {{ block.shopify_attributes }}
+>
+  {%- if st.content == 'products' -%}
+    {%- if st.collection != blank and products.size > 0 -%}
+      {%- capture product_items -%}
+        {%- for product in products limit: product_limit -%}
+          <li class="carousel-shell__item">
+            {% render 'product-card',
+              product: product,
+              index: forloop.index0,
+              sizes: '(min-width: 990px) 22vw, 60vw'
+            %}
+          </li>
+        {%- endfor -%}
+      {%- endcapture -%}
+
+      {%- if st.layout == 'carousel' -%}
+        {% render 'carousel-shell',
+          id: panel_id | append: '-carousel',
+          children: product_items,
+          layout: 'carousel',
+          layout_mobile: 'carousel',
+          tag: 'ul',
+          label: st.title,
+          columns_desktop: columns,
+          columns_tablet: 2,
+          columns_mobile: 1,
+          count: products.size,
+          settings: st
+        %}
+      {%- else -%}
+        <ul class="megamenu__products" role="list">
+          {%- for product in products limit: product_limit -%}
+            <li>
+              {% render 'product-card',
+                product: product,
+                index: forloop.index0,
+                sizes: '(min-width: 990px) 22vw, 60vw'
+              %}
+            </li>
+          {%- endfor -%}
+        </ul>
+      {%- endif -%}
+    {%- else -%}
+      {%- comment -%}
+        An empty state a merchant can act on, rather than a panel that opens
+        onto nothing and reads as a broken menu.
+      {%- endcomment -%}
+      <p class="megamenu__empty">{{ 'blocks.mega_menu.empty_collection' | t }}</p>
+    {%- endif -%}
+  {%- else -%}
+    {%- comment -%}
+      Eight slots, and the empty ones are skipped. A category with four cards
+      and one with eight are the same block; the merchant fills what they need.
+
+      The carousel shows `columns` at a time, so eight cards at four columns is
+      two pages — which is the layout that was asked for and the reason the fixed
+      three-card grid had to go.
+    {%- endcomment -%}
+    {%- capture promo_items -%}
+      {%- for index in (1..8) -%}
+        {%- liquid
+          assign image_key = 'image_' | append: index
+          assign heading_key = 'heading_' | append: index
+          assign label_key = 'link_label_' | append: index
+          assign link_key = 'link_' | append: index
+
+          assign card_image = st[image_key]
+          assign card_heading = st[heading_key]
+          assign card_label = st[label_key]
+          assign card_link = st[link_key]
+
+          assign is_empty = false
+          if card_image == blank and card_heading == blank
+            assign is_empty = true
+          endif
+        -%}
+
+        {%- unless is_empty -%}
+          <div class="carousel-shell__item">
+          {%- if card_link != blank -%}
+            <a class="menu-promo menu-promo--{{ st.text_position }}" href="{{ card_link }}" style="--promo-radius: 16px;">
+          {%- else -%}
+            <div class="menu-promo menu-promo--{{ st.text_position }}" style="--promo-radius: 16px;">
+          {%- endif -%}
+
+            <span class="menu-promo__media">
+              {%- if card_image != blank -%}
+                {% render 'image',
+                  image: card_image,
+                  alt: card_heading,
+                  ratio: st.image_ratio,
+                  sizes: '(min-width: 990px) 30vw, 80vw',
+                  wrapper_class: 'menu-promo__image',
+                  class: 'menu-promo__img'
+                %}
+              {%- else -%}
+                <span class="menu-promo__image menu-promo__image--placeholder">
+                  {{ 'product-' | append: index | placeholder_svg_tag: 'placeholder-svg' }}
+                </span>
+              {%- endif -%}
+
+              {%- if st.text_position == 'over' -%}
+                <span class="menu-promo__panel">
+                  {%- if card_heading != blank -%}
+                    <span class="menu-promo__heading">{{ card_heading | escape }}</span>
+                  {%- endif -%}
+                  {%- if card_label != blank -%}
+                    <span class="menu-promo__cta">
+                      <span>{{ card_label | escape }}</span>
+                      {% render 'icon', icon: 'arrow-right', size: 16 %}
+                    </span>
+                  {%- endif -%}
+                </span>
+              {%- endif -%}
+            </span>
+
+            {%- if st.text_position != 'over' -%}
+              <span class="menu-promo__content">
+                {%- if card_heading != blank -%}
+                  <span class="menu-promo__heading">{{ card_heading | escape }}</span>
+                {%- endif -%}
+                {%- if card_label != blank -%}
+                  <span class="menu-promo__cta">
+                    <span>{{ card_label | escape }}</span>
+                    {% render 'icon', icon: 'arrow-right', size: 16 %}
+                  </span>
+                {%- endif -%}
+              </span>
+            {%- endif -%}
+
+          {%- if card_link != blank -%}</a>{%- else -%}</div>{%- endif -%}
+          </div>
+        {%- endunless -%}
+      {%- endfor -%}
+    {%- endcapture -%}
+
+    {%- if st.layout == 'carousel' -%}
+      {% render 'carousel-shell',
+        id: panel_id | append: '-promos',
+        children: promo_items,
+        layout: 'carousel',
+        layout_mobile: 'carousel',
+        label: st.title,
+        columns_desktop: columns,
+        columns_tablet: 2,
+        columns_mobile: 1,
+        settings: st
+      %}
+    {%- else -%}
+      <div class="tabs__panel-grid">{{ promo_items }}</div>
+    {%- endif -%}
+  {%- endif -%}
+</div>
+
+{% schema %}
+{
+  "name": "t:blocks.menu_tab.name",
+  "tag": null,
+  "settings": [
+    {
+      "type": "text",
+      "id": "title",
+      "label": "t:blocks.menu_tab.settings.title.label",
+      "default": "Vitamins & Capsules"
+    },
+    {
+      "type": "select",
+      "id": "content",
+      "label": "t:blocks.menu_tab.settings.content.label",
+      "info": "t:blocks.menu_tab.settings.content.info",
+      "options": [
+        {
+          "value": "promotions",
+          "label": "t:blocks.menu_tab.settings.content.options__1.label"
+        },
+        {
+          "value": "products",
+          "label": "t:blocks.menu_tab.settings.content.options__2.label"
+        }
+      ],
+      "default": "promotions"
+    },
+    {
+      "type": "range",
+      "id": "columns",
+      "label": "t:shared.columns.desktop.label",
+      "min": 2,
+      "max": 5,
+      "step": 1,
+      "default": 3
+    },
+    {
+      "type": "select",
+      "id": "image_ratio",
+      "label": "t:shared.image_ratio.label",
+      "options": [
+        {
+          "value": "square",
+          "label": "t:shared.image_ratio.options__1.label"
+        },
+        {
+          "value": "portrait",
+          "label": "t:shared.image_ratio.options__2.label"
+        },
+        {
+          "value": "landscape",
+          "label": "t:shared.image_ratio.options__3.label"
+        }
+      ],
+      "default": "square"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.menu_tab.headers.products"
+    },
+    {
+      "type": "collection",
+      "id": "collection",
+      "label": "t:blocks.menu_tab.settings.collection.label"
+    },
+    {
+      "type": "range",
+      "id": "products_count",
+      "label": "t:blocks.menu_tab.settings.products_count.label",
+      "min": 2,
+      "max": 12,
+      "step": 1,
+      "default": 4
+    },
+    {
+      "type": "select",
+      "id": "layout",
+      "label": "t:shared.layout.label",
+      "options": [
+        {
+          "value": "grid",
+          "label": "t:blocks.menu_tab.settings.layout.options__1.label"
+        },
+        {
+          "value": "carousel",
+          "label": "t:blocks.menu_tab.settings.layout.options__2.label"
+        }
+      ],
+      "default": "carousel"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.menu_tab.headers.carousel_motion",
+      "visible_if": "{{ block.settings.layout == 'carousel' }}"
+    },
+    {
+      "type": "range",
+      "id": "carousel_speed",
+      "label": "t:shared.carousel.speed.label",
+      "info": "t:shared.carousel.speed.info",
+      "min": 100,
+      "max": 1500,
+      "step": 50,
+      "unit": "ms",
+      "default": 500,
+      "visible_if": "{{ block.settings.layout == 'carousel' }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "carousel_loop",
+      "label": "t:shared.carousel.loop.label",
+      "default": false,
+      "visible_if": "{{ block.settings.layout == 'carousel' }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "carousel_autoplay",
+      "label": "t:shared.carousel.autoplay.label",
+      "default": false,
+      "visible_if": "{{ block.settings.layout == 'carousel' }}"
+    },
+    {
+      "type": "range",
+      "id": "carousel_autoplay_delay",
+      "label": "t:shared.carousel.autoplay_delay.label",
+      "min": 2,
+      "max": 15,
+      "step": 1,
+      "unit": "s",
+      "default": 5,
+      "visible_if": "{{ block.settings.layout == 'carousel' and block.settings.carousel_autoplay }}"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.menu_tab.headers.carousel_arrows",
+      "visible_if": "{{ block.settings.layout == 'carousel' }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "carousel_navigation",
+      "label": "t:shared.carousel.navigation.label",
+      "default": true,
+      "visible_if": "{{ block.settings.layout == 'carousel' }}"
+    },
+    {
+      "type": "select",
+      "id": "carousel_nav_icon",
+      "label": "t:shared.carousel.nav_icon.label",
+      "options": [
+        {
+          "value": "chevron",
+          "label": "t:shared.carousel.nav_icon.options__1.label"
+        },
+        {
+          "value": "arrow",
+          "label": "t:shared.carousel.nav_icon.options__2.label"
+        },
+        {
+          "value": "play",
+          "label": "t:shared.carousel.nav_icon.options__3.label"
+        },
+        {
+          "value": "external",
+          "label": "t:shared.carousel.nav_icon.options__4.label"
+        }
+      ],
+      "default": "chevron",
+      "visible_if": "{{ block.settings.layout == 'carousel' and block.settings.carousel_navigation }}"
+    },
+    {
+      "type": "select",
+      "id": "carousel_controls_style",
+      "label": "t:shared.carousel.controls_style.label",
+      "info": "t:shared.carousel.controls_style.info",
+      "options": [
+        {
+          "value": "split",
+          "label": "t:shared.carousel.controls_style.options__1.label"
+        },
+        {
+          "value": "ghost",
+          "label": "t:shared.carousel.controls_style.options__2.label"
+        },
+        {
+          "value": "solid",
+          "label": "t:shared.carousel.controls_style.options__3.label"
+        }
+      ],
+      "default": "split",
+      "visible_if": "{{ block.settings.layout == 'carousel' and block.settings.carousel_navigation }}"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.menu_tab.headers.carousel_pagination",
+      "visible_if": "{{ block.settings.layout == 'carousel' }}"
+    },
+    {
+      "type": "select",
+      "id": "carousel_pagination",
+      "label": "t:shared.carousel.pagination.label",
+      "info": "t:shared.carousel.pagination.info",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.carousel.pagination.options__1.label"
+        },
+        {
+          "value": "dots",
+          "label": "t:shared.carousel.pagination.options__2.label"
+        },
+        {
+          "value": "numbers",
+          "label": "t:shared.carousel.pagination.options__3.label"
+        },
+        {
+          "value": "progress",
+          "label": "t:shared.carousel.pagination.options__4.label"
+        },
+        {
+          "value": "controls",
+          "label": "t:shared.carousel.pagination.options__5.label"
+        }
+      ],
+      "default": "none",
+      "visible_if": "{{ block.settings.layout == 'carousel' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.menu_tab.headers.promotions"
+    },
+    {
+      "type": "select",
+      "id": "text_position",
+      "label": "t:blocks.menu_promo.settings.text_position.label",
+      "options": [
+        {
+          "value": "over",
+          "label": "t:blocks.menu_promo.settings.text_position.options__2.label"
+        },
+        {
+          "value": "below",
+          "label": "t:blocks.menu_promo.settings.text_position.options__1.label"
+        }
+      ],
+      "default": "below"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.menu_tab.headers.card_1"
+    },
+    {
+      "type": "image_picker",
+      "id": "image_1",
+      "label": "t:shared.image.label"
+    },
+    {
+      "type": "text",
+      "id": "heading_1",
+      "label": "t:shared.heading.label",
+      "default": "Micronutrients for Peak Daily Vitality"
+    },
+    {
+      "type": "text",
+      "id": "link_label_1",
+      "label": "t:blocks.menu_promo.settings.link_label.label",
+      "default": "Shop Vitamin"
+    },
+    {
+      "type": "url",
+      "id": "link_1",
+      "label": "t:shared.link.label"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.menu_tab.headers.card_2"
+    },
+    {
+      "type": "image_picker",
+      "id": "image_2",
+      "label": "t:shared.image.label"
+    },
+    {
+      "type": "text",
+      "id": "heading_2",
+      "label": "t:shared.heading.label",
+      "default": "Fuel Your Body from the Cell Up"
+    },
+    {
+      "type": "text",
+      "id": "link_label_2",
+      "label": "t:blocks.menu_promo.settings.link_label.label",
+      "default": "Shop Vitamin"
+    },
+    {
+      "type": "url",
+      "id": "link_2",
+      "label": "t:shared.link.label"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.menu_tab.headers.card_3"
+    },
+    {
+      "type": "image_picker",
+      "id": "image_3",
+      "label": "t:shared.image.label"
+    },
+    {
+      "type": "text",
+      "id": "heading_3",
+      "label": "t:shared.heading.label",
+      "default": "Target Your Health Goals with Precision"
+    },
+    {
+      "type": "text",
+      "id": "link_label_3",
+      "label": "t:blocks.menu_promo.settings.link_label.label",
+      "default": "Shop Vitamin"
+    },
+    {
+      "type": "url",
+      "id": "link_3",
+      "label": "t:shared.link.label"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.menu_tab.headers.card_4"
+    },
+    {
+      "type": "image_picker",
+      "id": "image_4",
+      "label": "t:shared.image.label"
+    },
+    {
+      "type": "text",
+      "id": "heading_4",
+      "label": "t:shared.heading.label"
+    },
+    {
+      "type": "text",
+      "id": "link_label_4",
+      "label": "t:blocks.menu_promo.settings.link_label.label"
+    },
+    {
+      "type": "url",
+      "id": "link_4",
+      "label": "t:shared.link.label"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.menu_tab.headers.card_5"
+    },
+    {
+      "type": "image_picker",
+      "id": "image_5",
+      "label": "t:shared.image.label"
+    },
+    {
+      "type": "text",
+      "id": "heading_5",
+      "label": "t:shared.heading.label"
+    },
+    {
+      "type": "text",
+      "id": "link_label_5",
+      "label": "t:blocks.menu_promo.settings.link_label.label"
+    },
+    {
+      "type": "url",
+      "id": "link_5",
+      "label": "t:shared.link.label"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.menu_tab.headers.card_6"
+    },
+    {
+      "type": "image_picker",
+      "id": "image_6",
+      "label": "t:shared.image.label"
+    },
+    {
+      "type": "text",
+      "id": "heading_6",
+      "label": "t:shared.heading.label"
+    },
+    {
+      "type": "text",
+      "id": "link_label_6",
+      "label": "t:blocks.menu_promo.settings.link_label.label"
+    },
+    {
+      "type": "url",
+      "id": "link_6",
+      "label": "t:shared.link.label"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.menu_tab.headers.card_7"
+    },
+    {
+      "type": "image_picker",
+      "id": "image_7",
+      "label": "t:shared.image.label"
+    },
+    {
+      "type": "text",
+      "id": "heading_7",
+      "label": "t:shared.heading.label"
+    },
+    {
+      "type": "text",
+      "id": "link_label_7",
+      "label": "t:blocks.menu_promo.settings.link_label.label"
+    },
+    {
+      "type": "url",
+      "id": "link_7",
+      "label": "t:shared.link.label"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.menu_tab.headers.card_8"
+    },
+    {
+      "type": "image_picker",
+      "id": "image_8",
+      "label": "t:shared.image.label"
+    },
+    {
+      "type": "text",
+      "id": "heading_8",
+      "label": "t:shared.heading.label"
+    },
+    {
+      "type": "text",
+      "id": "link_label_8",
+      "label": "t:blocks.menu_promo.settings.link_label.label"
+    },
+    {
+      "type": "url",
+      "id": "link_8",
+      "label": "t:shared.link.label"
+    }
+  ]
+}
+{% endschema %}

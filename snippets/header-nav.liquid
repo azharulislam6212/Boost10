@@ -1,123 +1,120 @@
-{%- comment -%}
-  Phase 3b — replacement for the `<nav class="header__nav">` element in
-  `sections/header.liquid` (currently lines 56–106), and for the hamburger
-  button in `header__start` (lines 34–43).
+{% doc %}
+  The desktop navigation.
 
-  Two changes:
+  ## Every item with children is a `<details>`
 
-  1. A top-level link with children looks for a `mega-menu` theme block whose
-     `menu_item` matches its title. Found, the block renders the panel. Not
-     found, the plain column layout is used — so a merchant who adds a menu item
-     and no block still gets a working dropdown rather than an empty box.
+  Not a `<button>` plus a `data-open` attribute. The browser then owns the
+  open/closed semantics, the Enter and Space handling and the "this control
+  expands something" announcement, and the menu still opens on click before
+  `header.js` has finished downloading — which matters, because navigation is
+  usually the first thing a customer touches.
 
-  2. `desktop_menu_style` can hide the inline nav entirely and route desktop
-     customers through the same drawer as mobile. The drawer markup is not
-     duplicated for this; `MenuDrawer` already exists at the bottom of the
-     section and the hamburger simply stops being mobile-only.
-{%- endcomment -%}
+  `<nav-menu>` intercepts the click to run the animation and to add hover
+  intent, but everything it does is an enhancement over markup that already
+  worked.
 
-{%- comment -%} ---- replaces the hamburger in header__start ---- {%- endcomment -%}
-<button
-  type="button"
-  class="header__menu-toggle header__menu-toggle--{{ section.settings.desktop_menu_style | default: 'inline' }}"
-  data-overlay-open="MenuDrawer"
-  aria-expanded="false"
-  aria-controls="MenuDrawer"
-  aria-label="{{ 'accessibility.open_menu' | t }}"
+  ## Two kinds of panel, one mechanism
+
+  A top-level link with children gets a dropdown built from those links. If a
+  `mega-menu` block names the same item, `<nav-menu>` swaps that dropdown for
+  the block's panel at runtime. The dropdown is therefore both the fallback and
+  the no-JavaScript experience, and a merchant who has not built a panel yet
+  still gets a working menu rather than an empty box.
+
+  Blocks are matched on the item's *title*, not its index, because reordering
+  the navigation in the Shopify admin would otherwise move every panel to the
+  wrong menu — a failure that looks like a caching bug rather than a settings
+  problem. Renaming an item detaches its block, which is visible and
+  recoverable; reordering silently corrupting every panel is neither.
+
+  Parameters:
+    menu (linklist, required)
+
+  @example
+    {% render 'header-nav', menu: section.settings.menu %}
+{% enddoc %}
+
+{%- liquid
+  assign st = section.settings
+  assign menu_font = 'var(--font-body-family)'
+  if st.menu_font == 'heading'
+    assign menu_font = 'var(--font-heading-family)'
+  elsif st.menu_font == 'accent'
+    assign menu_font = 'var(--font-accent-family, var(--font-heading-family))'
+  endif
+-%}
+
+<nav-menu
+  class="site-header__nav"
+  data-trigger="{{ st.menu_trigger }}"
+  data-marker="{{ st.menu_marker }}"
+  style="--nav-font: {{ menu_font }}; --nav-size: {{ st.menu_size }}px; --nav-case: {% if st.menu_case == 'uppercase' %}uppercase{% else %}none{% endif %};"
 >
-  {% render 'icon', icon: 'menu', size: 20 %}
-</button>
-
-{%- comment -%} ---- replaces <nav class="header__nav"> ---- {%- endcomment -%}
-{%- if section.settings.desktop_menu_style != 'drawer' -%}
-  <nav class="header__nav" aria-label="{{ 'sections.header.menu' | t }}">
-    <ul class="header__menu" role="list">
+  <nav aria-label="{{ 'sections.header.menu' | t }}">
+    <ul class="nav" role="list">
       {%- for link in menu.links -%}
         {%- liquid
-          # Find a mega menu block for this link. Matched on title, because an
-          # index would silently reassign every panel when a merchant reorders
-          # the navigation — a failure that looks like a caching bug rather
-          # than a settings problem.
+          assign link_title = link.title | strip
+
+          # Find a mega menu block whose `menu_item` names this link.
           assign mega_block = null
           for candidate in section.blocks
-            if candidate.type == 'mega-menu'
-              assign candidate_item = candidate.settings.menu_item | strip
-              assign link_title = link.title | strip
-              if candidate_item == link_title
-                assign mega_block = candidate
-                break
-              endif
+            if candidate.type != 'mega-menu'
+              continue
+            endif
+            assign candidate_item = candidate.settings.menu_item | strip
+            if candidate_item == link_title
+              assign mega_block = candidate
+              break
             endif
           endfor
+
+          assign has_panel = false
+          if link.links.size > 0 or mega_block != null
+            assign has_panel = true
+          endif
+
+          assign panel_kind = 'dropdown'
+          if mega_block != null
+            assign panel_kind = 'mega'
+          endif
         -%}
 
-        <li class="header__menu-item">
-          {%- if link.links.size > 0 or mega_block != null -%}
-            <mega-menu
-              class="mega-menu{% if mega_block %} mega-menu--custom{% endif %}"
-              data-trigger="{{ section.settings.menu_trigger }}"
+        <li class="nav__item{% if has_panel %} nav__item--parent{% endif %}">
+          {%- if has_panel -%}
+            <details
+              class="nav__details"
+              data-nav-details
+              data-kind="{{ panel_kind }}"
+              data-menu-item="{{ link_title | escape }}"
             >
-              <a
-                class="header__link"
-                href="{{ link.url }}"
-                data-ref="trigger"
+              <summary
+                class="nav__link"
+                data-nav-summary
                 aria-expanded="false"
-                {% if link.active %}aria-current="page"{% endif %}
+                {% if link.active or link.child_active %}data-current="true"{% endif %}
               >
-                {{ link.title }}
-                {% render 'icon', icon: 'chevron-down', size: 12 %}
-              </a>
+                <span class="nav__label">{{ link.title }}</span>
+                {% render 'icon', icon: 'chevron-down', size: 12, class: 'nav__chevron' %}
+              </summary>
 
-              <div class="mega-menu__panel" data-ref="panel">
-                <div class="{% render 'container' %}">
-                 
-
-                  {%- if mega_block != null -%}
-                    {% comment %} {% content_for 'block', id: mega_block.id, link: link %} {% endcomment %}
-                  {%- else -%}
-
-                    {%- comment -%}
-                      Fallback. Identical column markup to the block's, so the
-                      two look the same and a merchant adding a block later sees
-                      their promo images appear rather than the whole panel
-                      change shape.
-                    {%- endcomment -%}
-                    <div class="mega-menu__content mega-menu__content--full">
-                      <div class="mega-menu__columns" style="--mega-columns: 4;">
-                        {%- for child in link.links -%}
-                          <div class="mega-menu__column">
-                            <a class="mega-menu__heading" href="{{ child.url }}">{{ child.title }}</a>
-
-                            {%- if child.links.size > 0 -%}
-                              <ul class="mega-menu__list" role="list">
-                                {%- for grandchild in child.links -%}
-                                  <li>
-                                    <a class="mega-menu__link" href="{{ grandchild.url }}">
-                                      {{- grandchild.title -}}
-                                    </a>
-                                  </li>
-                                {%- endfor -%}
-                              </ul>
-                            {%- endif -%}
-                          </div>
-                        {%- endfor -%}
-                      </div>
-                    </div>
-                  {%- endif -%}
+              <div class="nav__panel nav__panel--{{ panel_kind }}" data-nav-panel>
+                <div class="nav__panel-inner">
+                  {% render 'nav-dropdown', link: link %}
                 </div>
               </div>
-            </mega-menu>
+            </details>
           {%- else -%}
             <a
-              class="header__link"
+              class="nav__link"
               href="{{ link.url }}"
-              {% if link.active %}aria-current="page"{% endif %}
+              {% if link.active %}aria-current="page" data-current="true"{% endif %}
             >
-              {{ link.title }}
+              <span class="nav__label">{{ link.title }}</span>
             </a>
           {%- endif -%}
         </li>
       {%- endfor -%}
     </ul>
   </nav>
-{%- endif -%}
+</nav-menu>

@@ -53,6 +53,21 @@
   assign quick_add_style = quick_add | default: settings.quick_add_style
 
   comment
+    Where the quick add sits. `bar` spans the bottom of the image; `corner` is a
+    single round control in the top corner, which keeps the product label
+    visible and stays clear of the swatch row below the image.
+
+    A corner control has no room for a label, so it forces the icon-only form
+    regardless of the style setting — a 40px circle with the words "Add to cart"
+    in it is a circle with clipped text.
+  endcomment
+  assign quick_add_position = settings.quick_add_position | default: 'bar'
+  assign quick_add_icon_only = false
+  if quick_add_style == 'icon' or quick_add_position == 'corner'
+    assign quick_add_icon_only = true
+  endif
+
+  comment
     Which option gets swatches on a card is the same setting the product page
     uses, so a store selling by Flavour gets flavour swatches in both places.
   endcomment
@@ -97,6 +112,12 @@
      target: '.product-card__media',
      delay: card_delay %}
   class="product-card product-card--{{ alignment }} product-card--hover-{{ hover_effect }} {{ class }}"
+  {%- comment -%}
+    The placement lives on the card, not only on the actions, because the
+    reveal is driven by `:hover` on the card and the badge collision rule
+    needs to see both from one selector.
+  {%- endcomment -%}
+  data-quick-add-position="{{ quick_add_position }}"
   data-product-id="{{ product.id }}"
   data-morph-key="{{ card_id }}"
 >
@@ -154,14 +175,38 @@
           role="list"
           aria-label="{{ product.title | escape }}"
         >
+          {%- comment -%}
+            Each slide is its own link.
+
+            `.product-card__link::after` stretches the title's anchor over the
+            whole card so the image is clickable. That overlay is also what was
+            swallowing the arrows: the media wrapper is its own stacking context,
+            so the arrows' `z-index` could not lift them above an overlay painted
+            in the parent context.
+
+            Raising the media wrapper above the overlay fixes the arrows — but it
+            also takes the image out from under the stretched link, so the image
+            has to carry its own. Which is better anyway: a slide that navigates
+            goes to the product whatever the overlay is doing.
+
+            `tabindex="-1"` and `aria-hidden` keep it out of the tab order; the
+            title link is the one real stop for this card.
+          {%- endcomment -%}
           {%- for card_image in card_images -%}
             <li class="product-card__slide">
-              {% render 'image',
-                 image: card_image,
-                 ratio: ratio,
-                 sizes: sizes,
-                 priority: priority and forloop.first,
-                 class: 'product-card__image' %}
+              <a
+                class="product-card__slide-link"
+                href="{{ product.url }}"
+                tabindex="-1"
+                aria-hidden="true"
+              >
+                {% render 'image',
+                   image: card_image,
+                   ratio: ratio,
+                   sizes: sizes,
+                   priority: priority and forloop.first,
+                   class: 'product-card__image' %}
+              </a>
             </li>
           {%- endfor -%}
         </ul>
@@ -206,7 +251,7 @@
 
 
     {%- if quick_add_style != 'none' and product.available -%}
-      <div class="product-card__actions">
+      <div class="product-card__actions" data-quick-add-position="{{ quick_add_position }}">
         {%- if product.variants.size == 1 and settings.enable_quick_view == false -%}
           {%- comment -%}
             A single-variant product can be added straight from the grid. Anything
@@ -221,8 +266,8 @@
                type: 'submit',
                variant: 'primary',
                size: 'small',
-               full: true,
-               icon_only: quick_add_style == 'icon',
+               full: quick_add_position != 'corner',
+               icon_only: quick_add_icon_only,
                icon: 'plus' %}
           </form>
         {%- else -%}
@@ -230,8 +275,8 @@
              label: 'products.product.choose_options' | t,
              variant: 'primary',
              size: 'small',
-             full: true,
-             icon_only: quick_add_style == 'icon',
+             full: quick_add_position != 'corner',
+             icon_only: quick_add_icon_only,
              icon: 'plus',
              attributes: 'data-overlay-open="QuickOptions" data-product-url="' | append: product.url | append: '" data-section-id="quick-view"' %}
         {%- endif -%}

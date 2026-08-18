@@ -1,0 +1,2160 @@
+/* ==========================================================================
+   header.css — Boost10
+   --------------------------------------------------------------------------
+   The header, its navigation, the mega menu panels, the reusable tab group and
+   the mobile drawer.
+
+   ## The one idea
+
+   A pill that moves. It is the active marker under a navigation item, the
+   selection in a category rail, the promotional badge and the shape of the
+   header itself. Everything else is quiet: hairline rules, one weight of
+   shadow, no gradients that are not the merchant's own colour scheme.
+
+   Spending the boldness in one place is what stops a header with this many
+   controls from looking like a demo of all of them.
+
+   ## Everything colours itself from the scheme
+
+   No colour is written here that is not a scheme token. A merchant switching
+   the sticky scheme from mint to charcoal changes the whole pinned header,
+   including the icon buttons and the cart bubble, without touching CSS.
+
+   ## Load order
+
+   Loaded after `base.css`, which still holds the older `.site-header__*` rules from
+   the previous header. Those rules are unreachable — the class names changed —
+   but the file is left alone here so a merchant mid-migration does not lose a
+   header between two uploads.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. Tokens
+   -------------------------------------------------------------------------- */
+
+.site-header {
+  --header-row-height: 72px;
+  --header-border-width: 0px;
+  --header-radius: 999px;
+  --header-gap: var(--space-4);
+  --header-pad-inline: var(--space-6);
+
+  --header-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --header-speed: 320ms;
+
+  --panel-speed: 420ms;
+  --panel-fade: 200ms;
+
+  position: relative;
+  z-index: 100;
+  transition:
+    background-color var(--header-speed) var(--header-ease),
+    color var(--header-speed) var(--header-ease),
+    transform var(--header-speed) var(--header-ease),
+    box-shadow var(--header-speed) var(--header-ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .site-header,
+  .site-header * {
+    --header-speed: 0.01ms;
+    --panel-speed: 0.01ms;
+    --panel-fade: 0.01ms;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   2. Sticky modes
+   --------------------------------------------------------------------------
+   Four values on one attribute. `never` needs no rule at all — an element that
+   does not stick is the document default, and writing `position: static` for it
+   only creates something for a later rule to fight with.
+   -------------------------------------------------------------------------- */
+
+/* The positioning lives on `.shopify-section`, not on `<sticky-header>`.
+
+   A sticky element can only travel inside its own parent, and the section
+   wrapper Shopify emits is exactly as tall as the header — so sticky applied to
+   the inner element has nowhere to go and does nothing at all. Moving it one
+   level up puts the parent at `<body>` height, which is the whole page.
+
+   The mode still lives on the inner element, because that is where the merchant
+   setting and the component both read it. `:has()` bridges the two, so this
+   works with no JavaScript at all. */
+.header-section {
+  position: relative;
+  z-index: 100;
+}
+
+.header-section:has(> [data-sticky-mode='always']),
+.header-section:has(> [data-sticky-mode='scroll-up']),
+.header-section:has(> [data-sticky-mode='scroll-down']) {
+  position: sticky;
+  /* Not a hard `0`. Anything above the header that is itself pinned — a sticky
+     announcement bar — owns that space, and a header pinned to 0 lands on top of
+     it. `<sticky-header>` measures whatever is above and publishes the offset. */
+  inset-block-start: var(--header-sticky-offset, 0px);
+  /* Above the announcement bar in every case. Both sections are in the same
+     group and the header is the one that stays. */
+  z-index: 110;
+}
+
+/* Guarded on the mode, not on `[data-hidden]` alone, so an attribute left
+   behind by a mode change cannot hide a header that is supposed to be pinned. */
+sticky-header[data-sticky-mode='scroll-up'][data-hidden],
+sticky-header[data-sticky-mode='scroll-down'][data-hidden] {
+  transform: translateY(calc(-100% - 8px));
+}
+
+/* --------------------------------------------------------------------------
+   3. Shell
+   -------------------------------------------------------------------------- */
+
+.site-header__inner {
+  position: relative;
+}
+
+/* The scheme's real background, captured on the header itself.
+
+   Section 27 overrides `--color-background` on the *shell*, one level down, so
+   this copy is still the untouched scheme value and the hover surface can be
+   mixed from it. Capturing it on the same element that overrides it would be a
+   self-reference and resolve to nothing.
+
+   It follows the sticky scheme too: `<sticky-header>` swaps the scheme class on
+   this element, so `--header-surface` becomes the sticky background the moment
+   the page scrolls, with no second variable to keep in sync. */
+.site-header {
+  --header-surface: var(--color-background);
+  --header-surface-rgb: var(--color-background-rgb);
+}
+
+.site-header__shell {
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-background);
+  color: var(--color-text);
+  border: var(--header-border-width) solid var(--color-border);
+  transition:
+    background-color var(--header-speed) var(--header-ease),
+    color var(--header-speed) var(--header-ease),
+    border-radius var(--header-speed) var(--header-ease);
+}
+
+.site-header--shape-pill .site-header__shell {
+  border-radius: var(--header-radius);
+  padding-inline: var(--header-pad-inline);
+}
+
+/* The bar shape has to reach past the container's gutter or it is a bar with a
+   margin, which is neither shape. */
+.site-header--shape-bar .site-header__shell {
+  border-radius: 0;
+  margin-inline: calc(var(--container-gutter, var(--space-4)) * -1);
+  padding-inline: var(--container-gutter, var(--space-4));
+}
+
+/* `1fr auto 1fr`, not `auto 1fr auto`.
+
+   With the outer tracks on `auto` the middle one is whatever is left over, so a
+   centred logo sits in the middle of the *remaining* space — which moves as soon
+   as one side has more controls than the other. Equal flexible outer tracks put
+   the centre slot on the page's centre line and keep it there. */
+.site-header__row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: var(--header-gap);
+  min-block-size: var(--header-row-height);
+}
+
+.site-header__row--bottom {
+  min-block-size: calc(var(--header-row-height) * 0.7);
+  border-block-start: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent);
+}
+
+.site-header__slot {
+  display: flex;
+  align-items: center;
+  gap: var(--header-gap);
+  min-inline-size: 0;
+}
+
+.site-header__slot--center {
+  justify-content: center;
+}
+
+.site-header__slot--end {
+  justify-content: flex-end;
+}
+
+/* An empty slot still occupies its grid track, which is what keeps a centred
+   logo centred when only one side has controls. */
+.site-header__slot:empty {
+  min-block-size: 1px;
+}
+
+/* --------------------------------------------------------------------------
+   4. Transparent over a banner
+   --------------------------------------------------------------------------
+   `header--transparent` is written by Liquid and means "this template supports
+   it". `[data-transparent]` is written by the component and means "right now".
+   Two attributes rather than one is what makes the header correct with
+   JavaScript off: the class alone gives a transparent header over the hero and
+   it simply never turns solid.
+   -------------------------------------------------------------------------- */
+
+/* Transparency is a *layout* change: the banner has to start at the top of the
+   viewport, underneath the header, or there is nothing for the header to be
+   transparent over and it simply reads as a white bar.
+
+   Taking the header out of the flow with `position: absolute` would do it, but
+   then it cannot be sticky. Pulling the following content up by the header's own
+   height does the same thing and leaves the sticky behaviour intact.
+
+   `--header-height` is published by `<sticky-header>` on every resize. */
+/* The offset is taken off the main content, not off the header.
+
+   A negative bottom margin on the header pulls up whatever comes next — and in
+   a header group that is not always the page. With the header ordered last it
+   worked; reorder the group and it swallows a sibling section instead, which is
+   the overlap in the screenshot.
+
+   `#MainContent` is the thing that should slide under a transparent header, so
+   it is the thing that moves. No sibling can ever be affected. */
+body:has(.site-header--transparent) #MainContent {
+  margin-block-start: calc(var(--header-height, 0px) * -1);
+}
+
+/* Transparency is applied as a variable override — see section 27. */
+
+
+sticky-header[data-scrolled]:not([data-transparent]) {
+  box-shadow: 0 6px 24px -12px rgb(0 0 0 / 0.18);
+}
+
+/* --------------------------------------------------------------------------
+   5. Logo
+   --------------------------------------------------------------------------
+   Both versions are rendered and only opacity changes. Swapping `src` on scroll
+   costs a request at exactly the moment the customer is looking at the header,
+   and the box visibly empties while the second file arrives.
+   -------------------------------------------------------------------------- */
+
+.site-header__logo {
+  position: relative;
+  flex-shrink: 0;
+  line-height: 0;
+}
+
+.site-header__logo-heading {
+  margin: 0;
+  font-size: inherit;
+  line-height: 0;
+}
+
+.site-header__logo-link {
+  position: relative;
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+
+.site-header__logo-image {
+  display: block;
+  inline-size: var(--logo-width, 140px);
+  transition: opacity var(--header-speed) var(--header-ease);
+}
+
+.site-header__logo-text {
+  font-family: var(--font-heading-family);
+  font-size: var(--font-size-h5);
+  letter-spacing: -0.02em;
+  color: inherit;
+}
+
+.site-header__logo--has-inverse .site-header__logo-image--inverse {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.site-header__logo--prefers-inverse .site-header__logo-image--solid,
+sticky-header[data-transparent] .site-header__logo--prefers-inverse .site-header__logo-image--solid {
+  opacity: 0;
+}
+
+.site-header__logo--prefers-inverse .site-header__logo-image--inverse {
+  opacity: 1;
+}
+
+/* Once the header is solid the inverse logo has nothing to sit on. */
+sticky-header:not([data-transparent]) .site-header__logo--prefers-inverse .site-header__logo-image--solid {
+  opacity: 1;
+}
+
+sticky-header:not([data-transparent]) .site-header__logo--prefers-inverse .site-header__logo-image--inverse {
+  opacity: 0;
+}
+
+@media screen and (max-width: 989px) {
+  .site-header__logo-image {
+    inline-size: var(--logo-width-mobile, 110px);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   6. Burger
+   -------------------------------------------------------------------------- */
+
+.site-header__burger {
+  display: grid;
+  place-items: center;
+  inline-size: 40px;
+  block-size: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background-color: color-mix(in srgb, currentColor 6%, transparent);
+  color: inherit;
+  cursor: pointer;
+  transition: background-color var(--header-speed) var(--header-ease);
+}
+
+.site-header__burger:hover {
+  background-color: color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.site-header__burger-bars {
+  display: grid;
+  gap: 4px;
+  inline-size: 16px;
+}
+
+.site-header__burger-bars i {
+  display: block;
+  block-size: 1.5px;
+  background-color: currentColor;
+  border-radius: 2px;
+}
+
+/* The second bar is short, so the icon reads as a menu rather than as an equals
+   sign at the small sizes this button is used at. */
+.site-header__burger-bars i:last-child {
+  inline-size: 11px;
+}
+
+@media screen and (min-width: 990px) {
+  .site-header__burger {
+    display: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   7. Navigation
+   -------------------------------------------------------------------------- */
+
+.site-header__nav {
+  display: none;
+  min-inline-size: 0;
+}
+
+@media screen and (min-width: 990px) {
+  .site-header__nav {
+    display: block;
+  }
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Static by default so a full-width panel can span the header. Only the items
+   whose panel is anchored to them become a containing block. */
+.nav__item {
+  position: static;
+}
+
+.nav__item:has(.nav__panel--dropdown),
+.nav__item:has(.nav__panel--compact) {
+  position: relative;
+}
+
+.nav__details {
+  position: static;
+}
+
+.nav__link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 10px var(--space-4);
+  border-radius: 999px;
+  font-family: var(--nav-font, var(--font-body-family));
+  font-size: var(--nav-size, 15px);
+  font-weight: 500;
+  text-transform: var(--nav-case, none);
+  letter-spacing: 0.01em;
+  color: inherit;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  list-style: none;
+  transition:
+    background-color var(--header-speed) var(--header-ease),
+    color var(--header-speed) var(--header-ease);
+}
+
+/* Safari still paints a disclosure triangle without this. */
+.nav__link::-webkit-details-marker,
+.dropdown__toggle::-webkit-details-marker {
+  display: none;
+}
+
+.nav__chevron {
+  flex-shrink: 0;
+  transition: transform var(--header-speed) var(--header-ease);
+}
+
+[data-open] > .nav__link .nav__chevron {
+  transform: rotate(180deg);
+}
+
+/* ---- the marker ---- */
+
+.site-header__nav[data-marker='pill'] .nav__link:hover,
+.site-header__nav[data-marker='pill'] .nav__link[data-current='true'],
+.site-header__nav[data-marker='pill'] [data-open] > .nav__link {
+  background-color: var(--color-primary-button-background, var(--color-text));
+  color: var(--color-primary-button-text, var(--color-background));
+}
+
+.site-header__nav[data-marker='underline'] .nav__link {
+  border-radius: 0;
+  box-shadow: inset 0 -1px 0 transparent;
+}
+
+.site-header__nav[data-marker='underline'] .nav__link:hover,
+.site-header__nav[data-marker='underline'] .nav__link[data-current='true'],
+.site-header__nav[data-marker='underline'] [data-open] > .nav__link {
+  box-shadow: inset 0 -1px 0 currentColor;
+}
+
+.site-header__nav[data-marker='none'] .nav__link:hover,
+.site-header__nav[data-marker='none'] [data-open] > .nav__link {
+  opacity: 0.6;
+}
+
+.nav__link:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+/* --------------------------------------------------------------------------
+   8. Panels — one animation for every kind
+   --------------------------------------------------------------------------
+   The panel is a clipping window pinned under the header; the inner slides down
+   out of it. That reads as the menu coming out from behind the header rather
+   than fading in on top of the page, and it is one transform and one opacity
+   rather than a height animation, which cannot be composited.
+
+   `padding-block-end` gives the drop shadow somewhere to land inside the clip.
+   -------------------------------------------------------------------------- */
+
+.nav__panel {
+  position: absolute;
+  inset-block-start: 100%;
+  z-index: 10;
+  overflow: hidden;
+  padding-block: var(--space-2) var(--space-8);
+  pointer-events: none;
+}
+
+/* `page` is the layout container, because the panel's containing block *is*
+   `.site-header__inner` — the container element. Nothing extra is needed for it to
+   line up with the logo and the navigation above it.
+
+   `full` has to escape that container, and does it by pulling both edges out by
+   half the difference between the viewport and the container. The scrollbar is
+   subtracted or the panel is wider than the visible page and the whole document
+   gains a horizontal scrollbar. */
+.nav__panel--page {
+  inset-inline: 0;
+}
+
+.nav__panel--full {
+  inset-inline: calc((100vw - var(--scrollbar-width, 0px) - 100%) / -2);
+}
+
+.nav__panel--compact,
+.nav__panel--dropdown {
+  inset-inline-start: 0;
+  inline-size: max-content;
+}
+
+/* Alignment applies to `compact` panels only.
+
+   This is the container-width bug. `--page` sets `inset-inline: 0`; the old
+   `[data-align='center']` rule then overrode only the *start* edge with `50%`
+   and left the end edge at `0`. The panel became half the container wide,
+   shifted right, then translated back by half its own width — the offset,
+   undersized panel in the screenshot.
+
+   A full or page width panel already spans its container, so there is no
+   alignment left to choose and the setting does not apply to it. */
+.nav__panel--compact[data-align='center'] {
+  inset-inline-start: 50%;
+  inset-inline-end: auto;
+  translate: -50% 0;
+}
+
+.nav__panel--compact[data-align='end'] {
+  inset-inline-start: auto;
+  inset-inline-end: 0;
+}
+
+.nav__panel-inner {
+  background-color: var(--color-background);
+  color: var(--color-text);
+  border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+  border-radius: var(--mega-radius, 20px);
+  box-shadow: 0 24px 48px -28px rgb(0 0 0 / 0.4);
+  transform: translateY(-101%);
+  opacity: 0;
+  transition:
+    transform var(--panel-speed) var(--header-ease),
+    opacity var(--panel-fade) linear;
+}
+
+[data-open] > .nav__panel {
+  pointer-events: auto;
+}
+
+/* The clip exists only for the reveal. Held past it, it cuts off every submenu
+   that opens sideways out of this panel — which is why they were invisible
+   rather than unstyled. `header.js` adds `data-settled` on `transitionend`. */
+[data-settled] > .nav__panel {
+  overflow: visible;
+}
+
+[data-open] > .nav__panel > .nav__panel-inner {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+/* No max-width. The panel is already inside the container, so constraining it
+   again would inset it from a header it is supposed to line up with. */
+.nav__panel--page > .nav__panel-inner {
+  max-inline-size: none;
+}
+
+/* A full-bleed panel still keeps its content on the layout grid — text running
+   to both screen edges at 1900px is unreadable however wide the panel is. */
+.nav__panel--full > .nav__panel-inner {
+  max-inline-size: var(--container-wide, 1700px);
+  margin-inline: auto;
+  border-radius: 0;
+  border-inline: 0;
+}
+
+.nav__panel--compact > .nav__panel-inner {
+  max-inline-size: var(--mega-max-width, 460px);
+}
+
+/* --------------------------------------------------------------------------
+   9. Auto dropdown and sub-dropdown
+   -------------------------------------------------------------------------- */
+
+.dropdown {
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 220px;
+  margin: 0;
+  padding: var(--space-3);
+  list-style: none;
+}
+
+.dropdown__item {
+  position: relative;
+}
+
+.dropdown__link {
+  display: block;
+  padding: 9px var(--space-3);
+  border-radius: 12px;
+  font-size: var(--font-size-sm);
+  color: inherit;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color var(--header-speed) var(--header-ease);
+}
+
+.dropdown__link:hover {
+  background-color: color-mix(in srgb, currentColor 6%, transparent);
+}
+
+/* The parent item is the `<summary>` itself — it has to be the first child of
+   its `<details>` or the browser draws its own, which renders as a triangle and
+   the word "Details" in the middle of the menu. */
+.dropdown__link--parent {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  cursor: pointer;
+  list-style: none;
+}
+
+.dropdown__link--parent::-webkit-details-marker {
+  display: none;
+}
+
+[data-open] > .dropdown__link--parent {
+  background-color: color-mix(in srgb, currentColor 6%, transparent);
+}
+
+.dropdown__chevron {
+  flex-shrink: 0;
+  opacity: 0.6;
+  transition: translate var(--header-speed) var(--header-ease);
+}
+
+[data-open] > .dropdown__link--parent .dropdown__chevron {
+  translate: 2px 0;
+  opacity: 1;
+}
+
+.dropdown__link--all {
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.dropdown__details {
+  position: relative;
+}
+
+/* A submenu flies out sideways. Growing the parent list downwards moves the
+   link the customer was aiming at. */
+.nav__panel--sub {
+  inset-block-start: calc(var(--space-2) * -1);
+  inset-inline-start: 100%;
+  inline-size: max-content;
+  padding-block: 0 var(--space-6);
+  padding-inline-start: var(--space-1);
+}
+
+.nav__panel--sub.nav__panel--end {
+  inset-block-start: 100%;
+  inset-inline: auto 0;
+  padding-inline-start: 0;
+  padding-block-start: var(--space-2);
+}
+
+/* A submenu opening within one panel-width of the viewport edge would run off
+   it. Flipping to the other side is the only fix that does not need JS. */
+@media screen and (max-width: 1280px) {
+  .nav__panel--dropdown .nav__panel--sub {
+    inset-inline: auto 100%;
+    padding-inline: 0 var(--space-1);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   10. Mega menu grid
+   -------------------------------------------------------------------------- */
+
+.megamenu {
+  padding: var(--mega-padding, 24px);
+}
+
+.megamenu__grid {
+  display: grid;
+  grid-template-columns: repeat(var(--mega-columns, 12), minmax(0, 1fr));
+  gap: var(--mega-gap, 24px);
+  align-items: start;
+}
+
+.megamenu__item {
+  grid-column: span min(var(--span, 12), var(--mega-columns, 12));
+  min-inline-size: 0;
+}
+
+.megamenu__eyebrow {
+  margin: 0 0 var(--space-3);
+  font-family: var(--font-heading-family);
+  font-size: var(--font-size-xs);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-accent-text, var(--color-text));
+}
+
+.megamenu__eyebrow--link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  text-decoration: none;
+}
+
+.megamenu__eyebrow--link:hover {
+  color: var(--color-heading);
+}
+
+.megamenu__columns {
+  display: grid;
+  grid-template-columns: repeat(var(--columns, 3), minmax(0, 1fr));
+  gap: var(--space-6) var(--space-5);
+}
+
+.megamenu__column-heading {
+  display: block;
+  margin-block-end: var(--space-3);
+  font-family: var(--font-heading-family);
+  font-size: var(--font-size-md);
+  font-weight: 500;
+  color: var(--color-heading);
+  text-decoration: none;
+}
+
+.megamenu__column-heading:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.megamenu__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.megamenu__link {
+  display: block;
+  padding-block: 5px;
+  font-size: var(--font-size-sm);
+  color: var(--color-accent-text, var(--color-text));
+  text-decoration: none;
+  transition: color var(--header-speed) var(--header-ease);
+}
+
+.megamenu__link:hover {
+  color: var(--color-heading);
+}
+
+.megamenu__link--standalone {
+  font-weight: 500;
+  color: var(--color-heading);
+}
+
+.megamenu__empty {
+  margin: 0;
+  padding: var(--space-4);
+  border: 1px dashed var(--color-border);
+  border-radius: 12px;
+  font-size: var(--font-size-sm);
+  color: var(--color-accent-text);
+}
+
+/* --------------------------------------------------------------------------
+   11. Card rows
+   --------------------------------------------------------------------------
+   The dashed rule is the point of this card. It says "there is more of this
+   list below" without a divider between every row, and it is the one place in
+   the header where a border is decorative rather than structural.
+   -------------------------------------------------------------------------- */
+
+.menu-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3);
+  border: 1px dashed color-mix(in srgb, var(--color-border) 90%, transparent);
+  border-radius: var(--card-radius, 20px);
+  color: inherit;
+  text-decoration: none;
+  transition:
+    background-color var(--header-speed) var(--header-ease),
+    border-color var(--header-speed) var(--header-ease),
+    color var(--header-speed) var(--header-ease);
+}
+
+a.menu-card:hover,
+.menu-card--emphasis {
+  background-color: var(--color-primary-button-background, var(--color-heading));
+  border-color: transparent;
+  border-style: solid;
+  color: var(--color-primary-button-text, var(--color-background));
+}
+
+.menu-card__media {
+  flex-shrink: 0;
+  inline-size: 84px;
+}
+
+.menu-card__image {
+  display: block;
+  border-radius: calc(var(--card-radius, 20px) - 6px);
+  overflow: hidden;
+  background-color: color-mix(in srgb, currentColor 4%, transparent);
+}
+
+.menu-card__image--placeholder .placeholder-svg {
+  display: block;
+  inline-size: 100%;
+  aspect-ratio: 1;
+  fill: currentColor;
+  opacity: 0.25;
+}
+
+.menu-card__text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-inline-size: 0;
+}
+
+.menu-card__title {
+  font-family: var(--font-heading-family);
+  font-size: var(--font-size-lg);
+  font-weight: 400;
+  line-height: 1.2;
+}
+
+.menu-card__description {
+  font-size: var(--font-size-sm);
+  line-height: 1.4;
+  opacity: 0.75;
+}
+
+/* --------------------------------------------------------------------------
+   12. Promotional banner
+   -------------------------------------------------------------------------- */
+
+.menu-promo {
+  position: relative;
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+.menu-promo__image {
+  display: block;
+  overflow: hidden;
+  border-radius: var(--promo-radius, 16px);
+  background-color: color-mix(in srgb, currentColor 4%, transparent);
+}
+
+.menu-promo__image--placeholder .placeholder-svg {
+  display: block;
+  inline-size: 100%;
+  aspect-ratio: 1;
+  fill: currentColor;
+  opacity: 0.25;
+}
+
+.menu-promo__img {
+  transition: scale var(--header-speed) var(--header-ease);
+}
+
+a.menu-promo:hover .menu-promo__img {
+  scale: 1.03;
+}
+
+.menu-promo__content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-block-start: var(--space-4);
+}
+
+.menu-promo__heading {
+  font-family: var(--font-heading-family);
+  font-size: var(--font-size-lg);
+  font-weight: 400;
+  line-height: 1.25;
+}
+
+.menu-promo__cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  inline-size: fit-content;
+  min-inline-size: 160px;
+  padding-block-end: var(--space-2);
+  border-block-end: 1px solid currentColor;
+  font-size: var(--font-size-sm);
+}
+
+.menu-promo__cta svg {
+  transition: translate var(--header-speed) var(--header-ease);
+}
+
+a.menu-promo:hover .menu-promo__cta svg {
+  translate: 4px 0;
+}
+
+.menu-promo--overlay .menu-promo__content {
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline: 0;
+  padding: var(--space-5);
+  border-radius: var(--promo-radius, 16px);
+  background: linear-gradient(to top, rgb(0 0 0 / 0.7), rgb(0 0 0 / 0));
+  color: #fff;
+}
+
+/* --------------------------------------------------------------------------
+   13. Tab group — reusable
+   --------------------------------------------------------------------------
+   Nothing here knows about navigation. The marker is a real element rather than
+   a background on the active tab, because a background switches and an element
+   travels — and the travel is what tells the customer the two states are the
+   same control.
+   -------------------------------------------------------------------------- */
+
+.tabs {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.tabs--horizontal {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.tabs--vertical {
+  grid-template-columns: var(--tabs-rail-width, 260px) minmax(0, 1fr);
+  align-items: start;
+}
+
+.tabs__list {
+  position: relative;
+  display: flex;
+  gap: var(--space-1);
+}
+
+.tabs--horizontal .tabs__list {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+.tabs--vertical .tabs__list {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.tabs__marker {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  z-index: 0;
+  inline-size: var(--marker-width, 0);
+  block-size: var(--marker-height, 0);
+  border-radius: var(--tabs-marker-radius, 999px);
+  background-color: var(--color-background);
+  box-shadow: 0 2px 10px -6px rgb(0 0 0 / 0.35);
+  translate: var(--marker-x, 0) var(--marker-y, 0);
+  transition:
+    translate var(--panel-speed, 420ms) var(--header-ease, cubic-bezier(0.22, 1, 0.36, 1)),
+    inline-size var(--panel-speed, 420ms) var(--header-ease, cubic-bezier(0.22, 1, 0.36, 1)),
+    block-size var(--panel-speed, 420ms) var(--header-ease, cubic-bezier(0.22, 1, 0.36, 1));
+}
+
+/* First placement, and every placement made while the group was not painted.
+   Without this the marker visibly flies in from the corner when a panel opens. */
+.tabs__marker[data-instant] {
+  transition: none;
+}
+
+.tabs__tab {
+  position: relative;
+  z-index: 1;
+  padding: var(--space-4) var(--space-5);
+  border: 0;
+  border-radius: var(--tabs-marker-radius, 999px);
+  background: none;
+  font-family: var(--font-heading-family);
+  font-size: var(--font-size-md);
+  color: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition: opacity var(--header-speed) var(--header-ease);
+}
+
+.tabs__tab[aria-selected='false'] {
+  opacity: 0.65;
+}
+
+.tabs__tab[aria-selected='false']:hover {
+  opacity: 1;
+}
+
+.tabs__tab:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: -2px;
+}
+
+.tabs__panel:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+
+.tabs__panel-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--tab-columns, 3), minmax(0, 1fr));
+  gap: var(--space-5);
+}
+
+/* Inside a carousel the track owns the columns, so the grid steps aside rather
+   than fighting Swiper for the same property. */
+.tabs__panel .carousel-shell__track {
+  --grid-columns-desktop: var(--tab-columns, 3);
+}
+
+/* The mega menu's rail is inset into a tinted field, which is what makes the
+   selected pill read as sitting *in* the rail rather than on top of it. */
+.tabs--menu {
+  padding: var(--space-4);
+  border-radius: var(--mega-radius, 20px);
+  background-color: var(--color-secondary-background, var(--color-background));
+}
+
+@media screen and (max-width: 989px) {
+  .tabs--vertical {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tabs--vertical .tabs__list {
+    flex-direction: row;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .tabs__panel-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   14. Actions
+   -------------------------------------------------------------------------- */
+
+.site-header__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.site-header__account {
+  position: relative;
+}
+
+.site-header__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-inline-size: 40px;
+  block-size: 40px;
+  padding-inline: 0;
+  border: 0;
+  border-radius: 999px;
+  background-color: color-mix(in srgb, currentColor 6%, transparent);
+  color: inherit;
+  font-size: var(--header-utility-size, 14px);
+  text-decoration: none;
+  cursor: pointer;
+  list-style: none;
+  transition:
+    background-color var(--header-speed) var(--header-ease),
+    color var(--header-speed) var(--header-ease);
+}
+
+.site-header__action:hover,
+[data-open] > .site-header__action {
+  background-color: color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.site-header__action-label {
+  padding-inline-end: var(--space-3);
+  white-space: nowrap;
+}
+
+.site-header__action:has(.site-header__action-label) {
+  padding-inline-start: var(--space-4);
+}
+
+.site-header__action--account {
+  background-color: var(--color-primary-button-background, var(--color-text));
+  color: var(--color-primary-button-text, var(--color-background));
+}
+
+.site-header__action--account:hover {
+  filter: brightness(0.94);
+  background-color: var(--color-primary-button-background, var(--color-text));
+}
+
+.site-header__action--cart {
+  gap: var(--space-2);
+  padding-inline: var(--space-4);
+}
+
+/* Inline text beside the icon. `base.css` paints `[data-cart-count]` as a
+   floating red bubble for the previous header, which is why the number was
+   overflowing the control — so this one does not carry that attribute, and the
+   count arrives from Liquid on every section re-render instead. */
+.site-header__cart-count {
+  position: static;
+  min-inline-size: 0;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--header-utility-size, 14px);
+  font-weight: 500;
+  line-height: 1;
+}
+
+/* ---- promotional pill ---- */
+
+.site-header__promo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  block-size: 40px;
+  padding-inline: var(--space-3) 4px;
+  border-radius: 999px;
+  background-color: var(--color-heading, var(--color-text));
+  color: var(--color-background);
+  font-size: var(--header-utility-size, 14px);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.site-header__promo-label {
+  padding-inline-end: var(--space-1);
+}
+
+/* A pill inside a pill. The badge is the number the customer is meant to read,
+   so it carries the accent and the label around it stays quiet. */
+.site-header__promo-badge {
+  display: inline-flex;
+  align-items: center;
+  block-size: 32px;
+  padding-inline: var(--space-4);
+  border-radius: 999px;
+  background-color: var(--color-primary-button-background, var(--color-background));
+  color: var(--color-primary-button-text, var(--color-heading));
+  font-weight: 600;
+}
+
+@media screen and (max-width: 749px) {
+  .site-header__promo-label {
+    display: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   15. Localization
+   -------------------------------------------------------------------------- */
+
+.market-picker {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.market-picker__unit {
+  position: relative;
+}
+
+.market-picker__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  block-size: 40px;
+  padding-inline: var(--space-3);
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  font-family: var(--localization-font, var(--font-body-family));
+  font-size: var(--header-localization-size, 14px);
+  color: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color var(--header-speed) var(--header-ease);
+}
+
+.market-picker__trigger:hover {
+  background-color: color-mix(in srgb, currentColor 8%, transparent);
+}
+
+.market-picker__flag {
+  font-size: 1.15em;
+  line-height: 1;
+}
+
+.market-picker__panel {
+  position: absolute;
+  inset-block-start: calc(100% + var(--space-2));
+  inset-inline-end: 0;
+  z-index: 20;
+  inline-size: max-content;
+  min-inline-size: 220px;
+  max-block-size: 320px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background-color: var(--color-background);
+  color: var(--color-text);
+  box-shadow: 0 24px 48px -28px rgb(0 0 0 / 0.4);
+}
+
+.market-picker__list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.market-picker__list button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  inline-size: 100%;
+  padding: 8px var(--space-3);
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: inherit;
+  font-size: var(--font-size-sm);
+  text-align: start;
+  cursor: pointer;
+}
+
+.market-picker__list button:hover {
+  background-color: color-mix(in srgb, currentColor 6%, transparent);
+}
+
+.market-picker__list button[aria-current='true'] {
+  font-weight: 600;
+}
+
+.market-picker__currency {
+  opacity: 0.6;
+}
+
+.market-picker--header {
+  display: none;
+}
+
+@media screen and (min-width: 990px) {
+  .market-picker--header {
+    display: flex;
+  }
+}
+
+.market-picker--drawer {
+  flex-wrap: wrap;
+}
+
+.market-picker--drawer .market-picker__trigger {
+  border: 1px solid var(--color-border);
+}
+
+.market-picker--drawer .market-picker__panel {
+  inset-block-end: calc(100% + var(--space-2));
+  inset-block-start: auto;
+  inset-inline: 0 auto;
+}
+
+/* --------------------------------------------------------------------------
+   16. Menu drawer
+   -------------------------------------------------------------------------- */
+
+.nav-drawer .drawer__panel {
+  display: flex;
+  flex-direction: column;
+  inline-size: min(420px, 92vw);
+  max-inline-size: 100%;
+  block-size: 100%;
+  background-color: var(--color-background);
+  color: var(--color-text);
+}
+
+.nav-drawer__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border-block-end: 1px solid var(--color-border);
+}
+
+.nav-drawer__logo {
+  display: block;
+  line-height: 0;
+  text-decoration: none;
+  color: inherit;
+}
+
+.nav-drawer__logo-image {
+  display: block;
+  inline-size: 120px;
+}
+
+.nav-drawer__logo-text,
+.nav-drawer__title {
+  margin: 0;
+  font-family: var(--font-heading-family);
+  font-size: var(--font-size-h5);
+  line-height: 1.2;
+}
+
+.nav-drawer__close {
+  display: grid;
+  place-items: center;
+  inline-size: 40px;
+  block-size: 40px;
+  border: 0;
+  border-radius: 999px;
+  background-color: color-mix(in srgb, currentColor 6%, transparent);
+  color: inherit;
+  cursor: pointer;
+}
+
+.nav-drawer .drawer__body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.nav-drawer__footer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border-block-start: 1px solid var(--color-border);
+}
+
+.nav-drawer__account {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: inherit;
+  font-size: var(--font-size-sm);
+  text-decoration: none;
+}
+
+/* --------------------------------------------------------------------------
+   17. Mobile navigation
+   -------------------------------------------------------------------------- */
+
+.drawer-nav {
+  display: block;
+  padding: var(--space-3) var(--space-5);
+}
+
+.drawer-nav__list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.drawer-nav[data-dividers='true'] > .drawer-nav__list > .drawer-nav__item + .drawer-nav__item,
+.drawer-nav[data-dividers='true'] > [data-menu-panel] > .drawer-nav__list > .drawer-nav__item + .drawer-nav__item {
+  border-block-start: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+}
+
+.drawer-nav__link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  inline-size: 100%;
+  padding: var(--space-4) 0;
+  border: 0;
+  background: none;
+  font-family: var(--font-heading-family);
+  font-size: var(--font-size-lg);
+  font-weight: 400;
+  color: inherit;
+  text-align: start;
+  text-decoration: none;
+  cursor: pointer;
+  list-style: none;
+}
+
+.drawer-nav__link::-webkit-details-marker {
+  display: none;
+}
+
+.drawer-nav__link--all {
+  font-family: var(--font-body-family);
+  font-size: var(--font-size-sm);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.drawer-nav__list--nested .drawer-nav__link {
+  padding-block: var(--space-3);
+  font-size: var(--font-size-md);
+}
+
+.drawer-nav__list--nested {
+  padding-inline-start: var(--space-4);
+  border-inline-start: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+}
+
+/* ---- the plus / minus ---- */
+
+.drawer-nav__sign {
+  position: relative;
+  flex-shrink: 0;
+  inline-size: 18px;
+  block-size: 18px;
+}
+
+.drawer-nav__sign::before,
+.drawer-nav__sign::after {
+  content: '';
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 50%;
+  inline-size: 14px;
+  block-size: 1.5px;
+  background-color: currentColor;
+  border-radius: 2px;
+  translate: -50% -50%;
+  transition: rotate var(--header-speed) var(--header-ease), opacity var(--header-speed) var(--header-ease);
+}
+
+.drawer-nav__sign::after {
+  rotate: 90deg;
+}
+
+/* The vertical stroke rotates back to flat rather than disappearing, so the
+   plus visibly becomes the minus instead of one icon replacing another. */
+[data-open] > .drawer-nav__link .drawer-nav__sign::after {
+  rotate: 0deg;
+}
+
+/* ---- accordion panel ---- */
+
+/* A one-row grid animated from `0fr` to `1fr`.
+
+   This is the only way to transition to a height the browser has to measure.
+   `max-height` needs a guessed ceiling — too low and long menus are cut off,
+   too high and the animation spends most of its duration on empty space, which
+   is what made the accordion look like it was not animating at all. */
+/* The height is written by `header.js` in pixels, measured from the content.
+
+   `grid-template-rows: 0fr → 1fr` is tidier, but it depends on the browser
+   laying the row out before the second value is applied — and inside a
+   `<details>` that has just been opened, that pass does not reliably happen.
+   The panel jumped to full height with no animation.
+
+   A measured pixel height has no such dependency, and the component releases it
+   back to `auto` once the transition ends so a submenu opening inside an
+   already-open panel still grows its parent. */
+.drawer-nav__panel {
+  overflow: hidden;
+  block-size: 0;
+  /* `will-change` promotes the panel before the first frame. Without it the
+     browser starts the transition on the main thread, spends the first two or
+     three frames deciding to promote, and the opening reads as a stutter. */
+  will-change: block-size;
+  transition: block-size var(--panel-speed) var(--header-ease);
+}
+
+[data-open] > .drawer-nav__panel {
+  block-size: auto;
+}
+
+.drawer-nav__panel-inner {
+  /* No `overflow: hidden` here. The panel above already clips, and a second clip
+     on the element being measured means `scrollHeight` reports the *visible*
+     height rather than the content height — so the animation ran to the wrong
+     number and looked like a jump. */
+  padding-block-end: var(--space-3);
+  opacity: 0;
+  transition: opacity var(--panel-fade) linear;
+}
+
+[data-open] > .drawer-nav__panel > .drawer-nav__panel-inner {
+  opacity: 1;
+}
+
+/* A mega panel cloned into the drawer is a flat block of content, not a
+   floating panel: no shadow, no border, no absolute positioning. */
+.drawer-nav .nav__panel--mobile {
+  position: static;
+  padding: 0;
+  overflow: visible;
+  pointer-events: auto;
+}
+
+.drawer-nav .nav__panel--mobile > .nav__panel-inner {
+  max-inline-size: none;
+  margin-block-end: var(--space-4);
+  border: 0;
+  box-shadow: none;
+  background: none;
+  transform: none;
+  opacity: 1;
+}
+
+.drawer-nav .nav__panel--mobile .megamenu {
+  padding: 0;
+}
+
+.drawer-nav .nav__panel--mobile .megamenu__grid,
+.drawer-nav .nav__panel--mobile .megamenu__columns {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.drawer-nav .nav__panel--mobile .megamenu__item {
+  grid-column: 1 / -1;
+}
+
+/* ---- slide screens ---- */
+
+.drawer-nav--slide {
+  position: relative;
+  overflow: hidden;
+  transition: block-size var(--panel-speed) var(--header-ease);
+}
+
+.drawer-nav__screen {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 0;
+  transform: translateX(100%);
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    transform var(--panel-speed) var(--header-ease),
+    opacity var(--panel-fade) linear,
+    visibility 0s linear var(--panel-speed);
+}
+
+.drawer-nav__screen[data-menu-root] {
+  position: relative;
+  transform: translateX(0);
+}
+
+.drawer-nav__screen[data-active] {
+  transform: translateX(0);
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+/* The root slides out of the way rather than sitting under the child panel,
+   which would show through during the transition. */
+.drawer-nav--slide[data-depth]:not([data-depth='0']) .drawer-nav__screen[data-menu-root] {
+  transform: translateX(-30%);
+  opacity: 0;
+  visibility: hidden;
+}
+
+[dir='rtl'] .drawer-nav__screen {
+  transform: translateX(-100%);
+}
+
+[dir='rtl'] .drawer-nav--slide[data-depth]:not([data-depth='0']) .drawer-nav__screen[data-menu-root] {
+  transform: translateX(30%);
+}
+
+.drawer-nav__back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.drawer-nav__heading {
+  display: block;
+  padding-block: var(--space-2) var(--space-4);
+  font-family: var(--font-heading-family);
+  font-size: var(--font-size-h5);
+  color: inherit;
+  text-decoration: none;
+}
+
+/* --------------------------------------------------------------------------
+   18. The bay
+   --------------------------------------------------------------------------
+   Panels wait here for `<nav-menu>` to move them. A panel naming a menu item
+   that no longer exists stays, which is a recoverable failure — the alternative
+   is it appearing loose at the top of the page.
+   -------------------------------------------------------------------------- */
+
+.site-header__bay[hidden] {
+  display: none;
+}
+
+/* --------------------------------------------------------------------------
+   19. Small screens
+   -------------------------------------------------------------------------- */
+
+@media screen and (max-width: 989px) {
+  .site-header {
+    --header-row-height: 56px;
+    --header-pad-inline: var(--space-4);
+    --header-gap: var(--space-2);
+  }
+
+  .site-header__row--bottom {
+    display: none;
+  }
+
+  .site-header__action--cart {
+    padding-inline: var(--space-3);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   20. Promotional banner — overlay, below, or both
+   --------------------------------------------------------------------------
+   The default is the overlay, and it is not a scrim with text on it. The copy
+   sits on a panel that is inset from the image and rounded to match it, so the
+   photograph keeps its own frame and the words have a surface of their own
+   rather than fighting whatever is behind them. That works on a dark lifestyle
+   shot and on a pale product cut-out, which a gradient scrim does not.
+   -------------------------------------------------------------------------- */
+
+.menu-promo__panel {
+  position: absolute;
+  inset-block-end: var(--space-3);
+  inset-inline: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-radius: calc(var(--promo-radius, 16px) - 6px);
+  background-color: rgb(var(--color-background-rgb) / 0.92);
+  color: var(--color-text);
+  backdrop-filter: blur(14px);
+  translate: 0 0;
+  transition: translate var(--header-speed) var(--header-ease);
+}
+
+a.menu-promo:hover .menu-promo__panel {
+  translate: 0 -4px;
+}
+
+.menu-promo__panel .menu-promo__heading {
+  font-size: var(--font-size-md);
+}
+
+.menu-promo__eyebrow {
+  font-family: var(--font-body-family);
+  font-size: var(--font-size-xs);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.menu-promo__button {
+  margin-block-start: var(--space-2);
+}
+
+.menu-promo--overlay .menu-promo__media,
+.menu-promo--both .menu-promo__media {
+  position: relative;
+  display: block;
+}
+
+/* --------------------------------------------------------------------------
+   21. Product cards inside a mega menu panel
+   -------------------------------------------------------------------------- */
+
+.tabs__panel .product-card {
+  --card-radius: 16px;
+}
+
+.megamenu__products {
+  display: grid;
+  grid-template-columns: repeat(var(--tab-columns, 4), minmax(0, 1fr));
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media screen and (max-width: 989px) {
+  .megamenu__products {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* --------------------------------------------------------------------------
+   22. Localization — the search field
+   --------------------------------------------------------------------------
+   Hidden on desktop, shown on mobile. A pointer can reach any row in a 250-row
+   list in one flick; a thumb cannot, and on a phone the panel is short enough
+   that scrolling to Zimbabwe is a real cost. `data-search="always"` overrides
+   it for stores that ship to enough countries to need it everywhere.
+   -------------------------------------------------------------------------- */
+
+.market-picker__search {
+  display: none;
+  padding-block-end: var(--space-2);
+  border-block-end: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent);
+  margin-block-end: var(--space-2);
+}
+
+.market-picker__panel[data-search='always'] .market-picker__search {
+  display: block;
+}
+
+@media screen and (max-width: 989px) {
+  .market-picker__panel[data-search='auto'] .market-picker__search {
+    display: block;
+  }
+}
+
+.market-picker__search input {
+  inline-size: 100%;
+  padding: 8px var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background-color: var(--color-input-background, transparent);
+  color: inherit;
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+}
+
+.market-picker__search input:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 1px;
+}
+
+.market-picker__empty {
+  margin: var(--space-3) 0 0;
+  font-size: var(--font-size-sm);
+  opacity: 0.7;
+}
+
+/* The list is a real `<ul>`. `listbox` semantics were removed: the options are
+   submit buttons in Shopify's localization form, and a listbox whose options
+   are buttons that navigate is a role that lies about what happens on Enter. */
+.market-picker__list li + li {
+  margin-block-start: 1px;
+}
+
+/* --------------------------------------------------------------------------
+   23. Category rail on small screens
+   --------------------------------------------------------------------------
+   Stacked by default. A horizontal strip of five categories on a 380px screen
+   shows two and a half of them, and the half is the one that tells the customer
+   to scroll — which only works if they notice it.
+   -------------------------------------------------------------------------- */
+
+@media screen and (max-width: 989px) {
+  /* Horizontal and scrolling, always.
+
+     A vertical rail on a phone spends the whole screen width on category names
+     and leaves the panel below the fold. Laid across the top it costs one row,
+     and the partially visible next tab is what tells the customer there is more
+     to scroll — which a stacked list cannot say. */
+  .tabs--menu .tabs__list,
+  .tabs--vertical .tabs__list {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    padding-block-end: var(--space-2);
+  }
+
+  .tabs--menu .tabs__list::-webkit-scrollbar,
+  .tabs--vertical .tabs__list::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tabs--menu .tabs__tab,
+  .tabs--vertical .tabs__tab {
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+    white-space: nowrap;
+  }
+
+  /* The marker is measured from the tab's box, so it has to travel with the
+     rail rather than stay pinned to the viewport. */
+  .tabs--menu .tabs__rail,
+  .tabs--vertical .tabs__rail {
+    min-inline-size: 0;
+  }
+}
+
+/* The drawer's close button keeps the shared button styling but sits square. */
+.nav-drawer__close.button {
+  --button-padding-inline: 0;
+  inline-size: 40px;
+  min-inline-size: 40px;
+  block-size: 40px;
+  border-radius: 999px;
+}
+
+/* --------------------------------------------------------------------------
+   24. Small screens — placement is its own decision
+   --------------------------------------------------------------------------
+   The desktop slots are set for a row with five or six controls in it. A phone
+   has three, and the answers are different: a centred logo is a brand mark
+   between a burger and a cart, which is not what centring means at 1600px.
+   -------------------------------------------------------------------------- */
+
+@media screen and (max-width: 989px) {
+  /* The logo leaves whichever desktop slot it was in and takes the middle,
+     `order` moving it without a second copy in the markup. */
+  .site-header[data-logo-mobile='center'] .site-header__row--top {
+    grid-template-columns: 1fr auto 1fr;
+  }
+
+  .site-header[data-logo-mobile='center'] .site-header__logo {
+    grid-column: 2;
+    justify-self: center;
+  }
+
+  .site-header[data-logo-mobile='center'] .site-header__slot--start .site-header__logo,
+  .site-header[data-logo-mobile='center'] .site-header__slot--end .site-header__logo {
+    position: absolute;
+    inset-inline: 0;
+    inset-block-start: 50%;
+    z-index: 1;
+    inline-size: fit-content;
+    margin-inline: auto;
+    translate: 0 -50%;
+  }
+
+  .site-header[data-logo-mobile='center'] .site-header__row--top {
+    position: relative;
+  }
+
+  .site-header[data-logo-mobile='left'] .site-header__slot--center {
+    justify-content: flex-start;
+  }
+
+  /* The promotional pill is the first thing to go. It is the widest control in
+     the row and the only one that is not navigation. */
+  .site-header__actions[data-promo-desktop-only] .site-header__promo {
+    display: none;
+  }
+}
+
+/* ==========================================================================
+   28. The row cannot overlap itself
+   --------------------------------------------------------------------------
+   Seven menu items, a country selector, a promotional pill and three icon
+   controls do not fit on a 1400px row, and a grid track whose content is wider
+   than the track overflows it — which is why the menu was painting on top of
+   the localization in the screenshot.
+
+   Three things stop that: the outer slots refuse to grow past their content,
+   the navigation is the only thing allowed to shrink, and below the widths
+   where it would have to shrink to nothing, the optional controls step out.
+   ========================================================================== */
+
+.site-header__row {
+  column-gap: clamp(var(--space-2), 1.5vw, var(--space-5));
+}
+
+.site-header__slot {
+  min-inline-size: 0;
+}
+
+/* Everything except the navigation holds its size. These are targets the
+   customer reaches for by position, so they must not move. */
+.site-header__logo,
+.site-header__actions,
+.site-header__burger,
+.market-picker {
+  flex-shrink: 0;
+}
+
+/* The navigation is what gives.
+
+   It must NOT clip. A `compact` mega panel — the Science menu — is positioned
+   against its own `<li>`, which lives inside here, so `overflow: hidden` cut the
+   whole panel away and the menu opened onto nothing. Page and full width panels
+   survived because their containing block is `.site-header__inner`, an ancestor
+   of this element, and an overflow clip does not apply to a descendant whose
+   containing block is outside it.
+
+   Overlap is prevented by the width rules below instead: the row tightens, then
+   sheds its optional controls in order. */
+.site-header__nav {
+  min-inline-size: 0;
+  flex-shrink: 1;
+}
+
+.nav {
+  flex-wrap: nowrap;
+}
+
+@media screen and (min-width: 990px) and (max-width: 1399px) {
+  /* Tighten before hiding anything. Most rows fit again at this point. */
+  .site-header {
+    --header-pad-inline: var(--space-4);
+  }
+
+  .nav__link {
+    padding-inline: var(--space-3);
+  }
+
+  .site-header__promo-label {
+    display: none;
+  }
+}
+
+@media screen and (min-width: 990px) and (max-width: 1199px) {
+  /* The country name is the widest optional string in the row, and the flag and
+     the chevron still say what the control is. */
+  .market-picker--header .market-picker__trigger > span[aria-hidden='true'] {
+    display: none;
+  }
+}
+
+@media screen and (min-width: 990px) and (max-width: 1099px) {
+  .site-header__promo {
+    display: none;
+  }
+}
+
+/* ==========================================================================
+   29. Alignment settings, end to end
+   --------------------------------------------------------------------------
+   Two halves have to agree. Liquid puts each element into one of six slots;
+   these rules justify it *inside* that slot. With only the first half, "Right"
+   moved the logo to the end slot and the slot then centred it — which is
+   exactly "the setting does nothing".
+   ========================================================================== */
+
+.site-header__slot--start { justify-content: flex-start; }
+.site-header__slot--center { justify-content: center; }
+.site-header__slot--end { justify-content: flex-end; }
+
+/* When the logo is alone in a slot with other controls, its own setting still
+   decides where in that slot it sits. */
+.site-header[data-logo-position='left'] .site-header__slot--start .site-header__logo { margin-inline-end: auto; }
+.site-header[data-logo-position='right'] .site-header__slot--end .site-header__logo { margin-inline-start: auto; }
+.site-header[data-logo-position='center'] .site-header__slot--center .site-header__logo { margin-inline: auto; }
+
+/* Same for the navigation. In the start slot it hugs the logo; in the end slot
+   it hugs the actions; in the centre it is centred on the page. */
+.site-header[data-menu-position='left'] .site-header__slot--start .site-header__nav { margin-inline-end: auto; }
+.site-header[data-menu-position='right'] .site-header__slot--end .site-header__nav { margin-inline-start: auto; }
+.site-header[data-menu-position='center'] .site-header__slot--center .site-header__nav { margin-inline: auto; }
+
+/* Search sits with whichever group it was put in rather than floating. */
+.site-header[data-search-position='left'] .site-header__slot--start .site-header__action--search { order: 10; }
+.site-header[data-search-position='right'] .site-header__slot--end .site-header__action--search { order: -1; }
+
+/* ==========================================================================
+   27. Transparent → hover → sticky, as a variable override
+   --------------------------------------------------------------------------
+   The header has three appearances and one set of markup. Writing that as
+   `color` rules per element is how the last version ended up with a list of
+   `.site-header[data-scrolled] .nav__link, .site-header__action, …` that had to
+   grow every time a control was added — and how one of them got missed and left
+   white text on a white bar.
+
+   So nothing here sets a colour on an element. The **scheme variables are
+   overridden on the shell**, and every descendant already reads from them:
+   `.nav__link` inherits, the icon buttons mix from `currentColor`, the panels
+   use `--color-background`, the borders use `--color-border`. One override,
+   whole header.
+
+   ## Three states, and `:has([open])` is the interesting one
+
+   - **transparent** — over the banner, untouched
+   - **surfaced** — pointer over the header, or a menu open beneath it
+   - **solid** — scrolled past the banner, on the sticky scheme
+
+   A mega menu opening from a transparent header is the case a hover rule alone
+   gets wrong: the pointer moves down into the panel, leaves the header, and the
+   bar behind the open menu snaps back to transparent. `:has([open])` keeps the
+   surface up for as long as something is open, so the header and the panel it
+   owns are one object.
+
+   ## Why the overrides sit on the shell
+
+   `--header-surface` is captured on `.site-header` (section 3). The overrides
+   have to happen somewhere that can still read it, and a custom property cannot
+   reference itself on the same element. One level down is enough.
+   ========================================================================== */
+
+.site-header__shell {
+  transition:
+    background-color var(--header-speed) var(--header-ease),
+    color var(--header-speed) var(--header-ease),
+    border-color var(--header-speed) var(--header-ease),
+    backdrop-filter var(--header-speed) var(--header-ease),
+    box-shadow var(--header-speed) var(--header-ease);
+}
+
+/* ---- transparent ---- */
+
+/* `[data-transparent]` is written by Liquid and removed by the component past
+   the scroll threshold, so this whole block simply stops applying once the
+   banner is behind us — no second selector for the scrolled state, and no
+   `!important` to unpick it. */
+.site-header--transparent[data-transparent] .site-header__shell:not(:hover):not(:has([open])):not(:has(.market-picker__panel:not([hidden]))) {
+  --color-background: transparent;
+  --gradient-background: none;
+  --color-text: var(--header-transparent-text, #fff);
+  --color-heading: var(--header-transparent-text, #fff);
+  --color-border: color-mix(in srgb, var(--header-transparent-text, #fff) 22%, transparent);
+
+  backdrop-filter: none;
+  box-shadow: none;
+}
+
+/* ---- surfaced: hovered, or holding an open menu ---- */
+
+.site-header--transparent[data-transparent] .site-header__shell:is(:hover, :has([open]), :has(.market-picker__panel:not([hidden]))) {
+  /* Mixed from the scheme's own background rather than a fixed white, so a dark
+     scheme surfaces dark. 78% keeps the banner readable underneath, which is
+     what makes this feel like the header rising rather than the page changing. */
+  --color-background: color-mix(in srgb, var(--header-surface) 78%, transparent);
+
+  backdrop-filter: blur(18px) saturate(1.4);
+}
+
+/* The inverse logo belongs to the transparent state only. As soon as there is a
+   surface behind it — hover, open menu, or scrolled — the solid one is correct. */
+.site-header--transparent[data-transparent] .site-header__shell:is(:hover, :has([open]), :has(.market-picker__panel:not([hidden]))) .site-header__logo--prefers-inverse .site-header__logo-image--solid,
+.site-header[data-scrolled] .site-header__logo--prefers-inverse .site-header__logo-image--solid {
+  opacity: 1;
+}
+
+.site-header--transparent[data-transparent] .site-header__shell:is(:hover, :has([open]), :has(.market-picker__panel:not([hidden]))) .site-header__logo--prefers-inverse .site-header__logo-image--inverse,
+.site-header[data-scrolled] .site-header__logo--prefers-inverse .site-header__logo-image--inverse {
+  opacity: 0;
+}
+
+/* ---- solid: the sticky scheme ---- */
+
+/* Nothing to declare. The component swaps the scheme class on `.site-header` and
+   removes `[data-transparent]`, so the shell falls back to reading the sticky
+   scheme's own variables — and `--header-surface` has already followed it there.
+
+   The only addition is the lift, which says the header is now above the page
+   rather than part of the banner. */
+.site-header[data-scrolled]:not([data-transparent]) .site-header__shell {
+  box-shadow: 0 8px 28px -18px color-mix(in srgb, var(--color-text) 60%, transparent);
+}
+
+/* Panels opened from a transparent header must not inherit the transparent
+   background — they are their own surface and their contents have to be
+   readable regardless of what is behind the header. */
+.nav__panel-inner,
+.market-picker__panel {
+  --color-background: var(--header-surface);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .site-header__shell {
+    transition: none;
+  }
+}
+
+/* ==========================================================================
+   30. The mega menu panel, cloned into the drawer
+   --------------------------------------------------------------------------
+   The clone arrives with the classes it needs on desktop — absolutely
+   positioned, clipped for the reveal, `max-content` wide, capped at the panel's
+   maximum width. All four are wrong in a 380px drawer, and the compact panel in
+   particular arrived wider than the screen with its own scrollbar.
+
+   Everything below unwinds those, so the panel becomes what it should be on a
+   phone: a plain block of content in the flow of the accordion.
+   ========================================================================== */
+
+.drawer-nav .nav__panel--mobile {
+  position: static;
+  inset: auto;
+  inline-size: auto;
+  max-inline-size: none;
+  overflow: visible;
+  padding: 0;
+  translate: none;
+  pointer-events: auto;
+}
+
+.drawer-nav .nav__panel--mobile > .nav__panel-inner {
+  max-inline-size: none;
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  /* The desktop reveal slides the inner element down out of a clip. There is no
+     clip here, so an untouched transform would leave it sitting above the panel
+     it belongs to. */
+  transform: none;
+  opacity: 1;
+}
+
+.drawer-nav .nav__panel--mobile .megamenu {
+  padding: 0;
+}
+
+/* One column. A twelve-column grid on a phone gives every block a slice of a
+   slice. */
+.drawer-nav .nav__panel--mobile .megamenu__grid,
+.drawer-nav .nav__panel--mobile .megamenu__columns {
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+.drawer-nav .nav__panel--mobile .megamenu__item {
+  grid-column: 1 / -1;
+}
+
+/* The tab rail keeps its inset field, but loses the desktop two-column split. */
+.drawer-nav .nav__panel--mobile .tabs--vertical {
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+.drawer-nav .nav__panel--mobile .tabs__panel-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* A carousel inside the drawer measures itself when the accordion opens — but
+   only if it has a width to measure. Without this it inherits `max-content` from
+   the compact panel and reports a track wider than the drawer. */
+.drawer-nav .nav__panel--mobile .carousel-shell {
+  inline-size: 100%;
+  max-inline-size: 100%;
+}

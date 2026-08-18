@@ -1,0 +1,146 @@
+{% comment %}
+  blocks/menu-tabs.liquid — Boost10
+
+  A category rail with a panel that changes as you move down it. The "Shop by
+  category" menu: five categories on the left, three promotional cards on the
+  right, and the cards swap without the panel resizing.
+
+  ## The rail is empty in the markup
+
+  Each nested `menu-tab` block renders a `role="tabpanel"` carrying
+  `data-tab-label`, and `<tab-group>` builds the buttons from those labels.
+
+  This is not a shortcut. `{% content_for 'blocks' %}` produces one stream of
+  output, and the buttons and the panels have to end up in two different
+  containers — the rail on the left, the panels on the right. There is no Liquid
+  that emits nested blocks twice, so either the buttons are generated from the
+  panels or the merchant types every category name a second time in this block's
+  settings and keeps the two lists in sync by hand.
+
+  With JavaScript off, every panel stays visible and stacks. All the content is
+  reachable; only the switching is missing.
+
+  ## Hover selects
+
+  The customer is already dragging a pointer down a list of categories on the way
+  to the panel. Requiring a click there is a click that buys nothing. `data-hover`
+  is set from a setting so a merchant whose categories are also destinations can
+  turn it off.
+{% endcomment %}
+
+{%- liquid
+  assign st = block.settings
+  assign tab_id = 'MegaTabs-' | append: block.id
+-%}
+
+<div
+  class="megamenu__item megamenu__item--tabs"
+  style="--span: {{ st.column_span }};"
+  {{ block.shopify_attributes }}
+>
+  <tab-group
+    id="{{ tab_id }}"
+    class="tabs tabs--{{ st.orientation }} tabs--menu"
+    data-orientation="{{ st.orientation }}"
+    data-activation="auto"
+    data-stack="{% if st.stack_on_mobile %}true{% else %}false{% endif %}"
+    {% if st.select_on_hover %}data-hover="true"{% endif %}
+    style="--tabs-rail-width: {{ st.rail_width }}px; --tabs-marker-radius: {{ st.marker_radius }}px;"
+  >
+    <div class="tabs__rail">
+      <div
+        class="tabs__list"
+        role="tablist"
+        aria-orientation="{{ st.orientation }}"
+        {% if st.heading != blank %}aria-label="{{ st.heading | escape }}"{% endif %}
+        data-ref="list"
+      >
+        <span class="tabs__marker" data-ref="marker" aria-hidden="true"></span>
+      </div>
+    </div>
+
+    <div class="tabs__panels" data-ref="panels">
+      {% content_for 'blocks' %}
+    </div>
+  </tab-group>
+</div>
+
+{% schema %}
+{
+  "name": "t:blocks.menu_tabs.name",
+  "tag": null,
+  "settings": [
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "t:blocks.menu_tabs.settings.heading.label",
+      "info": "t:blocks.menu_tabs.settings.heading.info"
+    },
+    {
+      "type": "select",
+      "id": "orientation",
+      "label": "t:blocks.menu_tabs.settings.orientation.label",
+      "options": [
+        {
+          "value": "vertical",
+          "label": "t:blocks.menu_tabs.settings.orientation.options__1.label"
+        },
+        {
+          "value": "horizontal",
+          "label": "t:blocks.menu_tabs.settings.orientation.options__2.label"
+        }
+      ],
+      "default": "vertical"
+    },
+    {
+      "type": "range",
+      "id": "rail_width",
+      "label": "t:blocks.menu_tabs.settings.rail_width.label",
+      "info": "t:blocks.menu_tabs.settings.rail_width.info",
+      "min": 140,
+      "max": 400,
+      "step": 10,
+      "unit": "px",
+      "default": 260
+    },
+    {
+      "type": "range",
+      "id": "marker_radius",
+      "label": "t:blocks.menu_tabs.settings.marker_radius.label",
+      "min": 0,
+      "max": 40,
+      "step": 2,
+      "unit": "px",
+      "default": 16
+    },
+    {
+      "type": "checkbox",
+      "id": "select_on_hover",
+      "label": "t:blocks.menu_tabs.settings.select_on_hover.label",
+      "default": true
+    },
+    {
+      "type": "range",
+      "id": "column_span",
+      "label": "t:blocks.shared.column_span.label",
+      "info": "t:blocks.shared.column_span.info",
+      "min": 1,
+      "max": 12,
+      "step": 1,
+      "default": 12
+    },
+    {
+      "type": "checkbox",
+      "id": "stack_on_mobile",
+      "label": "t:blocks.menu_tabs.settings.stack_on_mobile.label",
+      "info": "t:blocks.menu_tabs.settings.stack_on_mobile.info",
+      "default": true
+    }
+  ],
+  "blocks": [
+    {
+      "type": "menu-tab"
+    }
+  ]
+}
+{% endschema %}

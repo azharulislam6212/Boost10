@@ -1,0 +1,121 @@
+{% doc %}
+  The promotional pill, account control and cart control.
+
+  ## The cart count is Liquid, never JavaScript
+
+  `sections/cart-drawer.liquid` names this section in its `data-sections`, so
+  every cart mutation re-renders the header through the Section Rendering API
+  and the number arrives already correct. Counting items in the browser as well
+  gives two sources of truth that disagree the moment a discount removes a line,
+  and the one the customer sees is the wrong one.
+
+  ## Why the account control is sometimes a disclosure
+
+  With no account menu set it is a plain link to the login or account page —
+  one target, one destination, nothing to expand. With a menu set it becomes a
+  `<details>` handled by the same `<nav-menu>` code as the main navigation, so
+  the animation, the hover intent and the Escape handling are not written twice.
+
+  Parameters:
+    cart_is_drawer     (boolean, required)
+    cart_count_display (string, required)  Already padded if the merchant asked
+
+  @example
+    {% render 'header-actions', cart_is_drawer: true, cart_count_display: '02' %}
+{% enddoc %}
+
+{%- liquid
+  assign st = section.settings
+  assign show_labels = false
+  if st.utility_style == 'text'
+    assign show_labels = true
+  endif
+-%}
+
+<div class="site-header__actions"{% unless st.promo_show_mobile %} data-promo-desktop-only{% endunless %}>
+  {%- if st.promo_label != blank or st.promo_badge != blank -%}
+    {%- comment -%}
+      Rendered as a link when it points somewhere and as a static pill when it
+      does not, rather than as an anchor with `href="#"` that sends the customer
+      back to the top of the page.
+    {%- endcomment -%}
+    {%- if st.promo_link != blank -%}
+      <a class="site-header__promo" href="{{ st.promo_link }}">
+    {%- else -%}
+      <span class="site-header__promo">
+    {%- endif -%}
+      {% render 'icon', icon: 'tag', size: 14, class: 'site-header__promo-icon' %}
+      {%- if st.promo_label != blank -%}
+        <span class="site-header__promo-label">{{ st.promo_label | escape }}</span>
+      {%- endif -%}
+      {%- if st.promo_badge != blank -%}
+        <span class="site-header__promo-badge">{{ st.promo_badge | escape }}</span>
+      {%- endif -%}
+    {%- if st.promo_link != blank -%}</a>{%- else -%}</span>{%- endif -%}
+  {%- endif -%}
+
+  {%- if st.show_account -%}
+    {%- liquid
+      assign account_url = routes.account_login_url
+      if customer
+        assign account_url = routes.account_url
+      endif
+    -%}
+
+    {%- if st.account_menu != blank and st.account_menu.links.size > 0 -%}
+      <nav-disclosure class="site-header__account">
+      <details class="nav__details" data-nav-details data-kind="sub">
+        <summary
+          class="site-header__action site-header__action--account"
+          data-nav-summary
+          aria-expanded="false"
+          aria-label="{{ 'sections.header.account' | t }}"
+        >
+          {% render 'icon', icon: 'account', size: 18 %}
+          {%- if show_labels -%}
+            <span class="site-header__action-label">{{ 'sections.header.account' | t }}</span>
+          {%- endif -%}
+        </summary>
+
+        <div class="nav__panel nav__panel--sub nav__panel--end" data-nav-panel>
+          <div class="nav__panel-inner">
+            <ul class="dropdown dropdown--sub" role="list">
+              {%- for link in st.account_menu.links -%}
+                <li class="dropdown__item">
+                  <a class="dropdown__link" href="{{ link.url }}">{{ link.title }}</a>
+                </li>
+              {%- endfor -%}
+            </ul>
+          </div>
+        </div>
+      </details>
+      </nav-disclosure>
+    {%- else -%}
+      <a
+        class="site-header__action site-header__action--account"
+        href="{{ account_url }}"
+        aria-label="{{ 'sections.header.account' | t }}"
+      >
+        {% render 'icon', icon: 'account', size: 18 %}
+        {%- if show_labels -%}
+          <span class="site-header__action-label">{{ 'sections.header.account' | t }}</span>
+        {%- endif -%}
+      </a>
+    {%- endif -%}
+  {%- endif -%}
+
+  <a
+    class="site-header__action site-header__action--cart"
+    href="{{ routes.cart_url }}"
+    {% if cart_is_drawer %}
+      data-overlay-open="CartDrawer"
+      aria-expanded="false"
+      aria-controls="CartDrawer"
+    {% endif %}
+    aria-label="{{ 'accessibility.open_cart' | t }}"
+  >
+    {% render 'icon', icon: 'cart', size: 18 %}
+    <span class="site-header__cart-count" aria-hidden="true">{{ cart_count_display }}</span>
+    <span class="visually-hidden">{{ 'sections.header.cart_count' | t: count: cart.item_count }}</span>
+  </a>
+</div>

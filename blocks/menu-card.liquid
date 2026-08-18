@@ -1,0 +1,157 @@
+{% comment %}
+  blocks/menu-card.liquid — Boost10
+
+  A row card: thumbnail, title, one line of description. Four of these stacked in
+  a compact panel is the "Science" menu — an editorial list where each entry
+  needs a sentence to be worth clicking, which a plain link column cannot carry.
+
+  ## The whole card is one link
+
+  Not a title link inside a card. Two nested anchors are invalid markup, and a
+  card where only the title is clickable gives a keyboard user one stop for a
+  target that looks like it is 400px wide to everyone else.
+
+  When no link is set the card renders as a `<div>` rather than as an anchor with
+  `href="#"` that sends the customer back to the top of the page.
+
+  ## Emphasis is one card, not a state
+
+  `emphasis` inverts a card so the merchant can point at the entry that matters
+  this month. It is a setting rather than an `:active` or `:hover` state because
+  it should be true when the panel opens — a highlight that only appears once
+  you are already pointing at it has told you nothing.
+{% endcomment %}
+
+{%- liquid
+  assign st = block.settings
+  assign has_link = false
+  if st.link != blank
+    assign has_link = true
+  endif
+-%}
+
+{%- capture card_body -%}
+  <span class="menu-card__media">
+    {%- if st.image != blank -%}
+      {% render 'image',
+        image: st.image,
+        alt: st.title,
+        ratio: st.image_ratio,
+        sizes: '96px',
+        widths: '96,140,192,280',
+        wrapper_class: 'menu-card__image',
+        class: 'menu-card__img'
+      %}
+    {%- else -%}
+      <span class="menu-card__image menu-card__image--placeholder">
+        {{ 'product-1' | placeholder_svg_tag: 'placeholder-svg' }}
+      </span>
+    {%- endif -%}
+  </span>
+
+  <span class="menu-card__text">
+    {%- if st.title != blank -%}
+      <span class="menu-card__title">{{ st.title | escape }}</span>
+    {%- endif -%}
+    {%- if st.description != blank -%}
+      <span class="menu-card__description">{{ st.description | escape }}</span>
+    {%- endif -%}
+  </span>
+{%- endcapture -%}
+
+{%- if has_link -%}
+  <a
+    class="megamenu__item menu-card{% if st.emphasis %} menu-card--emphasis{% endif %}"
+    href="{{ st.link }}"
+    style="--span: {{ st.column_span }}; --card-radius: {{ st.corner_radius }}px;"
+    {{ block.shopify_attributes }}
+  >
+    {{ card_body }}
+  </a>
+{%- else -%}
+  <div
+    class="megamenu__item menu-card{% if st.emphasis %} menu-card--emphasis{% endif %}"
+    style="--span: {{ st.column_span }}; --card-radius: {{ st.corner_radius }}px;"
+    {{ block.shopify_attributes }}
+  >
+    {{ card_body }}
+  </div>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "t:blocks.menu_card.name",
+  "tag": null,
+  "settings": [
+    {
+      "type": "image_picker",
+      "id": "image",
+      "label": "t:shared.image.label"
+    },
+    {
+      "type": "select",
+      "id": "image_ratio",
+      "label": "t:shared.image_ratio.label",
+      "options": [
+        {
+          "value": "square",
+          "label": "t:shared.image_ratio.options__1.label"
+        },
+        {
+          "value": "portrait",
+          "label": "t:shared.image_ratio.options__2.label"
+        },
+        {
+          "value": "landscape",
+          "label": "t:shared.image_ratio.options__3.label"
+        }
+      ],
+      "default": "square"
+    },
+    {
+      "type": "text",
+      "id": "title",
+      "label": "t:shared.heading.label",
+      "default": "Research & Testing"
+    },
+    {
+      "type": "text",
+      "id": "description",
+      "label": "t:shared.text.label",
+      "default": "Evidence-based research, broken down simply."
+    },
+    {
+      "type": "url",
+      "id": "link",
+      "label": "t:shared.link.label"
+    },
+    {
+      "type": "checkbox",
+      "id": "emphasis",
+      "label": "t:blocks.menu_card.settings.emphasis.label",
+      "info": "t:blocks.menu_card.settings.emphasis.info",
+      "default": false
+    },
+    {
+      "type": "range",
+      "id": "corner_radius",
+      "label": "t:shared.corner_radius.label",
+      "min": 0,
+      "max": 40,
+      "step": 2,
+      "unit": "px",
+      "default": 20
+    },
+    {
+      "type": "range",
+      "id": "column_span",
+      "label": "t:blocks.shared.column_span.label",
+      "info": "t:blocks.shared.column_span.info",
+      "min": 1,
+      "max": 12,
+      "step": 1,
+      "default": 12
+    }
+  ]
+}
+{% endschema %}

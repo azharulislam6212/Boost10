@@ -1,0 +1,273 @@
+{% comment %}
+  blocks/menu-promo.liquid — Boost10
+
+  A promotional banner: image, an optional eyebrow, a headline, and a call to
+  action that is either a text link or a real button.
+
+  ## Three text positions, and the default is the interesting one
+
+  `over` is the default and is not a gradient scrim with white text on it. The
+  copy sits on its own inset, rounded, blurred panel, so the photograph keeps a
+  visible frame on all four sides and the words have a surface of their own.
+  A scrim only works on images dark enough to carry white text; an inset panel
+  works on a pale product cut-out and on a dark lifestyle shot equally, which is
+  the difference between a design and a design that survives the merchant's
+  photography.
+
+  `below` puts everything under the image, for a row of banners that all need
+  the same baseline. `both` splits them — eyebrow and headline over the image,
+  the call to action beneath — for the one banner in a panel that is meant to
+  win.
+
+  ## Link or button
+
+  A text link with a rule under it when the whole banner is already clickable;
+  a real button when the merchant wants the banner to read as an offer rather
+  than as a category. The button comes from `snippets/button.liquid`, so it
+  inherits the theme's variants, sizes and hover behaviour rather than
+  reimplementing them at a smaller size.
+{% endcomment %}
+
+{%- liquid
+  assign st = block.settings
+  assign has_link = false
+  if st.link != blank
+    assign has_link = true
+  endif
+
+  assign tag = 'div'
+  if has_link and st.cta_style != 'button'
+    assign tag = 'a'
+  endif
+
+  assign show_over = false
+  assign show_below = false
+  case st.text_position
+    when 'over'
+      assign show_over = true
+    when 'both'
+      assign show_over = true
+      assign show_below = true
+    else
+      assign show_below = true
+  endcase
+-%}
+
+{%- capture eyebrow_and_heading -%}
+  {%- if st.eyebrow != blank -%}
+    <span class="menu-promo__eyebrow">{{ st.eyebrow | escape }}</span>
+  {%- endif -%}
+  {%- if st.heading != blank -%}
+    <span class="menu-promo__heading">{{ st.heading | escape }}</span>
+  {%- endif -%}
+{%- endcapture -%}
+
+{%- capture call_to_action -%}
+  {%- if st.link_label != blank -%}
+    {%- if st.cta_style == 'button' -%}
+      {%- comment -%}
+        A real button, so it is its own target. That is also why the wrapper
+        stops being an anchor in this mode: a button inside a link is invalid,
+        and browsers resolve it by making the inner control unreachable.
+      {%- endcomment -%}
+      <span class="menu-promo__button">
+        {% render 'button',
+          label: st.link_label,
+          href: st.link,
+          variant: st.button_variant,
+          size: 'small',
+          icon: 'arrow-right'
+        %}
+      </span>
+    {%- else -%}
+      <span class="menu-promo__cta">
+        <span>{{ st.link_label | escape }}</span>
+        {% render 'icon', icon: 'arrow-right', size: 16 %}
+      </span>
+    {%- endif -%}
+  {%- endif -%}
+{%- endcapture -%}
+
+<{{ tag }}
+  class="megamenu__item menu-promo menu-promo--{{ st.text_position }}"
+  {% if tag == 'a' %}href="{{ st.link }}"{% endif %}
+  style="--span: {{ st.column_span }}; --promo-radius: {{ st.corner_radius }}px;"
+  {{ block.shopify_attributes }}
+>
+  <span class="menu-promo__media">
+    {%- if st.image != blank -%}
+      {% render 'image',
+        image: st.image,
+        alt: st.heading,
+        ratio: st.image_ratio,
+        sizes: '(min-width: 990px) 33vw, 90vw',
+        wrapper_class: 'menu-promo__image',
+        class: 'menu-promo__img'
+      %}
+    {%- else -%}
+      <span class="menu-promo__image menu-promo__image--placeholder">
+        {{ 'lifestyle-1' | placeholder_svg_tag: 'placeholder-svg' }}
+      </span>
+    {%- endif -%}
+
+    {%- if show_over -%}
+      <span class="menu-promo__panel">
+        {{ eyebrow_and_heading }}
+        {%- unless show_below -%}{{ call_to_action }}{%- endunless -%}
+      </span>
+    {%- endif -%}
+  </span>
+
+  {%- if show_below -%}
+    <span class="menu-promo__content">
+      {%- unless show_over -%}{{ eyebrow_and_heading }}{%- endunless -%}
+      {{ call_to_action }}
+    </span>
+  {%- endif -%}
+</{{ tag }}>
+
+{% schema %}
+{
+  "name": "t:blocks.menu_promo.name",
+  "tag": null,
+  "settings": [
+    {
+      "type": "image_picker",
+      "id": "image",
+      "label": "t:shared.image.label"
+    },
+    {
+      "type": "select",
+      "id": "image_ratio",
+      "label": "t:shared.image_ratio.label",
+      "options": [
+        {
+          "value": "square",
+          "label": "t:shared.image_ratio.options__1.label"
+        },
+        {
+          "value": "portrait",
+          "label": "t:shared.image_ratio.options__2.label"
+        },
+        {
+          "value": "landscape",
+          "label": "t:shared.image_ratio.options__3.label"
+        },
+        {
+          "value": "wide",
+          "label": "t:shared.image_ratio.options__4.label"
+        }
+      ],
+      "default": "portrait"
+    },
+    {
+      "type": "text",
+      "id": "eyebrow",
+      "label": "t:blocks.menu_promo.settings.eyebrow.label"
+    },
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "t:shared.heading.label",
+      "default": "Micronutrients for Peak Daily Vitality"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.menu_promo.headers.cta"
+    },
+    {
+      "type": "text",
+      "id": "link_label",
+      "label": "t:blocks.menu_promo.settings.link_label.label",
+      "default": "Shop Vitamin"
+    },
+    {
+      "type": "url",
+      "id": "link",
+      "label": "t:shared.link.label"
+    },
+    {
+      "type": "select",
+      "id": "cta_style",
+      "label": "t:blocks.menu_promo.settings.cta_style.label",
+      "info": "t:blocks.menu_promo.settings.cta_style.info",
+      "options": [
+        {
+          "value": "link",
+          "label": "t:blocks.menu_promo.settings.cta_style.options__1.label"
+        },
+        {
+          "value": "button",
+          "label": "t:blocks.menu_promo.settings.cta_style.options__2.label"
+        }
+      ],
+      "default": "link"
+    },
+    {
+      "type": "select",
+      "id": "button_variant",
+      "label": "t:blocks.menu_promo.settings.button_variant.label",
+      "options": [
+        {
+          "value": "primary",
+          "label": "t:blocks.menu_promo.settings.button_variant.options__1.label"
+        },
+        {
+          "value": "secondary",
+          "label": "t:blocks.menu_promo.settings.button_variant.options__2.label"
+        },
+        {
+          "value": "outline",
+          "label": "t:blocks.menu_promo.settings.button_variant.options__3.label"
+        }
+      ],
+      "default": "primary"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.layout.label"
+    },
+    {
+      "type": "select",
+      "id": "text_position",
+      "label": "t:blocks.menu_promo.settings.text_position.label",
+      "info": "t:blocks.menu_promo.settings.text_position.info",
+      "options": [
+        {
+          "value": "over",
+          "label": "t:blocks.menu_promo.settings.text_position.options__2.label"
+        },
+        {
+          "value": "below",
+          "label": "t:blocks.menu_promo.settings.text_position.options__1.label"
+        },
+        {
+          "value": "both",
+          "label": "t:blocks.menu_promo.settings.text_position.options__3.label"
+        }
+      ],
+      "default": "over"
+    },
+    {
+      "type": "range",
+      "id": "corner_radius",
+      "label": "t:shared.corner_radius.label",
+      "min": 0,
+      "max": 40,
+      "step": 2,
+      "unit": "px",
+      "default": 16
+    },
+    {
+      "type": "range",
+      "id": "column_span",
+      "label": "t:blocks.shared.column_span.label",
+      "info": "t:blocks.shared.column_span.info",
+      "min": 1,
+      "max": 12,
+      "step": 1,
+      "default": 4
+    }
+  ]
+}
+{% endschema %}

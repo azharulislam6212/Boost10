@@ -111,6 +111,12 @@ const LAZY_MODULES = [
   // hidden panel measures zero. Without this the mega menu's product carousels
   // were both unswitchable and unmeasurable.
   { specifier: '@theme/collection-tabs', tags: ['collection-tabs'] },
+
+  // The header's own behaviour. `<sticky-header>` is registered in this file
+  // because every page has one; the navigation is lazy because a password
+  // page, a checkout-adjacent page and a bare landing page have no menu.
+  { specifier: '@theme/header', tags: ['nav-menu', 'nav-disclosure', 'mobile-nav', 'market-picker'] },
+  { specifier: '@theme/tabs', tags: ['tab-group'] },
   { specifier: '@theme/facet-dropdown', tags: ['facet-dropdown'] },
 
   { specifier: '@theme/media-gallery', tags: ['media-gallery', 'media-thumbnails'] },
@@ -175,10 +181,30 @@ export async function loadModulesFor(root = document) {
  * targets and drawer positions all read one number instead of hardcoding one.
  * Optionally hides on scroll down and returns on scroll up.
  *
+ * ## Four sticky modes, one attribute
+ *
+ * `sticky` and `hide-on-scroll` as two independent booleans produced a state
+ * nobody wanted — "not pinned, but hides on scroll" — and both this file and
+ * the stylesheet had to defend against it. `data-sticky-mode` has four values
+ * and no impossible combinations:
+ *
+ *   never        left in the flow; this component only measures
+ *   always       pinned from the first pixel
+ *   scroll-up    pinned, hides going down, returns going up
+ *   scroll-down  hidden until the page has scrolled past a fold, then pinned
+ *
+ * ## Transparency and the sticky scheme
+ *
+ * `[data-transparent]` is removed as soon as the page scrolls past the
+ * threshold, and the merchant's sticky colour scheme class is added at the same
+ * moment. Both are attribute writes on one element, so the whole header —
+ * icons, cart bubble, dropdown panels — recolours from the scheme tokens
+ * without a second rule anywhere.
+ *
  * Attributes:
- *   data-sticky      "false" to keep the header in the flow
- *   data-hide-on-scroll  "true" to hide while scrolling down
- *   data-threshold   Pixels scrolled before the sticky state engages (default 80)
+ *   data-sticky-mode    never | always | scroll-up | scroll-down
+ *   data-sticky-scheme  A `color-scheme-n` class applied once scrolled
+ *   data-threshold      Pixels scrolled before the sticky state engages (default 80)
  */
 export class StickyHeader extends BaseComponent {
   /** @type {number} */
@@ -196,9 +222,16 @@ export class StickyHeader extends BaseComponent {
     this.#observer = new ResizeObserver(rafThrottle(() => this.#measure()));
     this.#observer.observe(this);
 
-    if (this.dataset.sticky !== 'false') {
-      this.#unsubscribe = subscribeToTicker(rafThrottle((scrollY) => this.#onScroll(scrollY)));
-    }
+    // Every mode except `never` reacts to scroll — and `never` still needs the
+    // transparent state cleared once the page moves past the banner, so the
+    // subscription is unconditional and the mode is read inside the callback.
+    this.#unsubscribe = subscribeToTicker(rafThrottle((scrollY) => this.#onScroll(scrollY)));
+
+    // The ticker only reports on movement. Without this first call a header
+    // in `scroll-down` mode is visible until the customer scrolls, which is
+    // the one moment the mode exists to avoid, and a page loaded mid-scroll
+    // (a refresh, a back navigation) starts transparent over solid content.
+    this.#onScroll(window.scrollY);
 
     // An open drawer must never be hidden by a header that scrolled away.
     this.on(document, EVENTS.OVERLAY_OPEN, () => this.reveal());
@@ -237,6 +270,37 @@ export class StickyHeader extends BaseComponent {
     if (announcement instanceof HTMLElement) {
       setCssVar('--announcement-height', `${announcement.offsetHeight}px`);
     }
+
+    setCssVar('--header-sticky-offset', `${this.#stickyOffset()}px`);
+  }
+
+  /**
+   * How far down the header should pin.
+   *
+   * Zero unless something above it is pinned too. A sticky announcement bar
+   * keeps the top of the viewport, and a header pinned to `0` lands on top of
+   * it — so the header starts where that element ends instead.
+   *
+   * Measured rather than configured: the merchant can turn the announcement bar
+   * on, off or sticky, and none of that should require a second setting here.
+   *
+   * @returns {number}
+   * @private
+   */
+  #stickyOffset() {
+    let offset = 0;
+
+    for (const section of document.querySelectorAll('.shopify-section')) {
+      if (section.contains(this)) break;
+      if (!(section instanceof HTMLElement)) continue;
+
+      const position = getComputedStyle(section).position;
+      if (position !== 'sticky' && position !== 'fixed') continue;
+
+      offset += section.offsetHeight;
+    }
+
+    return offset;
   }
 
   /**
@@ -246,27 +310,53 @@ export class StickyHeader extends BaseComponent {
   #onScroll(scrollY) {
     const threshold = Number(this.dataset.threshold) || 80;
     const position = Math.max(0, scrollY);
+    const mode = this.dataset.stickyMode || 'always';
+    const scrolled = position > threshold;
 
-    this.toggleAttribute('data-scrolled', position > threshold);
+    this.toggleAttribute('data-scrolled', scrolled);
 
-    if (this.dataset.hideOnScroll !== 'true') {
-      this.#lastScroll = position;
-      return;
+    // Transparency ends where the banner does. The class stays — it says the
+    // template supports transparency — and only the live state is removed, so
+    // scrolling back to the top restores it without re-reading any settings.
+    // `site-header--transparent`, not `header--transparent`.
+    //
+    // The class was renamed when the header's CSS was moved off the names
+    // `base.css` already owned, and this check was missed. It never matched, so
+    // `[data-transparent]` was never removed — the header stayed in its
+    // transparent state for the whole page and the sticky scheme had nothing to
+    // paint over. Hover worked because that rule does not depend on this one.
+    if (this.classList.contains('site-header--transparent')) {
+      this.toggleAttribute('data-transparent', !scrolled);
     }
+
+    const scheme = this.dataset.stickyScheme;
+    if (scheme) this.classList.toggle(scheme, scrolled);
 
     const delta = position - this.#lastScroll;
 
-    // A small deadzone stops the header flickering during momentum scrolling,
-    // which is exactly the condition Lenis produces most of.
+    // A deadzone stops the header flickering during momentum scrolling, which
+    // is the condition Lenis produces most of. It is checked before the mode
+    // switch so a mode that ignores direction does not pay for it.
     if (Math.abs(delta) < 6) return;
-
-    if (delta > 0 && position > threshold * 2) {
-      this.setAttribute('data-hidden', '');
-    } else {
-      this.removeAttribute('data-hidden');
-    }
-
     this.#lastScroll = position;
+
+    switch (mode) {
+      case 'scroll-up':
+        // Hidden going down, back going up. The second threshold keeps the
+        // header still through the first screen, where a customer flicking
+        // past the hero is not asking for anything to move.
+        this.toggleAttribute('data-hidden', delta > 0 && position > threshold * 2);
+        break;
+
+      case 'scroll-down':
+        // The inverse: absent until the page has left the banner behind, then
+        // pinned. Used where the header would compete with the hero.
+        this.toggleAttribute('data-hidden', !scrolled);
+        break;
+
+      default:
+        this.removeAttribute('data-hidden');
+    }
   }
 }
 
@@ -601,7 +691,12 @@ function publishViewport() {
  */
 function onOverlayClose(event) {
   const overlay = event.target instanceof Element ? event.target : null;
-  overlay?.querySelector('mobile-navigation')?.reset?.();
+  // Both tags: `<mobile-nav>` is the current drawer navigation, and
+  // `<mobile-navigation>` is the previous one, still present in themes that
+  // have not taken the new header yet.
+  for (const nav of overlay?.querySelectorAll('mobile-nav, mobile-navigation') || []) {
+    /** @type {any} */ (nav).reset?.();
+  }
 }
 
 /**

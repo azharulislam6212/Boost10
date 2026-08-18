@@ -1,0 +1,104 @@
+/* ==========================================================================
+   product-card.css — Boost10
+   --------------------------------------------------------------------------
+   Where the quick add sits on a product card.
+
+   `base.css` already places `.product-card__actions` as a bar across the bottom
+   of the image, revealed on hover. This file adds the second placement — a
+   single round control in the top corner — and nothing else. It is loaded after
+   `base.css` and scoped to `[data-quick-add-position='corner']`, so a store that
+   never turns the setting on ships these rules and matches nothing.
+
+   ## Why a corner control is its own placement and not a smaller bar
+
+   The bottom bar covers the lower third of the photograph. On a supplement
+   bottle that is the label, which is the part the customer is reading. A corner
+   control sits over the background of the shot and the product stays visible
+   while the action is available.
+
+   It also removes the collision with the swatch row, which lives directly under
+   the image and gets pushed around by a bar that appears on hover.
+   ========================================================================== */
+
+.product-card[data-quick-add-position='corner'] .product-card__actions {
+  inset-inline: auto var(--space-3);
+  inset-block: var(--space-3) auto;
+  inline-size: auto;
+  /* The reveal comes down from the top, matching where the control lives. A
+     control in the top corner that rises from below reads as having been
+     dragged there. */
+  transform: translate3d(0, calc(var(--space-2) * -1), 0);
+}
+
+.product-card[data-quick-add-position='corner']:hover .product-card__actions,
+.product-card[data-quick-add-position='corner']:focus-within .product-card__actions {
+  transform: none;
+}
+
+.product-card[data-quick-add-position='corner'] .product-card__actions form {
+  display: contents;
+}
+
+/* Square, round, and sized from the icon rather than from a label that is not
+   there. `full: true` on the button snippet would stretch it across the card. */
+.product-card[data-quick-add-position='corner'] .product-card__actions .button {
+  --button-padding-inline: 0;
+  inline-size: 40px;
+  min-inline-size: 40px;
+  block-size: 40px;
+  padding: 0;
+  border-radius: 999px;
+  box-shadow: 0 6px 18px -10px rgb(0 0 0 / 0.5);
+}
+
+/* A badge occupies the opposite corner, so the two never overlap. If a merchant
+   moves badges to the right, the quick add steps down out of the way. */
+.product-card[data-quick-add-position='corner'][data-badge-position='right'] .product-card__actions {
+  inset-block-start: calc(var(--space-3) + 36px);
+}
+
+@media (hover: none) {
+  .product-card[data-quick-add-position='corner'] .product-card__actions {
+    transform: none;
+  }
+}
+
+/* ==========================================================================
+   Slider arrows, and why they were opening the product
+   --------------------------------------------------------------------------
+   `.product-card__link::after` stretches the title's anchor over the whole card
+   at `z-index: 1`. The arrows sit at `z-index: 3` — higher, but inside
+   `.product-card__media-wrapper`, which has `overflow: hidden` and a transform
+   on hover and is therefore its own stacking context. Everything inside it is
+   clamped to that context's level, so the overlay in the parent context painted
+   on top and took the click.
+
+   Raising the whole media area above the overlay is the fix. The image is no
+   longer under the stretched link, so each slide carries its own anchor — see
+   `snippets/product-card.liquid`.
+   ========================================================================== */
+
+.product-card:has(.product-card__slider) .product-card__media-wrapper {
+  position: relative;
+  z-index: 2;
+}
+
+.product-card__slide-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Above the slide links inside the media area, and explicitly clickable — a
+   parent with `pointer-events: none` for a hover effect would otherwise take
+   them out again. */
+.product-card__slider-arrow {
+  z-index: 4;
+  pointer-events: auto;
+}
+
+/* The track must not capture the arrows' clicks on the way past. */
+.product-card__slider .product-card__slides {
+  position: relative;
+  z-index: 1;
+}

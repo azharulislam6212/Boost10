@@ -1,0 +1,189 @@
+{% doc %}
+  Country and language selectors for the header and for the menu drawer.
+
+  Both wrap Shopify's own `localization` form, which is the only supported way
+  to change market or locale and is the only version that works with JavaScript
+  off. `<localization-form>` turns a submit button per country into a searchable
+  disclosure; it does not replace the form.
+
+  ## Ref names are namespaced, and that is what stops the drawer crashing
+
+  `BaseComponent` collects every `[data-ref]` under an element and skips the ones
+  inside a nested component — but only if that component is *already registered*.
+  `<market-picker>` is lazy-loaded, so when the drawer upgraded first it adopted
+  this panel as a second `refs.panel`, turned its own into an array, and
+  `refs.panel.animate` threw on open and on close.
+
+  Load order is a race nobody should have to win, so the name no longer
+  collides: `menu`, not `panel`.
+
+  ## Two instances, two id prefixes
+
+  The header and the drawer both render this, so every id here is prefixed. Two
+  panels sharing `#CountryPanel` means `aria-controls` on the drawer's trigger
+  points at the header's panel, and a screen reader announces the state of a
+  control the customer cannot see.
+
+  The section settings gate visibility, not the theme settings, so a merchant
+  can show the language switch in the drawer and keep it out of a crowded
+  header.
+
+  Parameters:
+    context (string, optional) `header` or `drawer`. Default: header
+
+  @example
+    {% render 'header-localization', context: 'drawer' %}
+{% enddoc %}
+
+{%- liquid
+  assign st = section.settings
+  assign scope = context | default: 'header'
+  assign id_prefix = scope | capitalize | append: 'Localization'
+
+  assign show_country = false
+  if st.show_country and localization.available_countries.size > 1
+    assign show_country = true
+  endif
+
+  assign show_language = false
+  if st.show_language and localization.available_languages.size > 1
+    assign show_language = true
+  endif
+
+  assign font_stack = 'var(--font-body-family)'
+  if st.localization_font == 'heading'
+    assign font_stack = 'var(--font-heading-family)'
+  elsif st.localization_font == 'accent'
+    assign font_stack = 'var(--font-accent-family, var(--font-heading-family))'
+  endif
+-%}
+
+
+{%- if show_country or show_language -%}
+  <div class="market-picker market-picker--{{ scope }}" style="--localization-font: {{ font_stack }};">
+    {%- if show_country -%}
+      {%- assign id_prefix = id_prefix | append: 'Country' -%}
+      <market-picker data-type="country" class="market-picker__unit">
+        {%- form 'localization', id: id_prefix, class: 'market-picker__form' -%}
+          <input type="hidden" name="country_code" value="{{ localization.country.iso_code }}" data-ref="input">
+
+          <button
+            type="button"
+            class="market-picker__trigger"
+            data-ref="trigger"
+            aria-expanded="false"
+            aria-controls="{{ id_prefix }}CountryPanel"
+          >
+            <span class="visually-hidden">{{ 'localization.country_label' | t }}</span>
+            {%- if st.show_flag -%}
+              {% render 'country-flag', iso: localization.country.iso_code %}
+            {%- endif -%}
+            <span aria-hidden="true">
+              {{- localization.country.name }} ({{ cart.currency.iso_code }})
+            </span>
+            {% render 'icon', icon: 'chevron-down', size: 12 %}
+          </button>
+
+          <div
+            class="market-picker__panel"
+            id="{{ id_prefix }}CountryPanel"
+            data-ref="menu"
+            data-search="{{ st.localization_search }}"
+            data-lenis-prevent
+            hidden
+          >
+            {%- comment -%}
+              Always rendered, shown by CSS. A pointer reaches any row of a
+              250-country list in one flick; a thumb does not, and on a phone the
+              panel is short enough that scrolling to Zimbabwe is a real cost. So
+              the default is `auto`: hidden on desktop, shown on mobile.
+
+              Rendering it and hiding it, rather than rendering it conditionally,
+              is what lets one breakpoint change the answer without a reload.
+            {%- endcomment -%}
+            <div class="market-picker__search" data-filter-wrapper>
+              <label class="visually-hidden" for="{{ id_prefix }}CountryFilter">
+                {{ 'localization.search_countries' | t }}
+              </label>
+              <input
+                id="{{ id_prefix }}CountryFilter"
+                type="search"
+                data-ref="filter"
+                autocomplete="off"
+                placeholder="{{ 'localization.search_countries' | t | escape }}"
+              >
+            </div>
+
+            {%- comment -%}
+              A plain list of submit buttons. `role="listbox"` was removed: these
+              options submit a form and reload the page, and a listbox promises
+              a selection that stays put.
+            {%- endcomment -%}
+            <ul class="market-picker__list" data-ref="list" role="list">
+              {%- for country in localization.available_countries -%}
+                <li>
+                  <button
+                    type="submit"
+                    name="country_code"
+                    value="{{ country.iso_code }}"
+                    data-option
+                    data-label="{{ country.name | escape }}"
+                    {% if country.iso_code == localization.country.iso_code %}aria-current="true"{% endif %}
+                  >
+                    {{ country.name }}
+                    <span class="market-picker__currency">{{ country.currency.iso_code }}</span>
+                  </button>
+                </li>
+              {%- endfor -%}
+            </ul>
+
+            <p class="market-picker__empty" data-ref="empty" hidden>
+              {{ 'localization.no_country_results' | t }}
+            </p>
+          </div>
+        {%- endform -%}
+      </market-picker>
+    {%- endif -%}
+
+    {%- if show_language -%}
+       {%- assign id_prefix_lang = id_prefix | append: 'Language' -%}
+      <market-picker data-type="language" class="market-picker__unit">
+        {%- form 'localization', id: id_prefix_lang , class: 'market-picker__form' -%}
+          <input type="hidden" name="locale_code" value="{{ localization.language.iso_code }}" data-ref="input">
+
+          <button
+            type="button"
+            class="market-picker__trigger"
+            data-ref="trigger"
+            aria-expanded="false"
+            aria-controls="{{ id_prefix }}LanguagePanel"
+          >
+            <span class="visually-hidden">{{ 'localization.language_label' | t }}</span>
+            <span aria-hidden="true">{{ localization.language.endonym_name | capitalize }}</span>
+            {% render 'icon', icon: 'chevron-down', size: 12 %}
+          </button>
+
+          <div class="market-picker__panel" id="{{ id_prefix }}LanguagePanel" data-ref="menu" hidden>
+            <ul class="market-picker__list" data-ref="list" role="list">
+              {%- for language in localization.available_languages -%}
+                <li>
+                  <button
+                    type="submit"
+                    name="locale_code"
+                    value="{{ language.iso_code }}"
+                    data-option
+                    data-label="{{ language.endonym_name | escape }}"
+                    lang="{{ language.iso_code }}"
+                    {% if language.iso_code == localization.language.iso_code %}aria-current="true"{% endif %}
+                  >
+                    {{ language.endonym_name | capitalize }}
+                  </button>
+                </li>
+              {%- endfor -%}
+            </ul>
+          </div>
+        {%- endform -%}
+      </market-picker>
+    {%- endif -%}
+  </div>
+{%- endif -%}

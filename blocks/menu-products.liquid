@@ -1,0 +1,320 @@
+{% comment %}
+  blocks/menu-products.liquid — Boost10
+
+  A collection's products inside a mega menu panel, as a grid or a carousel.
+
+  ## Why this exists next to `menu-tab`
+
+  `menu-tab` can already show products, but only inside a tab rail. This block
+  drops the same cards straight into a panel, so "Products" under a menu item is
+  one block rather than a rail with a single category in it.
+
+  Add several and each names its own collection — which is the "category-wise
+  products" layout: one block per category, side by side, each with its own
+  column span.
+
+  ## The cards are the theme's own
+
+  `snippets/product-card` already handles the image swap, the swatches, the
+  badges, the quick add and its corner placement, all from the same theme
+  settings the collection grid uses. A card written here would be a second
+  implementation that drifts from the first the week either one changes.
+
+  ## The carousel settings are the announcement bar's
+
+  Same ids, same labels, same translations: `carousel_navigation`,
+  `carousel_pagination`, `carousel_loop`, `carousel_speed`, `carousel_autoplay`.
+  `carousel-shell` reads them off whatever object it is handed, so passing
+  `block.settings` makes a block behave exactly like a section — and a merchant
+  who has set up the announcement bar already knows this panel.
+{% endcomment %}
+
+{%- liquid
+  assign st = block.settings
+  assign carousel_id = 'MenuProducts-' | append: block.id
+  assign columns = st.columns | default: 4
+  assign products = st.collection.products
+-%}
+
+<div
+  class="megamenu__item megamenu__item--products"
+  style="--span: {{ st.column_span }}; --tab-columns: {{ columns }};"
+  {{ block.shopify_attributes }}
+>
+  {%- if st.heading != blank -%}
+    {%- if st.collection != blank and st.show_heading_link -%}
+      <a class="megamenu__eyebrow megamenu__eyebrow--link" href="{{ st.collection.url }}">
+        <span>{{ st.heading | escape }}</span>
+        {% render 'icon', icon: 'arrow-right', size: 14 %}
+      </a>
+    {%- else -%}
+      <p class="megamenu__eyebrow">{{ st.heading | escape }}</p>
+    {%- endif -%}
+  {%- endif -%}
+
+  {%- if st.collection != blank and products.size > 0 -%}
+    {%- if st.layout == 'carousel' -%}
+      {%- capture product_items -%}
+        {%- for product in products limit: st.products_count -%}
+          <li class="carousel-shell__item">
+            {% render 'product-card',
+              product: product,
+              index: forloop.index0,
+              sizes: '(min-width: 990px) 20vw, 60vw'
+            %}
+          </li>
+        {%- endfor -%}
+      {%- endcapture -%}
+
+      {% render 'carousel-shell',
+        id: carousel_id,
+        children: product_items,
+        layout: 'carousel',
+        layout_mobile: 'carousel',
+        tag: 'ul',
+        label: st.collection.title,
+        columns_desktop: columns,
+        columns_tablet: 2,
+        columns_mobile: 1,
+        count: products.size,
+        settings: st
+      %}
+    {%- else -%}
+      <ul class="megamenu__products" role="list">
+        {%- for product in products limit: st.products_count -%}
+          <li>
+            {% render 'product-card',
+              product: product,
+              index: forloop.index0,
+              sizes: '(min-width: 990px) 20vw, 60vw'
+            %}
+          </li>
+        {%- endfor -%}
+      </ul>
+    {%- endif -%}
+  {%- else -%}
+    <p class="megamenu__empty">{{ 'blocks.mega_menu.empty_collection' | t }}</p>
+  {%- endif -%}
+</div>
+
+{% schema %}
+{
+  "name": "t:blocks.menu_products.name",
+  "tag": null,
+  "settings": [
+    {
+      "type": "collection",
+      "id": "collection",
+      "label": "t:blocks.menu_tab.settings.collection.label"
+    },
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "t:shared.heading.label"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_heading_link",
+      "label": "t:blocks.menu_products.settings.show_heading_link.label",
+      "default": true
+    },
+    {
+      "type": "range",
+      "id": "products_count",
+      "label": "t:blocks.menu_tab.settings.products_count.label",
+      "min": 2,
+      "max": 12,
+      "step": 1,
+      "default": 4
+    },
+    {
+      "type": "range",
+      "id": "columns",
+      "label": "t:shared.columns.desktop.label",
+      "min": 2,
+      "max": 5,
+      "step": 1,
+      "default": 4
+    },
+    {
+      "type": "select",
+      "id": "layout",
+      "label": "t:shared.layout.label",
+      "options": [
+        {
+          "value": "grid",
+          "label": "t:blocks.menu_tab.settings.layout.options__1.label"
+        },
+        {
+          "value": "carousel",
+          "label": "t:blocks.menu_tab.settings.layout.options__2.label"
+        }
+      ],
+      "default": "grid"
+    },
+    {
+      "type": "range",
+      "id": "column_span",
+      "label": "t:blocks.shared.column_span.label",
+      "info": "t:blocks.shared.column_span.info",
+      "min": 1,
+      "max": 12,
+      "step": 1,
+      "default": 12
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.menu_products.headers.carousel_motion",
+      "visible_if": "{{ block.settings.layout == 'carousel' }}"
+    },
+    {
+      "type": "range",
+      "id": "carousel_speed",
+      "label": "t:shared.carousel.speed.label",
+      "info": "t:shared.carousel.speed.info",
+      "min": 100,
+      "max": 1500,
+      "step": 50,
+      "unit": "ms",
+      "default": 500,
+      "visible_if": "{{ block.settings.layout == 'carousel' }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "carousel_loop",
+      "label": "t:shared.carousel.loop.label",
+      "default": false,
+      "visible_if": "{{ block.settings.layout == 'carousel' }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "carousel_autoplay",
+      "label": "t:shared.carousel.autoplay.label",
+      "default": false,
+      "visible_if": "{{ block.settings.layout == 'carousel' }}"
+    },
+    {
+      "type": "range",
+      "id": "carousel_autoplay_delay",
+      "label": "t:shared.carousel.autoplay_delay.label",
+      "min": 2,
+      "max": 15,
+      "step": 1,
+      "unit": "s",
+      "default": 5,
+      "visible_if": "{{ block.settings.layout == 'carousel' and block.settings.carousel_autoplay }}"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.menu_products.headers.carousel_arrows",
+      "visible_if": "{{ block.settings.layout == 'carousel' }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "carousel_navigation",
+      "label": "t:shared.carousel.navigation.label",
+      "default": true,
+      "visible_if": "{{ block.settings.layout == 'carousel' }}"
+    },
+    {
+      "type": "select",
+      "id": "carousel_nav_icon",
+      "label": "t:shared.carousel.nav_icon.label",
+      "options": [
+        {
+          "value": "chevron",
+          "label": "t:shared.carousel.nav_icon.options__1.label"
+        },
+        {
+          "value": "arrow",
+          "label": "t:shared.carousel.nav_icon.options__2.label"
+        },
+        {
+          "value": "play",
+          "label": "t:shared.carousel.nav_icon.options__3.label"
+        },
+        {
+          "value": "external",
+          "label": "t:shared.carousel.nav_icon.options__4.label"
+        }
+      ],
+      "default": "chevron",
+      "visible_if": "{{ block.settings.layout == 'carousel' and block.settings.carousel_navigation }}"
+    },
+    {
+      "type": "select",
+      "id": "carousel_controls_style",
+      "label": "t:shared.carousel.controls_style.label",
+      "info": "t:shared.carousel.controls_style.info",
+      "options": [
+        {
+          "value": "split",
+          "label": "t:shared.carousel.controls_style.options__1.label"
+        },
+        {
+          "value": "ghost",
+          "label": "t:shared.carousel.controls_style.options__2.label"
+        },
+        {
+          "value": "solid",
+          "label": "t:shared.carousel.controls_style.options__3.label"
+        }
+      ],
+      "default": "split",
+      "visible_if": "{{ block.settings.layout == 'carousel' and block.settings.carousel_navigation }}"
+    },
+    {
+      "type": "select",
+      "id": "carousel_nav_position",
+      "label": "t:shared.carousel.nav_position.label",
+      "options": [
+        {
+          "value": "inside",
+          "label": "t:shared.carousel.nav_position.options__1.label"
+        },
+        {
+          "value": "outside",
+          "label": "t:shared.carousel.nav_position.options__2.label"
+        }
+      ],
+      "default": "inside",
+      "visible_if": "{{ block.settings.layout == 'carousel' and block.settings.carousel_navigation }}"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.menu_products.headers.carousel_pagination",
+      "visible_if": "{{ block.settings.layout == 'carousel' }}"
+    },
+    {
+      "type": "select",
+      "id": "carousel_pagination",
+      "label": "t:shared.carousel.pagination.label",
+      "info": "t:shared.carousel.pagination.info",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.carousel.pagination.options__1.label"
+        },
+        {
+          "value": "dots",
+          "label": "t:shared.carousel.pagination.options__2.label"
+        },
+        {
+          "value": "numbers",
+          "label": "t:shared.carousel.pagination.options__3.label"
+        },
+        {
+          "value": "progress",
+          "label": "t:shared.carousel.pagination.options__4.label"
+        },
+        {
+          "value": "controls",
+          "label": "t:shared.carousel.pagination.options__5.label"
+        }
+      ],
+      "default": "none",
+      "visible_if": "{{ block.settings.layout == 'carousel' }}"
+    }
+  ]
+}
+{% endschema %}
