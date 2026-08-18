@@ -32,18 +32,33 @@
    1. Tokens
    -------------------------------------------------------------------------- */
 
+/* The timing tokens are on `:root`, not on `.site-header`.
+
+   This is why the drawer never animated. `{% render 'header-drawer' %}` runs
+   *after* `</sticky-header>` — the drawer is a sibling of the header, not a
+   descendant — so it inherited none of these. Every
+   `transition: … var(--panel-speed) var(--header-ease)` in the drawer resolved
+   to nothing, and an invalid transition is simply no transition: the accordion
+   snapped open, the slide panels teleported, and there was nothing in the
+   stylesheet to suggest why.
+
+   Timing is a property of the theme rather than of one element, so `:root` is
+   also where it belonged. The header still overrides its own layout tokens
+   below. */
+:root {
+  --header-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --header-speed: 320ms;
+
+  --panel-speed: 420ms;
+  --panel-fade: 200ms;
+}
+
 .site-header {
   --header-row-height: 72px;
   --header-border-width: 0px;
   --header-radius: 999px;
   --header-gap: var(--space-4);
   --header-pad-inline: var(--space-6);
-
-  --header-ease: cubic-bezier(0.22, 1, 0.36, 1);
-  --header-speed: 320ms;
-
-  --panel-speed: 420ms;
-  --panel-fade: 200ms;
 
   position: relative;
   z-index: 100;
@@ -55,8 +70,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .site-header,
-  .site-header * {
+  :root {
     --header-speed: 0.01ms;
     --panel-speed: 0.01ms;
     --panel-fade: 0.01ms;
@@ -110,8 +124,14 @@ sticky-header[data-sticky-mode='scroll-down'][data-hidden] {
    3. Shell
    -------------------------------------------------------------------------- */
 
+/* Deliberately static now.
+ *
+ * `.site-header__shell` is the containing block for panels — see below. Leaving
+ * `position: relative` here as well would put a second candidate between a panel
+ * and the bar, and whichever is nearer wins: the panel would silently go back to
+ * the container's padding box the moment the shell's positioning changed. */
 .site-header__inner {
-  position: relative;
+  position: static;
 }
 
 /* The scheme's real background, captured on the header itself.
@@ -127,9 +147,23 @@ sticky-header[data-sticky-mode='scroll-down'][data-hidden] {
 .site-header {
   --header-surface: var(--color-background);
   --header-surface-rgb: var(--color-background-rgb);
+  --header-ink: var(--color-text);
+  --header-ink-heading: var(--color-heading);
+  --header-rule: var(--color-border);
 }
 
 .site-header__shell {
+  /* The containing block for every panel.
+   *
+   * They used to resolve against `.site-header__inner`, which is the container —
+   * so `inset-inline: 0` gave them the container's *padding box*, a gutter wider
+   * than the bar on each side. In the pill shape that gap is obvious, and once
+   * the header is solid the panel visibly overhangs it.
+   *
+   * Anchored here, a page-width panel is exactly as wide as the bar above it, in
+   * every state and at every viewport, with no arithmetic. */
+  position: relative;
+
   display: flex;
   flex-direction: column;
   background-color: var(--color-background);
@@ -2076,9 +2110,34 @@ a.menu-promo:hover .menu-promo__panel {
 /* Panels opened from a transparent header must not inherit the transparent
    background — they are their own surface and their contents have to be
    readable regardless of what is behind the header. */
-.nav__panel-inner,
-.market-picker__panel {
+/* A panel is its own surface, so it restores the whole scheme — not just the
+   background.
+
+   Restoring only `--color-background` left the transparent header's *text*
+   override in place, which is white. The panel painted a light background and
+   then wrote white text, white headings and white hairlines onto it: a panel
+   that opens onto what looks like nothing at all.
+
+   All four are captured on `.site-header` before section 27 overrides them, so
+   this is the untouched scheme in every state — including the sticky one. */
+/* `:where()` so this has zero specificity.
+ *
+ * A mega menu block renders its own `color-scheme-n` class on this element,
+ * because Panel colour scheme is a setting the merchant chose. Written as a
+ * plain class selector, this rule sat in `header.css` — which loads after
+ * `base.css` — and beat that class, so the setting did nothing.
+ *
+ * At zero specificity it is a floor rather than an override: panels with a
+ * scheme keep it, panels without one (the automatic dropdown, the account menu,
+ * the country list) fall back to the header's base scheme instead of inheriting
+ * the transparent or sticky overrides from the bar. */
+:where(.nav__panel-inner, .market-picker__panel, .nav__panel--mobile) {
   --color-background: var(--header-surface);
+  --color-text: var(--header-ink);
+  --color-heading: var(--header-ink-heading);
+  --color-border: var(--header-rule);
+
+  color: var(--header-ink);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2157,4 +2216,210 @@ a.menu-promo:hover .menu-promo__panel {
 .drawer-nav .nav__panel--mobile .carousel-shell {
   inline-size: 100%;
   max-inline-size: 100%;
+}
+
+/* ==========================================================================
+   31. A menu item with a panel but no child links
+   --------------------------------------------------------------------------
+   Science has a mega menu block and no children in Navigation, so the fallback
+   dropdown Liquid builds from those children is an empty `<ul>`. Until the block
+   panel replaces it, that empty box is what opens — a bordered rectangle with
+   nothing in it, which is what the screenshot shows.
+
+   An empty list is not something to style. It is something not to render.
+   ========================================================================== */
+
+.nav__panel--dropdown > .nav__panel-inner:has(> .dropdown:empty) {
+  display: none;
+}
+
+/* ==========================================================================
+   32. The drawer's tab rail is horizontal, whatever the viewport says
+   --------------------------------------------------------------------------
+   The rule in section 13 is inside a `max-width: 989px` query, which is right
+   for the page but wrong for the drawer: the drawer only exists below that
+   width, so scoping the same rule to it is free, and it survives a merchant
+   previewing at a wider viewport with the drawer forced open.
+   ========================================================================== */
+
+.drawer-nav .tabs--vertical,
+.drawer-nav .tabs--menu {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.drawer-nav .tabs__list {
+  flex-direction: row;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+
+.drawer-nav .tabs__list::-webkit-scrollbar {
+  display: none;
+}
+
+.drawer-nav .tabs__tab {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   33. Nothing in the drawer may be wider than the drawer
+   --------------------------------------------------------------------------
+   The cloned panel was sized `max-content` and capped at the desktop panel's
+   maximum width, so a 460px card list arrived in a 380px drawer and ran off the
+   right edge with its text cut in half.
+
+   `min-inline-size: 0` on every level is the part that is easy to miss: a grid
+   or flex item defaults to `auto`, which refuses to shrink below its content,
+   and one un-shrinkable descendant pushes the whole chain wide.
+   ========================================================================== */
+
+.drawer-nav,
+.drawer-nav__panel,
+.drawer-nav__panel-inner,
+.drawer-nav .nav__panel--mobile,
+.drawer-nav .nav__panel--mobile > .nav__panel-inner,
+.drawer-nav .megamenu,
+.drawer-nav .megamenu__grid,
+.drawer-nav .megamenu__item,
+.drawer-nav .tabs,
+.drawer-nav .tabs__panels,
+.drawer-nav .tabs__panel {
+  min-inline-size: 0;
+  max-inline-size: 100%;
+}
+
+.drawer-nav .menu-card {
+  min-inline-size: 0;
+}
+
+.drawer-nav .menu-card__text {
+  min-inline-size: 0;
+}
+
+/* A long description has to wrap rather than set the card's width. */
+.drawer-nav .menu-card__title,
+.drawer-nav .menu-card__description,
+.drawer-nav .menu-promo__heading {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+/* ==========================================================================
+   34. A centred logo on a phone
+   --------------------------------------------------------------------------
+   The logo is centred by taking it out of the flow, which means it can run
+   underneath the controls on either side — and on a phone those controls start
+   about 60px in from each edge.
+
+   Constraining it to the space actually left over is what stops the overlap.
+   The burger is 40px, the actions are three 40px controls, and the gaps are the
+   row's own, so the reserved width is stated once here and the logo takes what
+   remains.
+   ========================================================================== */
+
+@media screen and (max-width: 989px) {
+  /* The logo is centred by taking it out of the flow, so it has to be told how
+     much room the controls need — and the earlier attempt reserved the *total*
+     width of both sides. That is the wrong number.
+
+     A centred element grows equally in both directions, so what matters is the
+     widest single side, doubled. Reserving burger + actions gave 192px total,
+     96px per side, while the actions alone were about 130px — and the logo ran
+     straight under the account icon, which is exactly the screenshot. */
+  .site-header[data-logo-mobile='center'] .site-header__row--top {
+    position: relative;
+    /* The actions side is the wider one: cart with its count, plus search. */
+    --mobile-side: 120px;
+  }
+
+  .site-header[data-logo-mobile='center'] .site-header__slot--start .site-header__logo,
+  .site-header[data-logo-mobile='center'] .site-header__slot--end .site-header__logo,
+  .site-header[data-logo-mobile='center'] .site-header__slot--center .site-header__logo {
+    position: absolute;
+    inset-inline: 0;
+    inset-block-start: 50%;
+    z-index: 1;
+    inline-size: fit-content;
+    /* Both sides, not the sum of them. */
+    max-inline-size: calc(100% - (var(--mobile-side) * 2));
+    margin-inline: auto;
+    translate: 0 -50%;
+  }
+
+  /* The account control moves to the drawer, which already has it in the footer.
+     Two icon controls beside a centred logo is the most a 380px row holds
+     without the logo shrinking to an initial. */
+  .site-header[data-logo-mobile='center'] .site-header__action--account,
+  .site-header[data-logo-mobile='center'] .site-header__account {
+    display: none;
+  }
+
+  /* The controls stay above the logo's box, so a long shop name is truncated by
+     its own max-width rather than drawn over them. */
+  .site-header__actions,
+  .site-header__burger {
+    position: relative;
+    z-index: 2;
+  }
+
+  .site-header[data-logo-mobile='center'] .site-header__logo-text {
+    display: block;
+    overflow: hidden;
+    font-size: var(--font-size-md);
+    line-height: 1.1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .site-header[data-logo-mobile='center'] .site-header__logo-image {
+    inline-size: min(var(--logo-width-mobile, 110px), 100%);
+  }
+
+  /* A left-aligned logo shares the row normally, but still must not push the
+     controls off the end. */
+  .site-header[data-logo-mobile='left'] .site-header__logo {
+    min-inline-size: 0;
+    max-inline-size: calc(100% - 160px);
+  }
+
+  .site-header[data-logo-mobile='left'] .site-header__logo-text {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   35. The "view all" link a promoted menu item keeps
+   --------------------------------------------------------------------------
+   When the component builds a disclosure out of a plain link, the link's own
+   destination would otherwise be lost — a `<summary>` cannot navigate. It is
+   moved to the top of the panel instead, where it reads as the category's own
+   page rather than as one more item in the list.
+   -------------------------------------------------------------------------- */
+
+.nav__panel-jump {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-4);
+  font-family: var(--font-heading-family);
+  font-size: var(--font-size-sm);
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.nav__panel-jump:hover {
+  color: var(--color-heading);
+}
+
+.megamenu .nav__panel-jump {
+  margin-block-end: var(--space-3);
 }

@@ -241,17 +241,28 @@ export class NavMenu extends BaseComponent {
   /** @type {number|null} */
   #hoverTimer = null;
 
+  /** @type {MutationObserver|null} */
+  #bayObserver = null;
+
+  /** @type {WeakSet<HTMLDetailsElement>} */
+  #bound = new WeakSet();
+
   setup() {
     this.#relocatePanels();
 
-    // `<nav-menu>` sits in the header row and the panel bay is emitted after it,
-    // so during a streaming parse this element can upgrade before the panels
-    // exist — and every mega menu silently falls back to its plain dropdown.
-    // Retrying once the document is parsed costs nothing and is the difference
-    // between the panels appearing and not.
+    // The bay is emitted after this element, so during a streaming parse the
+    // panels may not exist yet — and a mega menu that misses relocation falls
+    // back to its plain dropdown, which for a menu item with no child links is
+    // an empty box. That is the empty Science panel.
+    //
+    // One retry on `DOMContentLoaded` was not enough: the theme editor replaces
+    // the bay's contents without reloading, and a merchant adding a block gets
+    // no second parse. So the bay is watched until it is empty.
     if (document.readyState === 'loading') {
       this.on(document, 'DOMContentLoaded', () => this.#relocatePanels());
     }
+
+    this.#watchBay();
 
     this.delegate('click', '[data-nav-summary]', (event, summary) => {
       const details = /** @type {HTMLDetailsElement|null} */ (summary.closest('[data-nav-details]'));
@@ -321,6 +332,8 @@ export class NavMenu extends BaseComponent {
 
   teardown() {
     this.#clearHover();
+    this.#bayObserver?.disconnect();
+    this.#bayObserver = null;
   }
 
   /* --------------------------------------------------------- public API -- */
@@ -366,6 +379,109 @@ export class NavMenu extends BaseComponent {
 
   /* ---------------------------------------------------------- internals -- */
 
+  /**
+   * Bind hover intent to one disclosure, once.
+   *
+   * `setup()` cannot be the only place this happens: a panel that arrives late —
+   * from the bay observer, or from a menu item promoted below — produces a
+   * `<details>` that did not exist when the loop ran. The set is what stops a
+   * second pass double-binding the ones that were there from the start.
+   *
+   * @param {HTMLDetailsElement} details
+   * @private
+   */
+  #bindHover(details) {
+    if (this.#bound.has(details)) return;
+    this.#bound.add(details);
+
+    this.on(details, 'pointerenter', (event) => this.#onPointer(event, details, true));
+    this.on(details, 'pointerleave', (event) => this.#onPointer(event, details, false));
+  }
+
+  /**
+   * Turn a plain navigation link into a disclosure so a panel has somewhere to go.
+   *
+   * Liquid builds the `<details>` only when it can match the block's Menu item to
+   * a link, and that comparison has been the most fragile thing in this header —
+   * a trailing space or one capital letter and the panel had nowhere to land.
+   * Rather than make the match stricter or the merchant more careful, the
+   * component builds what is missing.
+   *
+   * The item's own destination is not thrown away: it becomes a "View all" link
+   * at the top of the panel, because a `<summary>` cannot navigate and a customer
+   * who clicks a category still expects the category.
+   *
+   * @param {HTMLAnchorElement} link
+   * @param {HTMLElement} panel
+   * @param {string} name
+   * @returns {HTMLDetailsElement|null}
+   * @private
+   */
+  #promote(link, panel, name) {
+    const item = link.closest('.nav__item');
+    if (!item) return null;
+
+    const details = document.createElement('details');
+    details.className = 'nav__details';
+    details.setAttribute('data-nav-details', '');
+    details.dataset.kind = 'mega';
+    details.dataset.menuItem = name;
+
+    const summary = document.createElement('summary');
+    summary.className = 'nav__link';
+    summary.setAttribute('data-nav-summary', '');
+    summary.setAttribute('aria-expanded', 'false');
+    summary.innerHTML = link.innerHTML;
+    if (link.dataset.current) summary.dataset.current = link.dataset.current;
+
+    // Borrowed from a sibling rather than written here, so it stays whatever the
+    // icon snippet renders.
+    const chevron = this.querySelector('.nav__chevron');
+    if (chevron && !summary.querySelector('.nav__chevron')) {
+      summary.append(chevron.cloneNode(true));
+    }
+
+    const href = link.getAttribute('href');
+    const inner = panel.querySelector('.nav__panel-inner');
+
+    if (href && href !== '#' && inner && !inner.querySelector('.nav__panel-jump')) {
+      const jump = document.createElement('a');
+      jump.className = 'nav__panel-jump';
+      jump.href = href;
+      jump.textContent = link.textContent?.trim() || name;
+      inner.prepend(jump);
+    }
+
+    details.append(summary, panel);
+    link.replaceWith(details);
+    item.classList.add('nav__item--parent');
+
+    return details;
+  }
+
+  /**
+   * Watch the bay so a panel that arrives late still finds its menu item.
+   *
+   * Disconnects itself once the bay is empty — every panel has been placed and
+   * there is nothing left to observe.
+   *
+   * @private
+   */
+  #watchBay() {
+    const bay = this.closest('sticky-header')?.querySelector('[data-nav-bay]');
+    if (!bay) return;
+
+    this.#bayObserver = new MutationObserver(() => {
+      this.#relocatePanels();
+      if (!bay.querySelector('[data-mega-panel]')) {
+        this.#bayObserver?.disconnect();
+        this.#bayObserver = null;
+      }
+    });
+
+    this.#bayObserver.observe(bay, { childList: true, subtree: true });
+  }
+
   /** @private */
   #relocatePanels() {
     const bay = this.closest('sticky-header')?.querySelector('[data-nav-bay]');
@@ -384,10 +500,34 @@ export class NavMenu extends BaseComponent {
           /** @type {HTMLElement} */ (node).dataset.menuItem?.trim().toLowerCase() ===
           name.toLowerCase()
       );
-      const existing = details ? panelOf(/** @type {HTMLDetailsElement} */ (details)) : null;
-      if (!existing) continue;
+      if (details) {
+        const existing = panelOf(/** @type {HTMLDetailsElement} */ (details));
+        if (!existing) continue;
 
-      existing.replaceWith(panel);
+        existing.replaceWith(panel);
+        this.#bindHover(/** @type {HTMLDetailsElement} */ (details));
+        continue;
+      }
+
+      // No disclosure for this name. Before giving up, look for a plain link
+      // with the same label — the usual reason there is no `<details>` is that
+      // Liquid's match was stricter than this one, not that the item is gone.
+      const link = [...this.querySelectorAll('.nav > .nav__item > .nav__link')].find(
+        (node) => node.textContent?.trim().toLowerCase() === name.toLowerCase()
+      );
+
+      if (link instanceof HTMLAnchorElement) {
+        const promoted = this.#promote(link, /** @type {HTMLElement} */ (panel), name);
+        if (promoted) this.#bindHover(promoted);
+        continue;
+      }
+
+      // Genuinely nothing to attach to. The panel stays in the bay, hidden, and
+      // says so by name — that line is the only way a merchant discovers a panel
+      // pointing at a menu item that no longer exists.
+      console.warn(
+        `[Boost10] Mega menu panel "${name}" has no matching header menu item.`
+      );
     }
   }
 

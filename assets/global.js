@@ -318,19 +318,25 @@ export class StickyHeader extends BaseComponent {
     // Transparency ends where the banner does. The class stays — it says the
     // template supports transparency — and only the live state is removed, so
     // scrolling back to the top restores it without re-reading any settings.
-    // `site-header--transparent`, not `header--transparent`.
-    //
-    // The class was renamed when the header's CSS was moved off the names
-    // `base.css` already owned, and this check was missed. It never matched, so
-    // `[data-transparent]` was never removed — the header stayed in its
-    // transparent state for the whole page and the sticky scheme had nothing to
-    // paint over. Hover worked because that rule does not depend on this one.
     if (this.classList.contains('site-header--transparent')) {
       this.toggleAttribute('data-transparent', !scrolled);
     }
 
+    // The sticky scheme goes on the *shell*, not on this element.
+    //
+    // On the header root it was inherited by everything the header contains —
+    // and a mega menu panel or a country list is not part of the bar. They
+    // turned dark with it, which is not what "sticky header background" means.
+    //
+    // The shell is the bar. `--header-surface`, `--header-ink` and the rest are
+    // captured one level up on this element, so they keep the *base* scheme and
+    // the panels have something correct to reset themselves to.
     const scheme = this.dataset.stickyScheme;
-    if (scheme) this.classList.toggle(scheme, scrolled);
+    const shell = this.querySelector('.site-header__shell');
+
+    if (scheme && shell) {
+      shell.classList.toggle(scheme, scrolled);
+    }
 
     const delta = position - this.#lastScroll;
 

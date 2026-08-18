@@ -1,12 +1,21 @@
  
     {{ 'base.css' | asset_url | stylesheet_tag: preload: true }}
     {%- comment -%}
-      Loaded after base.css and preloaded with it. The header is above the fold
-      on every page in the store, so it is never a candidate for a deferred
-      stylesheet: arriving late means the navigation paints unstyled.
+      Loaded after base.css, and deliberately *not* preloaded.
+
+      `preload: true` adds a `<link rel="preload">` on top of the stylesheet
+      link, and Shopify also advertises it in Early Hints. The browser then
+      counts one of those as unused and logs:
+
+        "preloaded using link preload in Early Hints but not used within a few
+         seconds from the window's load event"
+
+      A plain stylesheet link is already render-blocking and already fetched at
+      the highest priority, so the preload bought nothing and cost a console
+      warning on every page load.
     {%- endcomment -%}
-    {{ 'header.css' | asset_url | stylesheet_tag: preload: true }}
-    {{ 'product-card.css' | asset_url | stylesheet_tag: preload: true }}
+    {{ 'header.css' | asset_url | stylesheet_tag }}
+    {{ 'product-card.css' | asset_url | stylesheet_tag }}
     {{ 'rtl-support.css' | asset_url | stylesheet_tag: preload: true }}
     {{ 'animations.css' | asset_url | stylesheet_tag: preload: true }}
     {{ 'swiper.css' | asset_url | stylesheet_tag: preload: true }}

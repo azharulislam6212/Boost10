@@ -57,13 +57,27 @@
           assign link_title = link.title | strip
 
           # Find a mega menu block whose `menu_item` names this link.
+          # Matched on a normalised title: trimmed and lowercased on both sides.
+          #
+          # `<nav-menu>` already matches this way when it moves the panel into
+          # place, but this comparison did not — so a block whose Menu item read
+          # "Catalog " or "catalog" produced no `<details>` at all, and the panel
+          # then had nothing to be moved into. The console said the panel had no
+          # matching menu item, which was true, and misleading: the item was
+          # there, the two comparisons simply disagreed.
+          #
+          # Typing a name is not the place to demand exactness. Both ends are
+          # lenient now, and they are lenient in the same way.
+          assign link_key = link_title | downcase
           assign mega_block = null
+
           for candidate in section.blocks
             if candidate.type != 'mega-menu'
               continue
             endif
-            assign candidate_item = candidate.settings.menu_item | strip
-            if candidate_item == link_title
+
+            assign candidate_key = candidate.settings.menu_item | strip | downcase
+            if candidate_key == link_key
               assign mega_block = candidate
               break
             endif
