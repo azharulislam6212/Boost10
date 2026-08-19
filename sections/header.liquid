@@ -3,6 +3,7 @@
 
   ## The slot grid, and why the header is built out of captures
 
+  
   Every element in the header — logo, navigation, search, localization,
   utilities — is placed by two settings: a *row* (top or bottom) and a
   *position* (start, centre or end). That is ten independent placements from
@@ -218,6 +219,36 @@
 
   assign bottom_row = slot_bottom_start | append: slot_bottom_center | append: slot_bottom_end | strip
 -%}
+
+{%- comment -%}
+  The header's height, published before a single frame is painted.
+
+  `--header-height` is written by `<sticky-header>` from `offsetHeight`, which is
+  correct and arrives late. Until it does, the transparent header's offset on
+  `#MainContent` resolves to `0` — so the banner starts *below* the header, and
+  then jumps up by the header's height the moment the module loads. That vertical
+  jump is what makes the whole header look like it is assembling itself.
+
+  The height is knowable from the settings, so it is stated here. CSS uses this
+  from the first paint and the measured value afterwards; they agree, so nothing
+  moves.
+{%- endcomment -%}
+{%- liquid
+  assign header_block_size = row_height | plus: st.padding_top | plus: st.padding_bottom
+  assign header_block_size_mobile = 54 | plus: st.padding_top_mobile | plus: st.padding_bottom_mobile
+-%}
+
+{% style %}
+  :root {
+    --header-block-size: {{ header_block_size }}px;
+  }
+
+  @media screen and (max-width: 989px) {
+    :root {
+      --header-block-size: {{ header_block_size_mobile }}px;
+    }
+  }
+{% endstyle %}
 
 <sticky-header
   class="{{ header_classes }}"

@@ -6,6 +6,7 @@
 
    ## The one idea
 
+   
    A pill that moves. It is the active marker under a navigation item, the
    selection in a category rail, the promotional badge and the shape of the
    header itself. Everything else is quiet: hairline rules, one weight of
@@ -279,8 +280,17 @@ sticky-header[data-sticky-mode='scroll-down'][data-hidden] {
 
    `#MainContent` is the thing that should slide under a transparent header, so
    it is the thing that moves. No sibling can ever be affected. */
+/* `--header-block-size` first, `--header-height` never.
+ *
+ * The measured value is written by the component from `offsetHeight`, and until
+ * it arrives this resolved to `0` — so the banner rendered *below* the header and
+ * then jumped up by the header's height as soon as the module loaded. Every
+ * element in the header appeared to move, because the thing behind them did.
+ *
+ * The section states its height from the settings before anything is painted, so
+ * the offset is right on the first frame. */
 body:has(.site-header--transparent) #MainContent {
-  margin-block-start: calc(var(--header-height, 0px) * -1);
+  margin-block-start: calc(var(--header-block-size, 0px) * -1);
 }
 
 /* Transparency is applied as a variable override — see section 27. */
@@ -763,10 +773,32 @@ sticky-header:not([data-transparent]) .site-header__logo--prefers-inverse .site-
   color: var(--color-heading);
 }
 
+/* Multi-column flow, not a grid.
+ *
+ * A grid aligns rows: "Home" — one line, no children — sat in the same row as
+ * "Science", which has a heading and three links, so the row was as tall as
+ * Science and Home had a 60px hole under it. Repeat that down a menu of uneven
+ * lists and most of the panel is empty space, which is what the red boxes in
+ * the screenshot are marking.
+ *
+ * Columns flow instead: groups pack top to bottom and move to the next column
+ * when one fills. Nothing aligns to anything, so nothing waits for anything. */
 .megamenu__columns {
-  display: grid;
-  grid-template-columns: repeat(var(--columns, 3), minmax(0, 1fr));
-  gap: var(--space-6) var(--space-5);
+  display: block;
+  column-count: var(--columns, 3);
+  column-gap: var(--space-6);
+  column-fill: balance;
+}
+
+/* A group is atomic — its heading never separates from its list across a break. */
+.megamenu__column {
+  break-inside: avoid;
+  inline-size: 100%;
+  margin-block-end: var(--space-5);
+}
+
+.megamenu__column:last-child {
+  margin-block-end: 0;
 }
 
 .megamenu__column-heading {
@@ -939,16 +971,33 @@ a.menu-promo:hover .menu-promo__img {
   line-height: 1.25;
 }
 
+/* Full width of its card, with no minimum.
+ *
+ * `min-inline-size: 160px` was a floor so the rule under the text looked
+ * deliberate. In a narrow card — a banner given two of twelve columns — 160px is
+ * wider than the card, so the arrow was pushed outside it and landed on the
+ * banner next door. That is the overflow the red boxes are marking on
+ * "Shop Gut" and "Shop Energy".
+ *
+ * The rule matches the card now, at every width, and cannot leave it. */
 .menu-promo__cta {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-4);
-  inline-size: fit-content;
-  min-inline-size: 160px;
+  gap: var(--space-3);
+  inline-size: 100%;
+  min-inline-size: 0;
   padding-block-end: var(--space-2);
   border-block-end: 1px solid currentColor;
   font-size: var(--font-size-sm);
+}
+
+/* The label truncates rather than pushing the arrow out. */
+.menu-promo__cta > span:first-child {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .menu-promo__cta svg {
@@ -2945,37 +2994,127 @@ a.menu-promo:hover .menu-promo__panel {
   }
 }
 
-/* ==========================================================================
-   2. The white gap on reload, and the header disappearing into it
-   --------------------------------------------------------------------------
-   Both symptoms are one cause.
 
-   A transparent header writes `--color-text: var(--header-transparent-text)`,
-   which is white by default because the banner underneath is normally dark. But
-   the banner's image arrives over the network, and until it does that area is
-   the page's own background — white. So on reload there is a tall white gap, and
-   the header sitting over it is white text on white: the logo, the menu items,
-   the search and the cart all vanish, and only the controls that carry their own
-   colours are left. That is the screenshot exactly.
-
-   The header is not broken there. It is invisible, which looks the same.
-
-   The fix is to give the first section something to be transparent *over* while
-   its media loads. A backing colour behind it costs nothing, is covered the
-   moment the image paints, and means the header is legible from the first frame
-   — no delay, no flash, and no JavaScript deciding when it is safe to be
-   transparent.
-
-   It only applies where the merchant has turned transparency on, which is also
-   where they have committed to a dark banner.
-   ========================================================================== */
-
-body:has(.site-header--transparent) #MainContent > .shopify-section:first-child {
-  background-color: var(--header-banner-placeholder, var(--color-heading, #0b2b26));
-}
 
 /* The section's own media covers the backing, so anything with a background of
    its own is unaffected. This is only ever seen in the gap before it loads. */
 body:has(.site-header--transparent) #MainContent > .shopify-section:first-child > * {
   position: relative;
+}
+
+/* ==========================================================================
+   1. Panel density and banner alignment
+   --------------------------------------------------------------------------
+   With the link groups packing, the space left was the panel grid itself:
+   blocks of very different heights on one row, each stretched to the tallest.
+   ========================================================================== */
+
+.megamenu__grid {
+  grid-auto-rows: min-content;
+  row-gap: var(--mega-gap, 24px);
+}
+
+.megamenu__item {
+  align-self: start;
+  min-inline-size: 0;
+}
+
+/* Link lists are scanned, not read, and the heading is what separates them. */
+.megamenu__eyebrow,
+.megamenu__column-heading {
+  margin-block-end: var(--space-2);
+}
+
+.megamenu__list {
+  gap: 0;
+}
+
+.megamenu__link {
+  padding-block: 4px;
+}
+
+/* A top-level entry with no children is one line. It should not be spaced as
+   though a list were about to follow it. */
+.megamenu__link--standalone {
+  padding-block: 2px;
+}
+
+/* Banners sitting side by side share a baseline.
+   Each is its own block with its own Column span and Image ratio, so their
+   widths are the merchant's choice — but their *internals* should not drift:
+   the image fills its box, and the caption starts at the same distance from it
+   whatever the image's proportions are. */
+.megamenu__grid > .menu-promo {
+  display: flex;
+  flex-direction: column;
+}
+
+.megamenu__grid > .menu-promo .menu-promo__media {
+  display: block;
+  inline-size: 100%;
+}
+
+.megamenu__grid > .menu-promo .menu-promo__content {
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  padding-block-start: var(--space-3);
+}
+
+/* Two lines, then ellipsis. A three-line heading in one card and a one-line
+   heading in the next is what makes a row of banners look misaligned. */
+.menu-promo__heading {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
+
+/* ==========================================================================
+   2. Nothing in the header may change size when its module loads
+   --------------------------------------------------------------------------
+   Custom elements are `display: inline` until a stylesheet says otherwise —
+   including before their module has arrived. An inline box wrapping block
+   content lays out differently from a block one, so the header reflowed the
+   moment each module upgraded, and the controls appeared to shuffle into place.
+
+   Stating the display for the tags themselves means the first paint and the
+   upgraded paint are the same layout. It costs three rules and removes a whole
+   category of movement.
+   ========================================================================== */
+
+nav-menu,
+nav-disclosure,
+market-picker,
+mobile-nav,
+header-row {
+  display: block;
+}
+
+market-picker {
+  position: relative;
+}
+
+/* The drawer is closed at load; it must not reserve space or paint. */
+drawer-component:not([data-open]) > dialog:not([open]) {
+  display: none;
+}
+
+/* ==========================================================================
+   2. The banner's backing colour
+   --------------------------------------------------------------------------
+   A transparent header writes white text, because the banner underneath is
+   normally dark. The banner's image arrives over the network, and until it does
+   that area is the page's own white — so the header is white on white and every
+   control without its own colour disappears. That is the screenshot: only the
+   pills survive.
+
+   The first section gets a backing colour, covered the moment its image paints.
+   No delay, no flash, and no JavaScript deciding when it is safe to be
+   transparent.
+   ========================================================================== */
+
+body:has(.site-header--transparent) #MainContent > .shopify-section:first-child {
+  background-color: var(--header-banner-placeholder, var(--color-heading, #0b2b26));
 }
