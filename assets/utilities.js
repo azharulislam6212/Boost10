@@ -1056,6 +1056,9 @@ export function isScrollLocked() {
 /** Ceiling for waiting on `transitionend`, in case a panel never transitions. */
 const DISCLOSURE_FALLBACK = 500;
 
+/** How long the reveal will wait for a panel's height to settle, in frames. */
+const REVEAL_MAX_FRAMES = 6;
+
 /**
  * The animated part of a `<details>`.
  *
@@ -1155,16 +1158,47 @@ export function openDisclosure(details) {
   const summary = details.querySelector('[data-nav-summary], summary');
   summary?.setAttribute('aria-expanded', 'true');
 
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      // A close may have been requested inside those frames.
-      if (details.dataset.state !== 'open') return;
+  // The reveal waits for the panel's height to stop changing.
+  //
+  // A dropdown is text: it has its final height the moment `open` is set, and
+  // two frames was plenty. A mega menu is not. Its carousel only discovers its
+  // track width when the panel gains a size, and Swiper then relays out — after
+  // the reveal has already started. The inner element is translating by `-101%`
+  // of a height that is no longer the height it began from, so the panel lurches
+  // halfway through. That is why the dropdowns were smooth and the mega menus
+  // were not.
+  //
+  // Two identical measurements and the reveal begins. The cap stops a panel with
+  // something genuinely animating inside it from never opening at all.
+  const panel = panelOf(details);
+  let lastHeight = -1;
+  let frames = 0;
 
-      details.setAttribute('data-open', '');
-      measurePanel(panelOf(details), 'open');
-      settleDisclosure(details);
-    });
-  });
+  const reveal = () => {
+    // A close may have been requested while we were waiting.
+    if (details.dataset.state !== 'open') return;
+
+    details.setAttribute('data-open', '');
+    measurePanel(panel, 'open');
+    settleDisclosure(details);
+  };
+
+  const settleHeight = () => {
+    if (details.dataset.state !== 'open') return;
+
+    const height = panel ? panel.scrollHeight : 0;
+
+    if (height === lastHeight || frames >= REVEAL_MAX_FRAMES) {
+      reveal();
+      return;
+    }
+
+    lastHeight = height;
+    frames += 1;
+    requestAnimationFrame(settleHeight);
+  };
+
+  requestAnimationFrame(settleHeight);
 }
 
 /**

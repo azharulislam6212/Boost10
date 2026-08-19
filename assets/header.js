@@ -249,12 +249,20 @@ export class NavMenu extends BaseComponent {
     summary.innerHTML = link.innerHTML;
     if (link.dataset.current) summary.dataset.current = link.dataset.current;
 
-    // Borrowed from a sibling rather than written here, so it stays whatever the
-    // icon snippet renders.
-    const chevron = this.querySelector('.nav__chevron');
-    if (chevron && !summary.querySelector('.nav__chevron')) {
-      summary.append(chevron.cloneNode(true));
-    }
+    // No chevron is added.
+    //
+    // It used to clone one from a sibling so a promoted item looked like the
+    // ones Liquid built. But the link did not have a chevron a moment ago, and
+    // adding one makes the item about 16px wider — the navigation re-centres,
+    // and the whole menu slides sideways. That happens on every page load, right
+    // after the module arrives, which is exactly the jump you see on reload.
+    //
+    // A menu item that opens a panel and has no chevron is a small loss. A menu
+    // that moves on every load is not.
+    //
+    // The real fix is upstream: match the block's Menu item to the navigation
+    // and Liquid builds the disclosure — chevron included — before first paint.
+    // This path only runs when that match failed.
 
     const href = link.getAttribute('href');
     const inner = panel.querySelector('.nav__panel-inner');
@@ -656,6 +664,9 @@ export class MarketPicker extends BaseComponent {
   /** @type {number|undefined} */
   #closeTimer;
 
+  /** @type {number|undefined} */
+  #settleTimer;
+
   // `menu`, not `panel`.
   //
   // The markup was renamed so it would stop colliding with `DrawerComponent`'s
@@ -709,9 +720,26 @@ export class MarketPicker extends BaseComponent {
 
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        if (!this.refs.menu.hasAttribute('hidden')) {
-          this.refs.menu.setAttribute('data-open', '');
+        if (this.refs.menu.hasAttribute('hidden')) return;
+        this.refs.menu.setAttribute('data-open', '');
+
+        // Scrolling is switched on only once the panel has finished opening.
+        //
+        // A panel that is scrollable while it moves paints its scrollbar for the
+        // whole transition, and again on the way out while the box is still
+        // overflowing as it collapses. On a control nobody has used yet that
+        // reads as a flicker. It matters more here than elsewhere because the
+        // list is filled as the panel opens, so the height is genuinely still
+        // changing during those frames.
+        const settle = () => this.refs.menu.setAttribute('data-settled', '');
+
+        if (prefersReducedMotion()) {
+          settle();
+          return;
         }
+
+        this.refs.menu.addEventListener('transitionend', settle, { once: true });
+        this.#settleTimer = window.setTimeout(settle, 500);
       });
     });
 
@@ -730,6 +758,9 @@ export class MarketPicker extends BaseComponent {
   close() {
     if (!this.open) return;
 
+    // Scrolling off first, so the closing animation has no scrollbar either.
+    clearTimeout(this.#settleTimer);
+    this.refs.menu.removeAttribute('data-settled');
     this.refs.menu.removeAttribute('data-open');
     this.refs.trigger.setAttribute('aria-expanded', 'false');
 

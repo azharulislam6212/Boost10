@@ -55,6 +55,16 @@
 
 .site-header {
   --header-row-height: 72px;
+
+  /* A second variable, and not for tidiness.
+   *
+   * The section writes `--header-row-height` as an *inline style*, because it
+   * comes from the Height setting — and an inline custom property beats every
+   * stylesheet rule for that property, including one inside a media query. So
+   * every previous attempt to set a different height for phones was overridden
+   * before it was read. This one is never written inline, so a media query can
+   * own it. Change this number and the whole small-screen header follows. */
+  --header-row-height-mobile: 54px;
   --header-border-width: 0px;
   --header-radius: 999px;
   --header-gap: var(--space-4);
@@ -291,14 +301,13 @@ sticky-header[data-scrolled]:not([data-transparent]) {
 .site-header__logo {
   position: relative;
   flex-shrink: 0;
-  line-height: 0;
 }
 
 .site-header__logo-heading {
   margin: 0;
   font-size: inherit;
-  line-height: 0;
 }
+
 
 .site-header__logo-link {
   position: relative;
@@ -1669,7 +1678,9 @@ a.menu-promo:hover .menu-promo__cta svg {
 
 @media screen and (max-width: 989px) {
   .site-header {
-    --header-row-height: 56px;
+    /* Was `--header-row-height: 56px`, which the section's inline style silently
+       beat — so the phone header has been using the desktop height all along.
+       The row reads the mobile variable directly instead. */
     --header-pad-inline: var(--space-4);
     --header-gap: var(--space-2);
   }
@@ -2513,59 +2524,6 @@ a.menu-promo:hover .menu-promo__panel {
    together animates nothing at all.
    ========================================================================== */
 
-.market-picker__panel {
-  transform-origin: top center;
-  transform: scaleY(0.82) translateY(-6px);
-  opacity: 0;
-  transition:
-    transform var(--panel-speed) var(--header-ease),
-    opacity var(--panel-fade) linear,
-    visibility 0s linear var(--panel-speed);
-}
-
-.market-picker__panel > * {
-  /* Counter-scaled, so the rows keep their proportions while the box grows. */
-  transform: scaleY(1.22);
-  transform-origin: top center;
-  opacity: 0;
-  transition:
-    transform var(--panel-speed) var(--header-ease),
-    opacity var(--panel-fade) linear var(--panel-fade);
-}
-
-.market-picker__panel[data-open] {
-  transform: none;
-  opacity: 1;
-  transition-delay: 0s;
-}
-
-.market-picker__panel[data-open] > * {
-  transform: none;
-  opacity: 1;
-}
-
-/* Opening upwards in the drawer, so it grows from the control below it. */
-.market-picker--drawer .market-picker__panel,
-.market-picker--drawer .market-picker__panel > * {
-  transform-origin: bottom center;
-}
-
-.market-picker--drawer .market-picker__panel {
-  transform: scaleY(0.82) translateY(6px);
-}
-
-.market-picker--drawer .market-picker__panel[data-open] {
-  transform: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .market-picker__panel,
-  .market-picker__panel > * {
-    transform: none;
-    transition: opacity 0.01ms linear;
-  }
-}
-
 /* ==========================================================================
    38. The drawer's pickers: side by side, opening upwards
    --------------------------------------------------------------------------
@@ -2847,4 +2805,177 @@ a.menu-promo:hover .menu-promo__panel {
   .nav__link {
     padding-inline: var(--space-3);
   }
+}
+
+
+/* ==========================================================================
+   1. The mobile row is 54px
+   --------------------------------------------------------------------------
+   Set on the row's own `min-block-size`, not by overriding
+   `--header-row-height` — the section writes that one inline from the Height
+   setting, and an inline custom property beats a media query.
+
+   One number. The row, the logo's ceiling and the type size all read it, so
+   changing `--header-row-height-mobile` above is the whole edit.
+   ========================================================================== */
+
+@media screen and (max-width: 989px) {
+  .site-header__row--top {
+    min-block-size: var(--header-row-height-mobile, 54px);
+  }
+
+  .site-header__row--bottom {
+    min-block-size: calc(var(--header-row-height-mobile, 54px) * 0.72);
+  }
+
+  /* An image logo cannot grow the row. `--logo-width-mobile` sets a width, and a
+     portrait mark at that width can be twice as tall as the header was asked to
+     be. `object-fit` keeps it from distorting when the ceiling is what
+     constrains it rather than the width. */
+  .site-header__logo-image,
+  .site-header__logo-image img,
+  .site-header__logo-img {
+    max-block-size: calc(var(--header-row-height-mobile, 54px) - var(--space-3));
+    object-fit: contain;
+    object-position: left center;
+  }
+}
+
+/* ==========================================================================
+   4 + 6. The market picker uses the navigation's reveal
+   --------------------------------------------------------------------------
+   The same mechanism as every dropdown in this header: the panel is a clipping
+   window pinned under the trigger, and the surface inside slides down out of it.
+   Not a fade, not a scale — the identical animation, so a customer who has
+   opened one menu already knows what this one does.
+
+   The split is what makes it possible. One element cannot both clip its contents
+   and be the thing that travels, which is why the earlier attempts kept coming
+   out as something else: they were animating the panel itself.
+
+     .market-picker__panel  the clip. No background, no border, no shadow.
+     .market-picker__inner  the surface. Appearance, scrolling, and the movement.
+
+   Scrolling waits for `data-settled`, written by the component on
+   `transitionend`. A panel that is scrollable while it moves paints its
+   scrollbar for the whole transition, and again on the way out — and this list
+   is filled as it opens, so the height is genuinely still changing.
+   ========================================================================== */
+
+.market-picker__panel {
+  position: absolute;
+  inset-block-start: 100%;
+  inset-inline-end: 0;
+  z-index: 30;
+  inline-size: max-content;
+  min-inline-size: 220px;
+  max-inline-size: min(320px, 90vw);
+
+  /* Room below for the surface's shadow to land inside the clip. */
+  padding-block: var(--space-2) var(--space-6);
+  overflow: hidden;
+  pointer-events: none;
+
+  /* The appearance moved to the inner element. */
+  max-block-size: none;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.market-picker__panel[data-open] {
+  pointer-events: auto;
+}
+
+.market-picker__inner {
+  display: block;
+  max-block-size: 320px;
+  overflow: hidden;
+  overscroll-behavior: contain;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background-color: var(--color-background);
+  color: var(--color-text);
+  box-shadow: 0 24px 48px -28px rgb(0 0 0 / 0.4);
+
+  transform: translateY(-101%);
+  opacity: 0;
+  transition:
+    transform var(--panel-speed) var(--header-ease),
+    opacity var(--panel-fade) linear;
+}
+
+.market-picker__panel[data-open] .market-picker__inner {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.market-picker__panel[data-settled] .market-picker__inner {
+  overflow-y: auto;
+}
+
+/* ---- in the drawer it opens upwards ---- */
+
+.market-picker--drawer .market-picker__panel {
+  inset-block: auto 100%;
+  inset-inline: 0 auto;
+  padding-block: var(--space-6) var(--space-2);
+}
+
+.market-picker--drawer .market-picker__unit:last-child .market-picker__panel {
+  inset-inline: auto 0;
+}
+
+.market-picker--drawer .market-picker__inner {
+  max-block-size: 46vh;
+  /* Out of the bottom of the clip rather than the top. */
+  transform: translateY(101%);
+  box-shadow: 0 -18px 40px -24px rgb(0 0 0 / 0.45);
+}
+
+.market-picker--drawer .market-picker__panel[data-open] .market-picker__inner {
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .market-picker__inner {
+    transform: none;
+    transition: opacity 0.01ms linear;
+  }
+}
+
+/* ==========================================================================
+   2. The white gap on reload, and the header disappearing into it
+   --------------------------------------------------------------------------
+   Both symptoms are one cause.
+
+   A transparent header writes `--color-text: var(--header-transparent-text)`,
+   which is white by default because the banner underneath is normally dark. But
+   the banner's image arrives over the network, and until it does that area is
+   the page's own background — white. So on reload there is a tall white gap, and
+   the header sitting over it is white text on white: the logo, the menu items,
+   the search and the cart all vanish, and only the controls that carry their own
+   colours are left. That is the screenshot exactly.
+
+   The header is not broken there. It is invisible, which looks the same.
+
+   The fix is to give the first section something to be transparent *over* while
+   its media loads. A backing colour behind it costs nothing, is covered the
+   moment the image paints, and means the header is legible from the first frame
+   — no delay, no flash, and no JavaScript deciding when it is safe to be
+   transparent.
+
+   It only applies where the merchant has turned transparency on, which is also
+   where they have committed to a dark banner.
+   ========================================================================== */
+
+body:has(.site-header--transparent) #MainContent > .shopify-section:first-child {
+  background-color: var(--header-banner-placeholder, var(--color-heading, #0b2b26));
+}
+
+/* The section's own media covers the backing, so anything with a background of
+   its own is unaffected. This is only ever seen in the gap before it loads. */
+body:has(.site-header--transparent) #MainContent > .shopify-section:first-child > * {
+  position: relative;
 }
