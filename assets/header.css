@@ -188,15 +188,28 @@ sticky-header[data-sticky-mode='scroll-down'][data-hidden] {
   padding-inline: var(--container-gutter, var(--space-4));
 }
 
-/* `1fr auto 1fr`, not `auto 1fr auto`.
+/* `auto minmax(0, 1fr) auto` — and this is the overlap.
 
-   With the outer tracks on `auto` the middle one is whatever is left over, so a
-   centred logo sits in the middle of the *remaining* space — which moves as soon
-   as one side has more controls than the other. Equal flexible outer tracks put
-   the centre slot on the page's centre line and keep it there. */
+   It was `1fr auto 1fr`, chosen so a centred logo would sit on the page's centre
+   line. But that puts the *navigation* on an `auto` track, sized to its own
+   content, and the two outer tracks on whatever is left. Seven menu items eat
+   the row: both `1fr` tracks collapse to zero, and their contents — the logo on
+   one side, the market pickers and actions on the other — overflow their empty
+   tracks and are painted straight over the menu.
+
+   That is what the screenshot shows. Nothing was mis-sized; the tracks holding
+   the controls had no width at all.
+
+   Now the outer tracks are `auto`: they take exactly what their contents need
+   and can never collapse, so nothing on either side can reach the middle. The
+   navigation gets what is left, with `minmax(0, …)` so the track may shrink
+   rather than force the row wider than the page.
+
+   True centring for a centred logo is handled separately, by taking it out of
+   the flow — see section 44. */
 .site-header__row {
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--header-gap);
   min-block-size: var(--header-row-height);
@@ -1311,11 +1324,8 @@ a.menu-promo:hover .menu-promo__cta svg {
   border: 1px solid var(--color-border);
 }
 
-.market-picker--drawer .market-picker__panel {
-  inset-block-end: calc(100% + var(--space-2));
-  inset-block-start: auto;
-  inset-inline: 0 auto;
-}
+/* Superseded by section 38, which owns the drawer panel's position, surface and
+   stacking order in one place. */
 
 /* --------------------------------------------------------------------------
    16. Menu drawer
@@ -1870,7 +1880,7 @@ a.menu-promo:hover .menu-promo__panel {
   /* The logo leaves whichever desktop slot it was in and takes the middle,
      `order` moving it without a second copy in the markup. */
   .site-header[data-logo-mobile='center'] .site-header__row--top {
-    grid-template-columns: 1fr auto 1fr;
+    grid-template-columns: auto minmax(0, 1fr) auto;
   }
 
   .site-header[data-logo-mobile='center'] .site-header__logo {
@@ -1932,6 +1942,21 @@ a.menu-promo:hover .menu-promo__panel {
 .site-header__burger,
 .market-picker {
   flex-shrink: 0;
+}
+
+/* The end slot is a cluster, and it must be measured as one.
+ *
+ * With the country and language controls loose in the row, the navigation had
+ * no way to know how much room they needed — it sized itself to its own content
+ * and the two overlapped. Grouped and non-shrinking, the end slot claims its
+ * width first and the navigation takes what is left. */
+.site-header__slot--end {
+  flex-shrink: 0;
+  gap: var(--space-3);
+}
+
+.site-header__slot--center {
+  min-inline-size: 0;
 }
 
 /* The navigation is what gives.
@@ -2062,13 +2087,20 @@ a.menu-promo:hover .menu-promo__panel {
    banner is behind us — no second selector for the scrolled state, and no
    `!important` to unpick it. */
 .site-header--transparent[data-transparent] .site-header__shell:not(:hover):not(:has([open])):not(:has(.market-picker__panel:not([hidden]))) {
-  --color-background: transparent;
+  /* Frosted, not invisible.
+   *
+   * A fully transparent bar reads as "no header" over a busy photograph, and the
+   * links only become legible once you are already pointing at them. A tenth of
+   * white with a deep blur keeps the banner visible while giving the text
+   * something to sit on — and it means the header is a surface in all three
+   * states, so the hover is a change of degree rather than an appearance. */
+  --color-background: var(--header-veil, rgb(255 255 255 / 0.1));
   --gradient-background: none;
   --color-text: var(--header-transparent-text, #fff);
   --color-heading: var(--header-transparent-text, #fff);
   --color-border: color-mix(in srgb, var(--header-transparent-text, #fff) 22%, transparent);
 
-  backdrop-filter: none;
+  backdrop-filter: blur(50px);
   box-shadow: none;
 }
 
@@ -2382,9 +2414,17 @@ a.menu-promo:hover .menu-promo__panel {
 
   /* A left-aligned logo shares the row normally, but still must not push the
      controls off the end. */
+  /* No percentage cap here.
+   *
+   * `100%` on a logo that is *in the flow* resolves against its slot, and the
+   * slot is only as wide as the burger and the logo — so `calc(100% - 160px)`
+   * was usually a negative number, clamped to zero, and the logo disappeared
+   * entirely. That is why it was missing rather than merely cramped.
+   *
+   * The track shrinks instead, and the text truncates inside it. */
   .site-header[data-logo-mobile='left'] .site-header__logo {
     min-inline-size: 0;
-    max-inline-size: calc(100% - 160px);
+    max-inline-size: none;
   }
 
   .site-header[data-logo-mobile='left'] .site-header__logo-text {
@@ -2422,4 +2462,389 @@ a.menu-promo:hover .menu-promo__panel {
 
 .megamenu .nav__panel-jump {
   margin-block-end: var(--space-3);
+}
+
+/* ==========================================================================
+   36. The panel opens without a jump
+   --------------------------------------------------------------------------
+   The lurch was a carousel, not the animation. Opening a panel dispatched a
+   window `resize` so that any Swiper inside would re-measure — but that told
+   *every* carousel on the page to relayout, mid-transition, and the panel's own
+   height changed under the reveal.
+
+   The dispatch is gone. `carousel.js` already observes its own track, so a
+   carousel that gains width when its panel opens re-measures on its own and does
+   it once, before anything is visible.
+
+   What is left here is making sure the panel's height is settled before it
+   moves: images inside a panel are given their aspect ratio up front so the box
+   does not grow as they arrive.
+   ========================================================================== */
+
+.nav__panel-inner {
+  /* Promoted for the whole transition. Without it the first two or three frames
+     go to the compositor deciding to promote, which is felt as a stutter at the
+     start of every open. */
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+}
+
+.nav__panel [data-ratio],
+.nav__panel .menu-promo__image,
+.nav__panel .menu-card__image {
+  /* A reserved box. An image that arrives after the panel has opened would
+     otherwise push everything below it down. */
+  contain: layout paint;
+}
+
+/* ==========================================================================
+   37. The market picker opens like a dropdown
+   --------------------------------------------------------------------------
+   Not a fade. A list that fades in has no direction and no origin — it could
+   have come from anywhere. A dropdown grows out of the control that opened it,
+   which is the one thing the animation has to say.
+
+   `scaleY` from the correct edge does that in one composited property, and the
+   contents counter-scale so the text does not stretch on the way. In the header
+   the origin is the top edge; in the drawer, where it opens upwards, the bottom.
+
+   The two-step lives in `header.js`: `hidden` comes off, `data-open` lands on the
+   next frame. A panel that is `display: none` has no from-state, so setting both
+   together animates nothing at all.
+   ========================================================================== */
+
+.market-picker__panel {
+  transform-origin: top center;
+  transform: scaleY(0.82) translateY(-6px);
+  opacity: 0;
+  transition:
+    transform var(--panel-speed) var(--header-ease),
+    opacity var(--panel-fade) linear,
+    visibility 0s linear var(--panel-speed);
+}
+
+.market-picker__panel > * {
+  /* Counter-scaled, so the rows keep their proportions while the box grows. */
+  transform: scaleY(1.22);
+  transform-origin: top center;
+  opacity: 0;
+  transition:
+    transform var(--panel-speed) var(--header-ease),
+    opacity var(--panel-fade) linear var(--panel-fade);
+}
+
+.market-picker__panel[data-open] {
+  transform: none;
+  opacity: 1;
+  transition-delay: 0s;
+}
+
+.market-picker__panel[data-open] > * {
+  transform: none;
+  opacity: 1;
+}
+
+/* Opening upwards in the drawer, so it grows from the control below it. */
+.market-picker--drawer .market-picker__panel,
+.market-picker--drawer .market-picker__panel > * {
+  transform-origin: bottom center;
+}
+
+.market-picker--drawer .market-picker__panel {
+  transform: scaleY(0.82) translateY(6px);
+}
+
+.market-picker--drawer .market-picker__panel[data-open] {
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .market-picker__panel,
+  .market-picker__panel > * {
+    transform: none;
+    transition: opacity 0.01ms linear;
+  }
+}
+
+/* ==========================================================================
+   38. The drawer's pickers: side by side, opening upwards
+   --------------------------------------------------------------------------
+   I moved these into the flow last round to stop the panel covering the login
+   link. That fixed the overlap and lost the shape: two controls stacked full
+   width, and the footer growing and shrinking under the customer's thumb.
+
+   Side by side is right — they are two halves of one decision. The panel opens
+   upwards, over the footer, because there is no room below it. What was actually
+   wrong was never the position: the panel had no solid background, so the links
+   behind it showed through and read as overlapping text.
+
+   So: an opaque surface, its own stacking order, and a slide up rather than a
+   fade in.
+   ========================================================================== */
+
+.market-picker--drawer {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.market-picker--drawer .market-picker__unit {
+  position: relative;
+  flex: 1 1 0;
+  min-inline-size: 0;
+}
+
+.market-picker--drawer .market-picker__trigger {
+  inline-size: 100%;
+  justify-content: space-between;
+  border: 1px solid var(--color-border);
+}
+
+.market-picker--drawer .market-picker__panel {
+  position: absolute;
+  inset-block: auto calc(100% + var(--space-2));
+  inset-inline: 0 auto;
+  z-index: 40;
+  inline-size: max(100%, 220px);
+  max-block-size: 46vh;
+
+  /* Opaque, not translucent. The list sits directly over the account link and
+     the social row, and a background that lets them through is read as two
+     lines of text on top of each other — which is what the screenshot showed. */
+  background-color: var(--color-background);
+  box-shadow: 0 -18px 40px -24px rgb(0 0 0 / 0.45);
+}
+
+/* The second control's panel is aligned to its own right edge so it cannot run
+   off the drawer. */
+.market-picker--drawer .market-picker__unit:last-child .market-picker__panel {
+  inset-inline: auto 0;
+}
+
+/* ==========================================================================
+   39. Small screens: the logo comes first
+   --------------------------------------------------------------------------
+   The row was sized for desktop controls and the logo took what was left, which
+   on a 380px screen was nothing. Shrinking the controls is the cheaper trade:
+   nobody has ever failed to find a 36px cart icon, and a shop with no visible
+   name is a shop the customer cannot place.
+   ========================================================================== */
+
+@media screen and (max-width: 989px) {
+  .site-header__action,
+  .site-header__burger {
+    min-inline-size: 36px;
+    inline-size: 36px;
+    block-size: 36px;
+  }
+
+  .site-header__action--cart {
+    inline-size: auto;
+    padding-inline: var(--space-2);
+  }
+
+  .site-header__action svg {
+    inline-size: 17px;
+    block-size: 17px;
+  }
+
+  .site-header__cart-count {
+    font-size: 12px;
+  }
+
+  .site-header__actions {
+    gap: var(--space-1);
+  }
+
+  /* Recalculated for the smaller controls: burger, search, cart and the gaps. */
+  .site-header[data-logo-mobile='center'] .site-header__row--top {
+    --mobile-side: 96px;
+  }
+
+  .site-header__logo {
+    min-inline-size: 0;
+  }
+
+  .site-header__logo-text {
+    display: block;
+    overflow: hidden;
+    font-size: var(--font-size-md);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* ==========================================================================
+   40. `mega-menu-simple`
+   --------------------------------------------------------------------------
+   Links on the left, banners on the right, and the banner column only exists
+   when a banner is turned on — `--simple-banners` carries the count so the grid
+   collapses to a single column rather than leaving a gap where one would go.
+   ========================================================================== */
+
+.megamenu--simple {
+  padding: var(--mega-padding, 24px);
+}
+
+.megamenu__simple {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--mega-gap, 32px);
+  align-items: start;
+}
+
+.megamenu__simple:has(.megamenu__simple-banners) {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.megamenu__simple-links {
+  min-inline-size: 0;
+}
+
+.megamenu__simple-banners {
+  display: grid;
+  grid-template-columns: repeat(var(--simple-banners, 1), minmax(180px, 240px));
+  gap: var(--mega-gap, 32px);
+}
+
+@media screen and (max-width: 989px) {
+  .megamenu__simple,
+  .megamenu__simple:has(.megamenu__simple-banners) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .megamenu__simple-banners {
+    grid-template-columns: repeat(var(--simple-banners, 1), minmax(0, 1fr));
+  }
+}
+
+/* ==========================================================================
+   41. The row gives up the localization before it overlaps
+   --------------------------------------------------------------------------
+   Seven menu items, two market controls, a promotional pill and three icon
+   buttons will not fit on a laptop, and there is no clipping to fall back on —
+   the navigation must not clip, because a compact mega menu panel is positioned
+   inside it.
+
+   So the row sheds in a fixed order, widest and least essential first. The
+   country and language controls are the ones to go: they are in the drawer, they
+   are in the footer, and a customer changing market does it once.
+   ========================================================================== */
+
+@media screen and (min-width: 990px) and (max-width: 1439px) {
+  /* The country's name is the widest optional string in the row. The flag and
+     the chevron still say what the control is. */
+  .market-picker--header .market-picker__trigger > span[aria-hidden='true'] {
+    display: none;
+  }
+
+  .market-picker--header .market-picker__trigger {
+    padding-inline: var(--space-2);
+  }
+}
+
+@media screen and (min-width: 990px) and (max-width: 1279px) {
+  /* Both controls leave the row. They remain in the menu drawer and the footer,
+     which is where a market switch is looked for once and then forgotten. */
+  .market-picker--header {
+    display: none;
+  }
+}
+
+/* ==========================================================================
+   42. The action cluster's order is fixed
+   --------------------------------------------------------------------------
+   Promotional pill, search, account, cart — left to right. Stated here as well
+   as in the markup so a merchant reordering settings cannot separate search
+   from the account button, which is the pairing customers reach for.
+   ========================================================================== */
+
+.site-header__promo { order: 1; }
+.site-header__action--search { order: 2; }
+.site-header__account,
+.site-header__action--account { order: 3; }
+.site-header__action--cart { order: 4; }
+
+/* ==========================================================================
+   43. The market picker's panel
+   --------------------------------------------------------------------------
+   Above everything else in the header. It is the only panel that can open from
+   the end of the row, where the cart and account controls sit at `z-index: 2` —
+   without this it opened behind them.
+   ========================================================================== */
+
+.market-picker__panel {
+  z-index: 30;
+}
+
+.market-picker__unit {
+  z-index: 3;
+}
+
+/* ==========================================================================
+   44. A centred logo, now that the tracks are content-sized
+   --------------------------------------------------------------------------
+   `auto minmax(0, 1fr) auto` cannot centre the logo on the page — the middle
+   track is whatever is left between two content-sized sides, and it moves as
+   soon as one side has more controls than the other.
+
+   So a centred logo is taken out of the flow and centred on the row itself. That
+   is the only way to have both: outer tracks that never collapse, and a logo on
+   the page's centre line.
+
+   It is absolute, so it can reach the controls. The row states how much they
+   need and the logo takes what is left — reserving the widest single side,
+   doubled, because a centred element grows equally in both directions.
+   ========================================================================== */
+
+@media screen and (min-width: 990px) {
+  .site-header[data-logo-position='center'] .site-header__row--top {
+    position: relative;
+    --logo-reserve: 280px;
+  }
+
+  .site-header[data-logo-position='center'] .site-header__slot--center .site-header__logo {
+    position: absolute;
+    inset-inline: 0;
+    inset-block-start: 50%;
+    z-index: 1;
+    inline-size: fit-content;
+    max-inline-size: calc(100% - (var(--logo-reserve) * 2));
+    margin-inline: auto;
+    translate: 0 -50%;
+  }
+
+  /* The controls stay above it, so a long shop name truncates inside its own box
+     rather than being drawn over them. */
+  .site-header__slot--start > *,
+  .site-header__slot--end > * {
+    position: relative;
+    z-index: 2;
+  }
+}
+
+/* ==========================================================================
+   45. The navigation is the only thing that gives
+   --------------------------------------------------------------------------
+   With the outer tracks content-sized, the middle track is the remainder — and
+   a long menu will still be wider than the remainder on a small laptop. It must
+   not clip (a compact mega menu panel is positioned inside it) and it must not
+   overflow, so it tightens instead, in one step, before the market controls
+   start leaving the row at 1440.
+   ========================================================================== */
+
+@media screen and (min-width: 990px) and (max-width: 1599px) {
+  .site-header__nav {
+    --nav-size: 14px;
+  }
+
+  .nav {
+    gap: 0;
+  }
+
+  .nav__link {
+    padding-inline: var(--space-3);
+  }
 }

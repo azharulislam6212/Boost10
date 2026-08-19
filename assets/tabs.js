@@ -12,6 +12,7 @@
 import { BaseComponent, defineComponent } from '@theme/component';
 import { rafThrottle, prefersReducedMotion } from '@theme/utilities';
 
+
 /**
  * A tab strip with animated selection.
  *
@@ -121,20 +122,6 @@ export class TabGroup extends BaseComponent {
 
     this.#placeMarker(options.animate !== false);
 
-    // A carousel inside a panel that was `hidden` measured itself at zero width
-    // and laid out as one slide. Swapping the attribute is not a resize it can
-    // observe, so it is told to look again.
-    if (this.panels[index]?.querySelector('swiper-carousel')) {
-      requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
-    }
-
-    // A carousel inside a panel that was `hidden` measured itself at zero width
-    // and laid out as one slide. It only recovers when something tells it to
-    // look again, and swapping the panel's `hidden` attribute is not a resize
-    // the carousel can observe.
-    if (this.panels[index]?.querySelector('swiper-carousel')) {
-      requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
-    }
 
     if (!options.silent) {
       this.dispatchEvent(

@@ -1,0 +1,269 @@
+{% comment %}
+  blocks/mega-menu-simple.liquid — Boost10
+
+  The second mega menu type: the menu item's own links, laid out in columns, with
+  one or two banners beside them.
+
+  ## Why this exists next to `mega-menu`
+
+  `mega-menu` is a canvas — you add blocks and arrange them. That is the right
+  tool for the Science card list and the tabbed category rail, and the wrong tool
+  for "show this menu's links and put a picture next to them", which is most menus
+  most of the time and took four nested blocks to build.
+
+  This one has no nested blocks. Pick the menu, pick how many columns, turn on
+  one banner or two. Three settings and a panel.
+
+  ## The links come from a menu, not from the parent item
+
+  A block cannot read the navigation item it is attached to — nothing in Liquid
+  exposes that relationship. So the menu is picked here. Point it at the same
+  child menu the navigation item uses and it behaves exactly like an automatic
+  dropdown, in columns; point it somewhere else and you get a curated panel that
+  is not in the header tree at all.
+
+  ## Banners are settings, not blocks
+
+  Two is the ceiling this layout holds, and a merchant who wants a third wants a
+  different panel. Fixed slots mean the whole thing is one screen of settings
+  rather than a tree to open.
+{% endcomment %}
+
+{%- liquid
+  assign st = block.settings
+  assign label = st.menu_item | strip
+  assign menu = st.menu
+
+  assign banner_count = 0
+  if st.banner_1_enabled
+    assign banner_count = banner_count | plus: 1
+  endif
+  if st.banner_2_enabled
+    assign banner_count = banner_count | plus: 1
+  endif
+-%}
+
+<div
+  class="nav__panel nav__panel--mega nav__panel--{{ st.width }}"
+  data-nav-panel
+  data-mega-panel
+  data-menu-item="{{ label | escape }}"
+  {% if st.show_on_mobile %}data-mobile="true"{% endif %}
+  data-align="{{ st.align }}"
+  {{ block.shopify_attributes }}
+>
+  <div
+    class="nav__panel-inner megamenu megamenu--simple color-{{ st.color_scheme }}"
+    style="
+      --mega-radius: {{ st.corner_radius }}px;
+      --mega-padding: {{ st.padding }}px;
+      --mega-gap: {{ st.gap }}px;
+      --simple-banners: {{ banner_count }};
+    "
+  >
+    <div class="megamenu__simple">
+      <div class="megamenu__simple-links">
+        {%- if st.heading != blank -%}
+          <p class="megamenu__eyebrow">{{ st.heading | escape }}</p>
+        {%- endif -%}
+
+        {%- if menu != blank and menu.links.size > 0 -%}
+          <div class="megamenu__columns" style="--columns: {{ st.columns }};">
+            {%- for link in menu.links -%}
+              <div class="megamenu__column">
+                {%- if link.links.size > 0 -%}
+                  <a class="megamenu__column-heading" href="{{ link.url }}">{{ link.title }}</a>
+
+                  <ul class="megamenu__list" role="list">
+                    {%- for child in link.links -%}
+                      <li><a class="megamenu__link" href="{{ child.url }}">{{ child.title }}</a></li>
+                    {%- endfor -%}
+                  </ul>
+                {%- else -%}
+                  <a class="megamenu__link megamenu__link--standalone" href="{{ link.url }}">
+                    {{- link.title -}}
+                  </a>
+                {%- endif -%}
+              </div>
+            {%- endfor -%}
+          </div>
+        {%- else -%}
+          <p class="megamenu__empty">{{ 'blocks.mega_menu.empty_menu' | t }}</p>
+        {%- endif -%}
+      </div>
+
+      {%- if banner_count > 0 -%}
+        <div class="megamenu__simple-banners">
+          {%- for index in (1..2) -%}
+            {%- liquid
+              assign enabled_key = 'banner_' | append: index | append: '_enabled'
+              unless st[enabled_key]
+                continue
+              endunless
+
+              assign image_key = 'banner_' | append: index | append: '_image'
+              assign heading_key = 'banner_' | append: index | append: '_heading'
+              assign label_key = 'banner_' | append: index | append: '_link_label'
+              assign link_key = 'banner_' | append: index | append: '_link'
+
+              assign banner_image = st[image_key]
+              assign banner_heading = st[heading_key]
+              assign banner_label = st[label_key]
+              assign banner_link = st[link_key]
+            -%}
+
+            {%- if banner_link != blank -%}
+              <a class="menu-promo menu-promo--{{ st.banner_text_position }}" href="{{ banner_link }}" style="--promo-radius: {{ st.corner_radius | minus: 8 }}px;">
+            {%- else -%}
+              <div class="menu-promo menu-promo--{{ st.banner_text_position }}" style="--promo-radius: {{ st.corner_radius | minus: 8 }}px;">
+            {%- endif -%}
+
+              <span class="menu-promo__media">
+                {%- if banner_image != blank -%}
+                  {% render 'image',
+                    image: banner_image,
+                    alt: banner_heading,
+                    ratio: st.banner_ratio,
+                    sizes: '(min-width: 990px) 25vw, 80vw',
+                    wrapper_class: 'menu-promo__image',
+                    class: 'menu-promo__img'
+                  %}
+                {%- else -%}
+                  <span class="menu-promo__image menu-promo__image--placeholder">
+                    {{ 'lifestyle-' | append: index | placeholder_svg_tag: 'placeholder-svg' }}
+                  </span>
+                {%- endif -%}
+
+                {%- if st.banner_text_position == 'over' -%}
+                  <span class="menu-promo__panel">
+                    {%- if banner_heading != blank -%}
+                      <span class="menu-promo__heading">{{ banner_heading | escape }}</span>
+                    {%- endif -%}
+                    {%- if banner_label != blank -%}
+                      <span class="menu-promo__cta">
+                        <span>{{ banner_label | escape }}</span>
+                        {% render 'icon', icon: 'arrow-right', size: 16 %}
+                      </span>
+                    {%- endif -%}
+                  </span>
+                {%- endif -%}
+              </span>
+
+              {%- if st.banner_text_position != 'over' -%}
+                <span class="menu-promo__content">
+                  {%- if banner_heading != blank -%}
+                    <span class="menu-promo__heading">{{ banner_heading | escape }}</span>
+                  {%- endif -%}
+                  {%- if banner_label != blank -%}
+                    <span class="menu-promo__cta">
+                      <span>{{ banner_label | escape }}</span>
+                      {% render 'icon', icon: 'arrow-right', size: 16 %}
+                    </span>
+                  {%- endif -%}
+                </span>
+              {%- endif -%}
+
+            {%- if banner_link != blank -%}</a>{%- else -%}</div>{%- endif -%}
+          {%- endfor -%}
+        </div>
+      {%- endif -%}
+    </div>
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "t:blocks.mega_menu_simple.name",
+  "tag": null,
+  "settings": [
+    {
+      "type": "text",
+      "id": "menu_item",
+      "label": "t:blocks.mega_menu.settings.menu_item.label",
+      "info": "t:blocks.mega_menu.settings.menu_item.info"
+    },
+    {
+      "type": "link_list",
+      "id": "menu",
+      "label": "t:blocks.menu_links.settings.menu.label",
+      "info": "t:blocks.menu_links.settings.menu.info",
+      "default": "main-menu"
+    },
+    { "type": "text", "id": "heading", "label": "t:shared.heading.label" },
+    { "type": "range", "id": "columns", "label": "t:shared.columns.desktop.label", "min": 1, "max": 5, "step": 1, "default": 3 },
+
+    { "type": "header", "content": "t:blocks.mega_menu_simple.headers.banner_1" },
+    { "type": "checkbox", "id": "banner_1_enabled", "label": "t:blocks.mega_menu_simple.settings.banner_enabled.label", "default": true },
+    { "type": "image_picker", "id": "banner_1_image", "label": "t:shared.image.label" },
+    { "type": "text", "id": "banner_1_heading", "label": "t:shared.heading.label" },
+    { "type": "text", "id": "banner_1_link_label", "label": "t:blocks.menu_promo.settings.link_label.label" },
+    { "type": "url", "id": "banner_1_link", "label": "t:shared.link.label" },
+
+    { "type": "header", "content": "t:blocks.mega_menu_simple.headers.banner_2" },
+    { "type": "checkbox", "id": "banner_2_enabled", "label": "t:blocks.mega_menu_simple.settings.banner_enabled.label", "default": false },
+    { "type": "image_picker", "id": "banner_2_image", "label": "t:shared.image.label" },
+    { "type": "text", "id": "banner_2_heading", "label": "t:shared.heading.label" },
+    { "type": "text", "id": "banner_2_link_label", "label": "t:blocks.menu_promo.settings.link_label.label" },
+    { "type": "url", "id": "banner_2_link", "label": "t:shared.link.label" },
+
+    { "type": "header", "content": "t:blocks.mega_menu_simple.headers.banner_style" },
+    {
+      "type": "select",
+      "id": "banner_text_position",
+      "label": "t:blocks.menu_promo.settings.text_position.label",
+      "options": [
+        { "value": "over", "label": "t:blocks.menu_promo.settings.text_position.options__2.label" },
+        { "value": "below", "label": "t:blocks.menu_promo.settings.text_position.options__1.label" }
+      ],
+      "default": "over"
+    },
+    {
+      "type": "select",
+      "id": "banner_ratio",
+      "label": "t:shared.image_ratio.label",
+      "options": [
+        { "value": "square", "label": "t:shared.image_ratio.options__1.label" },
+        { "value": "portrait", "label": "t:shared.image_ratio.options__2.label" },
+        { "value": "landscape", "label": "t:shared.image_ratio.options__3.label" }
+      ],
+      "default": "portrait"
+    },
+
+    { "type": "header", "content": "t:sections.header.headers.appearance" },
+    {
+      "type": "select",
+      "id": "width",
+      "label": "t:blocks.mega_menu.settings.width.label",
+      "options": [
+        { "value": "full", "label": "t:blocks.mega_menu.settings.width.options__1.label" },
+        { "value": "page", "label": "t:blocks.mega_menu.settings.width.options__2.label" },
+        { "value": "compact", "label": "t:blocks.mega_menu.settings.width.options__3.label" }
+      ],
+      "default": "page"
+    },
+    {
+      "type": "select",
+      "id": "align",
+      "label": "t:blocks.mega_menu.settings.align.label",
+      "info": "t:blocks.mega_menu.settings.align.info",
+      "options": [
+        { "value": "start", "label": "t:shared.position.options__1.label" },
+        { "value": "center", "label": "t:shared.position.options__2.label" },
+        { "value": "end", "label": "t:shared.position.options__3.label" }
+      ],
+      "default": "start"
+    },
+    { "type": "range", "id": "gap", "label": "t:blocks.mega_menu.settings.gap.label", "min": 0, "max": 64, "step": 2, "unit": "px", "default": 32 },
+    { "type": "range", "id": "padding", "label": "t:blocks.mega_menu.settings.padding.label", "min": 0, "max": 80, "step": 2, "unit": "px", "default": 24 },
+    { "type": "range", "id": "corner_radius", "label": "t:shared.corner_radius.label", "min": 0, "max": 48, "step": 2, "unit": "px", "default": 24 },
+    { "type": "color_scheme", "id": "color_scheme", "label": "t:shared.color_scheme.label", "default": "scheme-1" },
+    {
+      "type": "checkbox",
+      "id": "show_on_mobile",
+      "label": "t:blocks.mega_menu.settings.show_on_mobile.label",
+      "info": "t:blocks.mega_menu.settings.show_on_mobile.info",
+      "default": true
+    }
+  ]
+}
+{% endschema %}

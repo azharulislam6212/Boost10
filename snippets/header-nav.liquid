@@ -72,9 +72,12 @@
           assign mega_block = null
 
           for candidate in section.blocks
-            if candidate.type != 'mega-menu'
+            # Both panel types are matched here. `mega-menu` is the canvas you
+            # arrange blocks on; `mega-menu-simple` is the menu-plus-banners one.
+            # A menu item does not care which built its panel.
+            unless candidate.type == 'mega-menu' or candidate.type == 'mega-menu-simple'
               continue
-            endif
+            endunless
 
             assign candidate_key = candidate.settings.menu_item | strip | downcase
             if candidate_key == link_key
@@ -83,8 +86,16 @@
             endif
           endfor
 
+          # A matched panel is enough on its own.
+          #
+          # An item with no children in Navigation used to fall through to a
+          # plain link, and the panel then had no disclosure to be moved into —
+          # so the mega menu never appeared, and on the items where Liquid did
+          # build one the fallback dropdown was an empty box.
+          #
+          # The panel decides. Children only matter for items that have no block.
           assign has_panel = false
-          if link.links.size > 0 or mega_block != null
+          if mega_block != null or link.links.size > 0
             assign has_panel = true
           endif
 
@@ -114,7 +125,16 @@
 
               <div class="nav__panel nav__panel--{{ panel_kind }}" data-nav-panel>
                 <div class="nav__panel-inner">
-                  {% render 'nav-dropdown', link: link %}
+                  {%- comment -%}
+                    Rendered only when this item has no panel block. With one, the
+                    component replaces this element wholesale, and building a
+                    dropdown here first meant a flash of the wrong menu on slow
+                    connections — or, for an item with no children, an empty box
+                    that never got replaced.
+                  {%- endcomment -%}
+                  {%- if mega_block == null -%}
+                    {% render 'nav-dropdown', link: link %}
+                  {%- endif -%}
                 </div>
               </div>
             </details>

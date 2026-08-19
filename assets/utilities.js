@@ -1039,3 +1039,180 @@ export function unlockScroll() {
 export function isScrollLocked() {
   return scrollLockCount > 0;
 }
+
+
+/* ==========================================================================
+   Disclosure mechanics
+   --------------------------------------------------------------------------
+   Opening and closing a `<details>` with a transition, and measuring a panel
+   that has no height until it is open.
+
+   These live here rather than in `header.js` because none of them know anything
+   about navigation: they take a `<details>`, they read `data-` attributes, and
+   they leave the styling to whatever stylesheet is in charge. The header uses
+   them for its menus and its drawer; anything else that discloses can too.
+   ========================================================================== */
+
+/** Ceiling for waiting on `transitionend`, in case a panel never transitions. */
+const DISCLOSURE_FALLBACK = 500;
+
+/**
+ * The animated part of a `<details>`.
+ *
+ * @param {HTMLDetailsElement} details
+ * @returns {HTMLElement|null}
+ */
+export function panelOf(details) {
+  return details.querySelector(':scope > [data-nav-panel], :scope > [data-mobile-panel]');
+}
+
+/**
+ * Give a measured panel a pixel height to animate to, and take it away again.
+ *
+ * A `<details>` panel has no height until it is open, and no *known* height once
+ * it is — `auto` cannot be transitioned. So the height is written in pixels for
+ * the duration of the transition and released afterwards, which is what lets a
+ * submenu opening inside an already-open panel still grow it.
+ *
+ * Only panels marked `data-mobile-panel` are measured; the desktop ones animate
+ * a transform inside a clip and need no height at all.
+ *
+ * @param {HTMLElement|null} panel
+ * @param {'open'|'close'} direction
+ */
+export function measurePanel(panel, direction) {
+  if (!panel || !panel.hasAttribute('data-mobile-panel')) return;
+
+  if (direction === 'close') {
+    // From its current height, not from `auto`, or there is nothing to animate
+    // away from.
+    panel.style.blockSize = `${panel.scrollHeight}px`;
+    void panel.offsetHeight;
+    panel.style.blockSize = '0px';
+    return;
+  }
+
+  panel.style.blockSize = '0px';
+  void panel.offsetHeight;
+  panel.style.blockSize = `${panel.scrollHeight}px`;
+
+  panel.addEventListener(
+    'transitionend',
+    (event) => {
+      if (event.propertyName !== 'block-size' && event.propertyName !== 'height') return;
+      panel.style.blockSize = 'auto';
+    },
+    { once: true }
+  );
+}
+
+/**
+ * Release the panel's clip once its reveal has finished.
+ *
+ * The clip exists so the inner element can slide out from behind the header.
+ * Held past the reveal it also cuts off anything a child disclosure opens
+ * sideways, so it comes off the moment the transition ends.
+ *
+ * @param {HTMLDetailsElement} details
+ */
+export function settleDisclosure(details) {
+  if (prefersReducedMotion()) {
+    details.setAttribute('data-settled', '');
+    return;
+  }
+
+  const panel = panelOf(details);
+  const inner = panel?.querySelector(':scope > .nav__panel-inner, :scope > .drawer-nav__panel-inner');
+
+  const done = () => {
+    clearTimeout(Number(details.dataset.settleTimer));
+    if (details.dataset.state !== 'open') return;
+    details.setAttribute('data-settled', '');
+  };
+
+  inner?.addEventListener('transitionend', done, { once: true });
+  details.dataset.settleTimer = String(window.setTimeout(done, DISCLOSURE_FALLBACK));
+}
+
+/**
+ * Open a `<details>` with a transition.
+ *
+ * `open` has to be set first — the panel is `display: none` until it is, and a
+ * transition on a display-none element never starts. `data-open` follows two
+ * frames later, because the browser has not laid the panel out until the frame
+ * after `open`, and a transition whose start and end are computed in one layout
+ * pass jumps straight to the end.
+ *
+ * @param {HTMLDetailsElement} details
+ */
+export function openDisclosure(details) {
+  if (details.dataset.state === 'open') return;
+
+  clearTimeout(Number(details.dataset.closeTimer));
+  details.dataset.state = 'open';
+  details.open = true;
+
+  const summary = details.querySelector('[data-nav-summary], summary');
+  summary?.setAttribute('aria-expanded', 'true');
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      // A close may have been requested inside those frames.
+      if (details.dataset.state !== 'open') return;
+
+      details.setAttribute('data-open', '');
+      measurePanel(panelOf(details), 'open');
+      settleDisclosure(details);
+    });
+  });
+}
+
+/**
+ * Close a `<details>`, waiting for the transition before removing `open`.
+ *
+ * Removing `open` immediately puts the panel back to `display: none` on the same
+ * frame and the closing animation is never seen. The timeout is the safety net
+ * for the cases where `transitionend` will not fire: reduced motion, a panel
+ * with no transition, a tab backgrounded mid-close.
+ *
+ * @param {HTMLDetailsElement} details
+ */
+export function closeDisclosure(details) {
+  if (!details.open || details.dataset.state === 'closed') return;
+
+  details.dataset.state = 'closed';
+  clearTimeout(Number(details.dataset.settleTimer));
+
+  // The clip goes back on before the panel starts moving, so a submenu hanging
+  // outside it is cut off rather than left floating over the page.
+  details.removeAttribute('data-settled');
+  details.removeAttribute('data-open');
+  measurePanel(panelOf(details), 'close');
+
+  const summary = details.querySelector('[data-nav-summary], summary');
+  summary?.setAttribute('aria-expanded', 'false');
+
+  const finish = () => {
+    clearTimeout(Number(details.dataset.closeTimer));
+    if (details.dataset.state !== 'closed') return;
+    details.open = false;
+    delete details.dataset.state;
+  };
+
+  if (prefersReducedMotion()) {
+    finish();
+    return;
+  }
+
+  const panel = panelOf(details);
+  panel?.addEventListener(
+    'transitionend',
+    (event) => {
+      if (event.target !== event.currentTarget && !panel.contains(/** @type {Node} */ (event.target))) return;
+      finish();
+    },
+    { once: true }
+  );
+
+  details.dataset.closeTimer = String(window.setTimeout(finish, DISCLOSURE_FALLBACK));
+}

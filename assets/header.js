@@ -17,203 +17,18 @@
  */
 import { BaseComponent, defineComponent } from '@theme/component';
 import { EVENTS } from '@theme/events';
-import { prefersReducedMotion } from '@theme/utilities';
+import {
+  closeDisclosure,
+  openDisclosure,
+  panelOf,
+  prefersReducedMotion
+} from '@theme/utilities';
 
 /** Pointer must rest this long before a panel opens. */
 const HOVER_IN_DELAY = 70;
 
 /** Grace period after the pointer leaves, so a diagonal path does not dismiss. */
 const HOVER_OUT_DELAY = 180;
-
-/** Ceiling for waiting on `transitionend`, in case the panel never transitions. */
-const CLOSE_FALLBACK = 500;
-
-/* ==========================================================================
-   Shared disclosure mechanics
-   ========================================================================== */
-
-/**
- * The animated part of a `<details>`.
- *
- * @param {HTMLDetailsElement} details
- * @returns {HTMLElement|null}
- */
-function panelOf(details) {
-  return details.querySelector(':scope > [data-nav-panel], :scope > [data-mobile-panel]');
-}
-
-/**
- * Open a `<details>` with a transition.
- *
- * `open` has to be set first — the panel is `display: none` until it is, and a
- * transition on a display-none element never starts. `data-open` is then set on
- * the next frame, which is the frame the browser has already laid the panel out
- * in, so the transition has a from-state to run from.
- *
- * @param {HTMLDetailsElement} details
- */
-/**
- * Give a measured panel a pixel height to animate to, and take it away again.
- *
- * A `<details>` panel has no height until it is open and no *known* height once
- * it is — `auto` cannot be transitioned. So the height is written in pixels for
- * the duration of the transition and released afterwards, which is what lets a
- * submenu opening inside an already-open panel still grow it.
- *
- * @param {HTMLElement|null} panel
- * @param {'open'|'close'} direction
- */
-function measurePanel(panel, direction) {
-  if (!panel || !panel.hasAttribute('data-mobile-panel')) return;
-
-  if (direction === 'close') {
-    // From its current height, not from `auto`, or there is nothing to animate
-    // away from.
-    panel.style.blockSize = `${panel.scrollHeight}px`;
-    void panel.offsetHeight;
-    panel.style.blockSize = '0px';
-    return;
-  }
-
-  panel.style.blockSize = '0px';
-  void panel.offsetHeight;
-  panel.style.blockSize = `${panel.scrollHeight}px`;
-
-  panel.addEventListener(
-    'transitionend',
-    (event) => {
-      if (event.propertyName !== 'block-size' && event.propertyName !== 'height') return;
-      panel.style.blockSize = 'auto';
-    },
-    { once: true }
-  );
-}
-
-/**
- * Nudge anything inside a panel that could not measure itself while hidden.
- *
- * A carousel built inside a closed `<details>` sees a zero-width track and lays
- * out as a single slide. It recovers the first time it gains width, but a panel
- * revealed by an attribute change is not a resize it can observe. One `resize`
- * on the window tells every one of them to look again.
- *
- * @param {HTMLElement} root
- */
-function remeasureCarousels(root) {
-  if (!root.querySelector('swiper-carousel')) return;
-  requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
-}
-
-function openDisclosure(details) {
-  if (details.dataset.state === 'open') return;
-
-  clearTimeout(Number(details.dataset.closeTimer));
-  details.dataset.state = 'open';
-  details.open = true;
-
-  const summary = details.querySelector('[data-nav-summary], summary');
-  summary?.setAttribute('aria-expanded', 'true');
-
-  // Two frames, not one. Setting `open` makes the panel renderable, but the
-  // browser has not laid it out until the frame after that — and a transition
-  // whose start and end values are computed in the same layout pass simply jumps
-  // to the end. One frame was enough for the transform panels and not enough for
-  // the accordion, which is measured, so it opened instantly.
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-    // A close may have been requested inside those frames.
-    if (details.dataset.state !== 'open') return;
-    details.setAttribute('data-open', '');
-    measurePanel(panelOf(details), 'open');
-
-    // The panel clips its own contents so the inner element can slide out from
-    // behind the header. That clip also cuts off anything a *child* disclosure
-    // opens sideways, which is why submenus were invisible: they were rendering
-    // correctly, outside a `hidden` overflow.
-    //
-    // The clip is only needed while the reveal is running, so it is released the
-    // moment the transition finishes. Releasing it earlier would show the panel
-    // contents sitting above the header before they had slid down.
-    settle(details);
-    });
-  });
-}
-
-/**
- * Release the panel's clip once its reveal has finished.
- *
- * @param {HTMLDetailsElement} details
- */
-function settle(details) {
-  if (prefersReducedMotion()) {
-    details.setAttribute('data-settled', '');
-    return;
-  }
-
-  const panel = panelOf(details);
-  const inner = panel?.querySelector(':scope > .nav__panel-inner, :scope > .drawer-nav__panel-inner');
-
-  const done = () => {
-    clearTimeout(Number(details.dataset.settleTimer));
-    if (details.dataset.state !== 'open') return;
-    details.setAttribute('data-settled', '');
-    remeasureCarousels(details);
-  };
-
-  inner?.addEventListener('transitionend', done, { once: true });
-  details.dataset.settleTimer = String(window.setTimeout(done, CLOSE_FALLBACK));
-}
-
-/**
- * Close a `<details>`, waiting for the transition before removing `open`.
- *
- * Removing `open` immediately puts the panel back to `display: none` on the
- * same frame, and the closing animation is never seen. The timeout is the
- * safety net for the cases where `transitionend` will not fire: reduced motion,
- * a panel with no transition, a tab that was backgrounded mid-close.
- *
- * @param {HTMLDetailsElement} details
- */
-function closeDisclosure(details) {
-  if (!details.open || details.dataset.state === 'closed') return;
-
-  details.dataset.state = 'closed';
-  clearTimeout(Number(details.dataset.settleTimer));
-
-  // The clip goes back on before the panel starts moving, so a submenu that was
-  // hanging outside the panel is cut off rather than left floating over the page
-  // while its parent slides away.
-  details.removeAttribute('data-settled');
-  details.removeAttribute('data-open');
-  measurePanel(panelOf(details), 'close');
-
-  const summary = details.querySelector('[data-nav-summary], summary');
-  summary?.setAttribute('aria-expanded', 'false');
-
-  const finish = () => {
-    clearTimeout(Number(details.dataset.closeTimer));
-    if (details.dataset.state !== 'closed') return;
-    details.open = false;
-    delete details.dataset.state;
-  };
-
-  if (prefersReducedMotion()) {
-    finish();
-    return;
-  }
-
-  const panel = panelOf(details);
-  panel?.addEventListener(
-    'transitionend',
-    (event) => {
-      if (event.target !== event.currentTarget && !panel.contains(/** @type {Node} */ (event.target))) return;
-      finish();
-    },
-    { once: true }
-  );
-
-  details.dataset.closeTimer = String(window.setTimeout(finish, CLOSE_FALLBACK));
-}
 
 /* ==========================================================================
    <nav-menu>
@@ -811,7 +626,7 @@ export class MobileNav extends BaseComponent {
 
 defineComponent('mobile-nav', MobileNav);
 
-export default { NavMenu, NavDisclosure, MobileNav, openDisclosure, closeDisclosure };
+export default { NavMenu, NavDisclosure, MobileNav };
 
 /* ==========================================================================
    <market-picker>
@@ -838,6 +653,9 @@ export default { NavMenu, NavDisclosure, MobileNav, openDisclosure, closeDisclos
  * with JavaScript off, and this component only decides what is visible.
  */
 export class MarketPicker extends BaseComponent {
+  /** @type {number|undefined} */
+  #closeTimer;
+
   // `menu`, not `panel`.
   //
   // The markup was renamed so it would stop colliding with `DrawerComponent`'s
@@ -881,8 +699,21 @@ export class MarketPicker extends BaseComponent {
   }
 
   show() {
+    clearTimeout(this.#closeTimer);
+
+    // `hidden` first, `data-open` on the next frame — the same two-step every
+    // other disclosure in the header uses. A panel that is `display: none` has
+    // no from-state, so setting both together animates nothing at all.
     this.refs.menu.removeAttribute('hidden');
     this.refs.trigger.setAttribute('aria-expanded', 'true');
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (!this.refs.menu.hasAttribute('hidden')) {
+          this.refs.menu.setAttribute('data-open', '');
+        }
+      });
+    });
 
     // Focus goes to the search field only when it is actually visible. At
     // desktop widths it is display:none, and focusing a hidden field puts the
@@ -898,8 +729,21 @@ export class MarketPicker extends BaseComponent {
 
   close() {
     if (!this.open) return;
-    this.refs.menu.setAttribute('hidden', '');
+
+    this.refs.menu.removeAttribute('data-open');
     this.refs.trigger.setAttribute('aria-expanded', 'false');
+
+    // `hidden` goes back on only once the panel has finished leaving, or the
+    // closing half of the animation is never seen.
+    const finish = () => this.refs.menu.setAttribute('hidden', '');
+
+    if (prefersReducedMotion()) {
+      finish();
+      return;
+    }
+
+    this.refs.menu.addEventListener('transitionend', finish, { once: true });
+    this.#closeTimer = window.setTimeout(finish, 400);
   }
 
   /** @private */
