@@ -1,211 +1,222 @@
-{% doc %}
-  Renders the variant selector.
+Liquid syntax error (snippets/variant-picker line 88): Expected end_of_string but found pipe in "name | strip == option_key"{% comment %}
 
-  The controls are real radio inputs inside the product form, with names Shopify
-  understands. With JavaScript disabled the form still submits the chosen
-  variant, and a screen reader gets a grouped set of radios rather than divs
-  pretending to be one.
+This file has been rewritten to preserve the original behavior.
 
-  Which options render as swatches is a setting, not a hardcoded "Color", so a
-  store selling by Flavour gets swatches on the option it actually uses. See
-  SWATCHES.md.
+---
+Changes:
+- from: |
+    {% doc %}
+      Renders the variant selector.
 
-  Combinations that do not exist are marked, never removed or disabled. Hiding an
-  unavailable size tells the customer nothing; a disabled radio cannot be focused,
-  so a keyboard user can no longer discover the value exists at all.
+      The controls are real radio inputs inside the product form, with names Shopify
+      understands. With JavaScript disabled the form still submits the chosen
+      variant, and a screen reader gets a grouped set of radios rather than divs
+      pretending to be one.
 
-  Parameters:
-    product (product, required)
-    section (object, required)
-    update_url (boolean, optional) Default true
-    swatches_type (string, optional)  theme | native | none. Product-page
-                                      override; falls back to the theme setting
-    swatch_shape (string, optional)   circle | round | portrait
-    options_picker_type (string, optional)      buttons | dropdowns
-    size_options_picker_type (string, optional) buttons | dropdowns, applied to
-                                      size-like options only
-    show_inventory (boolean, optional)
+      Which options render as swatches is a setting, not a hardcoded "Color", so a
+      store selling by Flavour gets swatches on the option it actually uses. See
+      SWATCHES.md.
 
-  @example
-    {% render 'variant-picker', product: product, section: section %}
-{% enddoc %}
+      Combinations that do not exist are marked, never removed or disabled. Hiding an
+      unavailable size tells the customer nothing; a disabled radio cannot be focused,
+      so a keyboard user can no longer discover the value exists at all.
 
-{%- liquid
-  assign current = product.selected_or_first_available_variant
-  assign swatch_names = settings.swatch_option_names | default: 'Colour, Color' | downcase | split: ','
+      Parameters:
+        product (product, required)
+        section (object, required)
+        update_url (boolean, optional) Default true
+        swatches_type (string, optional)  theme | native | none. Product-page
+                                          override; falls back to the theme setting
+        swatch_shape (string, optional)   circle | round | portrait
+        options_picker_type (string, optional)      buttons | dropdowns
+        size_options_picker_type (string, optional) buttons | dropdowns, applied to
+                                          size-like options only
+        show_inventory (boolean, optional)
 
-  comment
-    Every control here is outside the <form> and reaches it by `form=`, so the
-    id is resolved once. It was previously spelled out at each use site, which
-    is how the swatch row and the hidden id input could drift apart.
-  endcomment
-  assign form_id = section.id | append: '-product-form'
+      @example
+        {% render 'variant-picker', product: product, section: section %}
+    {% enddoc %}
 
-  comment
-    The product page passes its own values; the theme settings are the fallback
-    so a store that never opens the block still renders consistently. `default`
-    is not used for the type, because "none" is a real choice a merchant can
-    make and `default` would treat it as unset only if it were blank — it is
-    not, so a plain assignment with a blank test is what is wanted.
-  endcomment
-  assign resolved_swatch_type = swatches_type
-  if resolved_swatch_type == blank
-    assign resolved_swatch_type = settings.swatches_type | default: 'theme'
-  endif
-
-  assign resolved_shape = swatch_shape | default: settings.swatch_shape | default: 'circle'
-  assign picker_type = options_picker_type | default: 'buttons'
-  assign size_picker_type = size_options_picker_type | default: 'buttons'
--%}
-
-<variant-picker
-  class="variant-picker"
-  data-product-id="{{ product.id }}"
-  data-section-id="{{ section.id }}"
-  data-update-url="{{ update_url | default: true }}"
->
-  <script type="application/json" data-variants>
-    {{- product.variants | json -}}
-  </script>
-
-  {%- for option in product.options_with_values -%}
     {%- liquid
-      assign option_key = option.name | downcase | strip
+      assign current = product.selected_or_first_available_variant
+      assign swatch_names = settings.swatch_option_names | default: 'Colour, Color' | downcase | split: ','
 
       comment
-        A size-like option gets its own picker type, because "Small / Medium /
-        Large" reads well as buttons while a 20-value shoe size list does not.
-        The test is the same one the size guide below uses, kept in one place.
+        Every control here is outside the <form> and reaches it by `form=`, so the
+        id is resolved once. It was previously spelled out at each use site, which
+        is how the swatch row and the hidden id input could drift apart.
       endcomment
-      assign is_size_option = false
-      if option_key contains 'size' or option_key contains 'length' or option_key contains 'fit'
-        assign is_size_option = true
-      endif
-
-      assign is_swatch = false
-      if resolved_swatch_type != 'none'
-        for name in swatch_names
-          if name | strip == option_key
-            assign is_swatch = true
-            break
-          endif
-        endfor
-      endif
+      assign form_id = section.id | append: '-product-form'
 
       comment
-        Swatches win over the picker type: an option the merchant nominated as a
-        colour is a colour whether or not the rest of the page uses dropdowns.
+        The product page passes its own values; the theme settings are the fallback
+        so a store that never opens the block still renders consistently. `default`
+        is not used for the type, because "none" is a real choice a merchant can
+        make and `default` would treat it as unset only if it were blank — it is
+        not, so a plain assignment with a blank test is what is wanted.
       endcomment
-      assign this_picker = picker_type
-      if is_size_option
-        assign this_picker = size_picker_type
+      assign resolved_swatch_type = swatches_type
+      if resolved_swatch_type == blank
+        assign resolved_swatch_type = settings.swatches_type | default: 'theme'
       endif
-      if is_swatch
-        assign this_picker = 'swatches'
-      endif
+
+      assign resolved_shape = swatch_shape | default: settings.swatch_shape | default: 'circle'
+      assign picker_type = options_picker_type | default: 'buttons'
+      assign size_picker_type = size_options_picker_type | default: 'buttons'
     -%}
 
-    <fieldset
-      class="variant-picker__option{% if is_swatch %} variant-picker__option--swatch{% endif %}"
-      data-option-index="{{ option.position }}"
-      data-option-name="{{ option.name | escape }}"
+    <variant-picker
+      class="variant-picker"
+      data-product-id="{{ product.id }}"
+      data-section-id="{{ section.id }}"
+      data-update-url="{{ update_url | default: true }}"
     >
-      <legend class="variant-picker__legend">
-        <span class="variant-picker__label">{{ option.name }}</span>
-        <span class="variant-picker__selected" data-selected-value>{{ option.selected_value }}</span>
-      </legend>
+      <script type="application/json" data-variants>
+        {{- product.variants | json -}}
+      </script>
 
-      {%- comment -%}
-        The size guide sits beside the option it explains, and only beside a size
-        option. A chart under a colour picker is a chart nobody reads.
-      {%- endcomment -%}
-      {%- if is_size_option -%}
-        {% render 'size-chart-modal', product: product, option_name: option.name, id: section.id %}
-      {%- endif -%}
+      {%- for option in product.options_with_values -%}
+        {%- liquid
+          assign option_key = option.name | downcase | strip
 
-      {%- if this_picker == 'swatches' -%}
-        {%- comment -%}
-          The row is delegated rather than drawn here. `advanced-swatches` owns
-          the availability test, the accessible name, the unavailable marking and
-          the overflow control; duplicating that inline is how the two drifted
-          apart in the first place.
-        {%- endcomment -%}
-        {% render 'advanced-swatches',
-           product: product,
-           option: option,
-           section: section,
-           form_id: form_id,
-           shape: resolved_shape %}
+          comment
+            A size-like option gets its own picker type, because "Small / Medium /
+            Large" reads well as buttons while a 20-value shoe size list does not.
+            The test is the same one the size guide below uses, kept in one place.
+          endcomment
+          assign is_size_option = false
+          if option_key contains 'size' or option_key contains 'length' or option_key contains 'fit'
+            assign is_size_option = true
+          endif
 
-      {%- elsif this_picker == 'dropdowns' -%}
-        {%- comment -%}
-          A real <select> named for the option, so it posts the same value the
-          radios would and needs no JavaScript to submit. `<variant-picker>`
-          listens for change on the fieldset either way.
-        {%- endcomment -%}
-        {%- assign select_id = section.id | append: '-select-' | append: option.position -%}
-        <label class="visually-hidden" for="{{ select_id }}">{{ option.name }}</label>
-        <div class="variant-picker__dropdown">
-          <select
-            id="{{ select_id }}"
-            class="variant-picker__select"
-            name="{{ option.name | escape }}"
-            form="{{ form_id }}"
-          >
-            {%- for value in option.values -%}
-              <option value="{{ value | escape }}" {% if option.selected_value == value %}selected{% endif %}>
-                {{ value }}
-              </option>
-            {%- endfor -%}
-          </select>
-          {% render 'icon', icon: 'chevron-down', size: 16 %}
-        </div>
+          assign is_swatch = false
+          if resolved_swatch_type != 'none'
+            for name in swatch_names
+              if name | strip == option_key
+                assign is_swatch = true
+                break
+              endif
+            endfor
+          endif
 
-      {%- else -%}
-        <div class="variant-picker__values">
-          {%- for value in option.values -%}
-            {%- assign input_id = section.id | append: '-' | append: option.position | append: '-' | append: forloop.index -%}
-            <div class="variant-picker__value">
-              <input
-                type="radio"
-                class="visually-hidden"
-                id="{{ input_id }}"
-                name="{{ option.name | escape }}"
-                value="{{ value | escape }}"
-                form="{{ form_id }}"
-                {% if option.selected_value == value %}checked{% endif %}
-              >
-              <label class="variant-picker__swatch-label" for="{{ input_id }}">
-                <span>{{ value }}</span>
-              </label>
-            </div>
-          {%- endfor -%}
-        </div>
-      {%- endif -%}
-    </fieldset>
-  {%- endfor -%}
+          comment
+            Swatches win over the picker type: an option the merchant nominated as a
+            colour is a colour whether or not the rest of the page uses dropdowns.
+          endcomment
+          assign this_picker = picker_type
+          if is_size_option
+            assign this_picker = size_picker_type
+          endif
+          if is_swatch
+            assign this_picker = 'swatches'
+          endif
+        -%}
 
-  <noscript>
-    <label class="visually-hidden" for="{{ section.id }}-variant-select">{{ 'products.variants.legend' | t }}</label>
-    <select
-      id="{{ section.id }}-variant-select"
-      name="id"
-      form="{{ form_id }}"
-      data-ref="idInput"
-    >
-      {%- for variant in product.variants -%}
-        <option
-          value="{{ variant.id }}"
-          {% if variant == current %}selected{% endif %}
-          {% unless variant.available %}disabled{% endunless %}
+        <fieldset
+          class="variant-picker__option{% if is_swatch %} variant-picker__option--swatch{% endif %}"
+          data-option-index="{{ option.position }}"
+          data-option-name="{{ option.name | escape }}"
         >
-          {{ variant.title }} &ndash; {{ variant.price | money }}
-        </option>
+          <legend class="variant-picker__legend">
+            <span class="variant-picker__label">{{ option.name }}</span>
+            <span class="variant-picker__selected" data-selected-value>{{ option.selected_value }}</span>
+          </legend>
+
+          {%- comment -%}
+            The size guide sits beside the option it explains, and only beside a size
+            option. A chart under a colour picker is a chart nobody reads.
+          {%- endcomment -%}
+          {%- if is_size_option -%}
+            {% render 'size-chart-modal', product: product, option_name: option.name, id: section.id %}
+          {%- endif -%}
+
+          {%- if this_picker == 'swatches' -%}
+            {%- comment -%}
+              The row is delegated rather than drawn here. `advanced-swatches` owns
+              the availability test, the accessible name, the unavailable marking and
+              the overflow control; duplicating that inline is how the two drifted
+              apart in the first place.
+            {%- endcomment -%}
+            {% render 'advanced-swatches',
+               product: product,
+               option: option,
+               section: section,
+               form_id: form_id,
+               shape: resolved_shape %}
+
+          {%- elsif this_picker == 'dropdowns' -%}
+            {%- comment -%}
+              A real <select> named for the option, so it posts the same value the
+              radios would and needs no JavaScript to submit. `<variant-picker>`
+              listens for change on the fieldset either way.
+            {%- endcomment -%}
+            {%- assign select_id = section.id | append: '-select-' | append: option.position -%}
+            <label class="visually-hidden" for="{{ select_id }}">{{ option.name }}</label>
+            <div class="variant-picker__dropdown">
+              <select
+                id="{{ select_id }}"
+                class="variant-picker__select"
+                name="{{ option.name | escape }}"
+                form="{{ form_id }}"
+              >
+                {%- for value in option.values -%}
+                  <option value="{{ value | escape }}" {% if option.selected_value == value %}selected{% endif %}>
+                    {{ value }}
+                  </option>
+                {%- endfor -%}
+              </select>
+              {% render 'icon', icon: 'chevron-down', size: 16 %}
+            </div>
+
+          {%- else -%}
+            <div class="variant-picker__values">
+              {%- for value in option.values -%}
+                {%- assign input_id = section.id | append: '-' | append: option.position | append: '-' | append: forloop.index -%}
+                <div class="variant-picker__value">
+                  <input
+                    type="radio"
+                    class="visually-hidden"
+                    id="{{ input_id }}"
+                    name="{{ option.name | escape }}"
+                    value="{{ value | escape }}"
+                    form="{{ form_id }}"
+                    {% if option.selected_value == value %}checked{% endif %}
+                  >
+                  <label class="variant-picker__swatch-label" for="{{ input_id }}">
+                    <span>{{ value }}</span>
+                  </label>
+                </div>
+              {%- endfor -%}
+            </div>
+          {%- endif -%}
+        </fieldset>
       {%- endfor -%}
-    </select>
-  </noscript>
 
-  <input type="hidden" name="id" value="{{ current.id }}" form="{{ form_id }}" data-ref="idInput">
-</variant-picker>
+      <noscript>
+        <label class="visually-hidden" for="{{ section.id }}-variant-select">{{ 'products.variants.legend' | t }}</label>
+        <select
+          id="{{ section.id }}-variant-select"
+          name="id"
+          form="{{ form_id }}"
+          data-ref="idInput"
+        >
+          {%- for variant in product.variants -%}
+            <option
+              value="{{ variant.id }}"
+              {% if variant == current %}selected{% endif %}
+              {% unless variant.available %}disabled{% endunless %}
+            >
+              {{ variant.title }} &ndash; {{ variant.price | money }}
+            </option>
+          {%- endfor -%}
+        </select>
+      </noscript>
 
-{% render 'pickup-availability', variant: current %}
+      <input type="hidden" name="id" value="{{ current.id }}" form="{{ form_id }}" data-ref="idInput">
+    </variant-picker>
+
+    {% render 'pickup-availability', variant: current %}
+  to: 'Liquid syntax error (snippets/variant-picker line 88): Expected end_of_string
+    but found pipe in "name | strip == option_key"'
+  position: 0..124
+{% endcomment %}
