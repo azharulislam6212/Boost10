@@ -3260,3 +3260,65 @@ announcement-bar:not(:defined) * {
   position: relative;
   z-index: 105;
 }
+
+
+/* ---- 47.6 The logo's box is not a grey rectangle ----------------------- */
+
+/* `responsive-image` paints `--color-secondary-background` behind every image
+   as a placeholder. That is right for a product card and wrong for a logo:
+   a shop mark is almost always a transparent PNG or SVG, so the placeholder is
+   not hidden by the image — it sits behind it as a pale block for as long as the
+   logo is on screen, and on a transparent header over a dark banner it is the
+   most obvious thing in the row.
+
+   The logo reserves its box through `aspect-ratio` either way, so removing the
+   backing costs no layout stability. */
+.site-header__logo-image {
+  background-color: transparent;
+}
+
+/* ---- 47.7 The banner shows the section's backing, not the image's ------ */
+
+/* Same placeholder, and here it is the white the customer sees on reload.
+
+   `#MainContent > .shopify-section:first-child` already carries a backing
+   colour chosen for this exact gap — a neutral under a solid header, the heading
+   colour under a transparent one, so light hero text stays readable before the
+   media arrives. But `responsive-image` paints its own pale placeholder *on top*
+   of that backing, edge to edge, because the hero's media layer covers the
+   section. The considered backing was never visible; the generic one always was.
+
+   Only the hero's own media layers are cleared, so cards, promos and anything
+   else inside the first section keep their placeholders. */
+.hero__image,
+.hero__poster,
+.hero__video {
+  background-color: transparent;
+}
+
+
+/* ---- 47.8 The header does not animate into its own starting state ------ */
+
+/* `data-priming` is written by `<sticky-header>` for the two frames it takes to
+   adopt the page's restored scroll position, and removed once that state has
+   painted.
+
+   Reloading a page that was already scrolled is what this is for. The header
+   parses and paints in its top-of-page appearance — transparent, no sticky
+   scheme, no shadow — because that is what Liquid wrote. The component then
+   reads the restored offset and applies the scrolled appearance instead. Both
+   are correct; the problem is the 320ms of `background-color`, `color` and
+   `transform` transition between them, which reads as the bar changing under
+   the cursor a beat after the page arrives.
+
+   Suppressed rather than removed: the same transitions are what make scrolling
+   feel right a moment later, so they are switched off only for the frames where
+   there is nothing to animate *from*.
+
+   47.4 cannot cover this. `:not(:defined)` stops matching the instant the
+   element upgrades, and every one of these attribute writes happens inside
+   `setup()`, which runs after that. */
+sticky-header[data-priming],
+sticky-header[data-priming] * {
+  transition: none !important;
+}

@@ -231,10 +231,54 @@ export class StickyHeader extends BaseComponent {
     // in `scroll-down` mode is visible until the customer scrolls, which is
     // the one moment the mode exists to avoid, and a page loaded mid-scroll
     // (a refresh, a back navigation) starts transparent over solid content.
-    this.#onScroll(window.scrollY);
+    this.#prime();
+
+    // Restoring from the back/forward cache skips `setup()` entirely, and the
+    // scroll position it restores is not the one this element last saw.
+    this.on(window, 'pageshow', (event) => {
+      if (event.persisted) this.#prime();
+    });
 
     // An open drawer must never be hidden by a header that scrolled away.
     this.on(document, EVENTS.OVERLAY_OPEN, () => this.reveal());
+  }
+
+  /**
+   * Adopt the page's current scroll position without reacting to it as movement.
+   *
+   * Reloading a page that was already scrolled is the case this exists for. The
+   * browser restores the scroll offset, `setup()` runs, and the first
+   * `#onScroll` call used to compare that offset against `#lastScroll`, which
+   * was still `0` from the field initialiser. So a refresh at 1200px was read as
+   * a 1200px downward scroll that had just happened:
+   *
+   *   - in `scroll-up` mode the header immediately hid itself, sliding up and
+   *     out of view a moment after the page appeared, and stayed gone until the
+   *     customer scrolled up. That is the jump.
+   *   - in every mode the transparent state, the sticky colour scheme and the
+   *     shadow were all applied *after* the first paint, so the header painted
+   *     in its top-of-page appearance and then transitioned into its scrolled
+   *     one over 320ms — visible as the bar changing colour under the cursor on
+   *     every reload.
+   *
+   * The baseline is taken first, so `delta` is 0 and nothing is treated as
+   * movement. `data-priming` suppresses transitions for the two frames it takes
+   * the attribute writes to land and paint, so the correct state arrives without
+   * animating from the wrong one.
+   *
+   * @private
+   */
+  #prime() {
+    this.setAttribute('data-priming', '');
+
+    this.#lastScroll = Math.max(0, window.scrollY);
+    this.#onScroll(window.scrollY, true);
+
+    // One frame for the style change, one for it to be painted. Removing the
+    // attribute in the same frame it was added would let the transition run.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => this.removeAttribute('data-priming'));
+    });
   }
 
   teardown() {
@@ -307,7 +351,7 @@ export class StickyHeader extends BaseComponent {
    * @param {number} scrollY
    * @private
    */
-  #onScroll(scrollY) {
+  #onScroll(scrollY, priming = false) {
     const threshold = Number(this.dataset.threshold) || 80;
     const position = Math.max(0, scrollY);
     const mode = this.dataset.stickyMode || 'always';
@@ -338,7 +382,23 @@ export class StickyHeader extends BaseComponent {
       shell.classList.toggle(scheme, scrolled);
     }
 
+    // `scroll-down` is decided by position, not by direction, so it is settled
+    // before the deadzone. On a reload at 1200px the header belongs on screen,
+    // and it must not have to wait for the customer to move 6px to find that
+    // out — which is what running it below the `return` used to mean.
+    if (mode === 'scroll-down') {
+      this.toggleAttribute('data-hidden', !scrolled);
+    } else if (mode !== 'scroll-up') {
+      this.removeAttribute('data-hidden');
+    }
+
     const delta = position - this.#lastScroll;
+
+    // Priming is not movement. `#prime()` has already adopted the restored
+    // scroll offset as the baseline, so `delta` is 0 here — but returning
+    // explicitly says why, rather than leaving it to the deadzone below and
+    // hoping nobody widens it later.
+    if (priming) return;
 
     // A deadzone stops the header flickering during momentum scrolling, which
     // is the condition Lenis produces most of. It is checked before the mode
@@ -346,22 +406,12 @@ export class StickyHeader extends BaseComponent {
     if (Math.abs(delta) < 6) return;
     this.#lastScroll = position;
 
-    switch (mode) {
-      case 'scroll-up':
-        // Hidden going down, back going up. The second threshold keeps the
-        // header still through the first screen, where a customer flicking
-        // past the hero is not asking for anything to move.
-        this.toggleAttribute('data-hidden', delta > 0 && position > threshold * 2);
-        break;
-
-      case 'scroll-down':
-        // The inverse: absent until the page has left the banner behind, then
-        // pinned. Used where the header would compete with the hero.
-        this.toggleAttribute('data-hidden', !scrolled);
-        break;
-
-      default:
-        this.removeAttribute('data-hidden');
+    // Only `scroll-up` is left: it is the one mode that reads direction.
+    if (mode === 'scroll-up') {
+      // Hidden going down, back going up. The second threshold keeps the
+      // header still through the first screen, where a customer flicking
+      // past the hero is not asking for anything to move.
+      this.toggleAttribute('data-hidden', delta > 0 && position > threshold * 2);
     }
   }
 }
