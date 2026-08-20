@@ -3130,3 +3130,133 @@ drawer-component:not([data-open]) > dialog:not([open]) {
 body:has(.site-header--transparent) #MainContent > .shopify-section:first-child {
   background-color: var(--header-banner-placeholder, var(--color-heading, #0b2b26));
 }
+
+
+/* ==========================================================================
+   47. First paint and painted paint have to be the same header
+   --------------------------------------------------------------------------
+   Everything in this block exists to remove a difference between what the
+   browser lays out before `global.js` arrives and what it lays out after. None
+   of it is new behaviour; it is the existing behaviour, made true one frame
+   earlier.
+   ========================================================================== */
+
+/* ---- 47.1 `<sticky-header>` is a block ---------------------------------- */
+
+/* Section 2 of this file states the display for `nav-menu`, `nav-disclosure`,
+   `market-picker` and `mobile-nav`, and gives the reason: a custom element is
+   `display: inline` until a stylesheet says otherwise, including before its
+   module has arrived.
+
+   `sticky-header` was not in that list, and it is the element the whole header
+   hangs off. Inline is not merely a different box here — vertical padding on an
+   inline element does not affect layout at all, so `[data-section-spacing]`'s
+   `padding-block` was computed and then contributed nothing. The bar painted
+   `--header-row-height` tall while the section published
+   `--header-row-height + padding` as `--header-block-size`, and `#MainContent`
+   was pulled up by the larger of the two.
+
+   It also makes `offsetHeight` honest, which is what `#measure()` publishes as
+   `--header-height`. */
+sticky-header {
+  display: block;
+}
+
+/* `box-sizing` is set globally in the reset, but the header is the one element
+   whose height is quoted to the rest of the page as a number, so it is restated
+   here rather than assumed. */
+sticky-header.site-header {
+  box-sizing: border-box;
+
+  /* The floor is the number the section published. The ceilings are 47.3 and
+     the row's own `min-block-size`, so the header cannot end up on either side
+     of the value `#MainContent` offsets itself by. */
+  min-block-size: var(--header-block-size, auto);
+}
+
+/* ---- 47.2 The previous header's rules still match this one -------------- */
+
+/* `base.css` still carries the rules from the header this file replaced. They
+   were left in place deliberately — the comment at the top of this file says so
+   — on the understanding that the class names had changed and nothing could
+   match. But three of them are keyed on the *element name*:
+
+     sticky-header[data-sticky-mode='always'] { position: sticky; inset-block-start: 0 }
+     sticky-header[data-sticky-mode='scroll-up'] { … }
+     sticky-header[data-scrolled] { box-shadow: … }
+
+   and `<sticky-header>` is still `<sticky-header>`. So the inner element has
+   been sticky this whole time, inside a `.header-section` that is also sticky —
+   two pinned boxes, one nested in the other, and a stacking context on the
+   inner one that the panel positioning in section 3 was never written against.
+
+   Section 2 of this file is explicit that the positioning belongs on
+   `.header-section`. This restores that. Same specificity as the base.css rule
+   (one element, one class against one element, one attribute) and this file
+   loads second, so it wins on order. */
+sticky-header.site-header {
+  position: relative;
+  inset-block-start: auto;
+}
+
+/* The two `[data-hidden]` transforms in section 2 are unaffected: a transform
+   applies to a relatively positioned box exactly as it did to a sticky one. */
+
+/* ---- 47.3 An image logo may not grow the row --------------------------- */
+
+/* Section 43 caps the logo's height on small screens and explains why: the
+   setting is a *width*, and a portrait mark at that width can be twice as tall
+   as the header was asked to be. That is just as true at 1440px, and there was
+   no desktop equivalent — so on desktop the row silently grew to whatever the
+   logo needed.
+
+   That is the movement on reload. `ratio: 'adapt'` gives the wrapper the
+   image's own aspect ratio, so the box is correct from the first frame — but it
+   is correct at a height nobody budgeted for, the row is taller than
+   `--header-row-height`, and every slot in the grid re-resolves against a row
+   that does not match the number the rest of the page was given.
+
+   Same three selectors and the same `object-fit` as the mobile rule, so a mark
+   constrained by the ceiling letterboxes rather than distorting. */
+.site-header__logo-image,
+.site-header__logo-image img,
+.site-header__logo-img {
+  max-block-size: calc(var(--header-row-height) - var(--space-3));
+  object-fit: contain;
+}
+
+/* ---- 47.4 Nothing animates before the header exists -------------------- */
+
+/* The shell transitions `background-color`, `color` and `border-radius`, the
+   logo transitions `opacity`, the burger transitions its background. Those are
+   right for a header being scrolled and wrong for a header being *built*: any
+   attribute the component writes on connect — `data-scrolled`, `data-transparent`,
+   the sticky scheme class — is a state change like any other, and each one
+   animates for 320ms while the customer is looking at a page that has only just
+   appeared.
+
+   Suppressed until the element is upgraded. `:defined` flips in the same frame
+   the component connects, so the first real interaction still transitions
+   normally. */
+sticky-header:not(:defined),
+sticky-header:not(:defined) *,
+announcement-bar:not(:defined),
+announcement-bar:not(:defined) * {
+  transition: none !important;
+  animation: none !important;
+}
+
+/* ---- 47.5 The announcement bar keeps its own space -------------------- */
+
+/* A guard, not a fix — 47.1 and the section's arithmetic are the fix. But the
+   consequence of the two disagreeing was the banner painting *over* the
+   announcement text, which is unreadable rather than merely misaligned, and a
+   stacking order costs nothing.
+
+   Below the header's 110, above `#MainContent`. `position: relative` and not
+   `sticky`, so `#stickyOffset()` still measures 0 above the header and the
+   header still pins to the top of the viewport. */
+.announcement-bar-section {
+  position: relative;
+  z-index: 105;
+}

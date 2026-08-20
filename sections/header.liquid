@@ -233,9 +233,53 @@
   from the first paint and the measured value afterwards; they agree, so nothing
   moves.
 {%- endcomment -%}
+{%- comment -%}
+  The stated height has to match the painted one to the pixel, because
+  `#MainContent` is pulled up by exactly this number. Three things were missing
+  from the old sum, and every one of them left the banner sitting *higher* than
+  the header — far enough, with the default settings, to climb into the
+  announcement bar above it.
+
+    1. The shell's border. `border: var(--header-border-width) solid` is on the
+       box, top and bottom, so it is two more thicknesses of header.
+
+    2. The bottom row. A merchant who moves the menu or the market pickers to
+       the second row gets a header that is a whole row taller than this said.
+
+    3. The mobile padding fallback. `snippets/spacing.liquid` only emits the
+       mobile custom properties when the merchant set them; left at 0 the
+       stylesheet falls back to the *desktop* value, which is the documented
+       behaviour of those sliders. Reading `padding_top_mobile` raw claimed 0
+       where the page was actually painting 12.
+{%- endcomment -%}
 {%- liquid
-  assign header_block_size = row_height | plus: st.padding_top | plus: st.padding_bottom
-  assign header_block_size_mobile = 54 | plus: st.padding_top_mobile | plus: st.padding_bottom_mobile
+  assign border_total = st.border_thickness | default: 0 | plus: 0 | times: 2
+
+  # ---- desktop ------------------------------------------------------------
+  assign header_block_size = row_height | plus: st.padding_top | plus: st.padding_bottom | plus: border_total
+
+  # ---- mobile: the sliders fall back to the desktop value at 0 -------------
+  assign pad_top_mobile = st.padding_top_mobile | default: 0 | plus: 0
+  if pad_top_mobile == 0
+    assign pad_top_mobile = st.padding_top | default: 0 | plus: 0
+  endif
+
+  assign pad_bottom_mobile = st.padding_bottom_mobile | default: 0 | plus: 0
+  if pad_bottom_mobile == 0
+    assign pad_bottom_mobile = st.padding_bottom | default: 0 | plus: 0
+  endif
+
+  assign header_block_size_mobile = 54 | plus: pad_top_mobile | plus: pad_bottom_mobile | plus: border_total
+
+  # ---- the second row, when there is one ----------------------------------
+  # `--header-row-height * 0.7` plus its 1px top rule, mirroring header.css.
+  if bottom_row != blank
+    assign bottom_extra = row_height | times: 70 | divided_by: 100 | plus: 1
+    assign header_block_size = header_block_size | plus: bottom_extra
+
+    assign bottom_extra_mobile = 54 | times: 72 | divided_by: 100 | plus: 1
+    assign header_block_size_mobile = header_block_size_mobile | plus: bottom_extra_mobile
+  endif
 -%}
 
 {% style %}
@@ -249,6 +293,24 @@
     }
   }
 {% endstyle %}
+
+{%- comment -%}
+  The spacing snippet's declarations, captured rather than rendered.
+
+  `{% render 'spacing' %}` emits its own `style=` attribute, and this element
+  already has one. Two `style` attributes on one tag and the browser keeps the
+  first and silently drops the second — so the header's padding never reached
+  the page at all. The bar painted 24px shorter than the number published above,
+  and the banner was pulled up by the difference.
+
+  `declarations: true` returns the bare property list instead, which is
+  concatenated into the single attribute below. `data-section-spacing` is the
+  hook `base.css` selects on, so it is written by hand here.
+{%- endcomment -%}
+{%- capture header_spacing -%}
+  {%- render 'spacing', section: section.settings, declarations: true -%}
+{%- endcapture -%}
+{%- assign header_spacing = header_spacing | strip -%}
 
 <sticky-header
   class="{{ header_classes }}"
@@ -267,14 +329,15 @@
   data-threshold="80"
   {% if supports_transparent %}data-transparent{% endif %}
   {% if st.sticky_color_scheme != blank %}data-sticky-scheme="color-{{ st.sticky_color_scheme }}"{% endif %}
+  data-section-spacing
   style="
     --header-row-height: {{ row_height }}px;
     --header-border-width: {{ st.border_thickness }}px;
     --header-utility-size: {{ st.utility_size }}px;
     --header-localization-size: {{ st.localization_size }}px;
     {%- if transparent_text != blank %}--header-transparent-text: {{ transparent_text }};{% endif -%}
+    {{- header_spacing -}}
   "
-  {% render 'spacing', section: section.settings %}
 >
   <div class="{% render 'container', width: st.container_width, classes: 'site-header__inner' %}">
     <div class="site-header__shell">
