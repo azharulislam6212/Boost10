@@ -39,13 +39,19 @@
 
 /* ==========================================================================
    Cross-document view transitions
-   Opted into here so <page-transition> can hand the work to the browser rather
-   than animating an overlay itself. Browsers without it fall back to WAAPI.
-   ========================================================================== */
+   --------------------------------------------------------------------------
+   This used to be an unconditional `@view-transition { navigation: auto; }`.
+   It opted the whole storefront into browser-run cross-document transitions
+   whether or not the merchant had "page transitions" switched on — and because
+   an at-rule cannot read a theme setting, there was no way to switch it back
+   off. `<page-transition>` then stood down (`#supportsViewTransitions()` is
+   true in Chrome) and left the browser cross-fading the viewport on every
+   internal link.
 
-@view-transition {
-  navigation: auto;
-}
+   The opt-in now lives in `snippets/critical-style.liquid`, behind
+   `settings.enable_page_transitions`, where it can be turned off. Browsers
+   without the API still fall back to the component's WAAPI overlay.
+   ========================================================================== */
 
 /* ==========================================================================
    RESET
@@ -888,17 +894,100 @@
     inline-size: 100%;
     block-size: 100%;
     object-fit: cover;
+  }
+
+  /* Every image fades in. What changed is *what starts the fade*.
+
+     It used to be one mechanism for all of them: `opacity: 0` in the stylesheet,
+     `opacity: 1` once `<responsive-image>` had upgraded and written
+     `data-loaded`. That is fine for a card the customer scrolls to — by then
+     `global.js` has long since arrived. It is wrong for the hero and the logo,
+     because those are on screen during the load, and "invisible until the module
+     runs" is not a 250ms fade, it is however long the JavaScript takes. On a cold
+     load that is the white page.
+
+     So the two cases are driven differently and look the same.
+
+       lazy   `data-loaded` → transition. Unchanged: the same property, the same
+              `--transition-base` timing, the same trigger. Every product card,
+              collection card, article, banner and mega-menu image behaves
+              exactly as it did.
+
+       eager  a CSS animation instead. `priority: true` emits `loading="eager"`,
+              which is the hero background and the header logo. The animation
+              starts when the browser first renders the element, so the fade is
+              bounded by its own duration rather than by a network request for a
+              module — and it runs whether or not that module ever arrives.
+
+     Same duration and same easing token in both branches, so a merchant tuning
+     `--duration-base` still moves all of them together.
+
+     `backwards`, not `both`: the fill matters only before the animation starts.
+     Once it has finished, opacity reverts to the base value of 1 rather than
+     being pinned by the animation, so a hover effect or a section that wants to
+     fade an image later is still free to. */
+
+  /* ---- lazy: the component's fade, exactly as before ---- */
+  responsive-image:defined:not([data-loaded]) img[loading='lazy'] {
     opacity: 0;
+  }
+
+  responsive-image[data-loaded] img {
+    opacity: 1;
     transition: opacity var(--transition-base);
   }
 
-  responsive-image[data-loaded] img,
-  html.no-js responsive-image img {
-    opacity: 1;
+  /* ---- eager: the same fade, started by the browser ---- */
+  responsive-image img[loading='eager'] {
+    animation: responsive-image-in var(--duration-base, 250ms)
+      var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)) backwards;
+  }
+
+  @keyframes responsive-image-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  /* A decorative fade is exactly what this preference switches off, and an LCP
+     image is the last thing that should be animating for someone who asked for
+     no motion. */
+  @media (prefers-reduced-motion: reduce) {
+    responsive-image img[loading='eager'] {
+      animation: none;
+    }
+
+    responsive-image[data-loaded] img {
+      transition: none;
+    }
   }
 
   responsive-image[data-error] {
     background-color: var(--color-secondary-background);
+  }
+
+  /* The placeholder mark had no sizing rule anywhere in the theme.
+
+     `responsive-image img` does not reach it — `placeholder_svg_tag` emits an
+     inline `<svg>`, not an `<img>` — so the mark rendered at whatever intrinsic
+     size its viewBox implied, floating in the middle of a box sized by
+     `aspect-ratio`. On a card that is a small drawing in a large pale rectangle;
+     on a full-bleed hero it is a small drawing in most of a viewport, which is
+     the empty white area on a section whose image has not been set yet.
+
+     `100%` on both axes with a viewBox scales the mark to fit the box and keeps
+     its proportions, so the reserved space is filled rather than framed. The
+     fill is a scheme token, so the mark reads as part of the store in the theme
+     editor instead of as Shopify's default grey. */
+  .responsive-image__placeholder,
+  responsive-image > svg {
+    display: block;
+    inline-size: 100%;
+    block-size: 100%;
+    fill: var(--color-border);
   }
 
   @media screen and (max-width: 767px) {
