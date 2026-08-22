@@ -2240,17 +2240,88 @@
     overscroll-behavior: contain;
   }
 
-  .drawer__close,
-  .modal__close {
-    display: grid;
-    place-items: center;
-    inline-size: 4rem;
-    block-size: 4rem;
-    border-radius: 50%;
+  /* ---- overlay close buttons ------------------------------------------- */
+
+  /* Every close control in the theme is `snippets/button.liquid`, rendered as a
+     small primary icon button. What used to be here — a grid box, a fixed 4rem
+     square, a 50% radius and a grey hover — is gone, because all four of those
+     are the button's job and each one fought it:
+
+       display: grid       The button is a flex row of a label and an icon.
+                           Grid re-parents them as two grid items, which only
+                           looks harmless while the label is `visually-hidden`.
+       inline/block-size   `.button--icon-only` already sizes itself from
+                           `--button-height`, so `size: 'small'` was being
+                           overruled by a hard-coded 4rem.
+       border-radius       Belongs to the merchant's button settings.
+       :hover background   This is the one that broke the animation. The wipe is
+                           `.button::before` at `z-index: -1` — above the
+                           button's background, below its content. A background
+                           colour on the button itself covers the wipe's resting
+                           state, so the sweep has nothing to travel over. The
+                           button's own hover rule deliberately holds the
+                           background at `--button-background` for this reason,
+                           and this rule was overriding it.
+
+     What is left is placement, and only placement. Each overlay gets its own
+     class so its close button can be positioned for the panel it sits in,
+     without a change to one moving another. */
+
+  /* Close buttons that sit in a header row.
+
+     `.drawer__header`, `.modal__header` and `.size-chart__header` are all
+     `display: flex` with `justify-content: space-between`, so the title takes
+     the start and the close button the end. `flex: 0 0 auto` keeps it square:
+     the default `flex-shrink: 1` lets a long title squeeze a 36px button into
+     an oval. */
+  .close-menu-drawer,
+  .close-search-drawer,
+  .close-cart-drawer,
+  .close-filters-drawer,
+  .close-quick-view,
+  .close-compare-drawer,
+  .close-size-chart,
+  .close-page-popup {
+    flex: 0 0 auto;
   }
 
-  .drawer__close:hover,
-  .modal__close:hover { background-color: var(--color-secondary-background); }
+  /* The search drawer has no visible title — its heading is `visually-hidden`,
+     which is absolutely positioned and so contributes no width. With nothing to
+     be spaced apart from, `space-between` leaves the close button at the start
+     of the row. This pushes it back to the end. */
+  .close-search-drawer {
+    margin-inline-start: auto;
+  }
+
+  /* Close buttons that float over the panel.
+
+     These three have no header to sit in: the button is a direct child of
+     `.modal__panel`, which is a column flex container, so in flow it would take
+     a row of its own above the content and stretch to the panel's full width.
+     They are lifted out and pinned to the top corner instead. */
+  .modal__panel:has(> .close-media-zoom),
+  .modal__panel:has(> .close-promo-popup),
+  .modal__panel:has(> .close-back-in-stock) {
+    position: relative;
+  }
+
+  .close-media-zoom,
+  .close-promo-popup,
+  .close-back-in-stock {
+    position: absolute;
+    inset-block-start: var(--space-4);
+    inset-inline-end: var(--space-4);
+    /* Above the panel's own content — the zoom viewport fills the panel edge to
+       edge, and the promo popup's image column reaches the corner. */
+    z-index: 2;
+  }
+
+  /* The zoom viewport is the image itself, at whatever colour the photograph
+     happens to be in that corner. A shadow keeps the button readable over it
+     without tinting the button or dimming the image. */
+  .close-media-zoom {
+    box-shadow: var(--shadow-card, 0 2px 12px rgb(0 0 0 / 25%));
+  }
 
   /* ---- accordion, tabs, show more -------------------------------------- */
 
