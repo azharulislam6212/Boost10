@@ -68,23 +68,34 @@
           #
           # Typing a name is not the place to demand exactness. Both ends are
           # lenient now, and they are lenient in the same way.
-          assign link_key = link_title | downcase
-          assign mega_block = null
+          # `mega_menu_items` is built by `sections/header.liquid` from the
+          # rendered panels themselves, and passed in.
+          #
+          # This used to loop `section.blocks` here and never matched anything:
+          # the mega menus are theme blocks rendered through `content_for`, and
+          # that collection does not return them. So an item whose panel came
+          # from a block, rather than from child links in Navigation, fell
+          # through to a plain link - and `nav-menu` had to convert it into a
+          # disclosure after the page had loaded. Which worked, and was wrong:
+          # the conversion adds a chevron the server never sent, so the item
+          # widens, the navigation re-centres, and the menu slides sideways on
+          # every load.
+          #
+          # Both panel types are covered, because both write `data-menu-item`.
+          # `mega-menu` is the canvas you arrange blocks on; `mega-menu-simple`
+          # is the menu-plus-banners one. A menu item does not care which built
+          # its panel.
+          #
+          # `escape` because the attribute was written escaped, `downcase`
+          # because typing a name is not the place to demand exact case, and the
+          # pipes because "Sale" must not match inside "Sale Items".
+          assign link_key = link_title | escape | downcase
+          assign link_lookup = '|' | append: link_key | append: '|'
 
-          for candidate in section.blocks
-            # Both panel types are matched here. `mega-menu` is the canvas you
-            # arrange blocks on; `mega-menu-simple` is the menu-plus-banners one.
-            # A menu item does not care which built its panel.
-            unless candidate.type == 'mega-menu' or candidate.type == 'mega-menu-simple'
-              continue
-            endunless
-
-            assign candidate_key = candidate.settings.menu_item | strip | downcase
-            if candidate_key == link_key
-              assign mega_block = candidate
-              break
-            endif
-          endfor
+          assign has_mega = false
+          if mega_menu_items contains link_lookup
+            assign has_mega = true
+          endif
 
           # A matched panel is enough on its own.
           #
@@ -95,12 +106,12 @@
           #
           # The panel decides. Children only matter for items that have no block.
           assign has_panel = false
-          if mega_block != null or link.links.size > 0
+          if has_mega or link.links.size > 0
             assign has_panel = true
           endif
 
           assign panel_kind = 'dropdown'
-          if mega_block != null
+          if has_mega
             assign panel_kind = 'mega'
           endif
         -%}
@@ -132,9 +143,9 @@
                     connections — or, for an item with no children, an empty box
                     that never got replaced.
                   {%- endcomment -%}
-                  {%- if mega_block == null -%}
+                  {%- unless has_mega -%}
                     {% render 'nav-dropdown', link: link %}
-                  {%- endif -%}
+                  {%- endunless -%}
                 </div>
               </div>
             </details>

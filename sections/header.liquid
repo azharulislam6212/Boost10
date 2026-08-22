@@ -44,9 +44,54 @@
 {% endcomment %}
 
 
+{%- comment -%}
+  The panel bay, rendered early and held.
+
+  It is printed further down, exactly where it was — only the *evaluation* moves
+  up here, because the navigation has to know which menu items have a panel
+  before it renders, and this is the only place that knowledge exists.
+
+  `section.blocks` does not answer it. The mega menus are theme blocks rendered
+  through `content_for`, and iterating `section.blocks` in this section returns
+  nothing for them — which is why an item whose panel comes from a block, rather
+  than from child links in Navigation, was rendered as a plain link and had to be
+  turned into a disclosure by JavaScript afterwards.
+
+  The panels themselves are not in doubt. Each one carries
+  `data-menu-item="<name>"`, written by `blocks/mega-menu.liquid`. Reading the
+  markup answers the question exactly, from the same source the component uses
+  when it moves a panel into place.
+
+  `content_for` inside `capture` is the pattern `featured-collection.liquid`
+  already uses for its product cards.
+{%- endcomment -%}
+{%- capture header_bay -%}
+  {% content_for 'blocks' %}
+{%- endcapture -%}
+
 {%- liquid
   assign st = section.settings
   assign menu = st.menu
+
+  # ---- which menu items have a mega menu ----------------------------------
+  #
+  # Split on the attribute, drop the text before the first one, and take each
+  # value up to its closing quote.
+  #
+  # `escape` on both sides, because the attribute was written escaped and a menu
+  # item called "Gut & Digestion" is `Gut &amp; Digestion` in the markup.
+  # `downcase` on both sides, because typing a name into a block setting is not
+  # the place to demand exact case. The pipes are what stop "Sale" matching
+  # inside "Sale Items".
+  assign mega_menu_items = ''
+  assign mega_chunks = header_bay | split: 'data-menu-item="'
+
+  for mega_chunk in mega_chunks offset: 1
+    assign mega_key = mega_chunk | split: '"' | first | strip | downcase
+    if mega_key != blank
+      assign mega_menu_items = mega_menu_items | append: '|' | append: mega_key | append: '|'
+    endif
+  endfor
 
   # ---- height -------------------------------------------------------------
   case st.header_height
@@ -131,7 +176,7 @@
 {%- endcapture -%}
 
 {%- capture fragment_nav -%}
-  {% render 'header-nav', menu: menu %}
+  {% render 'header-nav', menu: menu, mega_menu_items: mega_menu_items %}
 {%- endcapture -%}
 
 {%- comment -%}
@@ -383,10 +428,16 @@
   {%- comment -%}
     The panel bay.
 
-    `{% content_for 'blocks' %}` can only be called once and only renders in
-    block order, so a mega menu panel cannot be emitted inside the `<li>` it
-    belongs to. It is emitted here instead, and `<nav-menu>` moves each panel
-    into the matching `<details>` on connect.
+    The blocks are rendered at the top of this file and held in `header_bay`;
+    this is where that markup is printed. Splitting the two is what lets the
+    navigation above read the panel names before it renders, so a menu item with
+    a panel is a `<details>` in the HTML the server sends rather than a link that
+    JavaScript has to convert.
+
+    A mega menu panel cannot be emitted inside the `<li>` it belongs to in any
+    case - the blocks render once, in block order - so `<nav-menu>` still moves
+    each panel into its matching `<details>` on connect. That move is invisible.
+    Building the disclosure was not.
 
     The bay is `hidden` rather than absent, so the panels are still in the
     document for the theme editor to highlight before the move happens, and
@@ -394,7 +445,7 @@
     instead of appearing loose at the top of the page.
   {%- endcomment -%}
   <div class="site-header__bay" data-nav-bay hidden>
-    {% content_for 'blocks' %}
+    {{ header_bay }}
   </div>
 </sticky-header>
 
