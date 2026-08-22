@@ -1054,7 +1054,9 @@ export function isScrollLocked() {
    ========================================================================== */
 
 /** Ceiling for waiting on `transitionend`, in case a panel never transitions. */
-const DISCLOSURE_FALLBACK = 500;
+// Longer than `--panel-speed` (420ms), because this is the net under the
+// transform's own `transitionend`, not a second way of ending the reveal.
+const DISCLOSURE_FALLBACK = 600;
 
 /** How long the reveal will wait for a panel's height to settle, in frames. */
 const REVEAL_MAX_FRAMES = 6;
@@ -1116,6 +1118,27 @@ export function measurePanel(panel, direction) {
  * Held past the reveal it also cuts off anything a child disclosure opens
  * sideways, so it comes off the moment the transition ends.
  *
+ * Which transition, though — and that is where this was wrong.
+ *
+ * The inner animates two properties, and they are not the same length:
+ *
+ *   transform  var(--panel-speed)   420ms
+ *   opacity    var(--panel-fade)    200ms
+ *
+ * `{ once: true }` took the first `transitionend` to arrive, which is opacity's,
+ * at 200ms. The clip came off 220ms before the panel had finished sliding — with
+ * the inner still translated up, roughly halfway through its travel. Released
+ * from the clip it was suddenly painted outside the panel, over the header,
+ * before dropping the rest of the way. That is the jump when a mega menu opens.
+ *
+ * It shows most once the header is stuck, because there the panel opens hard
+ * against a solid bar and the overshoot is drawn across it. At the top of the
+ * page the same overshoot lands on a transparent header over the banner, where
+ * it reads as part of the frosted panel and is easy to miss.
+ *
+ * So: the transform, specifically. The listener is removed by hand rather than
+ * with `once`, because `once` would have been spent on the opacity event.
+ *
  * @param {HTMLDetailsElement} details
  */
 export function settleDisclosure(details) {
@@ -1127,13 +1150,24 @@ export function settleDisclosure(details) {
   const panel = panelOf(details);
   const inner = panel?.querySelector(':scope > .nav__panel-inner, :scope > .drawer-nav__panel-inner');
 
-  const done = () => {
+  /** @param {TransitionEvent} [event] */
+  const done = (event) => {
+    // Anything bubbling up from inside the panel is not this panel arriving.
+    if (event && event.target !== inner) return;
+    if (event && event.propertyName !== 'transform') return;
+
+    inner?.removeEventListener('transitionend', done);
     clearTimeout(Number(details.dataset.settleTimer));
+
     if (details.dataset.state !== 'open') return;
     details.setAttribute('data-settled', '');
   };
 
-  inner?.addEventListener('transitionend', done, { once: true });
+  inner?.addEventListener('transitionend', done);
+
+  // The safety net, for the cases where `transitionend` will not fire at all —
+  // a panel with no transition, a tab backgrounded mid-open. It has to outlast
+  // the transform, or it would release the clip early on its own.
   details.dataset.settleTimer = String(window.setTimeout(done, DISCLOSURE_FALLBACK));
 }
 
@@ -1238,15 +1272,26 @@ export function closeDisclosure(details) {
     return;
   }
 
+  // The same mistake in the other direction, and the same fix.
+  //
+  // This took whichever `transitionend` arrived first from anywhere inside the
+  // panel — which is opacity's, at 200ms, while the inner is still sliding back
+  // up. `open` was removed then, the panel went to `display: none`, and the
+  // closing half of the animation was cut off partway.
   const panel = panelOf(details);
-  panel?.addEventListener(
-    'transitionend',
-    (event) => {
-      if (event.target !== event.currentTarget && !panel.contains(/** @type {Node} */ (event.target))) return;
-      finish();
-    },
-    { once: true }
-  );
+  const inner = panel?.querySelector(':scope > .nav__panel-inner, :scope > .drawer-nav__panel-inner');
+  const watched = inner ?? panel;
+
+  /** @param {TransitionEvent} event */
+  const onEnd = (event) => {
+    if (event.target !== watched) return;
+    if (event.propertyName !== 'transform') return;
+
+    watched?.removeEventListener('transitionend', onEnd);
+    finish();
+  };
+
+  watched?.addEventListener('transitionend', onEnd);
 
   details.dataset.closeTimer = String(window.setTimeout(finish, DISCLOSURE_FALLBACK));
 }
