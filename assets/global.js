@@ -210,6 +210,17 @@ export class StickyHeader extends BaseComponent {
   /** @type {number} */
   #lastScroll = 0;
 
+  /**
+   * The last value written to `data-pinned`, so the attribute is only touched
+   * when it changes. Re-writing it every frame would restart the drop-in
+   * animation sixty times a second and the header would never finish arriving.
+   *
+   * `null` until the first call, so priming always writes once.
+   *
+   * @type {boolean|null}
+   */
+  #pinned = null;
+
   /** @type {ResizeObserver|null} */
   #observer = null;
 
@@ -221,6 +232,13 @@ export class StickyHeader extends BaseComponent {
 
     this.#observer = new ResizeObserver(rafThrottle(() => this.#measure()));
     this.#observer.observe(this);
+
+    // The announcement bar is measured as well as the header. Its height is
+    // half of where the header hides to, and it changes on its own: it reflows
+    // at mobile widths, and a dismissible bar removes itself entirely. Observed
+    // rather than measured once, so neither leaves a stale number behind.
+    const announcement = document.querySelector('[data-announcement-bar]');
+    if (announcement instanceof HTMLElement) this.#observer.observe(announcement);
 
     // Every mode except `never` reacts to scroll — and `never` still needs the
     // transparent state cleared once the page moves past the banner, so the
@@ -316,6 +334,40 @@ export class StickyHeader extends BaseComponent {
     }
 
     setCssVar('--header-sticky-offset', `${this.#stickyOffset()}px`);
+    // Published as well as used internally: a section that needs to know where
+    // the header's flow position begins can read it without measuring again.
+    setCssVar('--header-offset-above', `${this.#offsetAbove()}px`);
+  }
+
+  /**
+   * How far below the top of the viewport the header sits when nothing is
+   * pinned yet — the combined height of everything above it in the header
+   * group, which in a default theme is the announcement bar.
+   *
+   * This is what `scroll-down` pins against. Added to the header's own height it
+   * gives the scroll position at which the header's bottom edge passes the top
+   * of the viewport — the moment the in-flow header has gone and the fixed one
+   * can take its place.
+   *
+   * `sticky` is counted and `fixed` is not: a sticky section above the header is
+   * in flow and does push it down, while a fixed one is out of flow and does
+   * not.
+   *
+   * @returns {number}
+   * @private
+   */
+  #offsetAbove() {
+    let offset = 0;
+
+    for (const section of document.querySelectorAll('.shopify-section')) {
+      if (section.contains(this)) break;
+      if (!(section instanceof HTMLElement)) continue;
+      if (getComputedStyle(section).position === 'fixed') continue;
+
+      offset += section.offsetHeight;
+    }
+
+    return offset;
   }
 
   /**
@@ -382,14 +434,40 @@ export class StickyHeader extends BaseComponent {
       shell.classList.toggle(scheme, scrolled);
     }
 
-    // `scroll-down` is decided by position, not by direction, so it is settled
-    // before the deadzone. On a reload at 1200px the header belongs on screen,
-    // and it must not have to wait for the customer to move 6px to find that
-    // out — which is what running it below the `return` used to mean.
+    // `scroll-down` pins rather than hides.
+    //
+    // It used to set `data-hidden` whenever the page was near the top, which is
+    // most of the time a customer spends on a landing page — so the header was
+    // simply not there. What it should do is behave like an ordinary header
+    // until the page has scrolled past it, and then come back pinned.
+    //
+    // The switch is the header's own bottom edge: everything above it in the
+    // group, plus its own height. Above that line the header is still at least
+    // partly on screen and belongs in the flow; below it the header has gone,
+    // and the fixed copy can drop in without two of them being visible at once.
+    //
+    // Decided by position rather than direction, so it is settled here rather
+    // than below the deadzone: a page restored mid-scroll needs the header
+    // pinned immediately, not after the customer has moved 6px.
     if (mode === 'scroll-down') {
-      this.toggleAttribute('data-hidden', !scrolled);
+      const pinPoint = this.#offsetAbove() + this.offsetHeight;
+      const pinned = position > pinPoint;
+
+      if (pinned !== this.#pinned) {
+        this.#pinned = pinned;
+        this.toggleAttribute('data-pinned', pinned);
+      }
+
+      // Nothing in this mode hides, and an attribute left behind by a mode
+      // change in the editor would strand the header off-screen.
+      this.removeAttribute('data-hidden');
     } else if (mode !== 'scroll-up') {
       this.removeAttribute('data-hidden');
+    }
+
+    if (mode !== 'scroll-down' && this.#pinned !== null) {
+      this.#pinned = null;
+      this.removeAttribute('data-pinned');
     }
 
     const delta = position - this.#lastScroll;

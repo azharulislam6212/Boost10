@@ -110,9 +110,12 @@
   z-index: 100;
 }
 
+/* `scroll-down` is deliberately absent. It is the one mode where the header is
+   *not* pinned for the whole page: it starts in flow, scrolls away with the
+   banner, and comes back pinned once the page has left it behind. Section 2b
+   below is where that happens. */
 .header-section:has(> [data-sticky-mode='always']),
-.header-section:has(> [data-sticky-mode='scroll-up']),
-.header-section:has(> [data-sticky-mode='scroll-down']) {
+.header-section:has(> [data-sticky-mode='scroll-up']) {
   position: sticky;
   /* Not a hard `0`. Anything above the header that is itself pinned — a sticky
      announcement bar — owns that space, and a header pinned to 0 lands on top of
@@ -124,10 +127,75 @@
 }
 
 /* Guarded on the mode, not on `[data-hidden]` alone, so an attribute left
-   behind by a mode change cannot hide a header that is supposed to be pinned. */
-sticky-header[data-sticky-mode='scroll-up'][data-hidden],
-sticky-header[data-sticky-mode='scroll-down'][data-hidden] {
+   behind by a mode change cannot hide a header that is supposed to be pinned.
+
+   `scroll-down` is no longer here. It used to hide the header with this same
+   transform while the page was at the top — which is why the header could not
+   be seen in that mode at all, and why what little of it showed was sitting on
+   the announcement bar: the travel is the header's own height, and from a
+   starting point below the announcement bar that is not far enough to leave the
+   screen. The mode does not hide anything now. See 2b. */
+sticky-header[data-sticky-mode='scroll-up'][data-hidden] {
   transform: translateY(calc(-100% - 8px));
+}
+
+/* --------------------------------------------------------------------------
+   2b. Show on scroll down
+   --------------------------------------------------------------------------
+   The header is visible at the top of the page, in flow, below the announcement
+   bar — an ordinary header. It scrolls away with the page like any other
+   content. Once the page has scrolled past it completely, it returns, pinned to
+   the top of the viewport, dropping in from above.
+
+   Two things make that work without the page moving underneath it.
+
+   The pin is `fixed` rather than `sticky`. Sticky pins as soon as its own top
+   edge reaches the offset, so the header would never leave the screen and there
+   would be nothing to come back from.
+
+   And it is the *inner* element that goes fixed, not the section. The section
+   stays in flow and keeps its height, so the space the header occupied at the
+   top of the page is still reserved and nothing below it shifts up at the moment
+   the header lifts out. Pinning the section instead would pull the whole page up
+   by the header's height in a single frame.
+   -------------------------------------------------------------------------- */
+
+sticky-header[data-sticky-mode='scroll-down'][data-pinned] {
+  position: fixed;
+  inset-block-start: 0;
+  /* Both edges rather than a width: on a fixed element these resolve against the
+     viewport, which is what the header should span — not the section it came
+     from. */
+  inset-inline: 0;
+  z-index: 110;
+
+  /* An animation, not a transition. There is no previous position to move from:
+     the element becomes fixed and is simply *there*, so a transition has nothing
+     to interpolate and the header would appear all at once. The keyframes give
+     it somewhere to come from. */
+  animation: site-header-drop-in var(--header-speed) var(--header-ease) backwards;
+}
+
+@keyframes site-header-drop-in {
+  from {
+    transform: translateY(-100%);
+  }
+
+  to {
+    transform: translateY(0);
+  }
+}
+
+/* Leaving is not animated, and does not need to be. `<sticky-header>` unpins at
+   exactly the scroll position where the header's place in the flow sits just
+   above the fold, so the fixed bar is replaced by an in-flow bar in the same
+   spot — off the top of the screen either way. Scrolling further up brings it
+   back into view with the page, as part of the document. */
+
+@media (prefers-reduced-motion: reduce) {
+  sticky-header[data-sticky-mode='scroll-down'][data-pinned] {
+    animation: none;
+  }
 }
 
 /* --------------------------------------------------------------------------
