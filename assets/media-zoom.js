@@ -220,6 +220,7 @@ defineComponent('media-zoom', MediaZoom);
  *         <button data-ref="zoomIn" aria-label="…">…</button>
  *         <button data-ref="zoomOut" aria-label="…">…</button>
  *         <button data-ref="reset" aria-label="…">…</button>
+ *         <span class="visually-hidden" role="status" data-ref="zoomStatus"></span>
  *       </div>
  *     </dialog>
  *   </media-zoom-modal>
@@ -351,7 +352,21 @@ export class MediaZoomModal extends ModalDialog {
     );
 
     this.toggleAttribute('data-zoomed', this.#scale > 1);
-    this.setAttribute('aria-label', themeString('zoomLevel', '', { level: this.#scale.toFixed(1) }));
+
+    // Announced through a live region, not through `aria-label` on this element.
+    //
+    // This element is a custom element with no role, which makes it `generic`,
+    // and `aria-label` is prohibited on `generic` - so the attribute was both an
+    // audit failure and silent. A label describes a thing when focus reaches it;
+    // it is not re-read when it changes, so the zoom level was never actually
+    // announced to anyone.
+    //
+    // The status span is, on every change, which is the point of showing a level
+    // at all.
+    const status = this.refs.zoomStatus;
+    if (status instanceof HTMLElement) {
+      status.textContent = themeString('zoomLevel', '', { level: this.#scale.toFixed(1) });
+    }
   }
 
   /**

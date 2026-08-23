@@ -52,8 +52,55 @@
       {%- unless page_title contains shop.name %} &ndash; {{ shop.name }}{% endunless -%}
     </title>
 
-    {%- if page_description -%}
-      <meta name="description" content="{{ page_description | escape }}">
+    {%- comment -%}
+      The meta description, with somewhere to fall back to.
+
+      This used to render only when `page_description` was set, and that field is
+      empty until someone fills it in. A new store therefore shipped no
+      description at all on any page - which is the Lighthouse failure, and worse
+      than the audit suggests: with no description, search results quote whatever
+      text the crawler finds first, usually the announcement bar or the menu.
+
+      The merchant's own words still win. The chain below only runs when the SEO
+      field is empty, and it takes the next most specific text the page already
+      has: the product's description, the collection's, the article's, the page's
+      body. `truncate` at 160 because search results cut somewhere around there
+      and a sentence ending mid-word reads as neglect.
+    {%- endcomment -%}
+    {%- liquid
+      assign meta_description = page_description
+
+      if meta_description == blank
+        case request.page_type
+          when 'product'
+            assign meta_description = product.description
+          when 'collection'
+            assign meta_description = collection.description
+          when 'article'
+            assign meta_description = article.excerpt_or_content
+          when 'page'
+            assign meta_description = page.content
+          when 'blog'
+            assign meta_description = blog.title
+        endcase
+      endif
+
+      # The store's own description, then its name. The last one is thin, but a
+      # thin description is still a description, and it is the difference
+      # between a search result that names the shop and one that quotes the menu.
+      if meta_description == blank
+        assign meta_description = shop.description
+      endif
+
+      if meta_description == blank
+        assign meta_description = shop.name
+      endif
+
+      assign meta_description = meta_description | strip_html | strip_newlines | strip | truncate: 160
+    -%}
+
+    {%- if meta_description != blank -%}
+      <meta name="description" content="{{ meta_description | escape }}">
     {%- endif -%}
 
 
