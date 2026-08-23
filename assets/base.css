@@ -2180,8 +2180,24 @@
     background: none;
   }
 
-  .drawer__dialog { justify-content: flex-end; }
-  .modal__dialog { align-items: center; justify-content: center; padding: var(--space-4); }
+  .drawer__dialog {
+    justify-content: flex-end;
+    overflow: clip;
+    box-sizing: border-box;
+  }
+
+  .modal__dialog {
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-4);
+    overflow: clip;
+    box-sizing: border-box;
+  }
+
+  @supports not (overflow: clip) {
+    .drawer__dialog,
+    .modal__dialog { overflow: hidden; }
+  }
 
   .drawer[data-placement='start'] .drawer__dialog { justify-content: flex-start; }
   .drawer[data-placement='top'] .drawer__dialog { align-items: flex-start; }
@@ -2201,6 +2217,16 @@
   .drawer__panel {
     inline-size: min(42rem, 100vw);
     block-size: 100%;
+    flex: 0 0 auto;
+    min-inline-size: 0;
+    will-change: transform;
+  }
+
+  /* The cart is an end-side drawer. Keep the animation physically anchored
+     to the right edge so it always enters from right -> left, even when other
+     drawer rules or RTL styles are present. */
+  .cart-drawer .drawer__panel {
+    transform: translate3d(0, 0, 0);
   }
 
   .drawer[data-placement='top'] .drawer__panel,
@@ -5831,6 +5857,7 @@
 
   /* Scroll lock. The body is pinned from JavaScript with inline styles, which
      cannot be defeated by merchant CSS; this only hides the scrollbar. */
+  html { scrollbar-gutter: stable; }
   html.scroll-locked { overflow: hidden; }
 }
 
@@ -6419,7 +6446,17 @@ sticky-header[data-transparent] .header__logo-image--transparent { opacity: 1; }
 }
 
 .drawer[data-placement='end'] .drawer__dialog:not([open]) .drawer__panel {
-  transform: translateX(100%);
+  transform: translate3d(100%, 0, 0);
+}
+
+/* Cart drawer: closed = fully outside the right edge. The open animation in
+   dialog.js then runs 100% -> 0%, which is right -> left. */
+.cart-drawer[data-placement='end'] .drawer__dialog:not([open]) .drawer__panel {
+  transform: translate3d(100%, 0, 0);
+}
+
+.cart-drawer[data-placement='end'] .drawer__dialog[open] .drawer__panel {
+  transform: translate3d(0, 0, 0);
 }
 
 /* RTL: `translateX` is physical, so the two placements swap. Logical

@@ -390,6 +390,8 @@ export class DrawerComponent extends Overlay {
           { opacity: 1, transform: 'translate3d(0, 0, 0)' }
         ];
       default:
+        // `end` is the physical right side in the default LTR theme.
+        // Opening must therefore travel right -> left: 100% -> 0%.
         return [
           { opacity: 0, transform: 'translate3d(100%, 0, 0)' },
           { opacity: 1, transform: 'translate3d(0, 0, 0)' }
