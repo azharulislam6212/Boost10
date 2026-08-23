@@ -70,7 +70,17 @@
                 <a
                   class="list-collections__sort-link"
                   href="{{ routes.collections_url }}?sort_by={{ order }}"
-                  {% if request.path == routes.collections_url and sort_by == order %}aria-current="true"{% endif %}
+                  {%- comment -%}
+                    No `aria-current` here.
+
+                    It used to be gated on `sort_by == order`, and `sort_by` is not
+                    an object Liquid has on this template - Shopify exposes
+                    `collection.sort_by` on a collection page and nothing equivalent
+                    for the collections list. So the comparison was nil against a
+                    string, never true, and the attribute was never written. Marking
+                    the active sort needs the current query string, which Liquid
+                    cannot read.
+                  {%- endcomment -%}
                 >
                   {{ order_label }}
                 </a>
@@ -81,7 +91,15 @@
       {%- endif -%}
     </div>
 
-    {%- paginate bv by per_page -%}
+    {%- comment -%}
+      `source`, not `bv`.
+
+      `bv` was never assigned anywhere in this file. `paginate` on nothing gives a
+      `paginate` object with no items, so `paginate.items` below was empty, the
+      pagination controls never appeared, and the loop underneath walked the whole
+      unpaginated list regardless of the per-page setting.
+    {%- endcomment -%}
+    {%- paginate source by per_page -%}
       {%- capture children -%}
         {%- for item in source -%}
  

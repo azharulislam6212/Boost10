@@ -1,3 +1,28 @@
+{% doc %}
+  The tokens that must exist before the first paint, inlined in the head.
+
+  No parameters: everything is read from theme settings.
+{% enddoc %}
+
+{%- liquid
+  comment
+    These three were read as bare names - `icon_sm`, `icon_md`, `icon_lg` - which
+    nothing ever assigned. `{{ icon_sm | divided_by: 16.0 }}` on nil is 0, so all
+    three tokens were emitted as `0rem`, and `--icon-size` with them.
+
+    It stayed hidden because `snippets/icon.liquid` writes `--icon-size` inline on
+    every icon it renders, so icons looked right; anything reading the token
+    without that inline override was sizing against zero.
+
+    The settings they were meant to read are `icon_size_sm`, `icon_size_md` and
+    `icon_size_lg`. The fallbacks match the schema defaults, so a store that has
+    never opened the setting gets what it always should have.
+  endcomment
+  assign icon_sm = settings.icon_size_sm | default: 14
+  assign icon_md = settings.icon_size_md | default: 20
+  assign icon_lg = settings.icon_size_lg | default: 28
+-%}
+
  {% style %}
       @layer reset, tokens, base, layout, components, utilities;
 
