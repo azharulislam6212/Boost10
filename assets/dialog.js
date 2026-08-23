@@ -200,27 +200,59 @@ export class Overlay extends BaseComponent {
   afterClose() {}
 
   /**
-   * @returns {Animation|Promise<any>|undefined}
+   * Cancel any previous WAAPI animation on the panel before starting a new
+   * direction. This is important when a drawer is closed while its entrance
+   * animation is still settling: reversing an already-running animation can
+   * briefly expose the CSS transform and makes the panel appear to jump.
+   *
+   * @private
    */
-  animateIn() {
-    if (prefersReducedMotion() || !this.refs.panel) return undefined;
-    return this.refs.panel.animate(this.enterKeyframes(), {
-      duration: 320,
-      easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
-      fill: 'both'
-    }).finished;
+  #cancelPanelAnimations() {
+    if (!(this.refs.panel instanceof HTMLElement)) return;
+    for (const animation of this.refs.panel.getAnimations()) animation.cancel();
   }
 
   /**
-   * @returns {Animation|Promise<any>|undefined}
+   * @returns {Promise<void>|undefined}
    */
-  animateOut() {
+  async animateIn() {
     if (prefersReducedMotion() || !this.refs.panel) return undefined;
-    return this.refs.panel.animate(this.enterKeyframes().slice().reverse(), {
+
+    this.#cancelPanelAnimations();
+
+    const animation = this.refs.panel.animate(this.enterKeyframes(), {
+      duration: 320,
+      easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+      fill: 'both'
+    });
+
+    try {
+      await animation.finished;
+    } catch {
+      // A close/open race can cancel the animation. The next animation owns
+      // the panel's transform, so cancellation is not an error.
+    }
+  }
+
+  /**
+   * @returns {Promise<void>|undefined}
+   */
+  async animateOut() {
+    if (prefersReducedMotion() || !this.refs.panel) return undefined;
+
+    this.#cancelPanelAnimations();
+
+    const animation = this.refs.panel.animate(this.enterKeyframes().slice().reverse(), {
       duration: 240,
       easing: 'cubic-bezier(0.76, 0, 0.24, 1)',
       fill: 'both'
-    }).finished;
+    });
+
+    try {
+      await animation.finished;
+    } catch {
+      // A second close/open action may cancel this animation.
+    }
   }
 
   /**

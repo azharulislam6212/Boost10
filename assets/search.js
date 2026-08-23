@@ -424,14 +424,20 @@ export class PredictiveSearch extends BaseComponent {
   }
 
   /**
-   * Clear the query and the panel, and return focus to the input.
+   * Clear the query and the panel. Focus is restored only when the reset was
+   * requested by the customer. A drawer reset after close must NOT focus an
+   * input inside the now-closed native dialog, because the browser can scroll
+   * that hidden control back into view and make the page visibly jump.
+   *
+   * @param {{focus?: boolean}} [options]
    */
-  reset() {
+  reset({ focus = true } = {}) {
     this.refs.input.value = '';
     this.#rendered = '';
     this.close();
     this.#toggleReset(false);
-    this.refs.input.focus();
+
+    if (focus) this.refs.input.focus({ preventScroll: true });
   }
 
   /**
@@ -580,7 +586,10 @@ export class SearchDrawer extends DrawerComponent {
   }
 
   afterClose() {
-    this.querySelector('predictive-search')?.reset?.();
+    // The drawer is already closed here. Never focus the search input during
+    // cleanup; doing so focuses an element inside a closed native dialog and
+    // can make the browser jump the page to that hidden field.
+    this.querySelector('predictive-search')?.reset?.({ focus: false });
   }
 }
 
