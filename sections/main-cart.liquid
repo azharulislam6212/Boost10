@@ -13,11 +13,18 @@
   assign section_settings = section.settings
 -%}
 
-{% capture cart_page_more_blocks %}
-  {%- content_for 'blocks' -%}
-{% endcapture %}
+{%- comment -%}
+  The form is written here rather than through `snippets/cart-items-component.liquid`.
 
-{%- capture cart_items_children -%}
+  Everything inside it is a theme block, and handing the block output to a wrapper
+  snippet meant capturing it first - which `{% content_for %}` does not allow. The
+  wrapper was a single `<form>` with one caller, so it moves here whole: same
+  action, same method, same class, same `data-section-id`.
+
+  With JavaScript disabled the page still updates quantities and reaches checkout,
+  because this is a real form and always was.
+{%- endcomment -%}
+<form action="{{ routes.cart_url }}" method="post" class="cart-page__form" data-section-id="{{ section.id }}">
   <div
     class="cart-section color-{{ section_settings.color_scheme }}"
     role="region"
@@ -31,9 +38,18 @@
         <div class="cart-page__items">
           {%- content_for 'block', id: 'cart-page-items', type: '_cart-products' -%}
 
-          {%- if cart_page_more_blocks != blank -%}
-            <div class="cart-page__blocks">{{ cart_page_more_blocks }}</div>
-          {%- endif -%}
+          {%- comment -%}
+            The merchant's own blocks, rendered where they belong.
+
+            They used to be captured at the top of the file and printed here
+            behind an `!= blank` test. `{% content_for %}` cannot have its output
+            captured - theme-check reports it as an error, because Shopify renders
+            blocks with their editor bindings attached and buffering that output
+            is not something the platform supports. Without a captured string
+            there is nothing to test, so the wrapper is always present and simply
+            empty when the merchant has added nothing.
+          {%- endcomment -%}
+          <div class="cart-page__blocks">{%- content_for 'blocks' -%}</div>
         </div>
 
         {%- unless cart.empty? -%}
@@ -58,9 +74,7 @@
       {%- endif -%}
     </div>
   </div>
-{%- endcapture -%}
-
-{%- render 'cart-items-component', children: cart_items_children, section_id: section.id -%}
+</form>
 
 {% schema %}
 {

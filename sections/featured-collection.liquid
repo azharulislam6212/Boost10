@@ -40,7 +40,49 @@
     </div>
 
     {%- if featured.products.size > 0 -%}
-      {%- capture children -%}
+      {%- comment -%}
+        The carousel element, written here rather than through
+        `snippets/carousel-shell.liquid`.
+
+        Each card is a theme block, and `{% content_for %}` cannot have its output
+        captured - theme-check reports it as an error, because Shopify renders
+        blocks with their editor bindings attached and buffering that output into
+        a variable is not something the platform supports. Handing the cards to
+        the shell snippet meant capturing them first.
+
+        The shell is not duplicated. `carousel-shell-attrs` writes the element's
+        attributes and `carousel-shell-tail` writes the arrows, pagination, pause
+        button and live region, from the same sub-snippets `carousel-shell.liquid`
+        uses. Only the element and its track are here.
+      {%- endcomment -%}
+      {%- liquid
+        assign cs_layout = section.settings.layout
+        assign cs_layout_mobile = section.settings.layout_mobile
+        assign cs_count = featured.products.size
+
+        assign cs_is_carousel = false
+        if cs_layout == 'carousel' or cs_layout_mobile == 'carousel'
+          assign cs_is_carousel = true
+        endif
+      -%}
+
+      <swiper-carousel
+        {% render 'carousel-shell-attrs',
+           settings: section.settings,
+           layout: cs_layout,
+           layout_mobile: cs_layout_mobile,
+           classes: 'featured-collection__carousel',
+           columns_desktop: section.settings.columns_desktop,
+           columns_tablet: section.settings.columns_tablet,
+           columns_mobile: section.settings.columns_mobile,
+           count: cs_count %}
+      >
+        <ul
+          class="carousel-shell__track product-grid"
+          data-ref="track"
+          role="list"
+          {% if cs_is_carousel %}aria-label="{{ featured.title | escape }}"{% endif %}
+        >
         {%- for product in featured.products limit: limit -%}
           <li class="product-grid__item carousel-shell__item" data-product-id="{{ product.id }}">
             {% content_for 'block',
@@ -52,20 +94,15 @@
             %}
           </li>
         {%- endfor -%}
-      {%- endcapture -%}
+      
+        </ul>
 
-      {% render 'carousel-shell',
-         children: children,
-         layout: section.settings.layout,
-         layout_mobile: section.settings.layout_mobile,
-         tag: 'ul',
-         label: featured.title,
-         classes: 'featured-collection__carousel',
-         track_classes: 'product-grid',
-         columns_desktop: section.settings.columns_desktop,
-         columns_tablet: section.settings.columns_tablet,
-         columns_mobile: section.settings.columns_mobile,
-         settings: section.settings %}
+        {% render 'carousel-shell-tail',
+           settings: section.settings,
+           layout: cs_layout,
+           layout_mobile: cs_layout_mobile %}
+      </swiper-carousel>
+
 
       {%- if section.settings.show_view_all and featured.all_products_count > limit -%}
         <div class="featured-collection__footer">

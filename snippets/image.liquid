@@ -198,6 +198,21 @@
     {{- placeholder | default: 'hero-apparel-1' | placeholder_svg_tag: 'responsive-image__placeholder' -}}
   </responsive-image>
 {%- else -%}
+  {%- comment -%}
+    `preload_tag` and the `preload` argument of `image_tag` cannot express these.
+
+    Both emit a plain `rel="preload"` for a single URL. What is needed here is a
+    responsive preload: `imagesrcset` with every width, `imagesizes` matching the
+    `sizes` the img will use, and a `media` query when there is a separate mobile
+    crop. Without those the browser preloads one fixed width and then downloads a
+    second file for the size it actually wants - two requests for the LCP image,
+    which is worse than not preloading at all.
+
+    So these two are written by hand, and the check is switched off for exactly
+    them, with the reason recorded rather than left as a standing warning.
+  {%- endcomment -%}
+  {% # theme-check-disable AssetPreload %}
+
   {%- if preload and priority -%}
     <link
       rel="preload"
@@ -226,6 +241,7 @@
       >
     {%- endif -%}
   {%- endif -%}
+  {% # theme-check-enable AssetPreload %}
 
   <responsive-image
     class="responsive-image {{ wrapper_class }}"

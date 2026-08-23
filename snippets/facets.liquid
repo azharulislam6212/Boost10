@@ -10,9 +10,9 @@
   and the server filters — which is not a fallback so much as the source of
   truth, since the module reads the same form the server would have received.
 
-  @param {object} results - `collection` or `search`
+  @param {object} results - `collection` or `search`.
   @param {object} section
-  @param {string} [context] - 'sidebar' | 'drawer'. Default sidebar
+  @param {string} [context] - sidebar | drawer. Default sidebar.
 
   @example
     {% render 'facets', results: collection, section: section %}
@@ -56,100 +56,19 @@
     {%- endif -%}
 
     {%- if section.settings.enable_filtering -%}
-      <accordion-element class="facets__groups" data-collapse-below="{% if layout == 'drawer' %}0{% else %}750{% endif %}">
-        {%- for filter in results.filters -%}
-          <details class="facets__group" data-default-open {% if filter.active_values.size > 0 %}open{% endif %}>
-            <summary class="facets__summary">
-              <span class="facets__group-label">{{ filter.label }}</span>
-              {%- if filter.active_values.size > 0 -%}
-                <span class="facets__group-count">{{ filter.active_values.size }}</span>
-              {%- endif -%}
-              {% render 'icon', icon: 'chevron-down', size: 14 %}
-            </summary>
+      {%- comment -%}
+        The groups come from `facets-guard.liquid`.
 
-            <div class="facets__group-content">
-              {%- case filter.type -%}
-                {%- when 'price_range' -%}
-                  <price-range
-                    class="price-range"
-                    data-min="0"
-                    data-max="{{ filter.range_max }}"
-                  >
-                    <div class="price-range__inputs">
-                      <label class="visually-hidden" for="{{ filter.min_value.param_name }}-{{ layout }}">
-                        {{ 'products.facets.price_from' | t }}
-                      </label>
-                      <input
-                        id="{{ filter.min_value.param_name }}-{{ layout }}"
-                        data-ref="min"
-                        type="number"
-                        name="{{ filter.min_value.param_name }}"
-                        value="{{ filter.min_value.value | money_without_currency | replace: ',', '' }}"
-                        min="0"
-                        max="{{ filter.range_max | money_without_currency | replace: ',', '' }}"
-                        inputmode="numeric"
-                        placeholder="0"
-                      >
+        The body was eighty lines of `case filter.type` written inline here, and
+        it is needed a second time by a layout that renders one dropdown per
+        group without the disclosure wrapper. Two copies of that body would drift
+        the first time swatch rendering changed, so it lives in one file and this
+        renders it.
 
-                      <label class="visually-hidden" for="{{ filter.max_value.param_name }}-{{ layout }}">
-                        {{ 'products.facets.price_to' | t }}
-                      </label>
-                      <input
-                        id="{{ filter.max_value.param_name }}-{{ layout }}"
-                        data-ref="max"
-                        type="number"
-                        name="{{ filter.max_value.param_name }}"
-                        value="{{ filter.max_value.value | money_without_currency | replace: ',', '' }}"
-                        min="0"
-                        max="{{ filter.range_max | money_without_currency | replace: ',', '' }}"
-                        inputmode="numeric"
-                        placeholder="{{ filter.range_max | money_without_currency | replace: ',', '' }}"
-                      >
-                    </div>
-
-                    <div class="price-range__track" data-ref="track" aria-hidden="true">
-                      <span class="price-range__fill" data-ref="fill"></span>
-                    </div>
-
-                    <output class="price-range__output" data-ref="output"></output>
-                    <p class="price-range__max">
-                      {{ 'products.facets.max_price_html' | t: price: filter.range_max | money }}
-                    </p>
-                  </price-range>
-
-                {%- else -%}
-                  <ul class="facets__values" role="list">
-                    {%- for value in filter.values -%}
-                      <li class="facets__value">
-                        <label class="facets__checkbox">
-                          <input
-                            type="checkbox"
-                            name="{{ value.param_name }}"
-                            value="{{ value.value }}"
-                            {% if value.active %}checked{% endif %}
-                            {% if value.count == 0 and value.active == false %}disabled{% endif %}
-                          >
-
-                          {%- if filter.presentation == 'swatch' -%}
-                            {% render 'swatch',
-                               value: value.label,
-                               option_name: filter.label,
-                               option_value: value,
-                               size: 'small' %}
-                          {%- else -%}
-                            <span class="facets__value-label">{{ value.label }}</span>
-                          {%- endif -%}
-
-                          <span class="facets__value-count">({{ value.count }})</span>
-                        </label>
-                      </li>
-                    {%- endfor -%}
-                  </ul>
-              {%- endcase -%}
-            </div>
-          </details>
-        {%- endfor -%}
-      </accordion-element>
+        With no `filter` passed, that file loops every group and wraps each in a
+        disclosure - which is exactly what this block did.
+      {%- endcomment -%}
+      {% render 'facets-guard', results: results, context: layout %}
     {%- endif -%}
 
     {%- comment -%}

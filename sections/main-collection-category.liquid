@@ -32,7 +32,7 @@
   data-section-id="{{ section.id }}"
   data-pagination="{{ section_settings.pagination_type }}"
   data-item-selector="[data-product-id]"
-  data-page="{{ paginate.current_page | default: 1 }}"
+  data-page="{{ current_page | default: 1 }}"
   data-total="{{ collection.products_count }}"
   role="region"
   aria-label="{{ collection.title | escape }}"
@@ -102,7 +102,51 @@
         paginate: paginate
       %}
 
-      {%- capture children -%}
+      {%- comment -%}
+        The grid markup, inline rather than through `snippets/product-grid.liquid`.
+
+        The loop below renders each card with `{% content_for 'block' %}`, and the
+        output of `content_for` cannot be captured - theme-check reports it as an
+        error, because Shopify renders blocks with their theme-editor bindings
+        attached and buffering that output into a variable is not something the
+        platform supports. Passing the cards to a wrapper snippet meant capturing
+        them first, so the wrapper had to come here instead.
+
+        This is the same markup `product-grid.liquid` emits, with the same classes,
+        the same refs and the same order. Nothing about how the grid looks or how
+        `<results-list>` finds it has changed.
+      {%- endcomment -%}
+      {%- liquid
+        assign grid_mode = section.settings.pagination_type | default: settings.pagination_type | default: 'paginate'
+        assign grid_total = collection.products_count
+        assign grid_id = 'ProductGrid-' | append: section.id
+        assign grid_desktop = section.settings.columns_desktop | default: 4
+        assign grid_tablet = section.settings.columns_tablet | default: 3
+        assign grid_mobile = section.settings.columns_mobile | default: 2
+      -%}
+
+      <div class="product-grid-wrapper">
+        <h2 class="visually-hidden">{{ 'products.facets.title' | t }}</h2>
+
+        {%- if paginate.previous and grid_mode != 'paginate' -%}
+          <button
+            type="button"
+            class="button button--secondary results-list__load-previous"
+            data-ref="loadPrevious"
+            data-prev-url="{{ paginate.previous.url }}"
+            hidden
+          >
+            {{ 'general.pagination.load_previous' | t }}
+          </button>
+        {%- endif -%}
+
+        <ul
+          class="product-grid"
+          id="{{ grid_id }}"
+          data-ref="grid"
+          role="list"
+          style="--columns-desktop: {{ grid_desktop }}; --columns-tablet: {{ grid_tablet }}; --columns-mobile: {{ grid_mobile }};"
+        >
         {%- for product in collection.products -%}
           <li
             id="{{ section.id }}-{{ product.id }}"
@@ -120,14 +164,21 @@
             %}
           </li>
         {%- endfor -%}
-      {%- endcapture -%}
+      
+        </ul>
 
-      {% render 'product-grid',
-         children: children,
-         paginate: paginate,
-         section: section,
-         total: collection.products_count,
-         empty_url: collection.url %}
+        <div class="product-grid__empty" data-ref="empty" {% if grid_total > 0 %}hidden{% endif %}>
+          <p class="product-grid__empty-title">{{ 'products.facets.no_results' | t }}</p>
+          <a class="button button--link" href="{{ collection.url }}">{{ 'products.facets.clear_all' | t }}</a>
+        </div>
+
+        <div class="product-grid__pagination">
+          {% render 'pagination', paginate: paginate, type: grid_mode %}
+        </div>
+
+        <p class="visually-hidden" data-ref="status" role="status"></p>
+      </div>
+
     {% endpaginate %}
 
     <div class="collection-results__blocks">

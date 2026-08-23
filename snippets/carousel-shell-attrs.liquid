@@ -1,0 +1,66 @@
+{% doc %}
+  The attributes for a `<swiper-carousel>` element, and nothing else.
+
+  `carousel-shell.liquid` renders the whole component and takes its slides as a
+  captured string. That works everywhere except where the slides are theme
+  blocks: the output of `{% content_for %}` cannot be captured - theme-check
+  reports it as an error, because Shopify renders blocks with their editor
+  bindings attached and buffering that output is not something the platform
+  supports.
+
+  So a section whose slides are blocks has to own the element itself. This
+  snippet and `carousel-shell-tail.liquid` are the two halves of the shell that
+  can be shared without splitting a tag across files: attributes here, the
+  controls after the track there. The section writes the element and the track
+  between them, and `{% content_for 'blocks' %}` goes inside the track where it
+  belongs.
+
+  `carousel-shell.liquid` is unchanged and still used by every caller whose
+  slides are not blocks.
+
+  @param {object} settings - The section's settings.
+  @param {string} [id] - Element id. Needed only when controls sit outside.
+  @param {string} [layout] - grid | carousel, desktop. Default grid.
+  @param {string} [layout_mobile] - grid | carousel. Default carousel.
+  @param {string} [classes] - Extra classes for the element.
+  @param {number} [columns_desktop] - Default 4.
+  @param {number} [columns_tablet] - Default 2.
+  @param {number} [columns_mobile] - Default 1.
+  @param {number} [count] - Slide count, for the loop guard in `carousel-options`.
+
+  @example
+    <swiper-carousel {% render 'carousel-shell-attrs', settings: section.settings %}>
+{% enddoc %}
+
+{%- liquid
+  assign layout_desktop = layout | default: 'grid'
+  assign layout_mob = layout_mobile | default: 'carousel'
+  assign cols_desktop = columns_desktop | default: 4
+  assign cols_tablet = columns_tablet | default: 2
+  assign cols_mobile = columns_mobile | default: 1
+
+  assign pagination = settings.carousel_pagination | default: 'none'
+  assign nav_place = settings.carousel_nav_position | default: 'outside'
+
+  assign inline_style = '--columns-desktop: ' | append: cols_desktop
+  assign inline_style = inline_style | append: '; --columns-tablet: ' | append: cols_tablet
+  assign inline_style = inline_style | append: '; --columns-mobile: ' | append: cols_mobile | append: ';'
+-%}
+{% if id %}id="{{ id }}"{% endif %}
+  class="carousel-shell swiper carousel-shell--nav-{{ nav_place }} {{ classes }}"
+  data-layout="{{ layout_desktop }}"
+  data-layout-mobile="{{ layout_mob }}"
+  data-options="
+    {%- render 'carousel-options',
+        settings: settings,
+        count: count,
+        columns_desktop: cols_desktop,
+        columns_tablet: cols_tablet,
+        columns_mobile: cols_mobile,
+        pagination: pagination -%}
+  "
+  style="{{ inline_style }}{% render 'carousel-vars',
+      settings: settings,
+      columns_desktop: cols_desktop,
+      columns_tablet: cols_tablet,
+      columns_mobile: cols_mobile %}{% render 'carousel-style', settings: settings %}"

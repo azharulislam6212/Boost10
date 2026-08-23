@@ -1,0 +1,94 @@
+{% doc %}
+  Everything a `<swiper-carousel>` carries after its track: the arrows, the
+  pagination, the pause button and the live region.
+
+  The other half of `carousel-shell-attrs.liquid`. See that file for why the
+  shell is split for block-driven carousels.
+
+  Every element here opens and closes inside this file, so nothing is left
+  hanging across a file boundary.
+
+  @param {object} settings - The section's settings.
+  @param {string} [layout] - grid | carousel, desktop. Default grid.
+  @param {string} [layout_mobile] - grid | carousel. Default carousel.
+  @param {boolean} [nav] - Render the arrows. Defaults to the theme setting.
+
+  @example
+    {% render 'carousel-shell-tail', settings: section.settings %}
+{% enddoc %}
+
+{%- liquid
+  assign layout_desktop = layout | default: 'grid'
+  assign layout_mob = layout_mobile | default: 'carousel'
+
+  # `false == blank` is true in Liquid, so a plain blank check treats "off" as
+  # "not set" and turns the arrows back on. `nil` is the only value that means
+  # "the caller said nothing".
+  assign show_nav = settings.carousel_navigation
+  if show_nav == nil
+    assign show_nav = true
+  endif
+  unless nav == nil
+    assign show_nav = nav
+  endunless
+
+  assign pagination = settings.carousel_pagination | default: 'none'
+
+  # Controls and pagination are only ever reachable when at least one breakpoint
+  # is actually a carousel. Rendering them for a grid-at-every-width section
+  # would put focusable buttons in the tab order that do nothing.
+  assign is_carousel = false
+  if layout_desktop == 'carousel' or layout_mob == 'carousel'
+    assign is_carousel = true
+  endif
+
+  # `controls` carries its own arrows, so the bare pair would be a duplicate.
+  assign use_controls = false
+  if pagination == 'controls'
+    assign use_controls = true
+  endif
+-%}
+
+{%- if is_carousel and use_controls -%}
+  {% render 'carousel-controls', settings: settings %}
+{%- else -%}
+  {%- if is_carousel and show_nav -%}
+    {% render 'carousel-nav', settings: settings %}
+  {%- endif -%}
+
+  {%- if is_carousel and pagination != 'none' -%}
+    {% render 'carousel-pagination', style: pagination %}
+  {%- endif -%}
+{%- endif -%}
+
+{%- if is_carousel -%}
+  {%- comment -%}
+    Rendered whenever autoplay is available rather than only when it is on,
+    because the component reveals it the moment autoplay starts and a control
+    that appears late is one a keyboard user has already tabbed past.
+  {%- endcomment -%}
+  {%- if settings.carousel_autoplay -%}
+    <button
+      type="button"
+      class="carousel-shell__pause"
+      data-ref="pause"
+      aria-pressed="false"
+      hidden
+    >
+      <span class="carousel-shell__pause-glyph carousel-shell__pause-glyph--pause">
+        {% render 'icon', icon: 'pause', size: 14 %}
+      </span>
+      <span class="carousel-shell__pause-glyph carousel-shell__pause-glyph--play">
+        {% render 'icon', icon: 'play', size: 14 %}
+      </span>
+      <span class="visually-hidden carousel-shell__pause-glyph carousel-shell__pause-glyph--pause">
+        {{ 'accessibility.pause_slideshow' | t }}
+      </span>
+      <span class="visually-hidden carousel-shell__pause-glyph carousel-shell__pause-glyph--play">
+        {{ 'accessibility.play_slideshow' | t }}
+      </span>
+    </button>
+  {%- endif -%}
+
+  <p class="visually-hidden" data-ref="status" role="status"></p>
+{%- endif -%}

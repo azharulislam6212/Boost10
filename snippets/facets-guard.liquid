@@ -1,84 +1,72 @@
 {%- comment -%}
-  Phase 6 — the `snippets/facets.liquid` edit outstanding since Phase 2.
+  The filter groups, and the guard that lets one be rendered on its own.
 
-  `facets-horizontal.liquid` renders one dropdown per filter group and calls
-  this snippet once per group with `filter:` set. Without the guard below,
-  every dropdown renders every filter, so a store with five filters shows
-  twenty-five filter groups.
+  Written as a separate file for two reasons.
 
-  Two edits, both small.
+  The body below is around eighty lines of `case f.type` covering price ranges,
+  checkboxes and swatches. It is needed twice - once inside a disclosure and once
+  without - and pasting it into both branches means the next change to swatch
+  rendering has to be made twice, and the two copies drift.
+
+  And a layout that renders one dropdown per filter group calls this once per
+  group with `filter:` set. Without the guard, every dropdown would render every
+  filter: five filters would show twenty-five groups.
+
+  `snippets/facets.liquid` renders this once, with no `filter`, which is every
+  group in a disclosure - exactly what it drew inline before.
 {%- endcomment -%}
 
+{% doc %}
+  The filter group list.
 
-{%- comment -%} ============================================================
-  EDIT 1 — the `{%- liquid -%}` block at the top (currently lines 22–25)
-  ============================================================ {%- endcomment -%}
+  @param {object} results - The collection or search result set being filtered.
+  @param {string} [context] - sidebar | drawer | horizontal. Default sidebar.
+  @param {object} [filter] - Render this one group only. Used by a per-group layout.
+
+  @example
+    {% render 'facets-guard', results: collection, context: 'sidebar' %}
+
+  @example
+    {% render 'facets-guard', results: collection, context: 'horizontal', filter: f %}
+{% enddoc %}
 
 {%- liquid
   assign layout = context | default: 'sidebar'
-  assign sort_options = results.sort_options
-  assign current_sort = results.sort_by | default: results.default_sort_by
 
-  # A single filter can be passed in, which is how the horizontal layout asks
-  # for one group at a time. Wrapping it in an array rather than branching the
-  # loop keeps one `{% for %}` below — the alternative duplicates the whole
-  # group body, which is 80 lines and the exact duplication this refactor has
-  # been removing everywhere else.
-  if filter
-    assign filters_to_render = filter | concat: empty_array
-  else
-    assign filters_to_render = results.filters
-  endif
+  comment
+    Every filter, then skipped inside the loop when the caller asked for one.
 
-  # The horizontal layout supplies its own summary button and popover, so the
-  # `<details>` wrapper below would nest a disclosure inside a disclosure.
+    Building a one-item array instead needs `concat`, and `concat` needs an array
+    on both sides - Liquid has no array literal, and an undefined variable is nil
+    rather than an empty array, so that route returns nothing and the caller
+    renders no filters at all. Skipping inside the loop costs one wasted
+    iteration per filter and cannot fail that way.
+  endcomment
+  assign filters_to_render = results.filters
+
+  comment
+    A per-group layout supplies its own summary button and popover, so the
+    disclosure wrapper here would nest a disclosure inside a disclosure.
+  endcomment
   assign wrap_in_details = true
   if layout == 'horizontal'
     assign wrap_in_details = false
   endif
 -%}
 
-
-{%- comment -%} ============================================================
-  NOTE on `filter | concat: empty_array`
-
-  Liquid has no array literal. `concat` needs an array on both sides, and an
-  undefined variable is `nil`, not an empty array — so `filter | concat: nil`
-  fails silently and returns nothing.
-
-  If your Liquid version rejects the line above, use this instead, which is
-  uglier but works everywhere:
-
-    {%- assign filters_to_render = '' | split: '' -%}
-    {%- if filter -%}
-      {%- assign filters_to_render = filters_to_render | concat: filter -%}
-    {%- endif -%}
-
-  Simplest of all, if you prefer: keep `results.filters` and skip non-matching
-  filters inside the loop with
-
-    {%- if filter and f.param_name != filter.param_name -%}{%- continue -%}{%- endif -%}
-
-  That costs one wasted iteration per filter and needs no array construction.
-  ============================================================ {%- endcomment -%}
-
-
-{%- comment -%} ============================================================
-  EDIT 2 — the filter loop (currently lines 61–71)
-
-  Replace the `{%- for filter in results.filters -%}` line and its `<details>`
-  wrapper with the block below. Everything inside `.facets__group-content`
-  stays exactly as it is.
-
-  The loop variable is renamed to `f` because `filter` is now the incoming
-  parameter, and shadowing it would make the guard above unreadable.
-  ============================================================ {%- endcomment -%}
-
 <accordion-element
   class="facets__groups"
   data-collapse-below="{% if layout == 'drawer' %}0{% else %}750{% endif %}"
 >
   {%- for f in filters_to_render -%}
+    {%- comment -%}
+      The guard. The loop variable is `f` because `filter` is the incoming
+      parameter, and shadowing it would make this line unreadable.
+    {%- endcomment -%}
+    {%- if filter != blank and f.param_name != filter.param_name -%}
+      {%- continue -%}
+    {%- endif -%}
+
     {%- if wrap_in_details -%}
       <details class="facets__group" data-default-open {% if f.active_values.size > 0 %}open{% endif %}>
         <summary class="facets__summary">
@@ -90,39 +78,169 @@
         </summary>
 
         <div class="facets__group-content">
-          {%- comment -%} …existing filter body, with `filter` renamed to `f`… {%- endcomment -%}
+        {%- case f.type -%}
+          {%- when 'price_range' -%}
+            <price-range
+              class="price-range"
+              data-min="0"
+              data-max="{{ f.range_max }}"
+            >
+              <div class="price-range__inputs">
+                <label class="visually-hidden" for="{{ f.min_value.param_name }}-{{ layout }}">
+                  {{ 'products.facets.price_from' | t }}
+                </label>
+                <input
+                  id="{{ f.min_value.param_name }}-{{ layout }}"
+                  data-ref="min"
+                  type="number"
+                  name="{{ f.min_value.param_name }}"
+                  value="{{ f.min_value.value | money_without_currency | replace: ',', '' }}"
+                  min="0"
+                  max="{{ f.range_max | money_without_currency | replace: ',', '' }}"
+                  inputmode="numeric"
+                  placeholder="0"
+                >
+
+                <label class="visually-hidden" for="{{ f.max_value.param_name }}-{{ layout }}">
+                  {{ 'products.facets.price_to' | t }}
+                </label>
+                <input
+                  id="{{ f.max_value.param_name }}-{{ layout }}"
+                  data-ref="max"
+                  type="number"
+                  name="{{ f.max_value.param_name }}"
+                  value="{{ f.max_value.value | money_without_currency | replace: ',', '' }}"
+                  min="0"
+                  max="{{ f.range_max | money_without_currency | replace: ',', '' }}"
+                  inputmode="numeric"
+                  placeholder="{{ f.range_max | money_without_currency | replace: ',', '' }}"
+                >
+              </div>
+
+              <div class="price-range__track" data-ref="track" aria-hidden="true">
+                <span class="price-range__fill" data-ref="fill"></span>
+              </div>
+
+              <output class="price-range__output" data-ref="output"></output>
+              <p class="price-range__max">
+                {{ 'products.facets.max_price_html' | t: price: f.range_max | money }}
+              </p>
+            </price-range>
+
+          {%- else -%}
+            <ul class="facets__values" role="list">
+              {%- for value in f.values -%}
+                <li class="facets__value">
+                  <label class="facets__checkbox">
+                    <input
+                      type="checkbox"
+                      name="{{ value.param_name }}"
+                      value="{{ value.value }}"
+                      {% if value.active %}checked{% endif %}
+                      {% if value.count == 0 and value.active == false %}disabled{% endif %}
+                    >
+
+                    {%- if f.presentation == 'swatch' -%}
+                      {% render 'swatch',
+                         value: value.label,
+                         option_name: f.label,
+                         option_value: value,
+                         size: 'small' %}
+                    {%- else -%}
+                      <span class="facets__value-label">{{ value.label }}</span>
+                    {%- endif -%}
+
+                    <span class="facets__value-count">({{ value.count }})</span>
+                  </label>
+                </li>
+              {%- endfor -%}
+            </ul>
+        {%- endcase -%}
         </div>
       </details>
     {%- else -%}
-      {%- comment -%}
-        Horizontal: no disclosure wrapper, because the dropdown's `<summary>`
-        already is one. The body is identical, which is why it should be moved
-        into its own snippet rather than written twice — see the note below.
-      {%- endcomment -%}
       <div class="facets__group facets__group--flat">
         <div class="facets__group-content">
-          {%- comment -%} …existing filter body, with `filter` renamed to `f`… {%- endcomment -%}
+        {%- case f.type -%}
+          {%- when 'price_range' -%}
+            <price-range
+              class="price-range"
+              data-min="0"
+              data-max="{{ f.range_max }}"
+            >
+              <div class="price-range__inputs">
+                <label class="visually-hidden" for="{{ f.min_value.param_name }}-{{ layout }}">
+                  {{ 'products.facets.price_from' | t }}
+                </label>
+                <input
+                  id="{{ f.min_value.param_name }}-{{ layout }}"
+                  data-ref="min"
+                  type="number"
+                  name="{{ f.min_value.param_name }}"
+                  value="{{ f.min_value.value | money_without_currency | replace: ',', '' }}"
+                  min="0"
+                  max="{{ f.range_max | money_without_currency | replace: ',', '' }}"
+                  inputmode="numeric"
+                  placeholder="0"
+                >
+
+                <label class="visually-hidden" for="{{ f.max_value.param_name }}-{{ layout }}">
+                  {{ 'products.facets.price_to' | t }}
+                </label>
+                <input
+                  id="{{ f.max_value.param_name }}-{{ layout }}"
+                  data-ref="max"
+                  type="number"
+                  name="{{ f.max_value.param_name }}"
+                  value="{{ f.max_value.value | money_without_currency | replace: ',', '' }}"
+                  min="0"
+                  max="{{ f.range_max | money_without_currency | replace: ',', '' }}"
+                  inputmode="numeric"
+                  placeholder="{{ f.range_max | money_without_currency | replace: ',', '' }}"
+                >
+              </div>
+
+              <div class="price-range__track" data-ref="track" aria-hidden="true">
+                <span class="price-range__fill" data-ref="fill"></span>
+              </div>
+
+              <output class="price-range__output" data-ref="output"></output>
+              <p class="price-range__max">
+                {{ 'products.facets.max_price_html' | t: price: f.range_max | money }}
+              </p>
+            </price-range>
+
+          {%- else -%}
+            <ul class="facets__values" role="list">
+              {%- for value in f.values -%}
+                <li class="facets__value">
+                  <label class="facets__checkbox">
+                    <input
+                      type="checkbox"
+                      name="{{ value.param_name }}"
+                      value="{{ value.value }}"
+                      {% if value.active %}checked{% endif %}
+                      {% if value.count == 0 and value.active == false %}disabled{% endif %}
+                    >
+
+                    {%- if f.presentation == 'swatch' -%}
+                      {% render 'swatch',
+                         value: value.label,
+                         option_name: f.label,
+                         option_value: value,
+                         size: 'small' %}
+                    {%- else -%}
+                      <span class="facets__value-label">{{ value.label }}</span>
+                    {%- endif -%}
+
+                    <span class="facets__value-count">({{ value.count }})</span>
+                  </label>
+                </li>
+              {%- endfor -%}
+            </ul>
+        {%- endcase -%}
         </div>
       </div>
     {%- endif -%}
   {%- endfor -%}
 </accordion-element>
-
-
-{%- comment -%} ============================================================
-  RECOMMENDED — extract the body
-
-  The filter body is around 80 lines of `{% case filter.type %}` covering price
-  ranges, checkboxes and swatches. Pasting it into both branches above means
-  the next change to swatch rendering has to be made twice, and the two copies
-  will drift the way the carousel branches did.
-
-  Cut everything currently between `<div class="facets__group-content">` and
-  its closing tag into `snippets/facet-group.liquid`, taking `filter` and
-  `layout` as parameters, then call it from both branches:
-
-    {% render 'facet-group', filter: f, layout: layout, results: results %}
-
-  That is a mechanical move — no logic changes — and it makes the two branches
-  above four lines each.
-  ============================================================ {%- endcomment -%}

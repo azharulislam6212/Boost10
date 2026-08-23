@@ -15,34 +15,66 @@
   rendered.
 {% endcomment %}
 
-{% capture product_media_gallery %}
-  {%- content_for 'block',
-    type: '_product-media-gallery',
-    id: 'media-gallery',
-    closest.product: closest.product
-  -%}
-{% endcapture %}
+{%- comment -%}
+  The layout is written here rather than in `snippets/product-main-content.liquid`.
 
-{% capture product_details %}
-  {%- content_for 'block',
-    type: '_product-details',
-    id: 'product-details',
-    closest.product: closest.product
-  -%}
-{% endcapture %}
+  Every column on this page is a theme block, and `{% content_for %}` cannot have
+  its output captured - theme-check reports it as an error, because Shopify
+  renders blocks with their editor bindings attached and buffering that output
+  into a variable is not something the platform supports. Handing three captured
+  strings to a wrapper snippet was exactly that, three times over.
 
-{% capture additional_blocks %}
-  {%- content_for 'blocks' -%}
-{% endcapture %}
+  The wrapper was thirty lines and had one caller, so it moves here whole. Same
+  markup, same classes, same `--media-column`.
+{%- endcomment -%}
+{%- liquid
+  comment
+    A product with one image does not need half the page for it. The gallery
+    column narrows, which keeps the buy button closer to the top of the fold.
+  endcomment
+  assign media_column = '1fr'
+  if closest.product.media.size == 1
+    assign media_column = '0.9fr'
+  endif
+-%}
 
-{% render 'product-main-content',
-  section_id: section.id,
-  section_settings: section.settings,
-  media_gallery: product_media_gallery,
-  product_details: product_details,
-  additional_blocks: additional_blocks,
-  media_count: closest.product.media.size
-%}
+<div
+  class="main-product color-{{ section.settings.color_scheme }}"
+  data-section-id="{{ section.id }}"
+  data-product-root
+  {% render 'spacing', section: section.settings %}
+>
+  <div class="{% render 'container', width: section.settings.container_width %}">
+    <div class="main-product__layout" style="--media-column: {{ media_column }};">
+      <div class="main-product__media">
+        {%- content_for 'block',
+          type: '_product-media-gallery',
+          id: 'media-gallery',
+          closest.product: closest.product
+        -%}
+      </div>
+
+      <div class="main-product__info">
+        {%- content_for 'block',
+          type: '_product-details',
+          id: 'product-details',
+          closest.product: closest.product
+        -%}
+      </div>
+    </div>
+
+    {%- comment -%}
+      The merchant's own blocks. Previously wrapped in `{% if additional_blocks
+      != blank %}`, which a capture made possible and `content_for` does not:
+      there is no string to test. The wrapper is now always present and empty
+      when the merchant has added nothing - an empty `<div>` with no padding of
+      its own, which changes nothing on the page.
+    {%- endcomment -%}
+    <div class="main-product__blocks">
+      {%- content_for 'blocks' -%}
+    </div>
+  </div>
+</div>
 
 {%- if section.settings.enable_sticky_atc -%}
   <sticky-add-to-cart

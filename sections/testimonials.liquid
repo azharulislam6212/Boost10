@@ -26,11 +26,57 @@
       </div>
     {%- endif -%}
 
-    {%- capture children -%}
-      {% content_for 'blocks' %}
-    {%- endcapture -%}
+{%- comment -%}
+      The carousel element, written here rather than through
+      `snippets/carousel-shell.liquid`.
 
-    {% render 'carousel-shell', children: children, layout: section.settings.layout, layout_mobile: section.settings.layout_mobile, tag: 'div', label: 'sections.testimonials.carousel_label', classes: 'testimonials__carousel', track_classes: 'testimonials__grid', columns_desktop: section.settings.columns_desktop, columns_tablet: section.settings.columns_tablet, columns_mobile: section.settings.columns_mobile, settings: section.settings %}
+      Its slides are theme blocks, and `{% content_for %}` cannot have its output
+      captured - theme-check reports it as an error, because Shopify renders
+      blocks with their editor bindings attached and buffering that output into a
+      variable is not something the platform supports. Handing slides to the shell
+      snippet meant capturing them first.
+
+      The shell is not duplicated. `carousel-shell-attrs` writes the element's
+      attributes and `carousel-shell-tail` writes the arrows, pagination, pause
+      button and live region - the same markup `carousel-shell.liquid` emits, from
+      the same sub-snippets. Only the element and its track live here, which is
+      the minimum that lets `content_for` sit inside the track.
+    {%- endcomment -%}
+    {%- liquid
+      assign cs_layout = section.settings.layout
+      assign cs_layout_mobile = section.settings.layout_mobile
+      assign cs_label = 'sections.testimonials.carousel_label' | t
+
+      assign cs_is_carousel = false
+      if cs_layout == 'carousel' or cs_layout_mobile == 'carousel'
+        assign cs_is_carousel = true
+      endif
+    -%}
+
+    <swiper-carousel
+      {% render 'carousel-shell-attrs',
+         settings: section.settings,
+         layout: cs_layout,
+         layout_mobile: cs_layout_mobile,
+         classes: 'testimonials__carousel',
+         columns_desktop: section.settings.columns_desktop,
+         columns_tablet: section.settings.columns_tablet,
+         columns_mobile: section.settings.columns_mobile %}
+    >
+      <div
+        class="carousel-shell__track testimonials__grid"
+        data-ref="track"
+        {% if cs_is_carousel %}aria-label="{{ cs_label | escape }}"{% endif %}
+      >
+        {% content_for 'blocks' %}
+      </div>
+
+      {% render 'carousel-shell-tail',
+         settings: section.settings,
+         layout: cs_layout,
+         layout_mobile: cs_layout_mobile %}
+    </swiper-carousel>
+
   </div>
 </div>
 
