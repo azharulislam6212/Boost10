@@ -391,7 +391,8 @@ export class NavMenu extends BaseComponent {
       event.stopPropagation();
       const summary = open.querySelector('[data-nav-summary]');
       this.close(/** @type {HTMLDetailsElement} */ (open));
-      /** @type {HTMLElement|null} */ (summary)?.focus();
+      // In the sticky header too - see `MarketPicker.show()`.
+      /** @type {HTMLElement|null} */ (summary)?.focus({ preventScroll: true });
       return;
     }
 
@@ -412,7 +413,9 @@ export class NavMenu extends BaseComponent {
 
     event.preventDefault();
     const step = event.key === 'ArrowRight' ? 1 : -1;
-    stops[(current + step + stops.length) % stops.length]?.focus();
+    // Arrow-key movement between top-level items, all of them in the sticky
+    // header. Scrolling to a document position here would be the same jump.
+    stops[(current + step + stops.length) % stops.length]?.focus({ preventScroll: true });
   }
 
   /** @private */
@@ -689,7 +692,9 @@ export class MarketPicker extends BaseComponent {
       if (event.key !== 'Escape' || !this.open) return;
       event.stopPropagation();
       this.close();
-      /** @type {HTMLElement} */ (this.refs.trigger).focus();
+      // Same reason as `show()`: the trigger sits in the sticky header, and
+      // scrolling to its document position would throw the page to the top.
+      /** @type {HTMLElement} */ (this.refs.trigger).focus({ preventScroll: true });
     });
 
     this.on(document, 'click', (event) => {
@@ -747,12 +752,24 @@ export class MarketPicker extends BaseComponent {
     // desktop widths it is display:none, and focusing a hidden field puts the
     // caret nowhere and swallows the next keystroke.
     const filter = /** @type {HTMLElement|undefined} */ (this.refs.filter);
+    // `preventScroll`, and this is the whole of the country-picker jump.
+    //
+    // `focus()` scrolls the focused element into view. The header is pinned by
+    // `position: sticky`, so it is at the top of the *viewport* while its place
+    // in the *document* is at the top of the page - and it is the document
+    // position the browser scrolls to. Opening the picker therefore threw the
+    // page back to the top, every time, and only ever once the header had stuck.
+    //
+    // The panel is already on screen when it opens, so there was nothing to
+    // scroll to in the first place.
     if (filter && getComputedStyle(filter).display !== 'none') {
-      filter.focus();
+      filter.focus({ preventScroll: true });
       return;
     }
 
-    /** @type {HTMLElement|null} */ (this.refs.menu.querySelector('[data-option]'))?.focus();
+    /** @type {HTMLElement|null} */ (this.refs.menu.querySelector('[data-option]'))?.focus({
+      preventScroll: true,
+    });
   }
 
   close() {

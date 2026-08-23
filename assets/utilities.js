@@ -977,8 +977,6 @@ export function getCssVar(name, target = document.documentElement) {
  */
 let scrollLockCount = 0;
 
-/** @type {number} */
-let lockedScrollTop = 0;
 
 /**
  * Freezes page scrolling while an overlay is open.
@@ -999,17 +997,25 @@ export function lockScroll() {
   scrollLockCount += 1;
   if (scrollLockCount > 1) return;
 
+  // `overflow: hidden` on the root, and nothing else.
+  //
+  // This used to pin the body: `position: fixed` with `top: -scrollY`. That
+  // stops the page scrolling, and it also takes the body out of flow - which
+  // leaves `position: sticky` with no scrolling ancestor to stick to. The header
+  // stopped being pinned and dropped back to where it sits in the document,
+  // which is the top of the page. Opening a country picker or a drawer therefore
+  // looked like the page had jumped to the top; closing it put the scroll back
+  // and the header re-stuck, which looked like the header dropping down.
+  //
+  // The root overflow does the same job without moving anything. The scroll
+  // position is untouched, so there is nothing to restore and nothing to jump.
   const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
-  lockedScrollTop = window.scrollY;
 
   document.documentElement.style.setProperty('--scrollbar-width', `${scrollbarWidth}px`);
   document.documentElement.classList.add('scroll-locked');
 
-  document.body.style.position = 'fixed';
-  document.body.style.insetInlineStart = '0';
-  document.body.style.insetInlineEnd = '0';
-  document.body.style.top = `-${lockedScrollTop}px`;
-
+  // Stopped before the class lands, so the smooth scroller is not still
+  // animating into a page that has just stopped scrolling.
   document.querySelector('smooth-scrollbar')?.stop?.();
 }
 
@@ -1024,12 +1030,10 @@ export function unlockScroll() {
   document.documentElement.classList.remove('scroll-locked');
   document.documentElement.style.removeProperty('--scrollbar-width');
 
-  document.body.style.position = '';
-  document.body.style.insetInlineStart = '';
-  document.body.style.insetInlineEnd = '';
-  document.body.style.top = '';
-
-  window.scrollTo({ top: lockedScrollTop, behavior: 'auto' });
+  // No `scrollTo` here. The page never moved, so putting it back is what used to
+  // move it: the stored offset was read before the lock and written after it,
+  // and any drift between the two - a smooth scroller mid-animation, a resize,
+  // an anchor - arrived as a jump the moment an overlay closed.
   document.querySelector('smooth-scrollbar')?.start?.();
 }
 

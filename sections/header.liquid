@@ -44,9 +44,53 @@
 {% endcomment %}
 
 
+{%- comment -%}
+  The panel bay, rendered here and printed further down.
+
+  Only the *evaluation* moves up. The markup is still output in the same place,
+  inside `<sticky-header>`, where `<nav-menu>` looks for it.
+
+  The navigation has to know which menu items have a panel before it renders,
+  and this is the only place that knowledge exists. `section.blocks` does not
+  answer it - the mega menus are theme blocks rendered through `content_for`,
+  and iterating that collection here returns nothing for them. The panels
+  themselves are not in doubt: each one carries `data-menu-item="<name>"`,
+  written by `blocks/mega-menu.liquid`. Reading the markup answers the question
+  exactly, from the same source `<nav-menu>` uses when it moves a panel into
+  place.
+
+  Theme Check reports this capture as `CaptureOnContentForBlock`. That is a real
+  rule and this is a real exception to it: without the capture the arrow cannot
+  be in the HTML the server sends, and an arrow added afterwards by JavaScript
+  widens the item and slides the whole navigation sideways on every page load.
+{%- endcomment -%}
+{%- capture header_bay -%}
+  {% content_for 'blocks' %}
+{%- endcapture -%}
+
 {%- liquid
   assign st = section.settings
   assign menu = st.menu
+
+  # ---- which menu items have a mega menu ----------------------------------
+  #
+  # Split on the attribute, drop the text before the first one, and take each
+  # value up to its closing quote.
+  #
+  # `escape` on both sides, because the attribute was written escaped and a menu
+  # item called "Gut & Digestion" is `Gut &amp; Digestion` in the markup.
+  # `downcase` on both sides, because typing a name into a block setting is not
+  # the place to demand exact case. The pipes stop "Sale" matching inside
+  # "Sale Items".
+  assign mega_menu_items = ''
+  assign mega_chunks = header_bay | split: 'data-menu-item="'
+
+  for mega_chunk in mega_chunks offset: 1
+    assign mega_key = mega_chunk | split: '"' | first | strip | downcase
+    if mega_key != blank
+      assign mega_menu_items = mega_menu_items | append: '|' | append: mega_key | append: '|'
+    endif
+  endfor
 
   # ---- height -------------------------------------------------------------
   case st.header_height
@@ -131,7 +175,7 @@
 {%- endcapture -%}
 
 {%- capture fragment_nav -%}
-  {% render 'header-nav', menu: menu %}
+  {% render 'header-nav', menu: menu, mega_menu_items: mega_menu_items %}
 {%- endcapture -%}
 
 {%- comment -%}
@@ -394,7 +438,7 @@
     instead of appearing loose at the top of the page.
   {%- endcomment -%}
   <div class="site-header__bay" data-nav-bay hidden>
-    {% content_for 'blocks' %}
+    {{ header_bay }}
   </div>
 </sticky-header>
 
