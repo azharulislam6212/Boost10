@@ -132,12 +132,18 @@
 -%}
 
 {%- comment -%}
-  Shopify serves font files from a different origin than the CDN already
-  preconnected in the layout, so the handshake is worth opening early.
+  No preconnect to `fonts.shopifycdn.com` either.
+
+  The two preloads below point at that origin and sit on the next lines of the
+  same head, so the browser opens the connection for them regardless. The
+  preconnect was asking for a handshake that a request two lines later was about
+  to ask for anyway - it bought no measurable time and cost a slot against the
+  four a page should keep.
+
+  A preload is the stronger hint of the two in any case: it opens the connection
+  *and* fetches the file, at high priority, rather than opening a connection and
+  hoping something uses it.
 {%- endcomment -%}
-{%- unless body_font.system? and heading_font.system? -%}
-  <link rel="preconnect" href="https://fonts.shopifycdn.com" crossorigin>
-{%- endunless -%}
 
 {%- unless body_font.system? -%}
   <link rel="preload" as="font" href="{{ preload_body | font_url }}" type="font/woff2" crossorigin>

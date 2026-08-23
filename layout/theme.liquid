@@ -36,7 +36,17 @@
     {%- endif -%}
 
     <link rel="canonical" href="{{ canonical_url }}">
-    <link rel="preconnect" href="https://cdn.shopify.com" crossorigin>
+    {%- comment -%}
+      No preconnect to `cdn.shopify.com` here.
+    
+      Shopify already sends it as an HTTP `Link:` header, once plain and once
+      with `crossorigin` - a Lighthouse report lists both under Preconnected
+      origins, sourced from the response headers rather than from markup. A
+      header hint arrives with the response, before a single byte of this
+      document has been parsed, so it is strictly earlier than the tag that
+      used to be here. The tag opened nothing new and spent one of the four
+      preconnects a page is advised to keep.
+    {%- endcomment -%}
 
     {%- comment -%} ---------- Favicons ---------- {%- endcomment -%}
     {%- if settings.favicon != blank -%}
@@ -56,16 +66,12 @@
       The meta description, with somewhere to fall back to.
 
       This used to render only when `page_description` was set, and that field is
-      empty until someone fills it in. A new store therefore shipped no
-      description at all on any page - which is the Lighthouse failure, and worse
-      than the audit suggests: with no description, search results quote whatever
-      text the crawler finds first, usually the announcement bar or the menu.
+      empty until someone fills it in - so a new store shipped no description on
+      any page. With none, search results quote whatever text the crawler finds
+      first, usually the announcement bar or the menu.
 
-      The merchant's own words still win. The chain below only runs when the SEO
-      field is empty, and it takes the next most specific text the page already
-      has: the product's description, the collection's, the article's, the page's
-      body. `truncate` at 160 because search results cut somewhere around there
-      and a sentence ending mid-word reads as neglect.
+      The merchant's own words still win: the chain runs only when the SEO field
+      is empty, and takes the next most specific text the page already has.
     {%- endcomment -%}
     {%- liquid
       assign meta_description = page_description
@@ -85,9 +91,6 @@
         endcase
       endif
 
-      # The store's own description, then its name. The last one is thin, but a
-      # thin description is still a description, and it is the difference
-      # between a search result that names the shop and one that quotes the menu.
       if meta_description == blank
         assign meta_description = shop.description
       endif
