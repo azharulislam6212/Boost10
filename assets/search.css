@@ -59,7 +59,7 @@
     /* Frosted panels. 5px is enough to separate the panel from the page without
        turning the page into wallpaper. */
     --search-glass-blur: 5px;
-    --search-glass-opacity: 0.3;
+    --search-glass-opacity: 0.8;
 
     /* How far the modal sits below the header. `--header-height` is published by
        `<sticky-header>` on every resize; the `max()` keeps a sensible gap on a
@@ -382,6 +382,69 @@
     color: var(--color-primary-button-hover-text);
   }
 
+  /* ---- loading spinner ----
+
+     Stacked on the magnifier inside the submit circle. Both are absolutely
+     centred in the same box and the swap is two opacity changes, so the control
+     never changes size and nothing in the field moves while a request is in
+     flight. A loader that occupies its own space would shove the field's
+     contents sideways on every keystroke. */
+  /* Declared on the plain class, not the overlay one, so the 404 page's field
+     stacks its spinner the same way. */
+  .search-form__submit {
+    position: relative;
+    display: grid;
+    place-items: center;
+  }
+
+  .search-form__submit .icon,
+  .search-form__spinner {
+    grid-area: 1 / 1;
+    transition: opacity var(--transition-fast);
+  }
+
+  .search-form__spinner {
+    inline-size: 1.8rem;
+    block-size: 1.8rem;
+    border: 2px solid currentColor;
+
+    /* One quarter left open is what makes the rotation readable — a complete
+       ring spinning looks static. */
+    border-block-start-color: transparent;
+    border-radius: 50%;
+    opacity: 0;
+    animation: search-spin 700ms linear infinite;
+
+    /* Paused until it is needed. An animation running behind `opacity: 0` on
+       every page costs a compositor frame for something nobody can see. */
+    animation-play-state: paused;
+  }
+
+  .predictive-search[data-loading] .search-form__submit .icon {
+    opacity: 0;
+  }
+
+  .predictive-search[data-loading] .search-form__spinner {
+    opacity: 1;
+    animation-play-state: running;
+  }
+
+  /* The results already on screen belong to the previous query. Dimming them
+     says so, and says it without moving anything. */
+  .predictive-search__panel {
+    transition: opacity var(--transition-base);
+  }
+
+  .predictive-search[data-loading] .predictive-search__panel {
+    opacity: 0.55;
+  }
+
+  @keyframes search-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
   /* One control's width plus a 16px gap clear of the submit circle, measured
      from the same inset — so the pair stays evenly spaced if either size
      changes. */
@@ -561,6 +624,40 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-3);
+  }
+
+  /* ---- placeholder rows ----
+
+     The example rows shown when the merchant has not picked any suggestion
+     products. They borrow the card's own classes, so only what marks them as
+     examples is set here: no pointer, muted copy, and a placeholder drawing
+     that fills the media tile at the card's 1:1 ratio. */
+  .search-card--placeholder {
+    cursor: default;
+  }
+
+  .search-card--placeholder .search-card__title,
+  .search-card--placeholder .search-card__meta,
+  .search-card--placeholder .search-card__price-current {
+    color: var(--color-accent-text);
+  }
+
+  .search-card__placeholder-svg {
+    inline-size: 100%;
+    block-size: 100%;
+    object-fit: cover;
+    fill: var(--color-border);
+    background-color: var(--search-tile);
+  }
+
+  /* Hover belongs to rows that go somewhere. */
+  .search-card--placeholder:hover {
+    background-color: transparent;
+  }
+
+  .predictive-search--overlay[data-layout='modal'] .search-card--placeholder:hover {
+    border-color: var(--color-border);
+    background-color: var(--color-background);
   }
 
   .search-panel__idle:empty {
@@ -973,6 +1070,24 @@
     .predictive-search .search-form__reset,
     .predictive-search .search-form__reset[data-visible] {
       transform: translateY(-50%);
+    }
+
+    /* The spinner still has to say "working", so it pulses in place rather than
+       rotating. Removing the animation outright would leave a static ring that
+       looks like a broken icon. */
+    .predictive-search[data-loading] .search-form__spinner {
+      animation: search-pulse 1.4s ease-in-out infinite;
+    }
+
+    @keyframes search-pulse {
+      0%,
+      100% {
+        opacity: 0.35;
+      }
+
+      50% {
+        opacity: 1;
+      }
     }
 
     /* `search.js` already stops rotating the prompt under reduced motion, so

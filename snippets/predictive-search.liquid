@@ -11,7 +11,6 @@
   field — moving it into the suggestions closes the mobile keyboard.
 
   ## Two variants, one snippet
-  
 
     overlay  The drawer and the modal. A head row with the field, a column of
              recent searches and suggested tags, and a results column that shows
@@ -109,7 +108,11 @@
     showing only collections still needs its way out.
   endcomment
   assign has_suggestions = false
-  if show_suggestion_products and suggestion_count > 0
+  comment
+    The products group counts even with nothing chosen, because it falls back to
+    placeholder rows — and a column with rows in it still needs its way out.
+  endcomment
+  if show_suggestion_products
     assign has_suggestions = true
   endif
   if show_suggestion_collections and suggestion_collection_count > 0
@@ -191,8 +194,17 @@
         {% render 'icon', icon: 'close', size: 16 %}
       </button>
 
+      {%- comment -%}
+        The spinner lives inside the submit control and sits on top of the
+        magnifier rather than beside it. Both are absolutely centred in the same
+        circle, so the swap is two opacity changes and nothing in the field
+        moves — a loader that takes its own space would push the field's
+        contents sideways on every keystroke.
+      {%- endcomment -%}
       <button type="submit" class="search-form__submit" aria-label="{{ 'search.submit' | t }}">
         {% render 'icon', icon: 'search', size: 18 %}
+        <span class="search-form__spinner" aria-hidden="true"></span>
+        <span class="visually-hidden" data-ref="busy"></span>
       </button>
     </form>
 
@@ -287,22 +299,32 @@
             popup, and `role="option"` on a list item that no listbox owns is
             invalid ARIA rather than a harmless extra attribute.
           {%- endcomment -%}
-          {%- if show_suggestion_products and suggestion_count > 0 -%}
+          {%- if show_suggestion_products -%}
             <section class="search-suggestions">
               <p class="search-group__title">
                 {{- settings.suggestion_text | default: 'Suggestion products' | escape -}}
               </p>
 
-              <ul class="search-group__items" role="list">
-                {%- for product in suggestion_products limit: 6 -%}
-                  {% render 'predictive-search-card',
-                     type: 'product',
-                     item: product,
-                     id: 'SearchSuggestionProduct-',
-                     index: forloop.index,
-                     selectable: false %}
-                {%- endfor -%}
-              </ul>
+              {%- if suggestion_count > 0 -%}
+                <ul class="search-group__items" role="list">
+                  {%- for product in suggestion_products limit: 6 -%}
+                    {% render 'predictive-search-card',
+                       type: 'product',
+                       item: product,
+                       id: 'SearchSuggestionProduct-',
+                       index: forloop.index,
+                       selectable: false %}
+                  {%- endfor -%}
+                </ul>
+              {%- else -%}
+                {%- comment -%}
+                  Nothing chosen yet. A heading over an empty column reads as a
+                  panel that failed to load, so the shape of the list is shown
+                  with example rows instead — clearly marked as examples, and
+                  not links.
+                {%- endcomment -%}
+                {% render 'predictive-search-placeholder', count: 3 %}
+              {%- endif -%}
             </section>
           {%- endif -%}
 

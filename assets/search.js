@@ -12,7 +12,6 @@
  * The whole thing degrades to a plain form. The input is a real `<input
  * type="search" name="q">` inside a `<form action="/search">`, so pressing Enter
  * with JavaScript disabled runs a normal search.
- * 
  *
  * Accessibility follows the combobox pattern: focus never leaves the input, and
  * the highlighted suggestion is tracked through `aria-activedescendant` by
@@ -429,10 +428,16 @@ export class PredictiveSearch extends BaseComponent {
 
       if (value.length < MIN_QUERY_LENGTH) {
         search.cancel?.();
+        this.#busy(false);
         this.close();
         return;
       }
 
+      // The spinner starts on the keystroke, not on the request. Waiting for
+      // the debounce to expire first leaves 300ms in which the customer has
+      // typed and nothing at all has acknowledged it — which is exactly the
+      // window that makes a search field feel dead.
+      this.#busy(true);
       search(value);
     });
 
@@ -497,6 +502,11 @@ export class PredictiveSearch extends BaseComponent {
     const cached = this.#cache.get(term);
     if (cached) {
       this.#render(cached, term);
+
+      // Nothing was fetched, so nothing is pending. The input handler turns the
+      // spinner on for every keystroke and this is the path where it would
+      // otherwise keep spinning over results that are already on screen.
+      this.#busy(false);
       return;
     }
 
@@ -504,7 +514,9 @@ export class PredictiveSearch extends BaseComponent {
     // one matters, and an out-of-order response would show results for a query
     // they have already moved past.
     this.#request?.abort();
-    this.#request = new AbortController();
+
+    const controller = new AbortController();
+    this.#request = controller;
 
     this.#busy(true);
 
@@ -512,7 +524,7 @@ export class PredictiveSearch extends BaseComponent {
       const html = await fetchSection(this.sectionId, {
         url: getRoute('predictiveSearch'),
         params: this.#params(term),
-        signal: this.#request.signal,
+        signal: controller.signal,
         cache: false
       });
 
@@ -527,8 +539,15 @@ export class PredictiveSearch extends BaseComponent {
       announceUrgent(message);
       this.close();
     } finally {
-      this.#busy(false);
-      this.#request = null;
+      // Only the newest request may clear the pending state. An aborted call
+      // reaches this line *after* its replacement has started, so the old
+      // `this.#request = null` was nulling the live controller — and clearing
+      // the spinner while a request was still in flight, which is the flicker
+      // between keystrokes.
+      if (this.#request === controller) {
+        this.#busy(false);
+        this.#request = null;
+      }
     }
   }
 
@@ -728,6 +747,13 @@ export class PredictiveSearch extends BaseComponent {
   #busy(busy) {
     this.toggleAttribute('data-loading', busy);
     this.refs.panel.setAttribute('aria-busy', busy ? 'true' : 'false');
+
+    // The spinner is `aria-hidden` decoration, so the state is given to a screen
+    // reader as words. Cleared rather than left to the results announcement,
+    // which never arrives when a request fails.
+    if (this.refs.busy instanceof HTMLElement) {
+      this.refs.busy.textContent = busy ? themeString('loading', '') : '';
+    }
   }
 
   /**

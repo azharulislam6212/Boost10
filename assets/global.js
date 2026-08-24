@@ -14,7 +14,6 @@
  *   3. Publish layout measurements — header height, announcement height — as
  *      custom properties, so sticky offsets are computed once rather than
  *      guessed in a dozen stylesheets.
- * 
  *
  * What it is not: a bootstrapper that news up controllers, a registry of
  * components, or a place for page-specific logic. Elements register themselves

@@ -1,0 +1,69 @@
+{% doc %}
+  Placeholder rows for the search panel's idle column.
+
+  Shown when the merchant has not chosen any suggestion products yet — in the
+  theme editor, where it lets them judge the panel's layout before configuring
+  it, and on a live storefront, where an empty column under a "Suggestion
+  products" heading looks like something that failed to load.
+
+  The copy is deliberately, visibly an example. `Example product` and a round
+  `$19.99` are Shopify's own onboarding convention: a customer who sees them
+  knows immediately that nothing real is there, which an invented product name
+  and a plausible price would not. The rows are not links for the same reason —
+  there is nowhere honest for them to go.
+
+  ## Kept in step with the real card
+
+  This deliberately reuses `snippets/predictive-search-card.liquid`'s classes
+  rather than its markup: `.search-card`, `.search-card__media`,
+  `.search-card__body`, `.search-card__title`, `.search-card__meta` and
+  `.search-card__price` all come from `assets/search.css`, so the typography,
+  the 64px media tile, its 1:1 ratio and the row rhythm are the card's, not a
+  second set that can drift from it. Only the contents differ.
+
+  @param {number} [count] - How many rows. Default 3, the length of a typical
+    suggestion list
+
+  @example
+    {% render 'predictive-search-placeholder', count: 3 %}
+{% enddoc %}
+
+{%- liquid
+  assign placeholder_count = count | default: 3
+  assign placeholder_title = 'search.placeholder.title' | t
+  assign placeholder_meta = 'search.placeholder.meta' | t
+  assign placeholder_price = 1999 | money
+-%}
+
+<ul class="search-group__items" role="list" data-placeholder-group>
+  {%- for index in (1..placeholder_count) -%}
+    {%- comment -%}
+      A different mark per row. Three identical drawings read as one image
+      repeated by mistake; three different ones read as a list.
+    {%- endcomment -%}
+    {%- liquid
+      assign marks = 'product-apparel-1,product-apparel-2,product-apparel-3' | split: ','
+      assign mark_index = forloop.index0 | modulo: marks.size
+      assign mark = marks[mark_index]
+    -%}
+
+    <li class="search-card-item" data-placeholder>
+      <span class="search-card search-card--placeholder">
+        <span class="search-card__media" aria-hidden="true">
+          {{ mark | placeholder_svg_tag: 'search-card__placeholder-svg' }}
+        </span>
+
+        <span class="search-card__body">
+          <span class="search-card__title">{{ placeholder_title }}</span>
+          <span class="search-card__meta">{{ placeholder_meta }}</span>
+
+          <span class="search-card__footer">
+            <span class="search-card__price">
+              <span class="search-card__price-current">{{ placeholder_price }}</span>
+            </span>
+          </span>
+        </span>
+      </span>
+    </li>
+  {%- endfor -%}
+</ul>
