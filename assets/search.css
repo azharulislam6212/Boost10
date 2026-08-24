@@ -1,0 +1,670 @@
+/**
+ * search.css — Boost10
+ *
+ * The search overlay (modal and drawer), the predictive suggestion rows, and
+ * the shared empty state.
+ *
+ * Kept out of base.css deliberately. This is one feature with a lot of surface,
+ * it is the part of the theme most likely to be restyled by an agency, and one
+ * addressable file makes that a contained change rather than a hunt through
+ * nine thousand lines.
+ *
+ * Loaded after base.css and declared inside `@layer components`, so it takes
+ * part in the same cascade as everything else and merchant Custom CSS — which
+ * theme.liquid injects unlayered — still beats it without `!important`.
+ *
+ * Every colour reads a custom property. `--search-accent` resolves to the
+ * merchant's primary button colour, which is what puts the green in the round
+ * submit button, the saving badge and the rating stars on a store whose buttons
+ * are green, and something coherent on a store whose buttons are not.
+ */
+
+@layer components {
+  /* ==========================================================================
+     Tokens
+     ========================================================================== */
+
+  .search-drawer,
+  .predictive-search--overlay {
+    --search-accent: var(--color-primary-button-background);
+    --search-accent-text: var(--color-primary-button-text);
+    --search-tile: var(--color-secondary-background);
+    --search-pill: 999px;
+    --search-card-radius: 1.6rem;
+    --search-media-size: 6.4rem;
+    --search-field-height: 5.2rem;
+    --search-aside-width: 32rem;
+  }
+
+  /* ==========================================================================
+     The overlay shell
+     --------------------------------------------------------------------------
+     Two layouts from one section. `data-layout` is on the custom element, so
+     nothing here depends on which section rendered it.
+     ========================================================================== */
+
+  /* The modal is a centred card rather than a full-width bar. It keeps the
+     `top` placement — the field has to stay near the header control the
+     customer just clicked, and a panel that grows as results arrive must not
+     push its own field up the screen while they read them. */
+  .search-drawer--modal .drawer__dialog {
+    justify-content: center;
+    padding: var(--space-4);
+  }
+
+  .search-drawer--modal .drawer__panel {
+    inline-size: min(100rem, 100%);
+    block-size: auto;
+    max-block-size: min(80vh, 78rem);
+    margin-block-start: var(--space-6);
+    border-radius: var(--space-6);
+    overflow: clip;
+  }
+
+  .search-drawer--drawer .drawer__panel {
+    inline-size: min(48rem, 100vw);
+    border-radius: 0;
+  }
+
+  .search-panel {
+    padding: 0;
+  }
+
+  .predictive-search--overlay {
+    display: flex;
+    flex-direction: column;
+    min-block-size: 0;
+    max-block-size: 100%;
+  }
+
+  /* ==========================================================================
+     Head row: title, field, close
+     --------------------------------------------------------------------------
+     One markup, two grids. The drawer stacks the field under the title; the
+     modal puts the field and the close button on a single line and hides the
+     title, which still gives the dialog its accessible name.
+     ========================================================================== */
+
+  .search-panel__head {
+    flex: 0 0 auto;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-5);
+    background-color: var(--color-background);
+  }
+
+  .predictive-search--overlay[data-layout='drawer'] .search-panel__head {
+    grid-template-areas:
+      'title close'
+      'form  form';
+  }
+
+  .predictive-search--overlay[data-layout='modal'] .search-panel__head {
+    grid-template-areas: 'form close';
+    border-block-end: 1px solid var(--color-border);
+  }
+
+  .search-panel__title {
+    grid-area: title;
+    margin: 0;
+    font-size: var(--font-size-h4, 2.2rem);
+  }
+
+  /* Hidden, not removed: `aria-label` on the dialog names it for a screen
+     reader, and dropping the heading entirely would leave the drawer's own
+     heading outline empty. */
+  .predictive-search--overlay[data-layout='modal'] .search-panel__title {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .predictive-search--overlay .search-form {
+    grid-area: form;
+    position: relative;
+    display: block;
+  }
+
+  /* Round, because everything else in this row is: the field is a pill and the
+     submit control is a circle inside it. A square here reads as a different
+     kind of control. */
+  .predictive-search--overlay .close-search-drawer {
+    grid-area: close;
+    margin-inline-start: 0;
+    border-radius: 50%;
+  }
+
+  /* ---- the field ---- */
+
+  /* `position: relative` on the form, not on `<predictive-search>`. The reset
+     and submit buttons are absolutely positioned; anchored to the component
+     they used to land wherever the head row happened to put its top-left
+     corner, which is fine when the form is the only child and wrong the moment
+     a title sits above it. */
+  .search-form {
+    position: relative;
+  }
+
+  .predictive-search--overlay .search-form__input {
+    --input-height: var(--search-field-height);
+
+    inline-size: 100%;
+    padding-inline-start: var(--space-5);
+    padding-inline-end: 10rem;
+    border-radius: var(--search-pill);
+    font-size: var(--font-size-md);
+  }
+
+  /* The drawer's dashed field is the design's cue that this is a prompt rather
+     than a form control to fill in and submit. The modal, sitting on its own
+     card, uses a solid field with a shadow instead — a dashed outline on a
+     floating card reads as a drop target. */
+  .predictive-search--overlay[data-layout='drawer'] .search-form__input {
+    border-style: dashed;
+  }
+
+  .predictive-search--overlay[data-layout='modal'] .search-form__input {
+    border-color: transparent;
+    background-color: var(--color-background);
+    box-shadow: var(--shadow-card, 0 1px 2px rgb(0 0 0 / 8%));
+  }
+
+  .predictive-search--overlay .search-form__submit,
+  .predictive-search--overlay .search-form__reset {
+    display: grid;
+    place-items: center;
+    inline-size: 4rem;
+    block-size: 4rem;
+    border-radius: 50%;
+    transition: background-color var(--transition-fast), color var(--transition-fast);
+  }
+
+  .predictive-search--overlay .search-form__submit {
+    inset-inline-end: 0.6rem;
+    background-color: var(--search-accent);
+    color: var(--search-accent-text);
+  }
+
+  .predictive-search--overlay .search-form__submit:hover {
+    background-color: var(--color-primary-button-hover-background);
+    color: var(--color-primary-button-hover-text);
+  }
+
+  .predictive-search--overlay .search-form__reset {
+    inset-inline-end: 5.2rem;
+    color: var(--color-accent-text);
+  }
+
+  .predictive-search--overlay .search-form__reset:hover {
+    background-color: var(--search-tile);
+    color: var(--color-heading);
+  }
+
+  /* ==========================================================================
+     Body: aside + results
+     ========================================================================== */
+
+  .search-panel__body {
+    flex: 1 1 auto;
+    min-block-size: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    display: grid;
+    gap: var(--space-6);
+    padding: var(--space-5);
+  }
+
+  @media screen and (min-width: 750px) {
+    .predictive-search--overlay[data-layout='modal'] .search-panel__body {
+      grid-template-columns: var(--search-aside-width) minmax(0, 1fr);
+      gap: 0;
+      padding: 0;
+    }
+
+    .predictive-search--overlay[data-layout='modal'] .search-panel__aside {
+      padding: var(--space-5);
+      border-inline-end: 1px solid var(--color-border);
+    }
+
+    .predictive-search--overlay[data-layout='modal'] .search-panel__main {
+      padding: var(--space-5);
+      background-color: var(--color-secondary-background);
+    }
+  }
+
+  .search-panel__aside {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  .search-panel__main {
+    min-inline-size: 0;
+  }
+
+  /* The results panel and the idle column occupy the same slot. Only one is
+     ever in flow: `hidden` on the panel is the browser's own switch, and the
+     idle column steps aside as soon as the component reports a query. */
+  .predictive-search[data-open] .search-panel__idle {
+    display: none;
+  }
+
+  .search-panel__idle {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .search-panel__idle:empty {
+    display: none;
+  }
+
+  /* ==========================================================================
+     Blocks: recent searches, suggested tags
+     ========================================================================== */
+
+  .search-block {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .search-block__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
+  .search-block__title,
+  .search-group__title {
+    margin: 0;
+    font-family: var(--font-default-family, var(--font-body-family));
+    font-size: 1.2rem;
+    font-weight: 600;
+    line-height: 1.4;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-heading);
+  }
+
+  .search-recent__clear {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    padding: 0;
+    font-size: var(--font-size-sm);
+    color: var(--color-accent-text);
+    transition: color var(--transition-fast);
+  }
+
+  .search-recent__clear:hover {
+    color: var(--color-heading);
+  }
+
+  .search-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .search-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding-block: 0.7rem;
+    padding-inline: var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--search-pill);
+    background-color: var(--color-background);
+    color: var(--color-text);
+    font-size: var(--font-size-sm);
+    line-height: 1.2;
+    text-align: start;
+    transition: border-color var(--transition-fast), background-color var(--transition-fast);
+  }
+
+  .search-chip:hover {
+    border-color: var(--color-heading);
+    background-color: var(--search-tile);
+  }
+
+  /* A recent chip is the `<li>` itself, holding two real buttons: the term runs
+     the search, the cross forgets it. One button with a nested cross would be
+     invalid HTML and would put the cross out of reach of the keyboard. */
+  .search-chip--recent {
+    padding-inline-end: 0.5rem;
+  }
+
+  .search-chip__label {
+    padding: 0;
+    background: none;
+    border: 0;
+    color: inherit;
+    font: inherit;
+    text-align: start;
+  }
+
+  .search-chip__remove {
+    display: grid;
+    place-items: center;
+    inline-size: 2rem;
+    block-size: 2rem;
+    padding: 0;
+    border-radius: 50%;
+    background-color: var(--search-tile);
+    color: var(--color-accent-text);
+    transition: background-color var(--transition-fast), color var(--transition-fast);
+  }
+
+  .search-chip__remove:hover {
+    background-color: var(--color-heading);
+    color: var(--color-background);
+  }
+
+  .search-chip__remove .icon {
+    inline-size: 1.1rem;
+    block-size: 1.1rem;
+  }
+
+  /* ==========================================================================
+     Result rows
+     ========================================================================== */
+
+  .predictive-search--overlay .predictive-search__panel {
+    position: static;
+    max-block-size: none;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+    overflow: visible;
+  }
+
+  .search-results__groups,
+  .search-group__items {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .search-results__groups {
+    gap: var(--space-5);
+  }
+
+  .search-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  /* base.css styles `[data-result]` itself as the row — a flex box with its own
+     padding, gap and selected background, from when a suggestion was a line of
+     text. Here the row is the `<a>` inside it, and leaving the old rule in place
+     made the option a flex container that shrink-wrapped the card to its
+     content: three cards ending in a ragged line halfway across the panel.
+     The attribute is repeated so this matches the old rule's specificity and
+     wins on file order rather than by shouting. */
+  .search-card-item[data-result],
+  .search-card-item[data-result][data-selected] {
+    display: block;
+    padding: 0;
+    gap: 0;
+    border-radius: 0;
+    background: none;
+    cursor: default;
+  }
+
+  .search-card-item {
+    list-style: none;
+  }
+
+  .search-card {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-3);
+    border-radius: var(--search-card-radius);
+    color: inherit;
+    text-decoration: none;
+    transition: background-color var(--transition-fast), border-color var(--transition-fast);
+  }
+
+  /* The modal gives each row a card; the drawer leaves them flat. Both are the
+     design — a narrow panel with bordered rows reads as a stack of boxes, and a
+     wide one with flat rows reads as an unfinished table. */
+  .predictive-search--overlay[data-layout='modal'] .search-card,
+  .predictive-search--overlay[data-layout='modal'] .search-panel__idle .search-card {
+    border: 1px solid var(--color-border);
+    background-color: var(--color-background);
+    box-shadow: var(--shadow-card, 0 1px 2px rgb(0 0 0 / 6%));
+  }
+
+  .search-card:hover,
+  [data-result][data-selected] .search-card {
+    background-color: var(--search-tile);
+  }
+
+  .predictive-search--overlay[data-layout='modal'] .search-card:hover,
+  .predictive-search--overlay[data-layout='modal'] [data-result][data-selected] .search-card {
+    border-color: var(--color-heading);
+    background-color: var(--color-background);
+  }
+
+  .search-card__media {
+    display: grid;
+    place-items: center;
+    inline-size: var(--search-media-size);
+    block-size: var(--search-media-size);
+    border-radius: 1.2rem;
+    background-color: var(--search-tile);
+    overflow: hidden;
+  }
+
+  .search-card__image-wrapper,
+  .search-card__image {
+    inline-size: 100%;
+    block-size: 100%;
+  }
+
+  .search-card__image {
+    object-fit: cover;
+  }
+
+  .search-card__glyph {
+    color: var(--color-accent-text);
+  }
+
+  .search-card__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    min-inline-size: 0;
+  }
+
+  .search-card__title {
+    font-family: var(--font-heading-family, var(--font-body-family));
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    line-height: 1.3;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--color-heading);
+
+    /* Two lines, then ellipsis. A long article title in a suggestion row must
+       not push the price out of the panel. */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .search-card__meta {
+    font-size: var(--font-size-sm);
+    color: var(--color-accent-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .search-card__footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+    margin-block-start: 0.2rem;
+  }
+
+  .search-card__price {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .search-card__price-current {
+    font-weight: 600;
+    color: var(--color-heading);
+  }
+
+  .search-card__price-was {
+    font-size: var(--font-size-sm);
+    color: var(--color-accent-text);
+  }
+
+  /* The stars follow the store's accent rather than the heading colour they use
+     on a product card: at this size a row of near-black stars reads as a row of
+     dirt. */
+  .search-card__rating .rating__stars {
+    gap: 0.1rem;
+  }
+
+  .search-card__rating .rating__star {
+    inline-size: 1.3rem;
+    block-size: 1.3rem;
+  }
+
+  .search-card__rating .rating__star--full,
+  .search-card__rating .rating__star--half {
+    color: var(--search-accent);
+  }
+
+  /* Colour is deliberately not set here. The saving badge takes the store's own
+     Badge colours › Sale, the same values the product cards use, so a merchant
+     who changes them changes them everywhere. Those rules are unlayered in
+     base.css and would beat anything written here in any case — an override in
+     this file would be dead code that looks alive. */
+  .search-card__badge {
+    align-self: start;
+    font-size: 1.1rem;
+    font-weight: 600;
+  }
+
+  /* ==========================================================================
+     Footer link
+     ========================================================================== */
+
+  .search-results__footer {
+    margin-block-start: var(--space-5);
+  }
+
+  .search-results__all {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding-block-end: var(--space-2);
+    border-block-end: 1px solid currentColor;
+    color: var(--color-heading);
+    font-size: var(--font-size-md);
+    text-decoration: none;
+    transition: gap var(--transition-fast), color var(--transition-fast);
+  }
+
+  .search-results__all:hover {
+    gap: var(--space-4);
+    color: var(--color-link-hover);
+  }
+
+  /* ==========================================================================
+     Empty state
+     --------------------------------------------------------------------------
+     Shared by the suggestion panel, the search page and every filtered grid.
+     ========================================================================== */
+
+  .search-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-3);
+    padding-block: var(--space-9);
+    padding-inline: var(--space-4);
+    text-align: center;
+  }
+
+  .search-empty--panel {
+    padding-block: var(--space-8);
+  }
+
+  .search-empty__icon {
+    display: grid;
+    place-items: center;
+    color: var(--color-heading);
+  }
+
+  .search-empty__title {
+    margin: 0;
+    font-family: var(--font-heading-family, var(--font-body-family));
+    font-size: var(--font-size-h5, 2rem);
+    font-weight: 600;
+    color: var(--color-heading);
+    text-wrap: balance;
+  }
+
+  .search-empty__text {
+    max-inline-size: 52ch;
+    margin: 0;
+    font-size: var(--font-size-sm);
+    color: var(--color-accent-text);
+    text-wrap: pretty;
+  }
+
+  .search-empty__action {
+    margin-block-start: var(--space-3);
+  }
+
+  /* The grid empty state is now this component. The old rule set a padded,
+     centred, grey block on the wrapper, which fought the layout above. */
+  .product-grid__empty {
+    padding-block: 0;
+  }
+
+  /* ==========================================================================
+     Motion
+     ========================================================================== */
+
+  @media (prefers-reduced-motion: reduce) {
+    .search-card,
+    .search-chip,
+    .search-results__all,
+    .predictive-search--overlay .search-form__submit,
+    .predictive-search--overlay .search-form__reset {
+      transition: none;
+    }
+  }
+}

@@ -1,0 +1,100 @@
+{% doc %}
+  The "nothing matched" state, in one place.
+
+  Three surfaces used to say nothing useful in three slightly different ways:
+  the predictive panel closed itself, and the collection and search grids
+  printed a bare line of grey text. All three now render this, so the copy, the
+  spacing and the way out are identical wherever a customer hits a dead end.
+
+  Every variant offers an exit. An empty state without a next step is a dead
+  end, and the most common reason a customer leaves a filtered collection.
+
+  @param {string} [context] - 'panel' inside predictive search, 'filters' for a
+    filtered grid, 'search' for a search page with no results. Default 'filters'
+  @param {string} [terms] - The query, echoed back in the panel variant
+  @param {string} [url] - Where the reset link goes. Defaults to clearing filters
+
+  @example
+    {% render 'search-empty', context: 'panel', terms: predictive_search.terms %}
+    {% render 'search-empty', context: 'filters' %}
+{% enddoc %}
+
+
+{%- liquid
+  assign variant = context | default: 'filters'
+
+  case variant
+    when 'panel'
+      assign empty_title = 'search.empty.title' | t
+      assign empty_text = 'search.empty.text' | t
+    when 'search'
+      assign empty_title = 'search.empty.page_title' | t
+      assign empty_text = 'search.empty.page_text' | t
+    else
+      assign empty_title = 'products.facets.empty_title' | t
+      assign empty_text = 'products.facets.empty_text' | t
+  endcase
+
+  assign reset_url = url
+  if reset_url == blank
+    if variant == 'search'
+      assign reset_url = routes.search_url
+    else
+      assign reset_url = collection.url | default: routes.all_products_collection_url
+    endif
+  endif
+
+  comment
+    Clear all filters, rather than the filter bar label Clear all. The bar sits
+    next to the filters it clears; this button sits alone in the middle of an
+    empty grid, where Clear all could mean the search, the filters or the cart.
+  endcomment
+  assign reset_label = 'products.facets.clear_all_filters' | t
+-%}
+
+<div class="search-empty search-empty--{{ variant }}">
+  <span class="search-empty__icon" aria-hidden="true">
+    {% render 'icon', icon: 'filter-off', size: 32 %}
+  </span>
+
+  <p class="search-empty__title">
+    {%- if variant == 'panel' and terms != blank -%}
+      {{ 'search.empty.title_for' | t: terms: terms }}
+    {%- else -%}
+      {{ empty_title }}
+    {%- endif -%}
+  </p>
+
+  <p class="search-empty__text">{{ empty_text }}</p>
+
+  {%- comment -%}
+    The panel already sits inside a search field, so "clear all filters" would be
+    nonsense there — the useful action is running the query on the full results
+    page, where filters and pagination exist.
+  {%- endcomment -%}
+  {%- if variant == 'panel' -%}
+    {%- if terms != blank -%}
+      {%- capture panel_url -%}
+        {{ routes.search_url }}?q={{ terms | url_encode }}&options%5Bprefix%5D=last
+      {%- endcapture -%}
+      {%- assign panel_label = 'search.empty.action' | t -%}
+      {% render 'button',
+         label: panel_label,
+         href: panel_url ,
+         variant: 'primary',
+         size: 'small',
+         icon: 'arrow-right',
+         icon_style: 'solid',
+         class: 'search-empty__action' %}
+    {%- endif -%}
+  {%- else -%}
+    {% render 'button',
+       label: reset_label,
+       href: reset_url,
+       variant: 'primary',
+       size: 'medium',
+       icon: 'arrow-right',
+       icon_style: 'solid',
+       class: 'search-empty__action' %}
+  {%- endif -%}
+</div>

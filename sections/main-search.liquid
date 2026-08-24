@@ -209,9 +209,46 @@
       
         </ul>
 
+        {%- comment -%}
+          Clearing filters must keep the query. A reset that drops `q` turns a
+          search into a browse of the whole catalogue — the same bug the hidden
+          inputs in the filter form exist to prevent.
+        {%- endcomment -%}
+        {%- capture search_reset_url -%}
+          {{ routes.search_url }}?q={{ search.terms | url_encode }}&options%5Bprefix%5D=last
+        {%- endcapture -%}
+        {%- assign search_reset_url = search_reset_url | strip -%}
+
+        {%- comment -%}
+          `search.filters` lists every filter the storefront offers, not the ones
+          in play, so its size says nothing. Only an active value — or either end
+          of a price range — means the customer narrowed something.
+        {%- endcomment -%}
+        {%- liquid
+          assign has_active_filters = false
+          for filter in search.filters
+            if filter.active_values.size > 0
+              assign has_active_filters = true
+              break
+            endif
+            if filter.min_value.value != blank or filter.max_value.value != blank
+              assign has_active_filters = true
+              break
+            endif
+          endfor
+        -%}
+
+        {%- comment -%}
+          Two different dead ends, two different messages. A search that matched
+          nothing needs different copy from a filter combination that matched
+          nothing, and the customer can tell which one they are in.
+        {%- endcomment -%}
         <div class="product-grid__empty" data-ref="empty" {% if grid_total > 0 %}hidden{% endif %}>
-          <p class="product-grid__empty-title">{{ 'products.facets.no_results' | t }}</p>
-          <a class="button button--link" href="{{ routes.search_url }}">{{ 'products.facets.clear_all' | t }}</a>
+          {%- if has_active_filters -%}
+            {% render 'search-empty', context: 'filters', url: search_reset_url %}
+          {%- else -%}
+            {% render 'search-empty', context: 'search', terms: search.terms, url: routes.search_url %}
+          {%- endif -%}
         </div>
 
         <div class="product-grid__pagination">

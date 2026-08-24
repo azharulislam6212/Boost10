@@ -1,0 +1,174 @@
+{% doc %}
+  One row in the predictive search panel.
+
+  Four resource types share one snippet because they share one row: a square
+  media tile, a title, a line of meta, and — for products only — price, rating
+  and a saving badge. Four near-identical snippets would drift the moment one of
+  them got a spacing fix.
+
+  The row is a single `<a>` inside the option. `assets/search.js` looks for
+  `a[href]` inside `[data-result]` and clicks it, so middle-click and
+  modifier-click keep working: they are handled by the browser, not intercepted.
+
+  A page has no image. Rather than an empty tile, it gets a glyph — the tile is
+  what gives the list its rhythm, and a hole in the column is more distracting
+  than an icon.
+
+  @param {string} type - 'product' | 'collection' | 'article' | 'page'
+  @param {object} item - The resource, straight from `predictive_search.resources`
+  @param {string} id - Id prefix for the option. Must be unique per group
+  @param {number} index - Position within the group, for the option id
+  @param {boolean} [selectable] - Default true. Pass false outside the combobox
+    popup — the merchant's idle suggestions are a plain list, and `role="option"`
+    on an item no listbox owns is invalid ARIA
+
+  @example
+    {% render 'predictive-search-card', type: 'product', item: product,
+       id: 'PredictiveProduct-', index: forloop.index %}
+{% enddoc %}
+
+{%- liquid
+  assign option_id = id | append: index
+
+  assign is_selectable = true
+  if selectable == false
+    assign is_selectable = false
+  endif
+
+  assign image = nil
+  assign meta = ''
+  assign title = item.title
+
+  case type
+    when 'product'
+      assign variant = item.selected_or_first_available_variant
+      assign image = item.featured_media.preview_image
+
+      comment
+        The meta line is type then variant, which reads as Deep sleep • 30
+        servings for a supplement catalogue. Both halves are optional, and the
+        separator is only printed when there is something on each side of it.
+      endcomment
+      assign meta_parts = ''
+      if settings.show_vendor and item.vendor != blank
+        assign meta_parts = item.vendor
+      elsif item.type != blank
+        assign meta_parts = item.type
+      endif
+
+      assign variant_label = ''
+      if variant.title != blank and variant.title != 'Default Title'
+        assign variant_label = variant.title
+      endif
+
+      if meta_parts != blank and variant_label != blank
+        assign meta = meta_parts | append: ' • ' | append: variant_label
+      else
+        assign meta = meta_parts | append: variant_label
+      endif
+
+      comment
+        Product-level price rather than the variant one. The predictive search
+        endpoint returns a trimmed product object, and price / compare_at_price
+        are always on it — a variant lookup that comes back blank would print a
+        bare currency symbol.
+      endcomment
+      assign card_price = item.price
+      assign card_compare = item.compare_at_price
+
+      assign on_sale = false
+      if card_compare != blank and card_compare > card_price
+        assign on_sale = true
+        assign saved_amount = card_compare | minus: card_price
+        assign saved_percent = saved_amount | times: 100.0 | divided_by: card_compare | round
+      endif
+
+    when 'collection'
+      assign image = item.featured_image
+      if image == blank
+        assign image = item.products.first.featured_media.preview_image
+      endif
+      assign meta = 'search.collection_count' | t: count: item.all_products_count
+
+    when 'article'
+      assign image = item.image
+      if item.published_at != blank
+        assign meta = item.published_at | date: format: 'date'
+      endif
+      if item.author != blank and meta != blank
+        assign meta = item.author | append: ' • ' | append: meta
+      elsif item.author != blank
+        assign meta = item.author
+      endif
+
+    else
+      assign meta = item.content | strip_html | truncatewords: 14
+  endcase
+-%}
+
+<li
+  id="{{ option_id }}"
+  class="search-card-item"
+  {% if is_selectable %}role="option" aria-selected="false" data-result{% endif %}
+  data-result-type="{{ type }}"
+  data-url="{{ item.url }}"
+>
+  <a class="search-card search-card--{{ type }}" href="{{ item.url }}">
+    <span class="search-card__media" aria-hidden="true">
+      {%- if image != blank -%}
+        {% render 'image',
+           image: image,
+           ratio: 'square',
+           sizes: '72px',
+           widths: '72,144,216',
+           class: 'search-card__image',
+           wrapper_class: 'search-card__image-wrapper' %}
+      {%- else -%}
+        {%- liquid
+          case type
+            when 'article'
+              assign fallback_icon = 'edit'
+            when 'collection'
+              assign fallback_icon = 'grid'
+            else
+              assign fallback_icon = 'note'
+          endcase
+        -%}
+        <span class="search-card__glyph">
+          {% render 'icon', icon: fallback_icon, size: 22 %}
+        </span>
+      {%- endif -%}
+    </span>
+
+    <span class="search-card__body">
+      <span class="search-card__title">{{ title }}</span>
+
+      {%- if meta != blank -%}
+        <span class="search-card__meta">{{ meta }}</span>
+      {%- endif -%}
+
+      {%- if type == 'product' -%}
+        <span class="search-card__footer">
+          <span class="search-card__price">
+            <span class="search-card__price-current{% if on_sale %} search-card__price-current--sale{% endif %}">
+              {{- card_price | money -}}
+            </span>
+            {%- if on_sale -%}
+              <s class="search-card__price-was">{{ card_compare | money }}</s>
+            {%- endif -%}
+          </span>
+
+          {%- if settings.show_rating -%}
+            {% render 'rating', product: item, show_count: false, class: 'search-card__rating' %}
+          {%- endif -%}
+        </span>
+      {%- endif -%}
+    </span>
+
+    {%- if type == 'product' and on_sale -%}
+      <span class="badge badge--sale search-card__badge">
+        {{- 'products.product.save_percent' | t: percent: saved_percent -}}
+      </span>
+    {%- endif -%}
+  </a>
+</li>

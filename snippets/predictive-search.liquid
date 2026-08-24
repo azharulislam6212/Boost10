@@ -1,5 +1,5 @@
 {% doc %}
-  Renders the search field and its suggestion panel.
+  Renders the search field and everything that hangs off it.
 
   The input is a real `<input type="search" name="q">` inside a
   `<form action="/search">`, so pressing Enter with JavaScript disabled runs a
@@ -10,63 +10,244 @@
   option through `aria-activedescendant` on the input. Focus never leaves the
   field — moving it into the suggestions closes the mobile keyboard.
 
+  ## Two variants, one snippet
+
+    overlay  The drawer and the modal. A head row with the field, a column of
+             recent searches and suggested tags, and a results column that shows
+             merchant-picked suggestions until the customer types.
+    inline   A field with a dropdown beneath it. Used on the 404 page, where
+             there is no panel to fill and no room for a sidebar.
+
+  The idle column is not decoration. An empty search panel asks the customer to
+  guess what the store sells; recent searches, tags and a few chosen products
+  give them something to click before they have typed a character.
+
   @param {string} [id] - Input id. Default SearchInput
+  @param {string} [variant] - 'overlay' | 'inline'. Default 'inline'
+  @param {string} [layout] - 'modal' | 'drawer'. Overlay only, drives the head row
+  @param {boolean} [close] - Render the overlay close button in the head row
 
   @example
-    {% render 'predictive-search', id: 'HeaderSearch' %}
+    {% render 'predictive-search', id: 'SearchDrawerInput', variant: 'overlay',
+       layout: settings.predictive_search_layout, close: true %}
 {% enddoc %}
 
 {%- liquid
   assign input_id = id | default: 'SearchInput'
   assign panel_id = input_id | append: 'Results'
+  assign resolved_variant = variant | default: 'inline'
+  assign resolved_layout = layout | default: 'modal'
+  assign is_overlay = false
+  if resolved_variant == 'overlay'
+    assign is_overlay = true
+  endif
+
+  comment
+    Three placeholder fields in Theme settings, rotated one at a time. A single
+    static placeholder in a supplement store says nothing; rotating prompts
+    show three things the customer could actually ask for. The first is what
+    renders server-side, so there is never an empty field before the script
+    loads, and it is the only one a customer with JavaScript off ever sees.
+  endcomment
+  assign prompt_1 = settings.search_input_placeholder
+  if prompt_1 == blank
+    assign prompt_1 = 'search.placeholder' | t
+  endif
+
+  assign prompts = prompt_1
+  if settings.search_input_placeholder_2 != blank
+    assign prompts = prompts | append: '|' | append: settings.search_input_placeholder_2
+  endif
+  if settings.search_input_placeholder_3 != blank
+    assign prompts = prompts | append: '|' | append: settings.search_input_placeholder_3
+  endif
+
+  assign suggested_tags = settings.search_suggested_tags | default: '' | split: ','
+
+  comment
+    Count on a product_list setting, with size as the fallback. The two are
+    interchangeable on this drop depending on the platform version, and a nil
+    count compared against zero fails silently — the merchant picks six
+    products, the panel shows none, and there is nothing to debug.
+  endcomment
+  assign suggestion_products = settings.suggestion_product_list
+  assign suggestion_count = suggestion_products.count | default: suggestion_products.size | default: 0
 -%}
 
 <predictive-search
-  class="predictive-search"
+  class="predictive-search predictive-search--{{ resolved_variant }}"
   data-section-id="predictive-search"
+  {% if is_overlay %}data-layout="{{ resolved_layout }}"{% endif %}
+  data-prompts="{{ prompts | escape }}"
+  data-recent-limit="{{ settings.recent_searches_limit | default: 6 }}"
+  {% if settings.show_recent_searches == false %}data-recent-disabled{% endif %}
 >
-  <form class="search-form" action="{{ routes.search_url }}" method="get" role="search">
-    <label class="visually-hidden" for="{{ input_id }}">{{ 'search.label' | t }}</label>
+  {%- comment -%}
+    The head row exists only in the overlay. Inline — the 404 page — the field
+    is the whole component, and a heading and a close button above it would be
+    furniture for a panel that is not there.
 
-    <input
-      id="{{ input_id }}"
-      data-ref="input"
-      type="search"
-      name="q"
-      value="{{ search.terms | escape }}"
-      placeholder="{{ 'search.placeholder' | t | escape }}"
-      role="combobox"
-      aria-expanded="false"
-      aria-controls="{{ panel_id }}"
-      aria-autocomplete="list"
-      aria-haspopup="listbox"
-      autocomplete="off"
-      spellcheck="false"
-    >
+    The drawer shows the title; the modal hides it in CSS rather than dropping
+    it from the markup, so the dialog keeps its accessible name in both layouts.
+  {%- endcomment -%}
+  {%- if is_overlay -%}
+    <div class="search-panel__head">
+      <h2 class="search-panel__title">{{ 'search.title' | t }}</h2>
+  {%- endif -%}
 
-    <input type="hidden" name="options[prefix]" value="last">
+    <form class="search-form" action="{{ routes.search_url }}" method="get" role="search">
+      <label class="visually-hidden" for="{{ input_id }}">{{ 'search.label' | t }}</label>
 
-    <button
-      type="button"
-      class="search-form__reset"
-      data-ref="reset"
-      aria-label="{{ 'search.clear' | t }}"
-      hidden
-    >
-      {% render 'icon', icon: 'close' %}
-    </button>
+      <input
+        id="{{ input_id }}"
+        data-ref="input"
+        class="search-form__input"
+        type="search"
+        name="q"
+        value="{{ search.terms | escape }}"
+        placeholder="{{ prompt_1 | escape }}"
+        role="combobox"
+        aria-expanded="false"
+        aria-controls="{{ panel_id }}"
+        aria-autocomplete="list"
+        aria-haspopup="listbox"
+        autocomplete="off"
+        spellcheck="false"
+        enterkeyhint="search"
+      >
 
-    <button type="submit" class="search-form__submit" aria-label="{{ 'search.submit' | t }}">
-      {% render 'icon', icon: 'search' %}
-    </button>
-  </form>
+      <input type="hidden" name="options[prefix]" value="last">
 
-  <div class="predictive-search__panel" id="{{ panel_id }}" data-ref="panel" data-lenis-prevent hidden>
-    {%- comment -%}
-      Filled by the predictive search section. Empty on first render so nothing
-      flashes before the customer has typed anything.
-    {%- endcomment -%}
-  </div>
+      <button
+        type="button"
+        class="search-form__reset"
+        data-ref="reset"
+        aria-label="{{ 'search.clear' | t }}"
+        hidden
+      >
+        {% render 'icon', icon: 'close', size: 16 %}
+      </button>
+
+      <button type="submit" class="search-form__submit" aria-label="{{ 'search.submit' | t }}">
+        {% render 'icon', icon: 'search', size: 18 %}
+      </button>
+    </form>
+
+    {%- if close -%}
+      {%- liquid
+        assign search_close_label = 'accessibility.close_search' | t
+      -%}
+      {%- comment -%}
+        Secondary rather than primary. The green submit control sits a few
+        pixels away inside the field; two green circles side by side, one of
+        which cancels and one of which searches, is a coin toss.
+      {%- endcomment -%}
+      {% render 'button',
+         label: search_close_label,
+         id: 'SearchClose',
+         class: 'close-search-drawer',
+         icon: 'close',
+         variant: 'secondary',
+         size: 'small',
+         icon_only: true,
+         attributes: 'data-overlay-close' %}
+    {%- endif -%}
+
+  {%- if is_overlay -%}
+    </div>
+
+    <div class="search-panel__body" data-lenis-prevent>
+      <div class="search-panel__aside">
+        {%- comment -%}
+          Recent searches are per-browser, so the list is written by JavaScript.
+          The section around it ships hidden and is revealed once there is
+          something in it — an empty "Recent searches" heading is worse than no
+          heading at all.
+        {%- endcomment -%}
+        <section class="search-block search-recent" data-ref="recent" hidden>
+          <div class="search-block__head">
+            <h3 class="search-block__title">
+              {{- settings.recent_searches_text | default: 'Recent searches' | escape -}}
+            </h3>
+
+            <button type="button" class="search-recent__clear" data-ref="recentClear">
+              {% render 'icon', icon: 'trash', size: 14 %}
+              <span>{{ 'search.clear_recent' | t }}</span>
+            </button>
+          </div>
+
+          <ul class="search-chips" data-ref="recentList" role="list"></ul>
+        </section>
+
+        {%- if suggested_tags.size > 0 -%}
+          <section class="search-block search-tags">
+            <h3 class="search-block__title">
+              {{- settings.suggested_tags_text | default: 'Suggested tag' | escape -}}
+            </h3>
+
+            <ul class="search-chips" role="list">
+              {%- for tag in suggested_tags -%}
+                {%- assign tag_label = tag | strip -%}
+                {%- if tag_label == blank -%}{%- continue -%}{%- endif -%}
+                <li>
+                  <button type="button" class="search-chip" data-search-term="{{ tag_label | escape }}">
+                    {{- tag_label -}}
+                  </button>
+                </li>
+              {%- endfor -%}
+            </ul>
+          </section>
+        {%- endif -%}
+      </div>
+
+      <div class="search-panel__main">
+        <div class="predictive-search__panel" id="{{ panel_id }}" data-ref="panel" hidden>
+          {%- comment -%}
+            Filled by sections/predictive-search.liquid. Empty on first render so
+            nothing flashes before the customer has typed anything.
+          {%- endcomment -%}
+        </div>
+
+        {%- comment -%}
+          The idle column. Hidden by CSS the moment the panel opens, rather than
+          removed, so returning to an empty field brings it straight back with
+          no second request.
+        {%- endcomment -%}
+        <div class="search-panel__idle" data-ref="idle">
+          {%- if suggestion_count > 0 -%}
+            <p class="search-group__title">
+              {{- settings.suggestion_text | default: 'Suggestion products' | escape -}}
+            </p>
+
+            <ul class="search-group__items" role="list">
+              {%- for product in suggestion_products limit: 6 -%}
+                {%- comment -%}
+                  `selectable: false` — these rows are outside the combobox
+                  popup, and `role="option"` on a list item that no listbox owns
+                  is invalid ARIA rather than a harmless extra attribute.
+                {%- endcomment -%}
+                {% render 'predictive-search-card',
+                   type: 'product',
+                   item: product,
+                   id: 'SearchSuggestion-',
+                   index: forloop.index,
+                   selectable: false %}
+              {%- endfor -%}
+            </ul>
+
+            <div class="search-results__footer">
+              <a class="search-results__all" href="{{ routes.all_products_collection_url }}">
+                <span>{{ settings.browse_all_text | default: 'Browse All' | escape }}</span>
+                {% render 'icon', icon: 'arrow-right', size: 16 %}
+              </a>
+            </div>
+          {%- endif -%}
+        </div>
+      </div>
+    </div>
+  {%- else -%}
+    <div class="predictive-search__panel" id="{{ panel_id }}" data-ref="panel" data-lenis-prevent hidden></div>
+  {%- endif -%}
 
   <p class="visually-hidden" data-ref="status" role="status"></p>
 </predictive-search>

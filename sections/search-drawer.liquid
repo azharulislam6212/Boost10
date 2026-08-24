@@ -1,20 +1,39 @@
 {% comment %}
   sections/search-drawer.liquid
 
-  The search drawer. Focus goes to the field on open rather than to the close
-  button — the one exception to the drawer default, because opening search has
-  exactly one purpose.
+  The search overlay, in both of its shapes.
+
+  Theme settings › Search › Layout picks between them:
+
+    modal   A centred card. The field sits in a bar across the top and the body
+            splits into a column of recent searches and tags beside the results.
+    drawer  A panel off the inline-end edge, single column, field under the
+            title. The same content, stacked.
+
+  One element, one component, one set of markup. A second section for the modal
+  would mean every future fix to the field, the chips or the result rows had to
+  be made twice — which is exactly how the two drift apart.
+
+  Focus goes to the field on open rather than to the close button — the one
+  exception to the drawer default, because opening search has exactly one
+  purpose and a customer who has to Tab to the field will assume it is broken.
 {% endcomment %}
+
+{%- liquid
+  assign layout = settings.predictive_search_layout | default: 'modal'
+-%}
 
 <search-drawer
   id="SearchDrawer"
-  class="search-drawer drawer"
+  class="search-drawer drawer search-drawer--{{ layout }}"
+  data-layout="{{ layout }}"
   {%- comment -%}
-    The style comes from Theme settings › Search, which already had a
-    modal/drawer control that nothing read. A second copy on this section would
-    have been one more setting saying the same thing in a different place.
+    The modal is anchored to the top of the viewport rather than centred with
+    `align-items: center`: the field has to stay near the header the customer
+    just clicked, and a panel that grows downward as results arrive must not
+    push its own field up the screen while they read it.
   {%- endcomment -%}
-  {%- if settings.predictive_search_layout == 'drawer' -%}
+  {%- if layout == 'drawer' -%}
     data-placement="end"
   {%- else -%}
     data-placement="top"
@@ -22,26 +41,12 @@
   data-overlay-type="search"
 >
   <dialog class="drawer__dialog" data-ref="dialog" aria-label="{{ 'search.title' | t }}">
-    <div class="drawer__panel" data-ref="panel">
-      <header class="drawer__header">
-        <h2 class="visually-hidden">{{ 'search.title' | t }}</h2>
-        {%- liquid
-          assign search_drawer_close_label = 'accessibility.close_search' | t
-        -%}
-        {% render 'button',
-           label: search_drawer_close_label,
-           id: 'SearchClose',
-           class: 'close-search-drawer',
-           icon: 'close',
-           variant: 'primary',
-           size: 'small',
-           icon_only: true,
-           attributes: 'data-overlay-close' %}
-      </header>
-
-      <div class="drawer__body" data-ref="body" data-lenis-prevent>
-        {% render 'predictive-search', id: 'SearchDrawerInput' %}
-      </div>
+    <div class="drawer__panel search-panel" data-ref="panel">
+      {% render 'predictive-search',
+         id: 'SearchDrawerInput',
+         variant: 'overlay',
+         layout: layout,
+         close: true %}
     </div>
   </dialog>
 </search-drawer>

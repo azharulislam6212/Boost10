@@ -1,0 +1,169 @@
+{% comment %}
+  sections/predictive-search.liquid
+
+  The section the predictive search endpoint renders.
+
+  `assets/search.js` requests `/search/suggest?q=…&section_id=predictive-search`,
+  so the suggestions are built by Liquid rather than reconstructed in JavaScript.
+  Money formatting, translations, metafield-driven ratings and badge rules stay
+  correct in the dropdown because they are the same snippets the rest of the
+  theme uses.
+
+  This file did not exist. `<predictive-search>` was fetching a section id that
+  Shopify could not resolve, every request came back 404, and the panel never
+  opened — which is why predictive search looked "off" no matter what the
+  setting said.
+
+  ## Contract with the JavaScript
+
+    - The root element carries `data-results-panel`. `search.js` parses the
+      response, takes that element and morphs it into the live panel. Without it
+      the panel closes silently.
+    - `<search-list>` is the combobox popup. `search.js` stamps `data-input` on
+      it after the morph, because only the browser knows which of the theme's
+      search fields made the request.
+    - Every selectable row carries `data-result` and a unique `id`. The id is
+      what `aria-activedescendant` points at while the customer arrows through
+      the list, so it must not collide between groups.
+
+  ## Grouping
+
+  One listbox, one group per resource type. A separate listbox per type would
+  break arrow-key navigation across the whole set, which is what a customer
+  expects when the panel shows products and articles together.
+{% endcomment %}
+
+{%- liquid
+  assign terms = predictive_search.terms | default: ''
+
+  assign products = predictive_search.resources.products
+  assign collections = predictive_search.resources.collections
+  assign articles = predictive_search.resources.articles
+  assign pages = predictive_search.resources.pages
+
+  assign total = 0
+  assign total = total | plus: products.size | plus: collections.size
+  assign total = total | plus: articles.size | plus: pages.size
+
+  comment
+    Type headings are a merchant choice (Theme settings › Search › Show types).
+    With a single resource type enabled they say nothing the panel does not
+    already show, so the products group falls back to a neutral "Result" label —
+    the design's single-column case.
+  endcomment
+  assign show_types = settings.show_search_types
+
+  assign list_id = 'PredictiveSearchList'
+-%}
+
+{%- capture browse_all_url -%}
+  {{ routes.search_url }}?q={{ terms | url_encode }}&options%5Bprefix%5D=last
+{%- endcapture -%}
+
+<div
+  class="predictive-search__results"
+  data-results-panel
+  data-count="{{ total }}"
+  data-terms="{{ terms | escape }}"
+>
+  {%- if total > 0 -%}
+    <search-list class="predictive-search__list">
+      <ul
+        class="search-results__groups"
+        id="{{ list_id }}"
+        role="listbox"
+        aria-label="{{ 'search.results_label' | t }}"
+      >
+        {%- if products.size > 0 -%}
+          {%- liquid
+            if show_types
+              assign products_label = 'search.type_products' | t
+            else
+              assign products_label = 'search.results_heading' | t
+            endif
+          -%}
+          <li class="search-group" role="group" aria-label="{{ products_label | escape }}">
+            <span class="search-group__title" aria-hidden="true">{{ products_label }}</span>
+            <ul class="search-group__items" role="presentation">
+              {%- for product in products -%}
+                {% render 'predictive-search-card',
+                   type: 'product',
+                   item: product,
+                   id: 'PredictiveProduct-',
+                   index: forloop.index %}
+              {%- endfor -%}
+            </ul>
+          </li>
+        {%- endif -%}
+
+        {%- if collections.size > 0 -%}
+          {%- assign collections_label = 'search.type_collections' | t -%}
+          <li class="search-group" role="group" aria-label="{{ collections_label | escape }}">
+            <span class="search-group__title" aria-hidden="true">{{ collections_label }}</span>
+            <ul class="search-group__items" role="presentation">
+              {%- for collection in collections -%}
+                {% render 'predictive-search-card',
+                   type: 'collection',
+                   item: collection,
+                   id: 'PredictiveCollection-',
+                   index: forloop.index %}
+              {%- endfor -%}
+            </ul>
+          </li>
+        {%- endif -%}
+
+        {%- if articles.size > 0 -%}
+          {%- assign articles_label = 'search.type_articles' | t -%}
+          <li class="search-group" role="group" aria-label="{{ articles_label | escape }}">
+            <span class="search-group__title" aria-hidden="true">{{ articles_label }}</span>
+            <ul class="search-group__items" role="presentation">
+              {%- for article in articles -%}
+                {% render 'predictive-search-card',
+                   type: 'article',
+                   item: article,
+                   id: 'PredictiveArticle-',
+                   index: forloop.index %}
+              {%- endfor -%}
+            </ul>
+          </li>
+        {%- endif -%}
+
+        {%- if pages.size > 0 -%}
+          {%- assign pages_label = 'search.type_pages' | t -%}
+          <li class="search-group" role="group" aria-label="{{ pages_label | escape }}">
+            <span class="search-group__title" aria-hidden="true">{{ pages_label }}</span>
+            <ul class="search-group__items" role="presentation">
+              {%- for page in pages -%}
+                {% render 'predictive-search-card',
+                   type: 'page',
+                   item: page,
+                   id: 'PredictivePage-',
+                   index: forloop.index %}
+              {%- endfor -%}
+            </ul>
+          </li>
+        {%- endif -%}
+      </ul>
+    </search-list>
+
+    {%- comment -%}
+      Outside `<search-list>` on purpose: it is not a suggestion, and inside the
+      list it would take an arrow-key stop and read as a fifth result.
+    {%- endcomment -%}
+    <div class="search-results__footer">
+      <a class="search-results__all" href="{{ browse_all_url | strip }}">
+        <span>{{ settings.browse_all_text | default: 'Browse All' | escape }}</span>
+        {% render 'icon', icon: 'arrow-right', size: 16 %}
+      </a>
+    </div>
+  {%- else -%}
+    {% render 'search-empty', terms: terms, context: 'panel' %}
+  {%- endif -%}
+</div>
+
+{% schema %}
+{
+  "name": "t:sections.predictive_search.name",
+  "settings": []
+}
+{% endschema %}
