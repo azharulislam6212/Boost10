@@ -228,13 +228,21 @@ export class StickyHeader extends BaseComponent {
   #unsubscribe = null;
 
   setup() {
-    // Keep the header surface hidden while its measured state, sticky state and
-    // transparent state are established. Without this guard the server-rendered
-    // header can paint once in its default state and then visibly move when the
-    // custom element upgrades on the first frame. The section keeps its normal
-    // flow height, so hiding the shell does not move page content.
-    this.setAttribute('data-booting', '');
-
+    // Nothing here hides the header, and nothing here positions it.
+    //
+    // `data-booting` used to be written on this line, and `header.css` used it
+    // to hold `.site-header__shell` at `visibility: hidden` until two frames
+    // after this method ran. On a fast connection that is imperceptible; on a
+    // slow one the storefront renders an announcement bar sitting straight on
+    // top of the hero, with the header arriving whenever the module does.
+    //
+    // The state this was protecting is already correct before the upgrade: the
+    // section publishes the header's height from the merchant's settings, and
+    // `.header-section:has([data-sticky-mode])` pins it in CSS. What this
+    // element adds is refinement — the measured height, the scrolled and
+    // transparent states — none of which is a reason to withhold the header.
+    // The transition between those states is suppressed by `[data-priming]`
+    // instead, which costs nothing visually.
     this.#measure();
 
     this.#observer = new ResizeObserver(rafThrottle(() => this.#measure()));
@@ -258,14 +266,11 @@ export class StickyHeader extends BaseComponent {
     // (a refresh, a back navigation) starts transparent over solid content.
     this.#prime();
 
-    // Let the first paint use the final measured header state. Two frames match
-    // the priming window used by `#prime()`, so no initial colour/position
-    // transition can leak through.
+    // `data-ready` is a hook for anything that wants to know the header has
+    // finished priming — it hides nothing and gates nothing. Two frames matches
+    // the window `#prime()` uses.
     requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        this.removeAttribute('data-booting');
-        this.setAttribute('data-ready', '');
-      });
+      requestAnimationFrame(() => this.setAttribute('data-ready', ''));
     });
 
     // Restoring from the back/forward cache skips `setup()` entirely, and the

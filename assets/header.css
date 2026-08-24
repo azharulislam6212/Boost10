@@ -36,21 +36,27 @@
 /* --------------------------------------------------------------------------
    Boot stability
    --------------------------------------------------------------------------
-   The server sends the complete header before the custom element upgrades.
-   During that short window sticky/transparent state and measured offsets are
-   not final yet. Keep only the visual shell hidden until StickyHeader has
-   primed those values; the header section itself remains in flow, so the page
-   never jumps vertically. No-JS storefronts keep the header visible.
+   The header is visible from the first paint. It is not waiting on anything.
+
+   It used to be. `.site-header__shell` was `visibility: hidden` until the
+   custom element upgraded and cleared `data-booting`, on the reasoning that the
+   server-rendered state might not match the measured one and the correction
+   would be visible. What that actually bought was a page whose header is a
+   blank strip for as long as the module takes to arrive — over a slow
+   connection, seconds — and then appears all at once. The screenshot of an
+   announcement bar sitting directly on top of a hero banner is that rule, not a
+   layout bug.
+
+   The premise was wrong twice over. Liquid already knows the header's height
+   (`--header-block-size`, published by the section from the merchant's own
+   settings) and its sticky mode, and `.header-section:has(…)` below pins it
+   with no script at all — so the pre-upgrade paint is not a guess, it is the
+   answer. And the thing worth suppressing was never the header, only the
+   *transition* between two correct states, which `:not(:defined)` and
+   `[data-priming]` handle further down without hiding anything.
+
+   Nothing replaces these rules. That is the fix.
    -------------------------------------------------------------------------- */
-
-sticky-header:not(:defined) .site-header__shell,
-sticky-header[data-booting] .site-header__shell {
-  visibility: hidden;
-}
-
-html.no-js sticky-header .site-header__shell {
-  visibility: visible;
-}
 
 
 /* The timing tokens are on `:root`, not on `.site-header`.
