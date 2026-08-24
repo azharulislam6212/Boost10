@@ -40,14 +40,25 @@ import {
   prefersReducedMotion
 } from '@theme/utilities';
 
-/** Below this many characters, a query returns noise rather than suggestions. */
-const MIN_QUERY_LENGTH = 2;
+/**
+ * Suggestions start at the first character.
+ *
+ * Two was a guess about noise, and it was the wrong one for a catalogue people
+ * search by brand initial or by a short name — "b", "k2", "d3" are real queries
+ * in a supplement store, and a panel that stayed empty until the second
+ * keystroke read as broken. Shopify's endpoint ranks a single-character query
+ * perfectly well; the 300ms debounce is what keeps the request count sane.
+ */
+const MIN_QUERY_LENGTH = 1;
 
 /** Where recent searches live. Per browser, never sent anywhere. */
 const RECENT_KEY = 'boost10:recent-searches';
 
-/** How long each rotating placeholder holds before the next one. */
+/** How long each rotating prompt holds before the next one. */
 const PROMPT_INTERVAL = 3200;
+
+/** Fade-out half of the prompt swap. Must match `--search-prompt-duration`. */
+const PROMPT_FADE = 260;
 
 
 /* ==========================================================================
@@ -387,8 +398,11 @@ export class PredictiveSearch extends BaseComponent {
   /** The query whose results are currently displayed. */
   #rendered = '';
 
-  /** @type {number|null} Rotating placeholder interval. */
+  /** @type {number|null} Rotating prompt interval. */
   #promptTimer = null;
+
+  /** @type {number|null} The in-flight half of a prompt cross-fade. */
+  #promptSwap = null;
 
   setup() {
     // The idle column, the recent searches and the rotating prompts are not
@@ -398,13 +412,19 @@ export class PredictiveSearch extends BaseComponent {
     this.#setupRecent();
     this.#setupTerms();
 
+    // The field's own chrome — the clear button and the animated prompt — reacts
+    // to what is typed whether or not suggestions are switched on. Bound before
+    // the early return, or a merchant with predictive search off gets a prompt
+    // animating underneath the customer's own text.
+    this.on(this.refs.input, 'input', () => this.#syncField());
+    this.#syncField();
+
     if (window.Theme?.settings?.predictiveSearch === false) return;
 
     const search = debounce((value) => this.search(value), 300);
 
     this.on(this.refs.input, 'input', (event) => {
       const value = event.target.value.trim();
-      this.#toggleReset(value.length > 0);
 
       if (value.length < MIN_QUERY_LENGTH) {
         search.cancel?.();
@@ -430,8 +450,6 @@ export class PredictiveSearch extends BaseComponent {
       if (this.contains(event.target)) return;
       this.close();
     });
-
-    this.#toggleReset(this.refs.input.value.trim().length > 0);
   }
 
   teardown() {
@@ -441,6 +459,11 @@ export class PredictiveSearch extends BaseComponent {
     if (this.#promptTimer) {
       clearInterval(this.#promptTimer);
       this.#promptTimer = null;
+    }
+
+    if (this.#promptSwap) {
+      clearTimeout(this.#promptSwap);
+      this.#promptSwap = null;
     }
   }
 
@@ -543,7 +566,7 @@ export class PredictiveSearch extends BaseComponent {
     this.refs.input.value = '';
     this.#rendered = '';
     this.close();
-    this.#toggleReset(false);
+    this.#syncField();
     this.refreshRecent();
 
     if (focus) this.refs.input.focus({ preventScroll: true });
@@ -620,6 +643,7 @@ export class PredictiveSearch extends BaseComponent {
     // `aria-activedescendant` is never set and arrow keys announce nothing.
     if (list && this.refs.input.id) list.dataset.input = this.refs.input.id;
 
+    this.#refreshMedia();
     list?.reset();
 
     const count = list?.count ?? 0;
@@ -634,6 +658,46 @@ export class PredictiveSearch extends BaseComponent {
     announce(message);
 
     this.dispatch(EVENTS.SEARCH_RESULTS, { query: term, count });
+  }
+
+  /**
+   * Put every image in the freshly morphed panel back into a visible state.
+   *
+   * `<responsive-image>` reveals itself by writing `data-loaded`, and a morph
+   * removes any attribute the incoming markup does not carry — which
+   * server-rendered markup never does for a runtime flag. `global.js` restores
+   * the flag on its own, but only for elements that upgraded; a panel rendered
+   * before that module arrives, or a card whose `<img>` node was replaced
+   * outright, would be left faded to zero with no event coming to fix it.
+   *
+   * Cheap and idempotent: a handful of nodes, one attribute each, and a
+   * one-shot listener for anything still in flight.
+   *
+   * @private
+   */
+  #refreshMedia() {
+    const figures = this.refs.panel.querySelectorAll('responsive-image');
+
+    for (const figure of figures) {
+      const image = figure.querySelector('img');
+      if (!(image instanceof HTMLImageElement)) continue;
+
+      if (image.complete && image.naturalWidth > 0) {
+        figure.setAttribute('data-loaded', '');
+        continue;
+      }
+
+      figure.removeAttribute('data-loaded');
+      image.addEventListener('load', () => figure.setAttribute('data-loaded', ''), { once: true });
+      image.addEventListener(
+        'error',
+        () => {
+          figure.setAttribute('data-error', '');
+          figure.setAttribute('data-loaded', '');
+        },
+        { once: true }
+      );
+    }
   }
 
   /**
@@ -678,7 +742,14 @@ export class PredictiveSearch extends BaseComponent {
    * @private
    */
   #toggleReset(visible) {
-    if (this.refs.reset instanceof HTMLElement) this.refs.reset.toggleAttribute('hidden', !visible);
+    if (!(this.refs.reset instanceof HTMLElement)) return;
+
+    this.refs.reset.toggleAttribute('data-visible', visible);
+
+    // `hidden` would win over the fade, so the button is taken out of the tab
+    // order explicitly instead. `visibility: hidden` in CSS already hides it
+    // from assistive technology.
+    this.refs.reset.tabIndex = visible ? 0 : -1;
   }
 
   /* ------------------------------------------------- prompts and history -- */
@@ -695,32 +766,78 @@ export class PredictiveSearch extends BaseComponent {
   }
 
   /**
-   * Rotate the placeholder through the merchant's prompts.
+   * The animated prompt.
    *
-   * A static placeholder in a supplement store says "Search". Three prompts say
-   * what the store actually sells. The first is already in the markup, so the
-   * field is never empty before this runs, and a customer who has started
-   * typing is left alone — swapping the placeholder under a half-typed query is
-   * movement with no meaning.
+   * A native `placeholder` cannot be animated — no pseudo-element transition
+   * applies to it — so the moving copy lives in a real element painted over the
+   * field, and the native placeholder is emptied only once that element is in
+   * play. With JavaScript off, or with a single prompt configured, or with
+   * `prefers-reduced-motion`, nothing here runs and the customer sees the
+   * server-rendered `placeholder` exactly as before. That ordering is the whole
+   * fallback: the enhancement removes the plain version, never the reverse.
+   *
+   * The prompt is `aria-hidden` and `pointer-events: none`. It is decoration
+   * over a field that already has a real `<label>`, and a click on it has to
+   * land in the input underneath.
    *
    * @private
    */
   #setupPrompts() {
+    const prompt = this.refs.prompt;
+    if (!(prompt instanceof HTMLElement)) return;
+
     const prompts = (this.dataset.prompts || '')
       .split('|')
-      .map((prompt) => prompt.trim())
+      .map((entry) => entry.trim())
       .filter(Boolean);
+
+    if (prompts.length === 0) return;
+
+    // Take over from the native placeholder. One element showing the copy means
+    // there is never a frame with both.
+    prompt.textContent = prompts[0];
+    this.refs.input.placeholder = '';
+    this.setAttribute('data-prompt', '');
+    this.#syncField();
 
     if (prompts.length < 2 || prefersReducedMotion()) return;
 
     let index = 0;
 
     this.#promptTimer = window.setInterval(() => {
+      // A customer who has started typing is left alone: moving copy under a
+      // half-typed query is motion with no meaning, and the prompt is hidden
+      // behind their text anyway.
       if (this.refs.input.value.trim().length > 0) return;
 
       index = (index + 1) % prompts.length;
-      this.refs.input.placeholder = prompts[index];
+
+      prompt.setAttribute('data-swap', '');
+      this.#promptSwap = window.setTimeout(() => {
+        prompt.textContent = prompts[index];
+        prompt.removeAttribute('data-swap');
+        this.#promptSwap = null;
+      }, PROMPT_FADE);
     }, PROMPT_INTERVAL);
+  }
+
+  /**
+   * Keep the field's chrome in step with its value.
+   *
+   * The clear button is shown through `data-visible` rather than the `hidden`
+   * attribute: `hidden` is `display: none`, which cannot transition, and the
+   * button appearing and vanishing between keystrokes without a fade is the
+   * jumpiest thing in the panel. CSS hides it with `visibility` instead, which
+   * keeps it out of the accessibility tree and out of the tab order while still
+   * allowing the fade.
+   *
+   * @private
+   */
+  #syncField() {
+    const filled = this.refs.input.value.trim().length > 0;
+
+    this.#toggleReset(filled);
+    this.toggleAttribute('data-filled', filled);
   }
 
   /**
@@ -843,7 +960,7 @@ export class PredictiveSearch extends BaseComponent {
     if (!value) return;
 
     this.refs.input.value = value;
-    this.#toggleReset(true);
+    this.#syncField();
     this.refs.input.focus({ preventScroll: true });
 
     // With suggestions switched off there is nothing to show in place, so the

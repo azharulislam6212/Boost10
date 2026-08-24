@@ -34,6 +34,45 @@
     --search-media-size: 6.4rem;
     --search-field-height: 5.2rem;
     --search-aside-width: 32rem;
+
+    /* The two panel widths, in one place. 99rem is 990px and 50rem is 500px at
+       the theme's 62.5% root — a merchant asking for a wider modal changes one
+       number rather than hunting through media queries. */
+    --search-modal-width: 99rem;
+    --search-drawer-width: 50rem;
+
+    /* Matches PROMPT_FADE in search.js. The swap is a fade out, a text change,
+       and a fade in, so the two halves have to agree or the copy changes while
+       it is still visible. */
+    --search-prompt-duration: 260ms;
+  }
+
+  /* ==========================================================================
+     The search field itself
+     --------------------------------------------------------------------------
+     Applies to every search input in the theme, not just the overlay: the 404
+     field, the FAQ filter and the store locator all render `type="search"`.
+     ========================================================================== */
+
+  /* WebKit paints its own clear button inside `type="search"`, and it appears on
+     hover and focus — directly on top of the theme's own clear control, which is
+     positioned in the same corner. Two crosses, one of which is unstyled and
+     ignores the design entirely. The native one goes; the theme's stays. */
+  input[type='search']::-webkit-search-decoration,
+  input[type='search']::-webkit-search-cancel-button,
+  input[type='search']::-webkit-search-results-button,
+  input[type='search']::-webkit-search-results-decoration {
+    display: none;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  /* Edge's equivalent, which is a pseudo-element rather than a shadow control. */
+  input[type='search']::-ms-clear,
+  input[type='search']::-ms-reveal {
+    display: none;
+    inline-size: 0;
+    block-size: 0;
   }
 
   /* ==========================================================================
@@ -47,13 +86,21 @@
      `top` placement — the field has to stay near the header control the
      customer just clicked, and a panel that grows as results arrive must not
      push its own field up the screen while they read them. */
-  .search-drawer--modal .drawer__dialog {
+  /* Every panel rule below is written as `.search-drawer[data-layout='…']`
+     rather than with the `--modal` / `--drawer` class. base.css sizes the panel
+     through `.drawer[data-placement='top'] .drawer__panel`, which carries an
+     attribute selector and therefore outweighs a two-class rule: written the
+     short way, `inline-size` here would lose and the modal would stay
+     full-bleed. Matching its shape puts these on equal specificity, where file
+     order decides — and search.css loads after base.css. */
+  .search-drawer[data-layout='modal'] .drawer__dialog {
     justify-content: center;
     padding: var(--space-4);
   }
 
-  .search-drawer--modal .drawer__panel {
-    inline-size: min(100rem, 100%);
+  .search-drawer[data-layout='modal'] .drawer__panel {
+    inline-size: min(var(--search-modal-width), 100%);
+    max-inline-size: var(--search-modal-width);
     block-size: auto;
     max-block-size: min(80vh, 78rem);
     margin-block-start: var(--space-6);
@@ -61,9 +108,49 @@
     overflow: clip;
   }
 
-  .search-drawer--drawer .drawer__panel {
-    inline-size: min(48rem, 100vw);
+  /* Same shape as the cart drawer: a fixed width that collapses to the viewport
+     rather than a breakpoint switch, so there is no width at which the panel is
+     wider than the screen and no jump as the screen crosses it. */
+  .search-drawer[data-layout='drawer'] .drawer__panel {
+    inline-size: min(var(--search-drawer-width), 100vw);
+    max-inline-size: 100vw;
     border-radius: 0;
+  }
+
+  /* ---- phones ----
+
+     Below the tablet breakpoint both layouts become the same thing: an
+     edge-to-edge sheet. The modal drops its margin, its rounded corners and its
+     side gutters — 990px of centred card on a 390px screen is a card with no
+     room left inside it. */
+  @media screen and (max-width: 749px) {
+    .search-drawer[data-layout] .drawer__dialog {
+      padding: 0;
+    }
+
+    .search-drawer[data-layout] .drawer__panel {
+      inline-size: 100vw;
+      max-inline-size: 100vw;
+      block-size: 100%;
+      max-block-size: 100%;
+      margin-block-start: 0;
+      border-radius: 0;
+    }
+
+    /* Notched phones and gesture bars. `max()` keeps the design's padding on
+       every device that has no inset to report, and the theme's own spacing is
+       never reduced by the safe area — only extended past it. */
+    .predictive-search--overlay .search-panel__head {
+      padding-block-start: max(var(--space-5), env(safe-area-inset-top));
+      padding-inline-start: max(var(--space-5), env(safe-area-inset-left));
+      padding-inline-end: max(var(--space-5), env(safe-area-inset-right));
+    }
+
+    .predictive-search--overlay .search-panel__body {
+      padding-block-end: max(var(--space-5), env(safe-area-inset-bottom));
+      padding-inline-start: max(var(--space-5), env(safe-area-inset-left));
+      padding-inline-end: max(var(--space-5), env(safe-area-inset-right));
+    }
   }
 
   .search-panel {
@@ -207,6 +294,81 @@
     color: var(--color-heading);
   }
 
+  /* The clear button fades rather than switching on `hidden`. `display: none`
+     cannot transition, and this control appears and disappears between
+     keystrokes — the snap was the jumpiest thing in the panel. `visibility`
+     still takes it out of the accessibility tree; `search.js` takes it out of
+     the tab order to match. */
+  .search-form__reset {
+    opacity: 0;
+    visibility: hidden;
+    transform: scale(0.8);
+    transition:
+      opacity var(--transition-fast),
+      transform var(--transition-fast),
+      visibility 0s linear var(--duration-fast, 150ms),
+      background-color var(--transition-fast),
+      color var(--transition-fast);
+  }
+
+  .search-form__reset[data-visible] {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    transition-delay: 0s;
+  }
+
+  /* ---- the animated prompt ----
+
+     A real element painted over the field, because a native `placeholder`
+     cannot be transitioned. It is only ever filled once `search.js` has cleared
+     the input's own placeholder, so the two never appear together, and with no
+     JavaScript this element stays empty and invisible. */
+  .search-form__prompt {
+    /* The insets track the field's own padding, which differs between the
+       overlay's pill and the plain field on the 404 page. Getting these wrong
+       shows up as the animated copy sitting a few pixels off from where the
+       customer's first character lands. */
+    --search-prompt-start: var(--input-padding-inline, var(--space-4));
+    --search-prompt-end: var(--space-9);
+
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: var(--search-prompt-start);
+    inset-inline-end: var(--search-prompt-end);
+    display: flex;
+    align-items: center;
+    pointer-events: none;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    color: var(--color-accent-text);
+    font-size: var(--font-size-md);
+    line-height: 1;
+    opacity: 1;
+    transform: translateY(0);
+    transition:
+      opacity var(--search-prompt-duration) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+      transform var(--search-prompt-duration) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+  }
+
+  .predictive-search--overlay .search-form__prompt {
+    --search-prompt-start: var(--space-5);
+    --search-prompt-end: 10rem;
+  }
+
+  /* Mid-swap: out and up, then the text changes and it comes back from below. */
+  .search-form__prompt[data-swap] {
+    opacity: 0;
+    transform: translateY(-0.6rem);
+  }
+
+  /* The customer's own text is the only copy in the field once they type. */
+  .predictive-search[data-filled] .search-form__prompt {
+    opacity: 0;
+    visibility: hidden;
+  }
+
   /* ==========================================================================
      Body: aside + results
      ========================================================================== */
@@ -257,6 +419,15 @@
   }
 
   .search-panel__idle {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  /* Products, collections and blog posts each get their own labelled group, and
+     the gap between groups is larger than the gap between rows — otherwise the
+     three read as one long list with headings dropped into it. */
+  .search-suggestions {
     display: flex;
     flex-direction: column;
     gap: var(--space-3);
@@ -662,9 +833,16 @@
     .search-card,
     .search-chip,
     .search-results__all,
+    .search-form__prompt,
     .predictive-search--overlay .search-form__submit,
-    .predictive-search--overlay .search-form__reset {
+    .search-form__reset {
       transition: none;
+    }
+
+    /* `search.js` already stops rotating the prompt under reduced motion, so
+       this only removes the travel from the single state it settles in. */
+    .search-form__prompt[data-swap] {
+      transform: none;
     }
   }
 }

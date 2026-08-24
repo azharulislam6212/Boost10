@@ -738,6 +738,27 @@ defineComponent('mobile-navigation', MobileNavigation);
  * that than any script — it only handles the reveal.
  */
 export class ResponsiveImage extends BaseComponent {
+  /**
+   * `data-loaded` is watched because this element writes it and something else
+   * removes it.
+   *
+   * `morph()` reconciles attributes in both directions: anything on the live
+   * node that the incoming markup does not carry is removed. Freshly rendered
+   * Liquid never carries `data-loaded` — it is a runtime flag, not markup — so
+   * every morph strips it from images that are already on screen, and
+   * `responsive-image:defined:not([data-loaded]) img[loading='lazy']` fades them
+   * to zero.
+   *
+   * Usually a new `src` follows and the `load` listener puts the flag back. It
+   * does not when the src is unchanged, which is the common case in predictive
+   * search: type "dre", then "drea", and the same products come back with the
+   * same image URLs. No `load` event fires, nothing re-marks the element, and
+   * the images stay invisible for the rest of the session.
+   *
+   * @type {string[]}
+   */
+  static observedAttributes = ['data-loaded'];
+
   setup() {
     const image = this.querySelector('img');
     if (!(image instanceof HTMLImageElement)) return;
@@ -753,6 +774,22 @@ export class ResponsiveImage extends BaseComponent {
       this.setAttribute('data-error', '');
       this.#markLoaded();
     });
+  }
+
+  /**
+   * @param {string} name
+   * @param {string|null} _oldValue
+   * @param {string|null} newValue
+   */
+  attributeChanged(name, _oldValue, newValue) {
+    if (name !== 'data-loaded' || newValue !== null) return;
+
+    // Only when the pixels are genuinely there. An image still in flight has to
+    // stay faded out, or the reveal becomes a pop-in of a half-painted frame.
+    const image = this.querySelector('img');
+    if (image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0) {
+      this.#markLoaded();
+    }
   }
 
   /** @private */

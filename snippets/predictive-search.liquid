@@ -72,6 +72,51 @@
   endcomment
   assign suggestion_products = settings.suggestion_product_list
   assign suggestion_count = suggestion_products.count | default: suggestion_products.size | default: 0
+
+  assign suggestion_collections = settings.suggestion_collection_list
+  assign suggestion_collection_count = suggestion_collections.count | default: suggestion_collections.size | default: 0
+
+  comment
+    Articles come from a blog picker rather than an article picker, because
+    Shopify has no article_list setting. Taking the newest few from the chosen
+    blog is also the behaviour a merchant actually wants: the panel stays
+    current on its own instead of pointing at three posts from last spring
+    until someone remembers to change them.
+  endcomment
+  assign articles_limit = settings.suggestion_articles_count | default: 3
+  assign suggestion_blog = blogs[settings.suggestion_blog]
+  assign suggestion_articles = suggestion_blog.articles
+
+  assign show_suggestion_products = true
+  if settings.show_suggestion_products == false
+    assign show_suggestion_products = false
+  endif
+
+  assign show_suggestion_collections = true
+  if settings.show_suggestion_collections == false
+    assign show_suggestion_collections = false
+  endif
+
+  assign show_suggestion_articles = true
+  if settings.show_suggestion_articles == false
+    assign show_suggestion_articles = false
+  endif
+
+  comment
+    Whether anything at all sits in the idle column. The Browse all link is
+    rendered from this rather than from the product group alone — a panel
+    showing only collections still needs its way out.
+  endcomment
+  assign has_suggestions = false
+  if show_suggestion_products and suggestion_count > 0
+    assign has_suggestions = true
+  endif
+  if show_suggestion_collections and suggestion_collection_count > 0
+    assign has_suggestions = true
+  endif
+  if show_suggestion_articles and suggestion_articles.size > 0
+    assign has_suggestions = true
+  endif
 -%}
 
 <predictive-search
@@ -116,14 +161,31 @@
         enterkeyhint="search"
       >
 
+      {%- comment -%}
+        The animated prompt. Empty in the markup and filled by JavaScript, which
+        also clears the input's own `placeholder` at the same moment — so a
+        customer without JavaScript keeps the plain placeholder above and never
+        sees an empty field, and there is no frame where both are painted.
+
+        `aria-hidden` because the field already has a real `<label>`, and
+        `pointer-events: none` in CSS so a click on the words lands in the input.
+      {%- endcomment -%}
+      <span class="search-form__prompt" data-ref="prompt" aria-hidden="true"></span>
+
       <input type="hidden" name="options[prefix]" value="last">
 
+      {%- comment -%}
+        No `hidden` attribute: `display: none` cannot transition, and this button
+        appears and disappears between keystrokes. CSS hides it with
+        `visibility` instead — still out of the accessibility tree, still out of
+        the tab order via `tabindex`, but able to fade.
+      {%- endcomment -%}
       <button
         type="button"
         class="search-form__reset"
         data-ref="reset"
         aria-label="{{ 'search.clear' | t }}"
-        hidden
+        tabindex="-1"
       >
         {% render 'icon', icon: 'close', size: 16 %}
       </button>
@@ -214,27 +276,74 @@
           no second request.
         {%- endcomment -%}
         <div class="search-panel__idle" data-ref="idle">
-          {%- if suggestion_count > 0 -%}
-            <p class="search-group__title">
-              {{- settings.suggestion_text | default: 'Suggestion products' | escape -}}
-            </p>
+          {%- comment -%}
+            Three merchant-curated groups, each independently switchable, each
+            rendered through the same card as a real suggestion — so what the
+            customer sees before typing is shaped exactly like what they see
+            after, and the panel does not appear to change layout mid-search.
 
-            <ul class="search-group__items" role="list">
-              {%- for product in suggestion_products limit: 6 -%}
-                {%- comment -%}
-                  `selectable: false` — these rows are outside the combobox
-                  popup, and `role="option"` on a list item that no listbox owns
-                  is invalid ARIA rather than a harmless extra attribute.
-                {%- endcomment -%}
-                {% render 'predictive-search-card',
-                   type: 'product',
-                   item: product,
-                   id: 'SearchSuggestion-',
-                   index: forloop.index,
-                   selectable: false %}
-              {%- endfor -%}
-            </ul>
+            `selectable: false` throughout: these rows sit outside the combobox
+            popup, and `role="option"` on a list item that no listbox owns is
+            invalid ARIA rather than a harmless extra attribute.
+          {%- endcomment -%}
+          {%- if show_suggestion_products and suggestion_count > 0 -%}
+            <section class="search-suggestions">
+              <p class="search-group__title">
+                {{- settings.suggestion_text | default: 'Suggestion products' | escape -}}
+              </p>
 
+              <ul class="search-group__items" role="list">
+                {%- for product in suggestion_products limit: 6 -%}
+                  {% render 'predictive-search-card',
+                     type: 'product',
+                     item: product,
+                     id: 'SearchSuggestionProduct-',
+                     index: forloop.index,
+                     selectable: false %}
+                {%- endfor -%}
+              </ul>
+            </section>
+          {%- endif -%}
+
+          {%- if show_suggestion_collections and suggestion_collection_count > 0 -%}
+            <section class="search-suggestions">
+              <p class="search-group__title">
+                {{- settings.suggestion_collections_text | default: 'Popular collections' | escape -}}
+              </p>
+
+              <ul class="search-group__items" role="list">
+                {%- for collection in suggestion_collections limit: 6 -%}
+                  {% render 'predictive-search-card',
+                     type: 'collection',
+                     item: collection,
+                     id: 'SearchSuggestionCollection-',
+                     index: forloop.index,
+                     selectable: false %}
+                {%- endfor -%}
+              </ul>
+            </section>
+          {%- endif -%}
+
+          {%- if show_suggestion_articles and suggestion_articles.size > 0 -%}
+            <section class="search-suggestions">
+              <p class="search-group__title">
+                {{- settings.suggestion_articles_text | default: 'From the journal' | escape -}}
+              </p>
+
+              <ul class="search-group__items" role="list">
+                {%- for article in suggestion_articles limit: articles_limit -%}
+                  {% render 'predictive-search-card',
+                     type: 'article',
+                     item: article,
+                     id: 'SearchSuggestionArticle-',
+                     index: forloop.index,
+                     selectable: false %}
+                {%- endfor -%}
+              </ul>
+            </section>
+          {%- endif -%}
+
+          {%- if has_suggestions -%}
             <div class="search-results__footer">
               <a class="search-results__all" href="{{ routes.all_products_collection_url }}">
                 <span>{{ settings.browse_all_text | default: 'Browse All' | escape }}</span>
