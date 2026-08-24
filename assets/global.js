@@ -478,6 +478,17 @@ export class StickyHeader extends BaseComponent {
       if (pinned !== this.#pinned) {
         this.#pinned = pinned;
         this.toggleAttribute('data-pinned', pinned);
+
+        // A page restored mid-scroll *adopts* the pinned state; it does not
+        // enter it. The drop-in keyframes have nothing to come from there — the
+        // header was never on screen to leave — so they read as the bar
+        // dropping in from the top of the window a beat after the page arrives,
+        // on every reload.
+        //
+        // Cleared as soon as the header unpins, which is the only way back to
+        // the animated path: scroll up past the header's place in the flow and
+        // the next pin is a real one, with a real starting position.
+        this.toggleAttribute('data-instant', pinned && priming);
       }
 
       // Nothing in this mode hides, and an attribute left behind by a mode
@@ -490,6 +501,7 @@ export class StickyHeader extends BaseComponent {
     if (mode !== 'scroll-down' && this.#pinned !== null) {
       this.#pinned = null;
       this.removeAttribute('data-pinned');
+      this.removeAttribute('data-instant');
     }
 
     const delta = position - this.#lastScroll;

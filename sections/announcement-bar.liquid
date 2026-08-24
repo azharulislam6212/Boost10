@@ -62,10 +62,35 @@
     {%- content_for 'blocks' -%}
   {%- endcapture -%}
 
+  {%- comment -%}
+    The dismissal key, decided by Liquid rather than by JavaScript.
+
+    `announcement-bar.js` used to derive it by hashing the rendered text after
+    the module loaded, which is the only moment it could. That is also why a
+    dismissible bar had to start hidden: nothing could know whether this
+    customer had closed it until the module arrived, so the safe state was
+    `display: none` — and the bar then appeared late and pushed the entire page
+    down, header included.
+
+    Stated here, the key exists before the first byte of the bar is parsed, so
+    the tiny script below can answer the same question in the same paint. The
+    rule it keys on is unchanged, dismissal still lasts a session, and editing
+    the wording still brings the bar back — the key is a hash of the text, so
+    new copy means a new key.
+  {%- endcomment -%}
+  {%- liquid
+    assign announcement_text = announcements | strip_html | strip
+    assign dismiss_key = announcement_text | md5 | slice: 0, 10
+    assign dismiss_storage_key = 'boost10:announcement:' | append: section.id | append: ':' | append: dismiss_key
+    assign bar_id = 'AnnouncementBar-' | append: section.id
+  -%}
+
   <announcement-bar
+    id="{{ bar_id }}"
     class="announcement-bar color-scheme-container color-{{ section_settings.color_scheme }}{% unless section_settings.enable_on_mobile %} announcement-bar--desktop-only{% endunless %}"
     data-announcement-bar
     data-section-id="{{ section.id }}"
+    data-dismiss-key="{{ dismiss_key }}"
     {% if section_settings.show_close %}data-dismissible{% endif %}
     {% render 'spacing', section: section_settings %}
   >
@@ -186,6 +211,57 @@
       {%- endif -%}
     </div>
   </announcement-bar>
+
+  {%- if section_settings.show_close -%}
+    {%- comment -%}
+      The pre-paint dismissal check.
+
+      Placed immediately after the element and deliberately not deferred: a
+      parser-blocking inline script runs before the bar it follows can be
+      painted, so both outcomes are settled in the first frame.
+
+        dismissed   `data-dismissed` is set and the bar is never painted at
+                    all — the returning customer sees no flash of something
+                    they closed, which is what the hidden-by-default rule was
+                    protecting.
+
+        not         `data-ready` is set, the existing CSS reveals the bar in
+                    the same frame, and the page below it never moves. This is
+                    the layout shift that pushed the header down.
+
+      The module still owns dismissal itself — the click, the write, the theme
+      editor re-render. This only answers, early, the one question that decides
+      whether the bar occupies space.
+    {%- endcomment -%}
+    <script>
+      (function () {
+        var bar = document.getElementById({{ bar_id | json }});
+        if (!bar) return;
+
+        var dismissed = false;
+        try {
+          dismissed = sessionStorage.getItem({{ dismiss_storage_key | json }}) === '1';
+        } catch (error) {
+          // Private mode, or storage blocked. Showing the bar is the safe
+          // answer: the worst case is one extra dismissal.
+        }
+
+        bar.setAttribute(dismissed ? 'data-dismissed' : 'data-ready', '');
+      })();
+    </script>
+
+    {%- comment -%}
+      With scripting off the check above never runs, so `data-ready` is never
+      written and the CSS would hide a dismissible bar permanently — the
+      merchant's announcement lost to a feature that cannot work anyway. There
+      is nothing to dismiss without JavaScript, so the bar is simply shown.
+    {%- endcomment -%}
+    <noscript>
+      <style>
+        #{{ bar_id }} { display: block; }
+      </style>
+    </noscript>
+  {%- endif -%}
 {%- endif -%}
 
 {% schema %}

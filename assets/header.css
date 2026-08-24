@@ -203,6 +203,30 @@ sticky-header[data-sticky-mode='scroll-down'][data-pinned] {
   animation: site-header-drop-in var(--header-speed) var(--header-ease) backwards;
 }
 
+/* Except when the page was *restored* into the pinned state rather than
+   scrolled into it.
+
+   Reloading half-way down a page is the case. The browser restores the offset,
+   `<sticky-header>` sees that the header's place in the flow is already above
+   the fold and pins it — correctly — and the keyframes then slide the bar down
+   from `translateY(-100%)` as if the customer had just scrolled it back into
+   view. They did not. They reloaded, and what they see is the header dropping
+   in from the top of the screen a beat after the page arrives, on every single
+   refresh.
+
+   `data-instant` is written alongside `data-pinned` only when the state was
+   adopted during priming, and cleared the moment the header unpins — so the
+   next genuine pin animates exactly as before.
+
+   Suppressing this through `[data-priming]` instead does not work, and is worth
+   recording: a CSS animation starts when its `animation-name` becomes
+   non-`none`. Setting `animation: none` for the priming frames and then
+   releasing it two frames later does not skip the drop-in, it *schedules* it —
+   the same jump, two frames later. The animation has to never apply at all. */
+sticky-header[data-sticky-mode='scroll-down'][data-pinned][data-instant] {
+  animation: none;
+}
+
 @keyframes site-header-drop-in {
   from {
     transform: translateY(-100%);

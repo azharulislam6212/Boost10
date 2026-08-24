@@ -112,9 +112,22 @@ export class AnnouncementBar extends BaseComponent {
     this.setAttribute('data-ready', '');
   }
 
-  /** @private */
+  /**
+   * The storage key, preferring the one Liquid stamped on the element.
+   *
+   * `data-dismiss-key` is an md5 of the announcement text taken at render time,
+   * and the section's pre-paint script reads storage under that key before this
+   * module exists. The two must agree exactly, or a dismissal written by one
+   * would never be found by the other.
+   *
+   * The DOM hash below stays as the fallback, for markup rendered before that
+   * attribute existed.
+   *
+   * @private
+   */
   get #key() {
-    return `${STORAGE_PREFIX}${this.dataset.sectionId}:${this.#contentHash}`;
+    const key = this.dataset.dismissKey || this.#contentHash;
+    return `${STORAGE_PREFIX}${this.dataset.sectionId}:${key}`;
   }
 
   /**
