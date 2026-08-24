@@ -12,6 +12,7 @@
  * The whole thing degrades to a plain form. The input is a real `<input
  * type="search" name="q">` inside a `<form action="/search">`, so pressing Enter
  * with JavaScript disabled runs a normal search.
+ * 
  *
  * Accessibility follows the combobox pattern: focus never leaves the input, and
  * the highlighted suggestion is tracked through `aria-activedescendant` by

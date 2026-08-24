@@ -14,6 +14,7 @@
   @param {string} [terms] - The query, echoed back in the panel variant
   @param {string} [url] - Where the reset link goes. Defaults to clearing filters
 
+  
   @example
     {% render 'search-empty', context: 'panel', terms: predictive_search.terms %}
     {% render 'search-empty', context: 'filters' %}
@@ -73,13 +74,25 @@
   {%- endcomment -%}
   {%- if variant == 'panel' -%}
     {%- if terms != blank -%}
+      {%- comment -%}
+        The capture is trimmed into its own variable before the render, never
+        inline as `href: panel_url | strip`. Shopify's `render` tag does not
+        accept filters in an argument — the parser stops at the pipe and the
+        whole tag is a syntax error — so anything that needs filtering is
+        resolved first and passed as a plain variable.
+      {%- endcomment -%}
       {%- capture panel_url -%}
         {{ routes.search_url }}?q={{ terms | url_encode }}&options%5Bprefix%5D=last
       {%- endcapture -%}
-      {%- assign panel_label = 'search.empty.action' | t | strip -%}
+
+      {%- liquid
+        assign panel_url = panel_url | strip
+        assign panel_label = 'search.empty.action' | t
+      -%}
+
       {% render 'button',
          label: panel_label,
-         href: panel_url ,
+         href: panel_url,
          variant: 'primary',
          size: 'small',
          icon: 'arrow-right',
