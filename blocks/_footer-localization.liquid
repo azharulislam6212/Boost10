@@ -1,106 +1,54 @@
 {% comment %}
-  blocks/menu.liquid
+  blocks/_footer-localization.liquid
 
-  A list of links, and nothing else.
+  The country and language pickers, as a block a merchant can place.
 
-  It used to carry a heading, a heading preset, a background and an accordion
-  toggle of its own. All four moved up to the Column, because that is where they
-  were already being decided: a Column is the thing that collapses on a phone, it
-  is the thing with a surface, and two places to set a heading meant a merchant
-  could give one column two headings, or set a preset on the menu that the column
-  overrode. One owner per decision.
+  They were a section setting, which meant the footer decided where they went.
+  As a block they sit wherever the merchant drags them — usually the end of the
+  utilities row, which is what the design shows.
 
-  What is left is the menu, its link colour and its type preset — the things that
-  are genuinely about the links.
-
-  ## It is not a disclosure any more
-
-  It was a `<details>` with its own summary. Now the Column is the disclosure and
-  this is the content inside it, so the menu renders as a plain list — one
-  summary per column rather than a summary inside a summary, which is what a
-  nested `<details>` in a collapsed column actually produced on a phone.
+  Nothing about the pickers themselves is re-implemented here.
+  `snippets/localization-selectors.liquid` wraps Shopify's own `localization`
+  form, which is the only supported way to change market or locale and the only
+  one that works with no JavaScript. The country list is searchable through that
+  snippet's own filter field — the same control the header uses, because it is
+  the same snippet.
 {% endcomment %}
 
 {%- liquid
-  assign menu = block.settings.menu
-  assign link_preset = block.settings.link_preset | default: 'paragraph'
-
-  comment
-    Declarations, merged into the one `style` attribute this element already
-    has. `data-block-spacing` is written by hand below because the attribute —
-    not the properties — is the selector base.css applies the padding through.
-  endcomment
-  capture menu_spacing
+  capture localization_spacing
     render 'spacing', block: block.settings, declarations: true
   endcapture
+
+  assign picker_id = 'FooterLocalization-' | append: block.id
 -%}
 
-{%- if menu != blank -%}
-  <div
-    class="footer-menu menu-block"
-    data-link-preset="{{ link_preset }}"
-    data-block-spacing
-    style="
-      {%- if block.settings.text_color != blank %}--menu-color: {{ block.settings.text_color }};{% endif -%}
-      {{- menu_spacing | strip -}}
-    "
-    {{ block.shopify_attributes }}
-  >
-    <ul class="footer-menu__list" role="list">
-      {%- for link in menu.links -%}
-        <li>
-          <a
-            class="footer-menu__link"
-            href="{{ link.url }}"
-            {% if link.current %}aria-current="page"{% endif %}
-          >
-            {{- link.title -}}
-          </a>
-        </li>
-      {%- endfor -%}
-    </ul>
-  </div>
-{%- endif -%}
+<div
+  class="footer-localization-block"
+  data-block-spacing
+  style="{{ localization_spacing | strip }}"
+  {{ block.shopify_attributes }}
+>
+  {%- if block.settings.heading != blank -%}
+    <p class="footer-localization-block__heading">{{ block.settings.heading }}</p>
+  {%- endif -%}
+
+  {% render 'localization-selectors', id_prefix: picker_id, class: 'footer__localization' %}
+</div>
 
 {% schema %}
 {
-  "name": "t:blocks.menu.name",
+  "name": "t:blocks.footer_localization.name",
   "tag": null,
   "settings": [
     {
-      "type": "link_list",
-      "id": "menu",
-      "label": "t:blocks.menu.settings.menu.label",
-      "default": "footer"
+      "type": "paragraph",
+      "content": "t:blocks.footer_localization.paragraph"
     },
     {
-      "type": "header",
-      "content": "t:blocks.menu.headers.appearance"
-    },
-    {
-      "type": "color",
-      "id": "text_color",
-      "label": "t:blocks.menu.settings.text_color.label"
-    },
-    {
-      "type": "select",
-      "id": "link_preset",
-      "label": "t:blocks.menu.settings.link_preset.label",
-      "options": [
-        {
-          "value": "paragraph",
-          "label": "t:shared.presets.paragraph"
-        },
-        {
-          "value": "h5",
-          "label": "t:shared.presets.h5"
-        },
-        {
-          "value": "h6",
-          "label": "t:shared.presets.h6"
-        }
-      ],
-      "default": "paragraph"
+      "type": "text",
+      "id": "heading",
+      "label": "t:shared.heading.label"
     },
     {
       "type": "header",
@@ -209,11 +157,6 @@
       "unit": "px",
       "default": 0,
       "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
-    }
-  ],
-  "presets": [
-    {
-      "name": "t:blocks.menu.name"
     }
   ]
 }

@@ -609,8 +609,27 @@ export function reveal(element, options = {}) {
     options.onReveal?.();
   };
 
+  // The element that is watched is not always the element that is hidden.
+  //
+  // The `reveal-*` presets rest at `clip-path: inset(100% 0 0 0)` — the element
+  // clipped away to nothing. IntersectionObserver applies the target's own
+  // clip-path before it measures, so an element clipped to nothing reports a
+  // ratio of 0 and never intersects, whatever the scroll position.
+  //
+  // When that resting state lands on the same element the observer is watching,
+  // those two facts deadlock: the state that hides the element suppresses the
+  // one event that would reveal it, and the content stays invisible for the
+  // life of the page. It only worked at all where the caller passed a
+  // `data-target`, because then the clip goes on a child and the host stays
+  // measurable — `reveal-up` on an element with no target was simply gone.
+  //
+  // So when the observed element clips itself, its parent is watched instead:
+  // the same place on the page, the same moment on screen, nothing clipped.
+  const clipsItself = targets.includes(element) && typeof restingState.clipPath === 'string';
+  const observed = clipsItself ? element.parentElement ?? element : element;
+
   const cancelObserve = observe(
-    element,
+    observed,
     () => play(withinLoadWindow()),
     {
       threshold: options.threshold,

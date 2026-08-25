@@ -1,9 +1,12 @@
 /**
  * footer.css — Boost10
  *
- * The footer and its composition blocks: Column, Menu, Email signup, Social
- * media links, plus the contact bar, the wordmark and the localization pickers
- * as they appear down there.
+ * The footer and everything composed inside it:
+ *
+ *     Column  ›  Group  ›  Elements
+ *
+ * plus the utility row, the bottom bar, the localization pickers, and the legal
+ * band that sits below the footer panel.
  *
  * Kept out of base.css for the same reason search.css is: this is one feature
  * with a lot of surface, it is the first thing an agency restyles, and one
@@ -14,10 +17,29 @@
  * everything else and merchant Custom CSS — injected unlayered by theme.liquid —
  * still wins without `!important`.
  *
- * Every colour reads a custom property from the section's colour scheme. The
- * gradient, the panel and the wordmark are built from `--color-background-rgb`
- * and `--color-primary-button-background`, so a merchant who changes the footer
- * scheme changes all three and nothing here needs editing.
+ * ## Where the colours come from
+ *
+ * The section's colour scheme, and only that. `.color-scheme-container` on the
+ * footer root paints `--color-background` *and* `--gradient-background`, so a
+ * merchant who sets the footer's gradient in Theme settings › Colours gets it —
+ * there is no gradient written into this file for that setting to lose to. Every
+ * surface below is built from `--color-background-rgb`,
+ * `--color-primary-button-background` and `--color-border-rgb`, which is why
+ * changing the scheme restyles the whole footer and nothing here needs editing.
+ *
+ * ## Where the shapes come from
+ *
+ * Custom properties emitted by Liquid, never a class per value:
+ *
+ *     --footer-radius / --footer-border-* / --footer-margin-block-*   section
+ *     --column-width / --column-order / --column-gap                  Column
+ *     --column-background / --column-heading-color                    Column
+ *     --utilities-gap-* / --utilities-radius / --utilities-border-*   Utilities
+ *     --utility-icon-size / --utility-icon-color / --utility-icon-bg  Utility item
+ *     --legal-logo-size / --legal-logo-opacity / --legal-logo-from|to Legal band
+ *
+ * Each one has a fallback in `var()`, so a block rendered before its setting
+ * existed still lays out.
  */
 
 @layer components {
@@ -39,32 +61,20 @@
     --footer-muted: var(--color-accent-text);
 
     position: relative;
+
+    /* The corners are a section setting, four independent values, so the
+       shorthand is assembled in Liquid and arrives as one property. `overflow`
+       is what makes them actually cut: a panel or a utility row with its own
+       background would otherwise square off the corner it sits in. */
+    border-radius: var(--footer-radius, 40px 40px 0 0);
     overflow: hidden;
-  }
 
-  /* The gradient is painted on a pseudo-element rather than the section, so the
-     panel's translucent surface has something to sit on and a merchant's Custom
-     CSS `background` on `.footer` does not have to fight a shorthand. */
-  .footer--gradient::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    z-index: 0;
-    pointer-events: none;
-    background:
-      radial-gradient(
-        120% 90% at 50% 0%,
-        rgb(var(--color-primary-button-background-rgb, 0 200 83) / 0.16) 0%,
-        transparent 60%
-      ),
-      linear-gradient(180deg, rgb(var(--color-background-rgb) / 0) 0%, rgb(var(--color-background-rgb) / 0.55) 100%);
-  }
+    /* Zero unless the merchant asked for a border, and `transparent` rather
+       than `currentColor` so a width of 0 cannot paint a hairline. */
+    border: var(--footer-border-width, 0px) solid var(--footer-border-color, transparent);
 
-  /* Everything above the gradient. One rule rather than a z-index on each part:
-     the container is the only direct child that paints. */
-  .footer > * {
-    position: relative;
-    z-index: 1;
+    margin-block-start: var(--footer-margin-block-start, 0px);
+    margin-block-end: var(--footer-margin-block-end, 0px);
   }
 
   /* ==========================================================================
@@ -86,8 +96,8 @@
      Columns
      --------------------------------------------------------------------------
      A row of columns whose widths are shares, not sizes: `--column-width` is a
-     percentage of the row and feeds `flex-basis`, so three columns at 100% split
-     into thirds and one at 150% beside them takes proportionally more. A
+     percentage of the row and feeds the grow factor, so three columns at 100%
+     split into thirds and one at 150% beside them takes proportionally more. A
      merchant never has to make the numbers add up.
      ========================================================================== */
 
@@ -100,18 +110,21 @@
 
   .footer-column {
     flex: 1 1 0;
-    /* `flex-grow` carries the share. `flex-basis: 0` with a grow factor divides
-       the free space in the ratio of the widths, which is what makes 150% next
-       to three 100%s land at the design's proportions. */
     flex-grow: calc(var(--column-width, 100%) / 100%);
     min-inline-size: 0;
     order: var(--column-order, 0);
+
+    /* Transparent until the merchant sets one. The radius is unconditional
+       because a radius on a transparent box is invisible, and making it
+       conditional would mean a second attribute for no gain. */
+    background-color: var(--column-background, transparent);
+    border-radius: 1.6rem;
   }
 
   .footer-column__content {
     display: flex;
     flex-direction: column;
-    gap: var(--space-4);
+    gap: var(--column-gap, var(--space-4));
     min-inline-size: 0;
   }
 
@@ -119,8 +132,7 @@
      ever drawn between things and the columns run in different directions at
      the two sizes. Side by side it is a rule down the inline-start edge, with
      the gap split so the line sits between the columns rather than against one
-     of them; stacked, it is a rule above — which is the rule further down in
-     the small-screen block. */
+     of them; stacked, it is a rule above — which is in the small-screen block. */
   @media screen and (min-width: 750px) {
     .footer-column[data-divider] {
       padding-inline-start: var(--footer-column-gap);
@@ -129,8 +141,7 @@
     }
   }
 
-  .footer-column__summary,
-  .footer-menu__summary {
+  .footer-column__summary {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -139,72 +150,104 @@
     list-style: none;
   }
 
-  .footer-column__summary::-webkit-details-marker,
-  .footer-menu__summary::-webkit-details-marker {
+  .footer-column__summary::-webkit-details-marker {
     display: none;
   }
 
   .footer-column__heading {
+    color: var(--column-heading-color, var(--footer-heading-color));
     font-family: var(--font-heading-family, var(--font-body-family));
     font-size: var(--font-size-h5, 1.8rem);
     font-weight: 600;
-    color: var(--footer-heading-color);
   }
 
-  /* The chevron only exists while the disclosure is a control. Above the
-     breakpoint `<accordion-element>` marks the summary static, and a marker
-     beside a heading that cannot be tapped is a promise the footer does not
-     keep. */
-  .footer-column__icon,
-  .footer-menu__icon {
+  /* The heading preset is an attribute, not a class per size: one declaration
+     per preset, selected by the value the merchant picked. */
+  .footer-column[data-heading-preset='h2'] .footer-column__heading { font-size: var(--font-size-h2); }
+  .footer-column[data-heading-preset='h3'] .footer-column__heading { font-size: var(--font-size-h3); }
+  .footer-column[data-heading-preset='h4'] .footer-column__heading { font-size: var(--font-size-h4, 2.2rem); }
+  .footer-column[data-heading-preset='h5'] .footer-column__heading { font-size: var(--font-size-h5, 1.8rem); }
+  .footer-column[data-heading-preset='h6'] .footer-column__heading { font-size: var(--font-size-h6, 1.6rem); }
+  .footer-column[data-heading-preset='paragraph'] .footer-column__heading {
+    font-size: var(--font-size-md);
+    font-weight: 500;
+  }
+
+  /* ---- markers ----------------------------------------------------------
+     Two shapes for one job. The chevron is the theme's own icon; the plus is
+     drawn from two bars here rather than swapped for a second SVG, so there is
+     nothing to load and nothing to keep in sync when the column opens.
+     ----------------------------------------------------------------------- */
+
+  .footer-column__icon {
     flex: 0 0 auto;
     transition: transform var(--transition-fast);
   }
 
-  .footer-column[open] > .footer-column__summary .footer-column__icon,
-  .footer-menu[open] > .footer-menu__summary .footer-menu__icon {
+  .footer-column[open] > .footer-column__summary .footer-column__icon {
     transform: rotate(180deg);
   }
 
-  [data-static] > .footer-column__summary,
-  [data-static] > .footer-menu__summary {
+  .footer-column__marker {
+    position: relative;
+    flex: 0 0 auto;
+    inline-size: 1.4rem;
+    block-size: 1.4rem;
+  }
+
+  .footer-column__marker::before,
+  .footer-column__marker::after {
+    content: '';
+    position: absolute;
+    inset-inline: 0;
+    inset-block-start: 50%;
+    block-size: 1.5px;
+    border-radius: 1px;
+    background-color: currentcolor;
+    transform: translateY(-50%);
+    transition: transform var(--transition-fast), opacity var(--transition-fast);
+  }
+
+  /* The upright bar of the plus. Rotating it back to flat is what turns the
+     plus into a minus — one property animating, no glyph swap. */
+  .footer-column__marker::after {
+    transform: translateY(-50%) rotate(90deg);
+  }
+
+  .footer-column[open] > .footer-column__summary .footer-column__marker::after {
+    transform: translateY(-50%) rotate(0deg);
+  }
+
+  /* Above the breakpoint `<accordion-element>` marks the summary static, and a
+     marker beside a heading that cannot be tapped is a promise the footer does
+     not keep.
+
+     The attribute is on the summary itself — `summary.setAttribute('data-static')`
+     in modules.js — not on an ancestor. The old selector was
+     `[data-static] > .footer-column__summary`, which asks for a static *parent*,
+     and nothing in the theme ever sets one: every chevron in the footer stayed
+     on screen at desktop width beside a heading that could not be clicked. */
+  .footer-column__summary[data-static] {
     cursor: default;
   }
 
-  [data-static] > .footer-column__summary .footer-column__icon,
-  [data-static] > .footer-menu__summary .footer-menu__icon,
-  .footer-menu[data-no-collapse] > .footer-menu__summary .footer-menu__icon {
+  .footer-column__summary[data-static] .footer-column__icon,
+  .footer-column__summary[data-static] .footer-column__marker {
     display: none;
   }
 
   /* ==========================================================================
      Menu block
+     --------------------------------------------------------------------------
+     Links and nothing else. The heading, the surface and the disclosure moved
+     up to the Column, which is the thing that actually collapses.
      ========================================================================== */
 
   .footer-menu {
     display: block;
     min-inline-size: 0;
-    background-color: var(--menu-background, transparent);
     color: var(--menu-color, inherit);
   }
-
-  .footer-menu__heading {
-    display: block;
-    margin-block-end: var(--space-4);
-    color: var(--menu-heading-color, var(--footer-accent));
-    font-family: var(--font-heading-family, var(--font-body-family));
-    font-weight: 500;
-  }
-
-  /* The heading preset is an attribute, not a class per size: one declaration
-     block per preset, selected by the value the merchant picked. */
-  .footer-menu[data-heading-preset='h1'] .footer-menu__heading { font-size: var(--font-size-h1); }
-  .footer-menu[data-heading-preset='h2'] .footer-menu__heading { font-size: var(--font-size-h2); }
-  .footer-menu[data-heading-preset='h3'] .footer-menu__heading { font-size: var(--font-size-h3); }
-  .footer-menu[data-heading-preset='h4'] .footer-menu__heading { font-size: var(--font-size-h4, 2.2rem); }
-  .footer-menu[data-heading-preset='h5'] .footer-menu__heading { font-size: var(--font-size-h5, 1.8rem); }
-  .footer-menu[data-heading-preset='h6'] .footer-menu__heading { font-size: var(--font-size-h6, 1.6rem); }
-  .footer-menu[data-heading-preset='paragraph'] .footer-menu__heading { font-size: var(--font-size-md); }
 
   .footer-menu__list {
     display: flex;
@@ -255,6 +298,19 @@
 
   .email-signup[data-width='fill'] {
     inline-size: 100%;
+  }
+
+  /* Alignment moves the children as well as the text, because a centred heading
+     above a left-hung form is worse than either alone. The field keeps its own
+     width; only its box is repositioned. */
+  .email-signup[data-align='center'] {
+    align-items: center;
+    text-align: center;
+  }
+
+  .email-signup[data-align='right'] {
+    align-items: flex-end;
+    text-align: end;
   }
 
   .email-signup__heading {
@@ -390,9 +446,19 @@
   .social-links {
     display: flex;
     flex-direction: column;
-    align-items: inherit;
+    align-items: flex-start;
     gap: var(--space-3);
     color: var(--social-color, inherit);
+  }
+
+  .social-links[data-align='center'] {
+    align-items: center;
+    text-align: center;
+  }
+
+  .social-links[data-align='right'] {
+    align-items: flex-end;
+    text-align: end;
   }
 
   .social-links__heading {
@@ -408,6 +474,14 @@
     margin: 0;
     padding: 0;
     list-style: none;
+  }
+
+  .social-links[data-align='center'] .social-links__list {
+    justify-content: center;
+  }
+
+  .social-links[data-align='right'] .social-links__list {
+    justify-content: flex-end;
   }
 
   .social-links__link {
@@ -432,270 +506,140 @@
   }
 
   /* ==========================================================================
-     Policy row
+     Utility row
+     --------------------------------------------------------------------------
+     A full-width row inside the columns flex container — contact details, the
+     pickers, the bottom bar. `flex-basis: 100%` is what takes it out of the
+     column rhythm without a second container to wrap it in.
      ========================================================================== */
 
-  .footer__policies {
-    margin-block-start: var(--space-7);
-    padding-block-start: var(--space-6);
-    border-block-start: 1px solid var(--footer-rule);
-  }
-
-  .footer__policies-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-4) var(--space-8);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .footer__policy-link {
-    color: inherit;
-    font-size: var(--font-size-sm);
-    text-decoration: none;
-    transition: color var(--transition-fast);
-  }
-
-  .footer__policy-link:hover {
-    color: var(--footer-accent);
-  }
-
-  /* ==========================================================================
-     Contact and localization bar
-     ========================================================================== */
-
-  .footer__bar {
+  .footer-utilities {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    justify-content: space-between;
-    gap: var(--space-5);
-    margin-block-start: var(--space-7);
+    gap: var(--utilities-gap-y, 20px) var(--utilities-gap-x, 32px);
+    flex: 1 1 100%;
+    order: var(--column-order, 0);
+    border-radius: var(--utilities-radius, 2.4rem);
+    background-color: var(--utilities-background, transparent);
+    border: var(--utilities-border-width, 0px) solid var(--utilities-border-color, transparent);
+  }
+
+  .footer-utilities--card {
     padding: var(--space-5) var(--space-6);
-    border: var(--footer-panel-border);
-    border-radius: var(--footer-panel-radius);
-    background-color: var(--footer-panel-surface);
+    background-color: var(--utilities-background, var(--footer-panel-surface));
+    border-width: var(--utilities-border-width, 1px);
+    border-color: var(--utilities-border-color, rgb(var(--color-border-rgb, 255 255 255) / 0.14));
   }
 
-  .footer__contact {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-6) var(--space-8);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
+  .footer-utilities[data-align='space-between'] { justify-content: space-between; }
+  .footer-utilities[data-align='start'] { justify-content: flex-start; }
+  .footer-utilities[data-align='center'] { justify-content: center; }
+  .footer-utilities[data-align='end'] { justify-content: flex-end; }
 
-  .footer__contact-item {
+  /* ==========================================================================
+     Utility item
+     ========================================================================== */
+
+  .utility-item {
     display: flex;
     align-items: center;
     gap: var(--space-3);
+    min-inline-size: 0;
   }
 
-  .footer__contact-icon {
+  /* The disc is sized from the icon rather than fixed, so a merchant who takes
+     the icon from 14px to 28px gets a badge that still fits it. */
+  .utility-item__icon {
     display: grid;
     place-items: center;
-    inline-size: 4rem;
-    block-size: 4rem;
+    flex: 0 0 auto;
+    inline-size: calc(var(--utility-icon-size, 18px) * 2.2);
+    block-size: calc(var(--utility-icon-size, 18px) * 2.2);
     border-radius: 50%;
-    background-color: var(--footer-accent);
-    color: var(--color-primary-button-text);
+    overflow: hidden;
   }
 
-  .footer__contact-body {
+  .utility-item[data-icon-style='solid'] .utility-item__icon {
+    background-color: var(--utility-icon-bg, var(--footer-accent));
+    color: var(--utility-icon-color, var(--color-primary-button-text));
+  }
+
+  /* Soft is the accent at low alpha with the accent as the mark — the badge a
+     dark footer wants when a solid disc would be the loudest thing in the row. */
+  .utility-item[data-icon-style='soft'] .utility-item__icon {
+    background-color: var(--utility-icon-bg, rgb(var(--color-primary-button-background-rgb, 0 200 83) / 0.16));
+    color: var(--utility-icon-color, var(--footer-accent));
+  }
+
+  .utility-item[data-icon-style='outline'] .utility-item__icon {
+    border: 1px solid var(--utility-icon-bg, rgb(var(--color-primary-button-background-rgb, 0 200 83) / 0.45));
+    color: var(--utility-icon-color, var(--footer-accent));
+  }
+
+  /* No badge at all: the mark sits on the footer's own ground, so the box
+     collapses to the glyph rather than keeping a circle's worth of space. */
+  .utility-item[data-icon-style='none'] .utility-item__icon {
+    inline-size: auto;
+    block-size: auto;
+    border-radius: 0;
+    background: none;
+    color: var(--utility-icon-color, var(--footer-accent));
+  }
+
+  .utility-item__image-wrapper,
+  .utility-item__image {
+    inline-size: 100%;
+    block-size: 100%;
+    object-fit: cover;
+  }
+
+  .utility-item__body {
     display: flex;
     flex-direction: column;
     gap: 0.2rem;
     min-inline-size: 0;
   }
 
-  .footer__contact-label {
+  .utility-item__label {
+    color: var(--footer-heading-color);
     font-size: 1.1rem;
     font-weight: 600;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: var(--footer-heading-color);
   }
 
-  .footer__contact-value {
+  .utility-item__value {
     color: var(--footer-muted);
     font-size: var(--font-size-sm);
     text-decoration: none;
     transition: color var(--transition-fast);
   }
 
-  a.footer__contact-value:hover {
+  a.utility-item__value:hover {
     color: var(--footer-accent);
   }
 
   /* ==========================================================================
-     Payment marks, copyright
+     Localization block
+     --------------------------------------------------------------------------
+     The markup is `snippets/localization-selectors.liquid`, unchanged — country
+     search input and all — so the pickers behave here exactly as they do in the
+     header. What is styled below is only how they sit in a footer.
      ========================================================================== */
 
-  .footer__meta {
+  .footer-localization-block {
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-4);
-    margin-block-start: var(--space-7);
+    flex-direction: column;
+    gap: var(--space-3);
+    min-inline-size: 0;
   }
 
-  .footer__payment-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
+  .footer-localization-block__heading {
     margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .footer__payment-icon {
-    block-size: 2.4rem;
-    inline-size: auto;
-  }
-
-  .footer__copyright {
-    margin: 0;
-    color: var(--footer-muted);
+    color: var(--footer-heading-color);
     font-size: var(--font-size-sm);
   }
-
-  /* ==========================================================================
-     The wordmark
-     --------------------------------------------------------------------------
-     Type as texture: a single line, clipped to a gradient, sized from the
-     viewport so it spans the footer at every width. `cqi`-free on purpose —
-     `vw` is what makes it track the page rather than its container, which is
-     the effect in the design.
-     ========================================================================== */
-
-  .footer__logo {
-    display: block;
-    margin-block-start: var(--space-8);
-  }
-
-  .footer__logo-inner {
-    position: relative;
-    display: block;
-    overflow: hidden;
-    line-height: 0.82;
-  }
-
-  .footer__logo-text {
-    display: block;
-    font-family: var(--font-heading-family, var(--font-body-family));
-    font-size: clamp(6rem, 17vw, 24rem);
-    font-weight: 500;
-    letter-spacing: -0.02em;
-    text-align: center;
-    white-space: nowrap;
-
-    /* The gradient is the ink. `background-clip: text` needs a painted
-       background and a transparent fill; the `color` fallback below it is what
-       a browser without the property shows, so the wordmark is never invisible. */
-    color: var(--footer-accent);
-    background-image: linear-gradient(
-      180deg,
-      var(--footer-accent) 0%,
-      rgb(var(--color-primary-button-background-rgb, 0 200 83) / 0.35) 100%
-    );
-    -webkit-background-clip: text;
-    background-clip: text;
-  }
-
-  @supports (background-clip: text) or (-webkit-background-clip: text) {
-    .footer__logo-text {
-      color: transparent;
-    }
-  }
-
-  .footer__logo-media {
-    inline-size: 100%;
-  }
-
-  /* The shimmer: one highlight sweeping across the wordmark, on a delay long
-     enough to land after the slide-up reveal rather than during it. `mix-blend`
-     rather than opacity so it lightens the letters it crosses and nothing else,
-     and `pointer-events: none` because it covers the whole line. */
-  .footer__logo-shine {
-    position: absolute;
-    inset-block: 0;
-    inset-inline-start: -60%;
-    inline-size: 45%;
-    pointer-events: none;
-    background: linear-gradient(
-      100deg,
-      transparent 0%,
-      rgb(255 255 255 / 0.28) 45%,
-      rgb(255 255 255 / 0.42) 50%,
-      rgb(255 255 255 / 0.28) 55%,
-      transparent 100%
-    );
-    mix-blend-mode: overlay;
-    animation: footer-logo-shine 4.5s var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)) 1.1s infinite;
-  }
-
-  @keyframes footer-logo-shine {
-    0% {
-      transform: translateX(0);
-    }
-
-    /* The sweep is a fifth of the cycle; the rest is the pause between passes.
-       A highlight crossing continuously reads as a loading state. */
-    35%,
-    100% {
-      transform: translateX(320%);
-    }
-  }
-
-  [dir='rtl'] .footer__logo-shine {
-    animation-name: footer-logo-shine-rtl;
-  }
-
-  @keyframes footer-logo-shine-rtl {
-    0% {
-      transform: translateX(0);
-    }
-
-    35%,
-    100% {
-      transform: translateX(-320%);
-    }
-  }
-
-  /* ==========================================================================
-     Disclaimer
-     ========================================================================== */
-
-  .footer__disclaimer {
-    display: flex;
-    justify-content: center;
-    margin-block-start: var(--space-7);
-  }
-
-  .footer__disclaimer-inner {
-    max-inline-size: 78rem;
-    padding: var(--space-4) var(--space-6);
-    border: 1px dashed rgb(var(--color-border-rgb, 255 255 255) / 0.3);
-    border-radius: 1.2rem;
-    color: var(--footer-muted);
-    font-size: var(--font-size-sm);
-    text-align: center;
-    text-wrap: pretty;
-  }
-
-  .footer__disclaimer-inner p {
-    margin: 0;
-  }
-
-  /* ==========================================================================
-     Localization pickers
-     --------------------------------------------------------------------------
-     The panels rise into place. Every other overlay in the theme animates, and
-     a picker that simply appears reads as a rendering glitch next to them.
-     ========================================================================== */
 
   .footer__localization {
     display: flex;
@@ -742,6 +686,275 @@
   }
 
   /* ==========================================================================
+     Bottom bar
+     ========================================================================== */
+
+  .footer-bottom {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-4) var(--space-6);
+    inline-size: 100%;
+  }
+
+  .footer-bottom[data-layout='split'] {
+    justify-content: space-between;
+  }
+
+  .footer-bottom[data-layout='stacked'] {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .footer-bottom[data-layout='centered'] {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .footer-bottom__payment-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .footer-bottom__payment-icon {
+    block-size: 2.4rem;
+    inline-size: auto;
+  }
+
+  .footer-bottom__meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-5);
+    color: var(--footer-muted);
+    font-size: var(--font-size-sm);
+  }
+
+  .footer-bottom[data-layout='centered'] .footer-bottom__meta {
+    justify-content: center;
+  }
+
+  .footer-bottom__copyright,
+  .footer-bottom__text p {
+    margin: 0;
+  }
+
+  /* ==========================================================================
+     Policy row
+     ========================================================================== */
+
+  .footer__policies {
+    margin-block-start: var(--space-7);
+    padding-block-start: var(--space-6);
+    border-block-start: 1px solid var(--footer-rule);
+  }
+
+  .footer__policies-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-4) var(--space-8);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .footer__policy-link {
+    color: inherit;
+    font-size: var(--font-size-sm);
+    text-decoration: none;
+    transition: color var(--transition-fast);
+  }
+
+  .footer__policy-link:hover {
+    color: var(--footer-accent);
+  }
+
+  /* ==========================================================================
+     Legal band
+     --------------------------------------------------------------------------
+     Its own section, below the footer panel: the disclaimer and the oversized
+     wordmark. Type as texture — a single line, clipped to a gradient, sized from
+     the viewport so it spans the page at every width. `vw` rather than `cqi` on
+     purpose: tracking the page is the effect.
+     ========================================================================== */
+
+  .footer-legal {
+    --legal-rule: rgb(var(--color-border-rgb, 255 255 255) / 0.14);
+    --legal-muted: var(--color-accent-text);
+
+    position: relative;
+    overflow: hidden;
+    margin-block-start: var(--legal-margin-block-start, 0px);
+    margin-block-end: var(--legal-margin-block-end, 0px);
+    color: var(--legal-text-color, inherit);
+  }
+
+  .footer-legal[data-divider] {
+    border-block-start: 1px solid var(--legal-rule);
+  }
+
+  .footer-legal[data-align='left'] { text-align: start; }
+  .footer-legal[data-align='center'] { text-align: center; }
+  .footer-legal[data-align='right'] { text-align: end; }
+
+  /* ---- disclaimer ---- */
+
+  .footer-legal__disclaimer {
+    display: flex;
+    justify-content: center;
+  }
+
+  .footer-legal[data-align='left'] .footer-legal__disclaimer { justify-content: flex-start; }
+  .footer-legal[data-align='right'] .footer-legal__disclaimer { justify-content: flex-end; }
+
+  .footer-legal__disclaimer-inner {
+    max-inline-size: 78rem;
+    color: var(--legal-text-color, var(--legal-muted));
+    font-size: var(--font-size-sm);
+    text-wrap: pretty;
+  }
+
+  .footer-legal__disclaimer--boxed .footer-legal__disclaimer-inner {
+    padding: var(--space-4) var(--space-6);
+    border: 1px dashed var(--legal-rule);
+    border-radius: 1.2rem;
+  }
+
+  .footer-legal__disclaimer-inner p {
+    margin: 0;
+  }
+
+  /* ---- wordmark ---- */
+
+  .footer-legal__wordmark {
+    position: relative;
+    display: block;
+    overflow: hidden;
+    margin-block-start: var(--space-6);
+    line-height: 0.82;
+    opacity: var(--legal-logo-opacity, 1);
+  }
+
+  .footer-legal__wordmark-text {
+    display: block;
+    font-family: var(--font-heading-family, var(--font-body-family));
+    font-size: clamp(4rem, var(--legal-logo-size, 17vw), 24rem);
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+
+    /* The gradient is the ink. `background-clip: text` needs a painted
+       background and a transparent fill; the `color` fallback below it is what
+       a browser without the property shows, so the wordmark is never invisible. */
+    color: var(--legal-logo-from, var(--color-primary-button-background));
+    background-image: linear-gradient(
+      180deg,
+      var(--legal-logo-from, var(--color-primary-button-background)) 0%,
+      var(--legal-logo-to, rgb(var(--color-primary-button-background-rgb, 0 200 83) / 0.35)) 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+  }
+
+  @supports (background-clip: text) or (-webkit-background-clip: text) {
+    .footer-legal__wordmark-text {
+      color: transparent;
+    }
+  }
+
+  .footer-legal__wordmark-media {
+    inline-size: 100%;
+  }
+
+  /* ---- the sweep --------------------------------------------------------
+     One pass, once, after the wordmark has finished rising — and then nothing.
+     The previous version ran `infinite`, so a highlight crossed the letters
+     every few seconds for as long as the page was open: it reads as a loading
+     skeleton and it keeps the compositor awake at the bottom of every page.
+
+     Three gates, all of them cheap:
+       [data-animation='sheen']   the merchant asked for it
+       [data-motion-revealed]     the band is actually on screen
+       :not([data-effect='none']) reveal animations are switched on
+
+     Resting opacity is 0 and the keyframes return to 0, so if none of the gates
+     open there is nothing to see and nothing running.
+     ----------------------------------------------------------------------- */
+
+  .footer-legal__wordmark-sheen {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: -60%;
+    inline-size: 45%;
+    opacity: 0;
+    pointer-events: none;
+    background: linear-gradient(
+      100deg,
+      transparent 0%,
+      rgb(255 255 255 / 0.28) 45%,
+      rgb(255 255 255 / 0.42) 50%,
+      rgb(255 255 255 / 0.28) 55%,
+      transparent 100%
+    );
+    mix-blend-mode: overlay;
+  }
+
+  .footer-legal__wordmark[data-animation='sheen'][data-motion-revealed]:not([data-effect='none'])
+    .footer-legal__wordmark-sheen {
+    animation: footer-legal-sheen 1.5s var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)) 0.75s 1 both;
+  }
+
+  @keyframes footer-legal-sheen {
+    from {
+      opacity: 0;
+      transform: translateX(0);
+    }
+
+    20% {
+      opacity: 1;
+    }
+
+    80% {
+      opacity: 1;
+    }
+
+    to {
+      opacity: 0;
+      transform: translateX(320%);
+    }
+  }
+
+  [dir='rtl'] .footer-legal__wordmark[data-animation='sheen'][data-motion-revealed]:not([data-effect='none'])
+    .footer-legal__wordmark-sheen {
+    animation-name: footer-legal-sheen-rtl;
+  }
+
+  @keyframes footer-legal-sheen-rtl {
+    from {
+      opacity: 0;
+      transform: translateX(0);
+    }
+
+    20% {
+      opacity: 1;
+    }
+
+    80% {
+      opacity: 1;
+    }
+
+    to {
+      opacity: 0;
+      transform: translateX(-320%);
+    }
+  }
+
+  /* ==========================================================================
      Small screens
      ========================================================================== */
 
@@ -769,10 +982,10 @@
     .footer-column + .footer-column,
     .footer-column[data-divider] {
       border-block-start: 1px solid var(--footer-rule);
+      border-radius: 0;
     }
 
-    .footer-column__summary,
-    .footer-menu__summary {
+    .footer-column__summary {
       padding-block: var(--space-4);
     }
 
@@ -780,22 +993,22 @@
       padding-block-end: var(--space-4);
     }
 
-    .footer-menu + .footer-menu {
-      border-block-start: 1px solid var(--footer-rule);
-    }
-
-    .footer__bar,
-    .footer__meta {
+    .footer-utilities {
       flex-direction: column;
       align-items: flex-start;
     }
 
-    .footer__contact {
-      gap: var(--space-4);
+    .footer-utilities[data-align='center'] {
+      align-items: center;
     }
 
-    .footer__logo-text {
-      font-size: clamp(4rem, 20vw, 12rem);
+    .footer-bottom[data-layout='split'] {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .footer-legal__wordmark-text {
+      font-size: clamp(3.2rem, calc(var(--legal-logo-size, 17vw) * 1.2), 12rem);
     }
   }
 
@@ -804,7 +1017,13 @@
      ========================================================================== */
 
   @media (prefers-reduced-motion: reduce) {
-    .footer__logo-shine {
+    /* The full selector, repeated. A media query adds no specificity, so a bare
+       `.footer-legal__wordmark-sheen { animation: none }` here would lose to the
+       five-component rule above and the sweep would run anyway. */
+    .footer-legal__wordmark[data-animation='sheen'][data-motion-revealed]:not([data-effect='none'])
+      .footer-legal__wordmark-sheen,
+    [dir='rtl'] .footer-legal__wordmark[data-animation='sheen'][data-motion-revealed]:not([data-effect='none'])
+      .footer-legal__wordmark-sheen {
       animation: none;
       opacity: 0;
     }

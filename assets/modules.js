@@ -244,13 +244,67 @@ export class AccordionElement extends BaseComponent {
     const start = summary ? summary.offsetHeight : 0;
     const end = item.offsetHeight;
 
+    // The height is animated on the `<details>` itself, so for the whole of the
+    // animation the element is shorter than the content inside it. Without this
+    // the content simply overflows and is painted at full height from the first
+    // frame — the panel appears instantly and only the box around it grows,
+    // which is what "the accordion doesn't animate" looks like on a phone.
+    //
+    // `overflow` is not an animatable property, so it cannot ride along in the
+    // keyframes; it is set here and cleared when the animation settles.
+    this.#clip(item, true);
+
     const animation = item.animate(
-      [{ height: `${start}px`, opacity: 0.6 }, { height: `${end}px`, opacity: 1 }],
+      [
+        { height: `${start}px`, opacity: 0.6 },
+        { height: `${end}px`, opacity: 1 },
+      ],
       { duration: 280, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' }
     );
 
     this.#animations.set(item, animation);
-    animation.finished.then(() => item.style.removeProperty('height')).catch(() => {});
+    animation.finished
+      .then(() => {
+        item.style.removeProperty('height');
+        this.#clip(item, false);
+      })
+      .catch(() => {
+        // Cancelled: the next animation is already clipping the element and
+        // owns the cleanup.
+      });
+  }
+
+  /**
+   * Clip the item to its animating height, and put back whatever `overflow` it
+   * had before.
+   *
+   * A `<details>` in this theme can legitimately carry `overflow: visible` for
+   * a focus ring or a dropdown, so the previous value is preserved rather than
+   * assumed — and only ever restored by the animation that set it.
+   *
+   * @param {HTMLDetailsElement} item
+   * @param {boolean} on
+   * @private
+   */
+  #clip(item, on) {
+    if (on) {
+      if (item.dataset.accordionClipped === undefined) {
+        item.dataset.accordionClipped = item.style.overflow || '';
+      }
+      item.style.overflow = 'hidden';
+      return;
+    }
+
+    const previous = item.dataset.accordionClipped;
+    if (previous === undefined) return;
+
+    if (previous === '') {
+      item.style.removeProperty('overflow');
+    } else {
+      item.style.overflow = previous;
+    }
+
+    delete item.dataset.accordionClipped;
   }
 
   /**
@@ -271,8 +325,13 @@ export class AccordionElement extends BaseComponent {
     const start = item.offsetHeight;
     const end = summary ? summary.offsetHeight : 0;
 
+    this.#clip(item, true);
+
     const animation = item.animate(
-      [{ height: `${start}px`, opacity: 1 }, { height: `${end}px`, opacity: 0.6 }],
+      [
+        { height: `${start}px`, opacity: 1 },
+        { height: `${end}px`, opacity: 0.6 },
+      ],
       { duration: 220, easing: 'cubic-bezier(0.76, 0, 0.24, 1)' }
     );
 
@@ -282,6 +341,7 @@ export class AccordionElement extends BaseComponent {
       .then(() => {
         item.open = false;
         item.style.removeProperty('height');
+        this.#clip(item, false);
       })
       .catch(() => {
         // Cancelled because the customer clicked again mid-animation. The next

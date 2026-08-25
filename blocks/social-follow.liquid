@@ -43,11 +43,20 @@
   {%- if block.settings.color != blank -%}
     --social-color: {{ block.settings.color }};
   {%- endif -%}
+  {%- render 'spacing', block: block.settings, declarations: true -%}
 {%- endcapture -%}
 
+{%- comment -%}
+  `data-block-spacing` by hand: the padding is captured as declarations and
+  merged into the one `style` attribute this element already has, and it is that
+  attribute selector — not the properties — that base.css applies padding
+  through.
+{%- endcomment -%}
 <div
   class="social-links"
-  style="{{ social_styles | strip }}"
+  data-align="{{ block.settings.alignment | default: 'left' }}"
+  data-block-spacing
+  style="{{ social_styles | strip_newlines | strip }}"
   {{ block.shopify_attributes }}
 >
   {%- if block.settings.heading != blank -%}
@@ -135,29 +144,213 @@
       "default": 18
     },
     {
+      "type": "select",
+      "id": "alignment",
+      "label": "t:blocks.email_signup.settings.alignment.label",
+      "options": [
+        {
+          "value": "left",
+          "label": "t:blocks.email_signup.settings.alignment.options__1.label"
+        },
+        {
+          "value": "center",
+          "label": "t:blocks.email_signup.settings.alignment.options__2.label"
+        },
+        {
+          "value": "right",
+          "label": "t:blocks.email_signup.settings.alignment.options__3.label"
+        }
+      ],
+      "default": "left"
+    },
+    {
       "type": "header",
       "content": "t:blocks.social_follow.headers.links"
     },
-    { "type": "url", "id": "social_facebook", "label": "t:blocks.social_follow.networks.facebook" },
-    { "type": "url", "id": "social_instagram", "label": "t:blocks.social_follow.networks.instagram" },
-    { "type": "url", "id": "social_youtube", "label": "t:blocks.social_follow.networks.youtube" },
-    { "type": "url", "id": "social_tiktok", "label": "t:blocks.social_follow.networks.tiktok" },
-    { "type": "url", "id": "social_x", "label": "t:blocks.social_follow.networks.x" },
-    { "type": "url", "id": "social_threads", "label": "t:blocks.social_follow.networks.threads" },
-    { "type": "url", "id": "social_linkedin", "label": "t:blocks.social_follow.networks.linkedin" },
-    { "type": "url", "id": "social_bluesky", "label": "t:blocks.social_follow.networks.bluesky" },
-    { "type": "url", "id": "social_snapchat", "label": "t:blocks.social_follow.networks.snapchat" },
-    { "type": "url", "id": "social_pinterest", "label": "t:blocks.social_follow.networks.pinterest" },
-    { "type": "url", "id": "social_tumblr", "label": "t:blocks.social_follow.networks.tumblr" },
-    { "type": "url", "id": "social_vimeo", "label": "t:blocks.social_follow.networks.vimeo" },
-    { "type": "url", "id": "social_custom", "label": "t:blocks.social_follow.settings.custom.label" },
+    {
+      "type": "url",
+      "id": "social_facebook",
+      "label": "t:blocks.social_follow.networks.facebook"
+    },
+    {
+      "type": "url",
+      "id": "social_instagram",
+      "label": "t:blocks.social_follow.networks.instagram"
+    },
+    {
+      "type": "url",
+      "id": "social_youtube",
+      "label": "t:blocks.social_follow.networks.youtube"
+    },
+    {
+      "type": "url",
+      "id": "social_tiktok",
+      "label": "t:blocks.social_follow.networks.tiktok"
+    },
+    {
+      "type": "url",
+      "id": "social_x",
+      "label": "t:blocks.social_follow.networks.x"
+    },
+    {
+      "type": "url",
+      "id": "social_threads",
+      "label": "t:blocks.social_follow.networks.threads"
+    },
+    {
+      "type": "url",
+      "id": "social_linkedin",
+      "label": "t:blocks.social_follow.networks.linkedin"
+    },
+    {
+      "type": "url",
+      "id": "social_bluesky",
+      "label": "t:blocks.social_follow.networks.bluesky"
+    },
+    {
+      "type": "url",
+      "id": "social_snapchat",
+      "label": "t:blocks.social_follow.networks.snapchat"
+    },
+    {
+      "type": "url",
+      "id": "social_pinterest",
+      "label": "t:blocks.social_follow.networks.pinterest"
+    },
+    {
+      "type": "url",
+      "id": "social_tumblr",
+      "label": "t:blocks.social_follow.networks.tumblr"
+    },
+    {
+      "type": "url",
+      "id": "social_vimeo",
+      "label": "t:blocks.social_follow.networks.vimeo"
+    },
+    {
+      "type": "url",
+      "id": "social_custom",
+      "label": "t:blocks.social_follow.settings.custom.label"
+    },
     {
       "type": "text",
       "id": "social_custom_label",
       "label": "t:blocks.social_follow.settings.custom_label.label",
       "visible_if": "{{ block.settings.social_custom != blank }}"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.spacing.block_header"
+    },
+    {
+      "type": "select",
+      "id": "padding_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        {
+          "value": "desktop",
+          "label": "t:shared.spacing.devices.options__1.label"
+        },
+        {
+          "value": "mobile",
+          "label": "t:shared.spacing.devices.options__2.label"
+        }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left_mobile",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right_mobile",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
     }
   ],
-  "presets": [{ "name": "t:blocks.social_follow.name" }]
+  "presets": [
+    {
+      "name": "t:blocks.social_follow.name"
+    }
+  ]
 }
 {% endschema %}

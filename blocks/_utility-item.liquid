@@ -1,0 +1,424 @@
+{% comment %}
+  blocks/_utility-item.liquid
+
+  One labelled fact with a mark beside it: an email address, a phone number, a
+  shop address. The contact row in the footer is three of these.
+
+  Private, and a footer piece rather than a general icon-with-text — the theme
+  already has `blocks/icon-with-text.liquid` for that. This one exists because a
+  utility row is a different shape: a small caps label above a value, a mark on a
+  solid disc, and a value that is a real `mailto:` or `tel:` link when the
+  merchant gives it one.
+
+  ## The mark
+
+  Either an icon from the theme's own set or an uploaded image, chosen with one
+  control. Custom is what the theme does everywhere a merchant might have a brand
+  glyph — the image goes through `snippets/image.liquid` like every other image
+  in the theme, so it is responsive, lazy and never a layout shift.
+{% endcomment %}
+
+{%- liquid
+  assign icon_source = block.settings.icon_source | default: 'icon'
+  assign icon_size = block.settings.icon_size | default: 18
+  assign value = block.settings.value
+
+  comment
+    A link only where one is meaningful. `tel:` is stripped of everything a
+    human reads and a dialler cannot.
+  endcomment
+  assign href = ''
+  case block.settings.link_type
+    when 'email'
+      assign href = 'mailto:' | append: value
+    when 'phone'
+      assign phone_href = value | remove: ' ' | remove: '(' | remove: ')' | remove: '-'
+      assign href = 'tel:' | append: phone_href
+    when 'url'
+      assign href = block.settings.link
+  endcase
+
+  capture item_spacing
+    render 'spacing', block: block.settings, declarations: true
+  endcapture
+-%}
+
+<div
+  class="utility-item"
+  data-icon-style="{{ block.settings.icon_background }}"
+  data-block-spacing
+  style="
+    --utility-icon-size: {{ icon_size }}px;
+    {%- if block.settings.icon_color != blank %}--utility-icon-color: {{ block.settings.icon_color }};{% endif -%}
+    {%- if block.settings.icon_background_color != blank %}--utility-icon-bg: {{ block.settings.icon_background_color }};{% endif -%}
+    {{- item_spacing | strip -}}
+  "
+  {{ block.shopify_attributes }}
+>
+  {%- if icon_source == 'image' and block.settings.icon_image != blank -%}
+    <span class="utility-item__icon" aria-hidden="true">
+      {% render 'image',
+         image: block.settings.icon_image,
+         ratio: 'square',
+         sizes: '48px',
+         widths: '48,96,144',
+         class: 'utility-item__image',
+         wrapper_class: 'utility-item__image-wrapper' %}
+    </span>
+  {%- elsif icon_source == 'icon' and block.settings.icon != blank -%}
+    <span class="utility-item__icon" aria-hidden="true">
+      {% render 'icon', icon: block.settings.icon, size: icon_size %}
+    </span>
+  {%- endif -%}
+
+  <span class="utility-item__body">
+    {%- if block.settings.label != blank -%}
+      <span class="utility-item__label">{{ block.settings.label }}</span>
+    {%- endif -%}
+
+    {%- if value != blank -%}
+      {%- if href != '' -%}
+        <a class="utility-item__value" href="{{ href }}">{{ value }}</a>
+      {%- else -%}
+        <span class="utility-item__value">{{ value }}</span>
+      {%- endif -%}
+    {%- endif -%}
+  </span>
+</div>
+
+{% schema %}
+{
+  "name": "t:blocks.utility_item.name",
+  "tag": null,
+  "settings": [
+    {
+      "type": "text",
+      "id": "label",
+      "label": "t:blocks.utility_item.settings.label.label",
+      "default": "Email"
+    },
+    {
+      "type": "text",
+      "id": "value",
+      "label": "t:blocks.utility_item.settings.value.label"
+    },
+    {
+      "type": "select",
+      "id": "link_type",
+      "label": "t:blocks.utility_item.settings.link_type.label",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.options.none"
+        },
+        {
+          "value": "email",
+          "label": "t:blocks.utility_item.settings.link_type.options__2.label"
+        },
+        {
+          "value": "phone",
+          "label": "t:blocks.utility_item.settings.link_type.options__3.label"
+        },
+        {
+          "value": "url",
+          "label": "t:blocks.utility_item.settings.link_type.options__4.label"
+        }
+      ],
+      "default": "none"
+    },
+    {
+      "type": "url",
+      "id": "link",
+      "label": "t:blocks.utility_item.settings.link.label",
+      "visible_if": "{{ block.settings.link_type == 'url' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.utility_item.headers.icon"
+    },
+    {
+      "type": "select",
+      "id": "icon_source",
+      "label": "t:blocks.utility_item.settings.icon_source.label",
+      "options": [
+        {
+          "value": "icon",
+          "label": "t:blocks.utility_item.settings.icon_source.options__1.label"
+        },
+        {
+          "value": "image",
+          "label": "t:blocks.utility_item.settings.icon_source.options__2.label"
+        },
+        {
+          "value": "none",
+          "label": "t:shared.options.none"
+        }
+      ],
+      "default": "icon"
+    },
+    {
+      "type": "select",
+      "id": "icon",
+      "label": "t:blocks.utility_item.settings.icon.label",
+      "options": [
+        {
+          "value": "mail",
+          "label": "t:blocks.utility_item.icons.mail"
+        },
+        {
+          "value": "phone",
+          "label": "t:blocks.utility_item.icons.phone"
+        },
+        {
+          "value": "location",
+          "label": "t:blocks.utility_item.icons.location"
+        },
+        {
+          "value": "clock",
+          "label": "t:blocks.utility_item.icons.clock"
+        },
+        {
+          "value": "chat",
+          "label": "t:blocks.utility_item.icons.chat"
+        },
+        {
+          "value": "note",
+          "label": "t:blocks.utility_item.icons.note"
+        },
+        {
+          "value": "truck",
+          "label": "t:blocks.utility_item.icons.truck"
+        },
+        {
+          "value": "tag",
+          "label": "t:blocks.utility_item.icons.tag"
+        },
+        {
+          "value": "account",
+          "label": "t:blocks.utility_item.icons.account"
+        },
+        {
+          "value": "cart",
+          "label": "t:blocks.utility_item.icons.cart"
+        },
+        {
+          "value": "bag",
+          "label": "t:blocks.utility_item.icons.bag"
+        },
+        {
+          "value": "search",
+          "label": "t:blocks.utility_item.icons.search"
+        },
+        {
+          "value": "heart",
+          "label": "t:blocks.utility_item.icons.heart"
+        },
+        {
+          "value": "star",
+          "label": "t:blocks.utility_item.icons.star"
+        },
+        {
+          "value": "info",
+          "label": "t:blocks.utility_item.icons.info"
+        },
+        {
+          "value": "lock",
+          "label": "t:blocks.utility_item.icons.lock"
+        },
+        {
+          "value": "share",
+          "label": "t:blocks.utility_item.icons.share"
+        },
+        {
+          "value": "external",
+          "label": "t:blocks.utility_item.icons.external"
+        },
+        {
+          "value": "check",
+          "label": "t:blocks.utility_item.icons.check"
+        },
+        {
+          "value": "grid",
+          "label": "t:blocks.utility_item.icons.grid"
+        },
+        {
+          "value": "list",
+          "label": "t:blocks.utility_item.icons.list"
+        },
+        {
+          "value": "edit",
+          "label": "t:blocks.utility_item.icons.edit"
+        },
+        {
+          "value": "refresh",
+          "label": "t:blocks.utility_item.icons.refresh"
+        }
+      ],
+      "default": "mail",
+      "visible_if": "{{ block.settings.icon_source == 'icon' }}"
+    },
+    {
+      "type": "image_picker",
+      "id": "icon_image",
+      "label": "t:blocks.utility_item.settings.icon_image.label",
+      "visible_if": "{{ block.settings.icon_source == 'image' }}"
+    },
+    {
+      "type": "range",
+      "id": "icon_size",
+      "label": "t:blocks.icon_with_text.settings.icon_size.label",
+      "min": 12,
+      "max": 40,
+      "step": 2,
+      "unit": "px",
+      "default": 18,
+      "visible_if": "{{ block.settings.icon_source != 'none' }}"
+    },
+    {
+      "type": "select",
+      "id": "icon_background",
+      "label": "t:blocks.utility_item.settings.icon_background.label",
+      "options": [
+        {
+          "value": "solid",
+          "label": "t:blocks.utility_item.settings.icon_background.options__1.label"
+        },
+        {
+          "value": "soft",
+          "label": "t:blocks.utility_item.settings.icon_background.options__2.label"
+        },
+        {
+          "value": "outline",
+          "label": "t:blocks.utility_item.settings.icon_background.options__3.label"
+        },
+        {
+          "value": "none",
+          "label": "t:shared.options.none"
+        }
+      ],
+      "default": "solid",
+      "visible_if": "{{ block.settings.icon_source != 'none' }}"
+    },
+    {
+      "type": "color",
+      "id": "icon_color",
+      "label": "t:blocks.utility_item.settings.icon_color.label",
+      "visible_if": "{{ block.settings.icon_source != 'none' }}"
+    },
+    {
+      "type": "color",
+      "id": "icon_background_color",
+      "label": "t:blocks.utility_item.settings.icon_background_color.label",
+      "visible_if": "{{ block.settings.icon_source != 'none' and block.settings.icon_background != 'none' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.spacing.block_header"
+    },
+    {
+      "type": "select",
+      "id": "padding_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        {
+          "value": "desktop",
+          "label": "t:shared.spacing.devices.options__1.label"
+        },
+        {
+          "value": "mobile",
+          "label": "t:shared.spacing.devices.options__2.label"
+        }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left_mobile",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right_mobile",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    }
+  ]
+}
+{% endschema %}

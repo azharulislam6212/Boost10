@@ -1,0 +1,435 @@
+{% comment %}
+  sections/footer-legal.liquid
+
+  The band beneath the footer: the oversized wordmark and the legal disclaimer.
+
+  ## Why it is a section and not a block
+
+  It sits *outside* the footer panel — full bleed, its own surface, its own
+  rhythm — so as a block it would have had to reach out of the container it was
+  rendered into. As a section it simply follows the footer in the footer group,
+  and `enabled_on.groups: ["footer"]` keeps it there: it cannot be dropped onto
+  a product page, where an 18vw wordmark is not a thing anyone wants.
+
+  ## The animation
+
+  The wordmark used to carry an infinite shimmer — `animation: … infinite` — so
+  a highlight crossed the letters every four and a half seconds for as long as
+  the page was open. A repeating sweep on a static element reads as a loading
+  skeleton, and it kept the compositor awake at the bottom of every page.
+
+  What replaced it plays exactly once, when the band scrolls into view:
+
+    1. the wordmark rises from a clipped baseline (a mask, not a transform, so
+       the letters emerge rather than slide as a block),
+    2. one light sweep crosses it,
+    3. it stops. `animation-iteration-count: 1`, `fill-mode: both`.
+
+  All of it is CSS keyed off `data-motion-revealed`, the attribute
+  `<motion-effect>` already sets when an element enters the viewport — no
+  observer of its own, no script, nothing to throw. Merchants who want it
+  static choose "None"; `prefers-reduced-motion` gets the finished state with
+  no animation at all.
+{% endcomment %}
+
+{%- liquid
+  assign st = section.settings
+  assign logo_source = st.logo_source | default: 'text'
+  assign wordmark = st.logo_text | default: shop.name
+  assign animation = st.logo_animation | default: 'sheen'
+
+  comment
+    The rise itself is the engine's own `reveal-up` preset, not a keyframe
+    written here: it clips the wordmark from the baseline and lifts it, it is
+    already tuned to the theme's easing, and — the part that matters — the
+    engine writes the hidden state in JavaScript at the moment it takes charge.
+    A resting state written in CSS would leave the wordmark invisible on any
+    page where the script failed to load.
+
+    `none` is passed through as a real "no animation", which the master switch
+    in Theme settings can also force.
+  endcomment
+  assign wordmark_effect = 'reveal-up'
+  if animation == 'none'
+    assign wordmark_effect = 'none'
+  endif
+
+  assign has_logo = false
+  if logo_source == 'text' and wordmark != blank
+    assign has_logo = true
+  elsif logo_source == 'image' and st.logo_image != blank
+    assign has_logo = true
+  endif
+
+  assign has_disclaimer = false
+  if st.disclaimer != blank
+    assign has_disclaimer = true
+  endif
+
+  comment
+    Two style attributes on one tag and the browser keeps the first, silently
+    dropping the second. This root needs its own, so spacing is asked for as
+    bare declarations and the `data-section-spacing` hook is written by hand.
+  endcomment
+  capture section_spacing
+    render 'spacing', section: st, declarations: true
+  endcapture
+-%}
+
+{%- capture legal_styles -%}
+  --legal-logo-size: {{ st.logo_size | default: 17 }}vw;
+  --legal-logo-opacity: {{ st.logo_opacity | default: 100 | divided_by: 100.0 }};
+  {%- if st.logo_color != blank -%}--legal-logo-from: {{ st.logo_color }};{%- endif -%}
+  {%- if st.logo_color_end != blank -%}--legal-logo-to: {{ st.logo_color_end }};{%- endif -%}
+  {%- if st.text_color != blank -%}--legal-text-color: {{ st.text_color }};{%- endif -%}
+
+  {%- comment -%}
+    Written inline, and it has to be.
+
+    `snippets/color-schemes.liquid` emits `.color-scheme-container` and every
+    `.color-<scheme>` block from a `{% style %}` tag, which is *unlayered* — and
+    an unlayered declaration beats every layered one, so a rule in footer.css
+    could not turn the gradient off however specific it was. An inline
+    declaration wins outright, and setting the custom property rather than the
+    `background-image` leaves the scheme's own machinery untouched.
+
+    Why turn it off at all: the footer above already paints the ramp. Painting
+    it again here restarts it, and the seam between the two is visible on any
+    gradient that actually goes anywhere. Solid keeps the scheme's background
+    colour, which is the colour the ramp ends on.
+  {%- endcomment -%}
+  {%- if st.background_mode == 'solid' -%}
+    --gradient-background: none;
+  {%- elsif st.background_mode == 'none' -%}
+    --gradient-background: none;
+    background-color: transparent;
+  {%- endif -%}
+  --legal-margin-block-start: {{ st.margin_top | default: 0 }}px;
+  --legal-margin-block-end: {{ st.margin_bottom | default: 0 }}px;
+  {{- section_spacing | strip -}}
+{%- endcapture -%}
+
+{%- if has_logo or has_disclaimer -%}
+  <section
+    class="footer-legal color-scheme-container color-{{ st.color_scheme }}"
+    data-align="{{ st.text_alignment | default: 'center' }}"
+    {% if st.show_divider %}data-divider{% endif %}
+    data-section-spacing
+    style="{{ legal_styles | strip_newlines | strip }}"
+  >
+    <div class="{% render 'container', width: st.container_width %}">
+      {%- if has_disclaimer -%}
+        <motion-effect
+          class="footer-legal__disclaimer footer-legal__disclaimer--{{ st.disclaimer_style | default: 'boxed' }}"
+          {% render 'motion-attrs', kind: 'text', section: st %}
+        >
+          <div class="footer-legal__disclaimer-inner">
+            {{ st.disclaimer }}
+          </div>
+        </motion-effect>
+      {%- endif -%}
+
+      {%- if has_logo -%}
+        {%- comment -%}
+          `data-effect` is on this element already — `motion-attrs` writes it —
+          and the stylesheet reads it, so a merchant who switches the theme's
+          reveal animations off gets a wordmark that is simply there, with no
+          mask animation waiting to run.
+        {%- endcomment -%}
+        <motion-effect
+          class="footer-legal__wordmark"
+          data-animation="{{ animation }}"
+          {% render 'motion-attrs', kind: 'text', section: st, effect: wordmark_effect, delay: 80 %}
+        >
+          {%- if logo_source == 'image' -%}
+            {% render 'image',
+              image: st.logo_image,
+              class: 'footer-legal__wordmark-image',
+              wrapper_class: 'footer-legal__wordmark-media',
+              sizes: '100vw',
+              ratio: 'adapt'
+            %}
+          {%- else -%}
+            <span class="footer-legal__wordmark-text">{{ wordmark }}</span>
+          {%- endif -%}
+
+          {%- comment -%}
+            The sweep. One element, `aria-hidden`, `pointer-events: none`, and
+            no animation at all unless the band has been revealed and the
+            merchant asked for it.
+          {%- endcomment -%}
+          {%- if animation == 'sheen' -%}
+            <span class="footer-legal__wordmark-sheen" aria-hidden="true"></span>
+          {%- endif -%}
+        </motion-effect>
+      {%- endif -%}
+    </div>
+  </section>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "t:sections.footer_legal.name",
+  "tag": "aside",
+  "class": "footer-legal-section",
+  "enabled_on": {
+    "groups": ["footer"]
+  },
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "t:sections.footer_legal.settings.intro_paragraph"
+    },
+    {
+      "type": "select",
+      "id": "container_width",
+      "label": "t:shared.container.width.label",
+      "info": "t:shared.container.width.info",
+      "options": [
+        { "value": "edge", "label": "t:shared.container.width.options__1.label" },
+        { "value": "wide", "label": "t:shared.container.width.options__2.label" },
+        { "value": "standard", "label": "t:shared.container.width.options__3.label" },
+        { "value": "compact", "label": "t:shared.container.width.options__4.label" },
+        { "value": "custom", "label": "t:shared.container.width.options__5.label" }
+      ],
+      "default": "standard"
+    },
+    {
+      "type": "select",
+      "id": "text_alignment",
+      "label": "t:shared.alignment.label",
+      "options": [
+        { "value": "left", "label": "t:shared.alignment.options__1.label" },
+        { "value": "center", "label": "t:shared.alignment.options__2.label" },
+        { "value": "right", "label": "t:shared.alignment.options__3.label" }
+      ],
+      "default": "center"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_divider",
+      "label": "t:sections.footer_legal.settings.show_divider.label",
+      "default": false
+    },
+    {
+      "type": "header",
+      "content": "t:sections.footer_legal.headers.disclaimer"
+    },
+    {
+      "type": "richtext",
+      "id": "disclaimer",
+      "label": "t:sections.footer_legal.settings.disclaimer.label",
+      "default": "<p>* These statements have not been evaluated by the Food and Drug Administration. Products are not intended to diagnose, treat, cure, or prevent any disease.</p>"
+    },
+    {
+      "type": "select",
+      "id": "disclaimer_style",
+      "label": "t:sections.footer_legal.settings.disclaimer_style.label",
+      "options": [
+        { "value": "boxed", "label": "t:sections.footer_legal.settings.disclaimer_style.options__1.label" },
+        { "value": "plain", "label": "t:sections.footer_legal.settings.disclaimer_style.options__2.label" }
+      ],
+      "default": "boxed"
+    },
+    {
+      "type": "color",
+      "id": "text_color",
+      "label": "t:sections.footer_legal.settings.text_color.label"
+    },
+    {
+      "type": "header",
+      "content": "t:sections.footer_legal.headers.watermark"
+    },
+    {
+      "type": "select",
+      "id": "logo_source",
+      "label": "t:sections.footer_legal.settings.logo_source.label",
+      "options": [
+        { "value": "text", "label": "t:sections.footer_legal.settings.logo_source.options__1.label" },
+        { "value": "image", "label": "t:sections.footer_legal.settings.logo_source.options__2.label" },
+        { "value": "none", "label": "t:shared.options.none" }
+      ],
+      "default": "text"
+    },
+    {
+      "type": "text",
+      "id": "logo_text",
+      "label": "t:sections.footer_legal.settings.logo_text.label",
+      "info": "t:sections.footer_legal.settings.logo_text.info",
+      "visible_if": "{{ section.settings.logo_source == 'text' }}"
+    },
+    {
+      "type": "image_picker",
+      "id": "logo_image",
+      "label": "t:sections.footer_legal.settings.logo_image.label",
+      "visible_if": "{{ section.settings.logo_source == 'image' }}"
+    },
+    {
+      "type": "range",
+      "id": "logo_size",
+      "label": "t:sections.footer_legal.settings.logo_size.label",
+      "info": "t:sections.footer_legal.settings.logo_size.info",
+      "min": 6,
+      "max": 30,
+      "step": 1,
+      "unit": "%",
+      "default": 17,
+      "visible_if": "{{ section.settings.logo_source != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "logo_opacity",
+      "label": "t:sections.footer_legal.settings.logo_opacity.label",
+      "min": 10,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 100,
+      "visible_if": "{{ section.settings.logo_source != 'none' }}"
+    },
+    {
+      "type": "color",
+      "id": "logo_color",
+      "label": "t:sections.footer_legal.settings.logo_color.label",
+      "visible_if": "{{ section.settings.logo_source == 'text' }}"
+    },
+    {
+      "type": "color",
+      "id": "logo_color_end",
+      "label": "t:sections.footer_legal.settings.logo_color_end.label",
+      "info": "t:sections.footer_legal.settings.logo_color_end.info",
+      "visible_if": "{{ section.settings.logo_source == 'text' }}"
+    },
+    {
+      "type": "select",
+      "id": "logo_animation",
+      "label": "t:sections.footer_legal.settings.logo_animation.label",
+      "info": "t:sections.footer_legal.settings.logo_animation.info",
+      "options": [
+        { "value": "sheen", "label": "t:sections.footer_legal.settings.logo_animation.options__1.label" },
+        { "value": "reveal", "label": "t:sections.footer_legal.settings.logo_animation.options__2.label" },
+        { "value": "none", "label": "t:shared.options.none" }
+      ],
+      "default": "sheen",
+      "visible_if": "{{ section.settings.logo_source != 'none' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.color_scheme.label"
+    },
+    {
+      "type": "color_scheme",
+      "id": "color_scheme",
+      "label": "t:shared.color_scheme.label",
+      "default": "scheme-2"
+    },
+    {
+      "type": "select",
+      "id": "background_mode",
+      "label": "t:sections.footer_legal.settings.background_mode.label",
+      "info": "t:sections.footer_legal.settings.background_mode.info",
+      "options": [
+        { "value": "solid", "label": "t:sections.footer_legal.settings.background_mode.options__1.label" },
+        { "value": "scheme", "label": "t:sections.footer_legal.settings.background_mode.options__2.label" },
+        { "value": "none", "label": "t:shared.options.none" }
+      ],
+      "default": "solid"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.animation.header"
+    },
+    {
+      "type": "select",
+      "id": "animation_text",
+      "label": "t:shared.animation.animation_text.label",
+      "options": [
+        { "value": "inherit", "label": "t:shared.animation.animation_text.options__1.label" },
+        { "value": "none", "label": "t:shared.animation.animation_text.options__2.label" },
+        { "value": "fade-in", "label": "t:shared.animation.animation_text.options__3.label" },
+        { "value": "fade-up", "label": "t:shared.animation.animation_text.options__4.label" },
+        { "value": "slide-up", "label": "t:shared.animation.animation_text.options__5.label" }
+      ],
+      "default": "inherit"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.spacing.section_header"
+    },
+    {
+      "type": "select",
+      "id": "padding_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        { "value": "desktop", "label": "t:shared.spacing.devices.options__1.label" },
+        { "value": "mobile", "label": "t:shared.spacing.devices.options__2.label" }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 160,
+      "step": 4,
+      "unit": "px",
+      "default": 24,
+      "visible_if": "{{ section.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 160,
+      "step": 4,
+      "unit": "px",
+      "default": 16,
+      "visible_if": "{{ section.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 160,
+      "step": 4,
+      "unit": "px",
+      "default": 16,
+      "visible_if": "{{ section.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 160,
+      "step": 4,
+      "unit": "px",
+      "default": 8,
+      "visible_if": "{{ section.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "margin_top",
+      "label": "t:shared.spacing.margin_top.label",
+      "min": 0,
+      "max": 160,
+      "step": 4,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "margin_bottom",
+      "label": "t:shared.spacing.margin_bottom.label",
+      "min": 0,
+      "max": 160,
+      "step": 4,
+      "unit": "px",
+      "default": 0
+    }
+  ]
+}
+{% endschema %}

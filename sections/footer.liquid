@@ -7,86 +7,102 @@
 
       Column  ›  Group  ›  Elements
 
-  The section holds Columns; a Column holds Groups and elements; a Group bundles
-  the elements that belong together. Every level is a real theme block, so a
-  merchant rearranges the whole footer by dragging in the editor, and nothing
-  here needs to know what a "newsletter column" is.
+  The section holds Columns and Utility rows; a Column holds Groups and elements;
+  a Group bundles what belongs together. Every level is a real theme block, so a
+  merchant rearranges the whole footer by dragging, and nothing here needs to
+  know what a "newsletter column" is.
 
-  What the section still owns is everything that is one-per-footer and not a
-  composition choice: the panel the columns sit in, the policy row, the contact
-  and localization bar, the payment marks, the copyright, the wordmark and the
-  disclaimer. Those are settings rather than blocks because there is exactly one
-  of each, and as blocks a merchant could delete the copyright.
+  What the section owns is now only what is true of the footer as a whole: its
+  surface, its corners, its border, the panel the columns sit in, and the policy
+  row. The contact details, the pickers, the payment marks and the copyright are
+  blocks — they were section settings, which meant the section decided both what
+  they said and where they went.
+
+  ## The background comes from the colour scheme
+
+  Both the colour and the gradient. `.color-scheme-container` paints
+  `--color-background` and `--gradient-background`, and the gradient half is a
+  real setting on every scheme — so a merchant who wants the footer's deep green
+  ramp sets it once in Theme settings › Colours and the footer follows. There is
+  no gradient defined in this theme's stylesheet for it to disagree with.
 
   ## Collapsing
 
-  One `<accordion-element data-collapse-below>` wraps the columns. Above the
-  breakpoint it opens every disclosure and marks the summaries static; below it,
-  each Column and each Menu is a tappable row. The same markup serves both, and
-  with the script gone it is an open list — a readable footer, not a broken one.
+  One `<accordion-element>` wraps the columns, always. It used to be behind a
+  "Collapse columns on mobile" checkbox with a breakpoint slider beside it — two
+  settings for a decision no merchant makes differently, and a footer that reads
+  as a wall of links on a phone when either one is wrong. The breakpoint is the
+  theme's own.
 
   ## Motion
 
   `<motion-effect>` is the theme's reveal engine and nothing here re-implements
-  it. The panel, the bar, the wordmark and the disclaimer each get one, with
-  rising delays, so the footer arrives as one short cascade rather than four
-  unrelated animations firing at once. The wordmark's shimmer is a CSS animation
-  on top of that reveal — not a second `<motion-effect>`, which would fight it
-  for the same transform.
+  it. The panel and the utility rows each get one with rising delays, so the
+  footer arrives as one short cascade rather than several unrelated animations.
 {% endcomment %}
 
 {%- liquid
   assign st = section.settings
-  assign breakpoint = st.collapse_below | default: 750
 
-  assign logo_text = st.logo_text
-  if logo_text == blank
-    assign logo_text = shop.name
+  assign border_width = 0
+  if st.border_style == 'solid'
+    assign border_width = st.border_width | default: 1 | plus: 0
   endif
 
-  assign show_wordmark = false
-  if st.show_logo
-    if st.logo_image != blank or logo_text != blank
-      assign show_wordmark = true
-    endif
-  endif
-
-  assign has_contact = false
-  if st.contact_email != blank or st.contact_phone != blank or st.contact_address != blank
-    assign has_contact = true
-  endif
-
-  assign has_bar = false
-  if has_contact or st.show_localization
-    assign has_bar = true
-  endif
-
-  assign phone_href = st.contact_phone | remove: ' ' | remove: '(' | remove: ')' | remove: '-'
+  comment
+    `declarations: true`, not the default. This element already has a `style`
+    attribute of its own, and a tag with two of them keeps the first and drops
+    the second — which is how a padding slider ends up moving a value that never
+    reaches the page. The `data-section-spacing` hook is written by hand below
+    because that attribute, not the properties, is what base.css selects on.
+  endcomment
+  capture section_spacing
+    render 'spacing', section: st, declarations: true
+  endcapture
 -%}
 
+{%- capture footer_styles -%}
+  --footer-radius:
+    {{ st.radius_top_left | default: 0 }}px
+    {{ st.radius_top_right | default: 0 }}px
+    {{ st.radius_bottom_right | default: 0 }}px
+    {{ st.radius_bottom_left | default: 0 }}px;
+  --footer-margin-block-start: {{ st.margin_top | default: 0 }}px;
+  --footer-margin-block-end: {{ st.margin_bottom | default: 0 }}px;
+  {%- if border_width > 0 -%}
+    --footer-border-width: {{ border_width }}px;
+    --footer-border-color: {{ st.border_color | default: 'currentColor' }};
+  {%- endif -%}
+  {{- section_spacing | strip -}}
+{%- endcapture -%}
+
+{%- comment -%}
+  `color-scheme-container` is what paints the scheme's background *and* its
+  gradient. The class was missing, so the footer took only the text colours and
+  its background came from a gradient written into the stylesheet — which no
+  merchant could reach.
+{%- endcomment -%}
 <footer
-  class="footer color-{{ st.color_scheme }}{% if st.enable_gradient %} footer--gradient{% endif %}"
+  class="footer color-scheme-container color-{{ st.color_scheme }}"
   role="contentinfo"
-  {% render 'spacing', section: st %}
+  data-section-spacing
+  style="{{ footer_styles | strip_newlines | strip }}"
 >
   <div class="{% render 'container', width: st.container_width %}">
-    {%- comment -%} ---------- columns ---------- {%- endcomment -%}
     {%- if section.blocks.size > 0 -%}
       <motion-effect
         class="footer__panel footer__panel--{{ st.panel_style | default: 'card' }}"
         {% render 'motion-attrs', kind: 'text', section: st, children: true, stagger: 90 %}
       >
-        <accordion-element
-          class="footer__columns"
-          {% if st.collapse_on_mobile %}data-collapse-below="{{ breakpoint }}"{% endif %}
-        >
+        <accordion-element class="footer__columns" data-collapse-below="750">
           {% content_for 'blocks' %}
         </accordion-element>
 
         {%- comment -%}
-          The policy row sits inside the panel, under a rule — the design's
-          bottom strip. A section setting rather than a block, so a merchant
-          cannot end up with a footer that has no policy links in it.
+          The policy row stays a section setting, exactly as it was. A merchant
+          can reorder every other part of the footer; the one row that has to be
+          there on a store that sells anything is not something to be able to
+          drag out by accident.
         {%- endcomment -%}
         {%- if st.policy_menu != blank and st.policy_menu.links.size > 0 -%}
           <div class="footer__policies">
@@ -101,139 +117,37 @@
         {%- endif -%}
       </motion-effect>
     {%- endif -%}
-
-    {%- comment -%} ---------- contact and localization ---------- {%- endcomment -%}
-    {%- if has_bar -%}
-      <motion-effect
-        class="footer__bar"
-        {% render 'motion-attrs', kind: 'text', section: st, children: true, stagger: 70, delay: 120 %}
-      >
-        {%- if has_contact -%}
-          <ul class="footer__contact" role="list">
-            {%- if st.contact_email != blank -%}
-              <li class="footer__contact-item">
-                <span class="footer__contact-icon" aria-hidden="true">
-                  {% render 'icon', icon: 'note', size: 18 %}
-                </span>
-                <span class="footer__contact-body">
-                  <span class="footer__contact-label">{{ 'sections.footer.contact.email' | t }}</span>
-                  <a class="footer__contact-value" href="mailto:{{ st.contact_email }}">
-                    {{- st.contact_email -}}
-                  </a>
-                </span>
-              </li>
-            {%- endif -%}
-
-            {%- if st.contact_phone != blank -%}
-              <li class="footer__contact-item">
-                <span class="footer__contact-icon" aria-hidden="true">
-                  {% render 'icon', icon: 'truck', size: 18 %}
-                </span>
-                <span class="footer__contact-body">
-                  <span class="footer__contact-label">{{ 'sections.footer.contact.phone' | t }}</span>
-                  <a class="footer__contact-value" href="tel:{{ phone_href }}">{{ st.contact_phone }}</a>
-                </span>
-              </li>
-            {%- endif -%}
-
-            {%- if st.contact_address != blank -%}
-              <li class="footer__contact-item">
-                <span class="footer__contact-icon" aria-hidden="true">
-                  {% render 'icon', icon: 'tag', size: 18 %}
-                </span>
-                <span class="footer__contact-body">
-                  <span class="footer__contact-label">{{ 'sections.footer.contact.location' | t }}</span>
-                  <span class="footer__contact-value">{{ st.contact_address }}</span>
-                </span>
-              </li>
-            {%- endif -%}
-          </ul>
-        {%- endif -%}
-
-        {%- if st.show_localization -%}
-          {% render 'localization-selectors', id_prefix: 'Footer', class: 'footer__localization' %}
-        {%- endif -%}
-      </motion-effect>
-    {%- endif -%}
-
-    {%- comment -%} ---------- payment marks and copyright ---------- {%- endcomment -%}
-    <div class="footer__meta">
-      {%- if st.show_payment_icons and shop.enabled_payment_types.size > 0 -%}
-        <div class="footer__payment">
-          <h2 class="visually-hidden">{{ 'sections.footer.payment_methods' | t }}</h2>
-          <ul class="footer__payment-list" role="list">
-            {%- for type in shop.enabled_payment_types -%}
-              <li>{{ type | payment_type_svg_tag: class: 'footer__payment-icon' }}</li>
-            {%- endfor -%}
-          </ul>
-        </div>
-      {%- endif -%}
-
-      <p class="footer__copyright">
-        {{ 'sections.footer.copyright_html' | t: year: 'now' | date: '%Y', shop: shop.name }}
-        {{ powered_by_link }}
-      </p>
-
-      {%- if st.show_follow_on_shop -%}
-        <div class="footer__follow">
-          {{ shop | login_button: action: 'follow' }}
-        </div>
-      {%- endif -%}
-    </div>
-
-    {%- comment -%}
-      ---------- the wordmark ----------
-
-      Presentational, and marked as such. It repeats the shop name that is
-      already in the copyright line above it and in the header logo, so the inner
-      element is `aria-hidden` — a screen reader announcing the store name a
-      third time in four lines is noise, not branding.
-    {%- endcomment -%}
-    {%- if show_wordmark -%}
-      <motion-effect
-        class="footer__logo"
-        {% render 'motion-attrs', kind: 'text', section: st, effect: 'slide-up', delay: 200, duration: 900 %}
-      >
-        <div class="footer__logo-inner" aria-hidden="true">
-          {%- if st.logo_image != blank -%}
-            {% render 'image',
-               image: st.logo_image,
-               ratio: 'adapt',
-               sizes: '100vw',
-               class: 'footer__logo-image',
-               wrapper_class: 'footer__logo-media' %}
-          {%- else -%}
-            <span class="footer__logo-text">{{ logo_text }}</span>
-          {%- endif -%}
-
-          <span class="footer__logo-shine"></span>
-        </div>
-      </motion-effect>
-    {%- endif -%}
-
-    {%- if st.disclaimer != blank -%}
-      <motion-effect
-        class="footer__disclaimer"
-        {% render 'motion-attrs', kind: 'text', section: st, delay: 260 %}
-      >
-        <div class="footer__disclaimer-inner rte">{{ st.disclaimer }}</div>
-      </motion-effect>
-    {%- endif -%}
   </div>
 </footer>
-
 
 {% schema %}
 {
   "name": "t:sections.footer.name",
   "blocks": [
-    { "type": "_footer-column" },
-    { "type": "group" },
-    { "type": "menu" },
-    { "type": "email-signup" },
-    { "type": "social-follow" },
-    { "type": "@theme" },
-    { "type": "@app" }
+    {
+      "type": "_footer-column"
+    },
+    {
+      "type": "_footer-utilities"
+    },
+    {
+      "type": "group"
+    },
+    {
+      "type": "menu"
+    },
+    {
+      "type": "email-signup"
+    },
+    {
+      "type": "social-follow"
+    },
+    {
+      "type": "@theme"
+    },
+    {
+      "type": "@app"
+    }
   ],
   "settings": [
     {
@@ -242,11 +156,26 @@
       "label": "t:shared.container.width.label",
       "info": "t:shared.container.width.info",
       "options": [
-        { "value": "edge", "label": "t:shared.container.width.options__1.label" },
-        { "value": "wide", "label": "t:shared.container.width.options__2.label" },
-        { "value": "standard", "label": "t:shared.container.width.options__3.label" },
-        { "value": "compact", "label": "t:shared.container.width.options__4.label" },
-        { "value": "custom", "label": "t:shared.container.width.options__5.label" }
+        {
+          "value": "edge",
+          "label": "t:shared.container.width.options__1.label"
+        },
+        {
+          "value": "wide",
+          "label": "t:shared.container.width.options__2.label"
+        },
+        {
+          "value": "standard",
+          "label": "t:shared.container.width.options__3.label"
+        },
+        {
+          "value": "compact",
+          "label": "t:shared.container.width.options__4.label"
+        },
+        {
+          "value": "custom",
+          "label": "t:shared.container.width.options__5.label"
+        }
       ],
       "default": "standard"
     },
@@ -256,63 +185,20 @@
       "label": "t:sections.footer.settings.panel_style.label",
       "info": "t:sections.footer.settings.panel_style.info",
       "options": [
-        { "value": "card", "label": "t:sections.footer.settings.panel_style.options__1.label" },
-        { "value": "plain", "label": "t:sections.footer.settings.panel_style.options__2.label" }
+        {
+          "value": "card",
+          "label": "t:sections.footer.settings.panel_style.options__1.label"
+        },
+        {
+          "value": "plain",
+          "label": "t:sections.footer.settings.panel_style.options__2.label"
+        }
       ],
       "default": "card"
     },
     {
-      "type": "checkbox",
-      "id": "enable_gradient",
-      "label": "t:sections.footer.settings.enable_gradient.label",
-      "info": "t:sections.footer.settings.enable_gradient.info",
-      "default": true
-    },
-    {
-      "type": "checkbox",
-      "id": "collapse_on_mobile",
-      "label": "t:sections.footer.settings.collapse_on_mobile.label",
-      "info": "t:sections.footer.settings.collapse_on_mobile.info",
-      "default": true
-    },
-    {
-      "type": "range",
-      "id": "collapse_below",
-      "label": "t:sections.footer.settings.collapse_below.label",
-      "min": 480,
-      "max": 1200,
-      "step": 10,
-      "unit": "px",
-      "default": 750
-    },
-    {
       "type": "header",
-      "content": "t:sections.footer.headers.contact"
-    },
-    {
-      "type": "text",
-      "id": "contact_email",
-      "label": "t:sections.footer.settings.contact_email.label"
-    },
-    {
-      "type": "text",
-      "id": "contact_phone",
-      "label": "t:sections.footer.settings.contact_phone.label"
-    },
-    {
-      "type": "text",
-      "id": "contact_address",
-      "label": "t:sections.footer.settings.contact_address.label"
-    },
-    {
-      "type": "checkbox",
-      "id": "show_localization",
-      "label": "t:sections.footer.settings.show_localization.label",
-      "default": true
-    },
-    {
-      "type": "header",
-      "content": "t:sections.footer.headers.bottom"
+      "content": "t:sections.footer.headers.legal_links"
     },
     {
       "type": "link_list",
@@ -320,48 +206,99 @@
       "label": "t:sections.footer.settings.policy_menu.label"
     },
     {
-      "type": "checkbox",
-      "id": "show_payment_icons",
-      "label": "t:sections.footer.settings.show_payment_icons.label",
-      "info": "t:sections.footer.settings.show_payment_icons.info",
-      "default": true
+      "type": "header",
+      "content": "t:shared.color_scheme.label"
     },
     {
-      "type": "checkbox",
-      "id": "show_follow_on_shop",
-      "label": "t:sections.footer.settings.show_follow_on_shop.label",
-      "info": "t:sections.footer.settings.show_follow_on_shop.info",
-      "default": true
+      "type": "paragraph",
+      "content": "t:sections.footer.settings.background_paragraph"
     },
     {
-      "type": "richtext",
-      "id": "disclaimer",
-      "label": "t:sections.footer.settings.disclaimer.label",
-      "info": "t:sections.footer.settings.disclaimer.info"
+      "type": "color_scheme",
+      "id": "color_scheme",
+      "label": "t:shared.color_scheme.label",
+      "default": "scheme-2"
     },
     {
       "type": "header",
-      "content": "t:sections.footer.headers.wordmark"
+      "content": "t:sections.footer.headers.corners"
     },
     {
-      "type": "checkbox",
-      "id": "show_logo",
-      "label": "t:sections.footer.settings.show_logo.label",
-      "info": "t:sections.footer.settings.show_logo.info",
-      "default": true
+      "type": "range",
+      "id": "radius_top_left",
+      "label": "t:sections.footer.settings.radius_top_left.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 40
     },
     {
-      "type": "text",
-      "id": "logo_text",
-      "label": "t:sections.footer.settings.logo_text.label",
-      "visible_if": "{{ section.settings.show_logo }}"
+      "type": "range",
+      "id": "radius_top_right",
+      "label": "t:sections.footer.settings.radius_top_right.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 40
     },
     {
-      "type": "image_picker",
-      "id": "logo_image",
-      "label": "t:sections.footer.settings.logo_image.label",
-      "info": "t:sections.footer.settings.logo_image.info",
-      "visible_if": "{{ section.settings.show_logo }}"
+      "type": "range",
+      "id": "radius_bottom_left",
+      "label": "t:sections.footer.settings.radius_bottom_left.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "radius_bottom_right",
+      "label": "t:sections.footer.settings.radius_bottom_right.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.group.headers.borders"
+    },
+    {
+      "type": "select",
+      "id": "border_style",
+      "label": "t:blocks.group.settings.border_style.label",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.options.none"
+        },
+        {
+          "value": "solid",
+          "label": "t:shared.options.solid"
+        }
+      ],
+      "default": "none"
+    },
+    {
+      "type": "range",
+      "id": "border_width",
+      "label": "t:blocks.group.settings.border_width.label",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 1,
+      "visible_if": "{{ section.settings.border_style == 'solid' }}"
+    },
+    {
+      "type": "color",
+      "id": "border_color",
+      "label": "t:blocks.group.settings.border_color.label",
+      "visible_if": "{{ section.settings.border_style == 'solid' }}"
     },
     {
       "type": "header",
@@ -372,11 +309,26 @@
       "id": "animation_text",
       "label": "t:shared.animation.animation_text.label",
       "options": [
-        { "value": "inherit", "label": "t:shared.animation.animation_text.options__1.label" },
-        { "value": "none", "label": "t:shared.animation.animation_text.options__2.label" },
-        { "value": "fade-in", "label": "t:shared.animation.animation_text.options__3.label" },
-        { "value": "fade-up", "label": "t:shared.animation.animation_text.options__4.label" },
-        { "value": "slide-up", "label": "t:shared.animation.animation_text.options__5.label" }
+        {
+          "value": "inherit",
+          "label": "t:shared.animation.animation_text.options__1.label"
+        },
+        {
+          "value": "none",
+          "label": "t:shared.animation.animation_text.options__2.label"
+        },
+        {
+          "value": "fade-in",
+          "label": "t:shared.animation.animation_text.options__3.label"
+        },
+        {
+          "value": "fade-up",
+          "label": "t:shared.animation.animation_text.options__4.label"
+        },
+        {
+          "value": "slide-up",
+          "label": "t:shared.animation.animation_text.options__5.label"
+        }
       ],
       "default": "inherit"
     },
@@ -392,14 +344,24 @@
       "default": 0
     },
     {
-      "type": "color_scheme",
-      "id": "color_scheme",
-      "label": "t:shared.color_scheme.label",
-      "default": "scheme-2"
-    },
-    {
       "type": "header",
       "content": "t:shared.spacing.section_header"
+    },
+    {
+      "type": "select",
+      "id": "padding_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        {
+          "value": "desktop",
+          "label": "t:shared.spacing.devices.options__1.label"
+        },
+        {
+          "value": "mobile",
+          "label": "t:shared.spacing.devices.options__2.label"
+        }
+      ],
+      "default": "desktop"
     },
     {
       "type": "range",
@@ -409,7 +371,8 @@
       "max": 160,
       "step": 4,
       "unit": "px",
-      "default": 64
+      "default": 64,
+      "visible_if": "{{ section.settings.padding_device == 'desktop' }}"
     },
     {
       "type": "range",
@@ -419,26 +382,47 @@
       "max": 160,
       "step": 4,
       "unit": "px",
-      "default": 32
+      "default": 32,
+      "visible_if": "{{ section.settings.padding_device == 'desktop' }}"
     },
     {
       "type": "range",
       "id": "padding_top_mobile",
-      "label": "t:shared.spacing.padding_top_mobile.label",
-      "info": "t:shared.spacing.padding_top_mobile.info",
+      "label": "t:shared.spacing.padding_top.label",
       "min": 0,
-      "max": 120,
+      "max": 160,
+      "step": 4,
+      "unit": "px",
+      "default": 40,
+      "visible_if": "{{ section.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 160,
+      "step": 4,
+      "unit": "px",
+      "default": 24,
+      "visible_if": "{{ section.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "margin_top",
+      "label": "t:shared.spacing.margin_top.label",
+      "min": 0,
+      "max": 160,
       "step": 4,
       "unit": "px",
       "default": 0
     },
     {
       "type": "range",
-      "id": "padding_bottom_mobile",
-      "label": "t:shared.spacing.padding_bottom_mobile.label",
-      "info": "t:shared.spacing.padding_bottom_mobile.info",
+      "id": "margin_bottom",
+      "label": "t:shared.spacing.margin_bottom.label",
       "min": 0,
-      "max": 120,
+      "max": 160,
       "step": 4,
       "unit": "px",
       "default": 0

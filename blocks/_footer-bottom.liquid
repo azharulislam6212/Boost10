@@ -1,0 +1,233 @@
+{% comment %}
+  blocks/_footer-bottom.liquid
+
+  The payment marks and the copyright line, as one placeable row.
+
+  They were rendered by the section, below everything else and in a fixed order.
+  As a block they are a column like any other, so the design's arrangement —
+  marks on one side, copyright on the other — is a layout choice a merchant makes
+  rather than one the theme makes for them.
+
+  ## The year
+
+  `{% raw %}{{ 'sections.footer.copyright_html' | t: year: 'now' | date: '%Y' }}{% endraw %}` looks
+  right and is not: Liquid applies `date` to the *result of `t`*, not to the
+  argument, so `year` receives the literal string `now` and the filter then runs
+  over the finished sentence. The year is resolved into a variable first and
+  passed as one.
+{% endcomment %}
+
+{%- liquid
+  assign year = 'now' | date: '%Y'
+
+  capture bottom_spacing
+    render 'spacing', block: block.settings, declarations: true
+  endcapture
+-%}
+
+<div
+  class="footer-bottom"
+  data-layout="{{ block.settings.layout | default: 'split' }}"
+  data-block-spacing
+  style="{{ bottom_spacing | strip }}"
+  {{ block.shopify_attributes }}
+>
+  {%- if block.settings.show_payment_icons and shop.enabled_payment_types.size > 0 -%}
+    <div class="footer-bottom__payment">
+      <h2 class="visually-hidden">{{ 'sections.footer.payment_methods' | t }}</h2>
+      <ul class="footer-bottom__payment-list" role="list">
+        {%- for type in shop.enabled_payment_types -%}
+          <li>{{ type | payment_type_svg_tag: class: 'footer-bottom__payment-icon' }}</li>
+        {%- endfor -%}
+      </ul>
+    </div>
+  {%- endif -%}
+
+  <div class="footer-bottom__meta">
+    {%- if block.settings.show_copyright -%}
+      <p class="footer-bottom__copyright">
+        {{ 'sections.footer.copyright_html' | t: year: year, shop: shop.name }}
+        {%- if block.settings.show_powered_by %} {{ powered_by_link }}{% endif -%}
+      </p>
+    {%- endif -%}
+
+    {%- if block.settings.text != blank -%}
+      <div class="footer-bottom__text rte">{{ block.settings.text }}</div>
+    {%- endif -%}
+
+    {%- if block.settings.show_follow_on_shop -%}
+      <div class="footer-bottom__follow">
+        {{ shop | login_button: action: 'follow' }}
+      </div>
+    {%- endif -%}
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "t:blocks.footer_bottom.name",
+  "tag": null,
+  "settings": [
+    {
+      "type": "select",
+      "id": "layout",
+      "label": "t:blocks.footer_bottom.settings.layout.label",
+      "options": [
+        {
+          "value": "split",
+          "label": "t:blocks.footer_bottom.settings.layout.options__1.label"
+        },
+        {
+          "value": "stacked",
+          "label": "t:blocks.footer_bottom.settings.layout.options__2.label"
+        },
+        {
+          "value": "centered",
+          "label": "t:blocks.footer_bottom.settings.layout.options__3.label"
+        }
+      ],
+      "default": "split"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_payment_icons",
+      "label": "t:sections.footer.settings.show_payment_icons.label",
+      "info": "t:sections.footer.settings.show_payment_icons.info",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "show_copyright",
+      "label": "t:blocks.footer_bottom.settings.show_copyright.label",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "show_powered_by",
+      "label": "t:blocks.footer_bottom.settings.show_powered_by.label",
+      "default": false,
+      "visible_if": "{{ block.settings.show_copyright }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_follow_on_shop",
+      "label": "t:sections.footer.settings.show_follow_on_shop.label",
+      "info": "t:sections.footer.settings.show_follow_on_shop.info",
+      "default": false
+    },
+    {
+      "type": "richtext",
+      "id": "text",
+      "label": "t:shared.text.label"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.spacing.block_header"
+    },
+    {
+      "type": "select",
+      "id": "padding_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        {
+          "value": "desktop",
+          "label": "t:shared.spacing.devices.options__1.label"
+        },
+        {
+          "value": "mobile",
+          "label": "t:shared.spacing.devices.options__2.label"
+        }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left_mobile",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right_mobile",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    }
+  ]
+}
+{% endschema %}
