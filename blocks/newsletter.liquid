@@ -10,8 +10,23 @@
   would be inventing a second source of truth for a legal record.
 {% endcomment %}
 
+{%- comment -%}
+  The form id is built before the render, not inside its arguments.
+
+  This block previously passed `id: 'Newsletter-', append: block.id`, which is
+  what an automatic rewrite leaves behind when it strips a filter out of a
+  `render` argument: `append` is not a parameter this snippet has, so every
+  newsletter block on a page rendered with the same id — `Newsletter-`. Two
+  blocks then shared one `<label for>` and one error region, and clicking the
+  second block's label focused the first block's field.
+{%- endcomment -%}
+{%- assign newsletter_id = 'Newsletter-' | append: block.id -%}
+
 <div class="newsletter-block" {% render 'spacing', block: block.settings %} {{ block.shopify_attributes }}>
-  {% render 'newsletter-form', id: 'Newsletter-', append: block.id, heading: block.settings.heading, text: block.settings.text %}
+  {% render 'newsletter-form',
+     id: newsletter_id,
+     heading: block.settings.heading,
+     text: block.settings.text %}
 </div>
 
 {% schema %}
@@ -32,18 +47,3 @@
   "presets": [{ "name": "t:blocks.newsletter.name" }]
 }
 {% endschema %}
-{% comment %}
-
-This file has been rewritten to preserve the original behavior.
-
----
-Changes:
-- from: |-
-    {% render 'newsletter-form',
-         id: 'Newsletter-' | append: block.id,
-         heading: block.settings.heading,
-         text: block.settings.text %}
-  to: "{% render 'newsletter-form', id: 'Newsletter-', append: block.id, heading:
-    block.settings.heading, text: block.settings.text %}"
-  position: 622..749
-{% endcomment %}

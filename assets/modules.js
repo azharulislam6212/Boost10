@@ -166,11 +166,27 @@ export class AccordionElement extends BaseComponent {
   }
 
   /**
+   * Every disclosure this group owns, at any depth.
+   *
+   * It used to be `:scope > details, :scope > * > details` — one level, or two.
+   * That was enough while a footer column was a block in a flat list, and
+   * stopped being enough the moment the footer grew a hierarchy: a Menu inside a
+   * Group inside a Column is three levels down, so the accordion found nothing,
+   * marked nothing static, and every column on a phone stayed a wall of links.
+   *
+   * Depth is now unbounded and ownership is what limits the search instead. A
+   * `<details>` inside a nested `<accordion-element>` belongs to that group, not
+   * to this one, and a block that opted out with `data-no-collapse` is not a
+   * disclosure at all — it is markup that happens to be a `<details>` so it can
+   * share one stylesheet with the ones that are.
+   *
    * @returns {HTMLDetailsElement[]}
    * @private
    */
   #items() {
-    return Array.from(this.querySelectorAll(':scope > details, :scope > * > details'));
+    const found = this.querySelectorAll('details:not([data-no-collapse])');
+
+    return Array.from(found).filter((item) => item.closest('accordion-element') === this);
   }
 
   /**

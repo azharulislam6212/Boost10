@@ -1,0 +1,217 @@
+{% comment %}
+  blocks/menu.liquid
+
+  A heading and a list of links. The footer's workhorse, and the one block in
+  this family that is public — a merchant adds it wherever a menu belongs, in a
+  footer column, inside a group, or on its own.
+
+  ## Why it is a `<details>`
+
+  So it can collapse. `<accordion-element data-collapse-below>` opens every
+  disclosure above the breakpoint and marks the summaries static, so the same
+  markup is a headed list on a desktop and a tappable row on a phone. No
+  duplicate DOM, and with the script gone it is an open list — which is a
+  readable footer, not a broken one.
+
+  "Show as accordion on mobile" is per block rather than per footer: a column of
+  five links wants collapsing, a column with an address in it does not. Off, the
+  block renders the same `<details>` with `data-no-collapse`, which the
+  accordion skips and the stylesheet leaves open.
+
+  ## Colour and typography
+
+  Every visual choice is a custom property on the element, not a class. The
+  merchant's heading preset, link preset, gap and colours land as
+  `--menu-heading-preset` and friends, so one CSS rule reads them all and a new
+  preset needs no new selector.
+{% endcomment %}
+
+{%- liquid
+  assign menu = block.settings.menu
+  assign heading = block.settings.heading
+  assign collapsible = block.settings.accordion_on_mobile
+
+  assign heading_preset = block.settings.heading_preset | default: 'h4'
+  assign link_preset = block.settings.link_preset | default: 'paragraph'
+-%}
+
+{%- if menu != blank or heading != blank -%}
+  {%- capture menu_styles -%}
+    --menu-gap: {{ block.settings.vertical_gap | default: 4 }}px;
+    {%- if block.settings.background_color != blank and block.settings.background_color != 'rgba(0,0,0,0)' -%}
+      --menu-background: {{ block.settings.background_color }};
+    {%- endif -%}
+    {%- if block.settings.text_color != blank and block.settings.text_color != 'rgba(0,0,0,0)' -%}
+      --menu-color: {{ block.settings.text_color }};
+    {%- endif -%}
+  {%- endcapture -%}
+
+  {%- capture menu_spacing -%}
+    {%- render 'spacing', block: block.settings, declarations: true -%}
+  {%- endcapture -%}
+
+  <details
+    class="footer-menu menu-block"
+    data-heading-preset="{{ heading_preset }}"
+    data-link-preset="{{ link_preset }}"
+    {% unless collapsible %}data-no-collapse open{% endunless %}
+    {%- comment -%}
+      `data-block-spacing` written by hand, because the padding is captured as
+      declarations and merged into the `style` attribute this element already
+      has. Two `style` attributes on one tag and the browser keeps the first —
+      and it is that attribute selector, not the properties, that makes the
+      padding sliders do anything at all.
+    {%- endcomment -%}
+    data-block-spacing
+    style="{{ menu_styles | strip }}{{ menu_spacing | strip }}"
+    {{ block.shopify_attributes }}
+  >
+    <summary class="footer-menu__summary">
+      <span class="footer-menu__heading">{{ heading }}</span>
+      {% render 'icon', icon: 'chevron-down', class: 'footer-menu__icon', size: 14 %}
+    </summary>
+
+    <div class="footer-menu__content">
+      {%- if menu != blank -%}
+        <ul class="footer-menu__list" role="list">
+          {%- for link in menu.links -%}
+            <li>
+              <a
+                class="footer-menu__link"
+                href="{{ link.url }}"
+                {% if link.current %}aria-current="page"{% endif %}
+              >
+                {{- link.title -}}
+              </a>
+            </li>
+          {%- endfor -%}
+        </ul>
+      {%- endif -%}
+    </div>
+  </details>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "t:blocks.menu.name",
+  "tag": null,
+  "settings": [
+    {
+      "type": "link_list",
+      "id": "menu",
+      "label": "t:blocks.menu.settings.menu.label",
+      "default": "footer"
+    },
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "t:shared.heading.label"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.menu.headers.appearance"
+    },
+    {
+      "type": "range",
+      "id": "vertical_gap",
+      "label": "t:blocks.menu.settings.vertical_gap.label",
+      "min": 0,
+      "max": 40,
+      "step": 2,
+      "unit": "px",
+      "default": 4
+    },
+    {
+      "type": "checkbox",
+      "id": "accordion_on_mobile",
+      "label": "t:blocks.menu.settings.accordion_on_mobile.label",
+      "default": true
+    },
+    {
+      "type": "color",
+      "id": "background_color",
+      "label": "t:blocks.menu.settings.background_color.label"
+    },
+    {
+      "type": "color",
+      "id": "text_color",
+      "label": "t:blocks.menu.settings.text_color.label"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.menu.headers.typography"
+    },
+    {
+      "type": "select",
+      "id": "heading_preset",
+      "label": "t:blocks.menu.settings.heading_preset.label",
+      "options": [
+        { "value": "h1", "label": "t:shared.presets.h1" },
+        { "value": "h2", "label": "t:shared.presets.h2" },
+        { "value": "h3", "label": "t:shared.presets.h3" },
+        { "value": "h4", "label": "t:shared.presets.h4" },
+        { "value": "h5", "label": "t:shared.presets.h5" },
+        { "value": "h6", "label": "t:shared.presets.h6" },
+        { "value": "paragraph", "label": "t:shared.presets.paragraph" }
+      ],
+      "default": "h4"
+    },
+    {
+      "type": "select",
+      "id": "link_preset",
+      "label": "t:blocks.menu.settings.link_preset.label",
+      "options": [
+        { "value": "paragraph", "label": "t:shared.presets.paragraph" },
+        { "value": "h5", "label": "t:shared.presets.h5" },
+        { "value": "h6", "label": "t:shared.presets.h6" }
+      ],
+      "default": "paragraph"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.spacing.block_header"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "padding_left",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "padding_right",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0
+    }
+  ],
+  "presets": [{ "name": "t:blocks.menu.name" }]
+}
+{% endschema %}

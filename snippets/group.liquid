@@ -160,6 +160,35 @@
 
   assign radius = settings.border_radius | default: 0 | plus: 0
 
+  # ---- gaps -------------------------------------------------------------
+  #
+  # `gap` is the original single control and is what every group saved before
+  # this change is configured with. The two axes layer on top of it: each falls
+  # back to `gap` when the merchant has not moved it, so an existing group
+  # renders exactly as it did and a new one gets the axis it was given. `plus: 0`
+  # coerces the range to a number — `default` alone does not replace a
+  # deliberate 0, which is a value a merchant can legitimately want here.
+  assign gap_base = settings.gap | default: 16 | plus: 0
+  assign gap_x = settings.gap_horizontal | default: gap_base | plus: 0
+  assign gap_y = settings.gap_vertical | default: gap_base | plus: 0
+  assign gap_x_mobile = settings.gap_horizontal_mobile | default: gap_x | plus: 0
+  assign gap_y_mobile = settings.gap_vertical_mobile | default: gap_y | plus: 0
+
+  # ---- mobile layout ----------------------------------------------------
+  #
+  # Swipe is CSS scroll-snap, not a carousel component. The children are already
+  # laid out in a flex row; making that row scroll and snap is four declarations
+  # and works with no script, no resize observer and no second set of markup for
+  # small screens. A `<swiper-carousel>` here would mean cloning the children
+  # into slides, which is a different DOM on a phone than on a desktop — and the
+  # blocks inside a group are authored by the merchant, not by the theme.
+  assign swipe_on_mobile = settings.swipe_on_mobile | default: false
+  assign custom_column_width_mobile = settings.custom_column_width_mobile | default: false
+  assign column_width_mobile = settings.column_width_mobile | default: 76 | plus: 0
+  assign column_order = settings.column_order | default: 0 | plus: 0
+
+  assign sticky_desktop = settings.sticky_desktop | default: false
+
   # ---- flags ------------------------------------------------------------
   assign background_media = settings.background_media | default: 'none'
   assign has_media = false
@@ -185,6 +214,12 @@
   if has_link
     assign classes = classes | append: ' block-group--linked'
   endif
+  if swipe_on_mobile
+    assign classes = classes | append: ' block-group--swipe-mobile'
+  endif
+  if sticky_desktop
+    assign classes = classes | append: ' block-group--sticky'
+  endif
   assign scheme = settings.color_scheme | default: ''
   if scheme != ''
     assign classes = classes | append: ' color-' | append: scheme
@@ -201,7 +236,20 @@
     `base.css` applies the padding through.
   {%- endcomment -%}
   {%- render 'spacing', block: settings, declarations: true -%}
-  --group-gap: {{ settings.gap | default: 16 }}px;
+  {%- comment -%}
+    `--group-gap` is kept as the single-value shorthand some other markup still
+    reads. The two axes are what `base.css` uses for this element, in the CSS
+    `gap: <row> <column>` order.
+  {%- endcomment -%}
+  --group-gap: {{ gap_base }}px;
+  --group-gap-x: {{ gap_x }}px;
+  --group-gap-y: {{ gap_y }}px;
+  --group-gap-x-mobile: {{ gap_x_mobile }}px;
+  --group-gap-y-mobile: {{ gap_y_mobile }}px;
+  --group-order: {{ column_order }};
+  {%- if swipe_on_mobile and custom_column_width_mobile -%}
+    --group-swipe-width: {{ column_width_mobile }}%;
+  {%- endif -%}
   --group-inline: {{ inline_axis }};
   --group-block: {{ block_axis }};
   --group-width: {{ width_value }};

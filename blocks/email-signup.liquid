@@ -1,0 +1,341 @@
+{% comment %}
+  blocks/email-signup.liquid
+
+  A newsletter form whose field and submit control are styled from the block's
+  own settings.
+
+  Public. It began as a footer composition piece and is not one: a signup with
+  this much control over its border, its presets and its submit treatment is
+  wanted in a rich text section and a promo popup too, and a block only the
+  footer can reach is a block every other section has to re-invent.
+
+  `blocks/newsletter.liquid` stays as the plain, heading-and-field version, and
+  both wrap the same `snippets/newsletter-form.liquid` shape — so there is one
+  form, one consent path, and one place where Shopify's `customer` form is
+  posted.
+
+  Nothing here intercepts the submit. Success and error come back from Shopify
+  after a reload, and re-implementing its validation and consent handling in
+  JavaScript would be inventing a second source of truth for a legal record.
+
+  ## Why the styling is custom properties
+
+  Border style, thickness, colours, the two text presets and the submit
+  treatment are all merchant settings. Expressed as classes that would be
+  thirty-odd combinations; expressed as properties on the wrapper it is one rule
+  per part, and a new option costs a value rather than a selector.
+{% endcomment %}
+
+{%- liquid
+  assign form_id = 'FooterSignup-' | append: block.id
+
+  assign border = block.settings.input_border | default: 'all'
+  assign style = block.settings.input_style | default: 'default'
+  assign button_style = block.settings.button_style | default: 'link'
+  assign button_display = block.settings.button_display | default: 'arrow'
+-%}
+
+{%- capture signup_styles -%}
+  {%- if block.settings.width == 'custom' -%}
+    --signup-width: {{ block.settings.custom_width | default: 100 }}%;
+  {%- endif -%}
+  {%- if style == 'custom' -%}
+    --signup-input-border-width: {{ block.settings.border_thickness | default: 1 }}px;
+    {%- if block.settings.input_text_color != blank -%}
+      --signup-input-color: {{ block.settings.input_text_color }};
+    {%- endif -%}
+    {%- if block.settings.input_border_color != blank -%}
+      --signup-input-border-color: {{ block.settings.input_border_color }};
+    {%- endif -%}
+  {%- endif -%}
+  {%- if block.settings.heading_color != blank -%}
+    --signup-heading-color: {{ block.settings.heading_color }};
+  {%- endif -%}
+  {%- if block.settings.link_text_color != blank -%}
+    --signup-button-color: {{ block.settings.link_text_color }};
+  {%- endif -%}
+{%- endcapture -%}
+
+{%- capture signup_spacing -%}
+  {%- render 'spacing', block: block.settings, declarations: true -%}
+{%- endcapture -%}
+
+<div
+  class="email-signup"
+  data-width="{{ block.settings.width | default: 'fill' }}"
+  data-border="{{ border }}"
+  data-input-style="{{ style }}"
+  data-button-style="{{ button_style }}"
+  data-button-display="{{ button_display }}"
+  data-heading-preset="{{ block.settings.heading_preset | default: 'h4' }}"
+  data-text-preset="{{ block.settings.input_preset | default: 'paragraph' }}"
+  data-block-spacing
+  style="{{ signup_styles | strip }}{{ signup_spacing | strip }}"
+  {{ block.shopify_attributes }}
+>
+  {%- if block.settings.heading != blank -%}
+    <p class="email-signup__heading">{{ block.settings.heading }}</p>
+  {%- endif -%}
+
+  {%- if block.settings.text != blank -%}
+    <div class="email-signup__text rte">{{ block.settings.text }}</div>
+  {%- endif -%}
+
+  <validated-form>
+    {%- form 'customer', id: form_id, class: 'email-signup__form' -%}
+      <input type="hidden" name="contact[tags]" value="newsletter">
+
+      <label class="visually-hidden" for="{{ form_id }}-email">
+        {{- 'general.newsletter.label' | t -}}
+      </label>
+
+      <div class="email-signup__field">
+        <input
+          id="{{ form_id }}-email"
+          class="email-signup__input"
+          type="email"
+          name="contact[email]"
+          value="{{ form.email }}"
+          placeholder="{{ 'general.newsletter.placeholder' | t | escape }}"
+          autocomplete="email"
+          required
+          {% if form.errors %}
+            aria-invalid="true"
+            aria-describedby="{{ form_id }}-error"
+          {% endif %}
+        >
+
+        {%- comment -%}
+          One button, two appearances. As an arrow it keeps its accessible name
+          in visually hidden text rather than dropping to an `aria-label`, so the
+          label is translated by the same string the text form uses.
+        {%- endcomment -%}
+        <button type="submit" class="email-signup__submit">
+          {%- if button_display == 'arrow' -%}
+            {% render 'icon', icon: 'arrow-right', size: 16 %}
+            <span class="visually-hidden">{{ 'general.newsletter.submit' | t }}</span>
+          {%- else -%}
+            <span>{{ 'general.newsletter.submit' | t }}</span>
+          {%- endif -%}
+        </button>
+      </div>
+
+      {%- if form.errors -%}
+        <p class="email-signup__error" id="{{ form_id }}-error" role="alert">
+          {{ form.errors.translated_fields.email | capitalize }}
+          {{ form.errors.messages.email }}
+        </p>
+      {%- endif -%}
+
+      {%- if form.posted_successfully? -%}
+        <p class="email-signup__success" role="status">
+          {{- 'general.newsletter.success' | t -}}
+        </p>
+      {%- endif -%}
+    {%- endform -%}
+  </validated-form>
+</div>
+
+{% schema %}
+{
+  "name": "t:blocks.email_signup.name",
+  "tag": null,
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "t:blocks.email_signup.paragraph"
+    },
+    {
+      "type": "select",
+      "id": "width",
+      "label": "t:blocks.email_signup.settings.width.label",
+      "options": [
+        { "value": "fill", "label": "t:blocks.email_signup.settings.width.options__1.label" },
+        { "value": "custom", "label": "t:blocks.email_signup.settings.width.options__2.label" }
+      ],
+      "default": "fill"
+    },
+    {
+      "type": "range",
+      "id": "custom_width",
+      "label": "t:blocks.email_signup.settings.custom_width.label",
+      "min": 20,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 100,
+      "visible_if": "{{ block.settings.width == 'custom' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.email_signup.headers.heading"
+    },
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "t:shared.text.label",
+      "default": "We send tasty emails"
+    },
+    {
+      "type": "richtext",
+      "id": "text",
+      "label": "t:blocks.email_signup.settings.text.label"
+    },
+    {
+      "type": "color",
+      "id": "heading_color",
+      "label": "t:blocks.email_signup.settings.heading_color.label"
+    },
+    {
+      "type": "select",
+      "id": "heading_preset",
+      "label": "t:blocks.email_signup.settings.heading_preset.label",
+      "options": [
+        { "value": "h2", "label": "t:shared.presets.h2" },
+        { "value": "h3", "label": "t:shared.presets.h3" },
+        { "value": "h4", "label": "t:shared.presets.h4" },
+        { "value": "h5", "label": "t:shared.presets.h5" },
+        { "value": "h6", "label": "t:shared.presets.h6" },
+        { "value": "paragraph", "label": "t:shared.presets.paragraph" }
+      ],
+      "default": "h4"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.email_signup.headers.input"
+    },
+    {
+      "type": "select",
+      "id": "input_border",
+      "label": "t:blocks.email_signup.settings.input_border.label",
+      "options": [
+        { "value": "all", "label": "t:blocks.email_signup.settings.input_border.options__1.label" },
+        { "value": "underline", "label": "t:blocks.email_signup.settings.input_border.options__2.label" },
+        { "value": "none", "label": "t:blocks.email_signup.settings.input_border.options__3.label" }
+      ],
+      "default": "all"
+    },
+    {
+      "type": "select",
+      "id": "input_style",
+      "label": "t:blocks.email_signup.settings.input_style.label",
+      "info": "t:blocks.email_signup.settings.input_style.info",
+      "options": [
+        { "value": "default", "label": "t:blocks.email_signup.settings.input_style.options__1.label" },
+        { "value": "custom", "label": "t:blocks.email_signup.settings.input_style.options__2.label" }
+      ],
+      "default": "default"
+    },
+    {
+      "type": "range",
+      "id": "border_thickness",
+      "label": "t:blocks.email_signup.settings.border_thickness.label",
+      "min": 0,
+      "max": 8,
+      "step": 1,
+      "unit": "px",
+      "default": 1,
+      "visible_if": "{{ block.settings.input_style == 'custom' }}"
+    },
+    {
+      "type": "color",
+      "id": "input_text_color",
+      "label": "t:blocks.email_signup.settings.input_text_color.label",
+      "visible_if": "{{ block.settings.input_style == 'custom' }}"
+    },
+    {
+      "type": "color",
+      "id": "input_border_color",
+      "label": "t:blocks.email_signup.settings.input_border_color.label",
+      "visible_if": "{{ block.settings.input_style == 'custom' }}"
+    },
+    {
+      "type": "select",
+      "id": "input_preset",
+      "label": "t:blocks.email_signup.settings.input_preset.label",
+      "options": [
+        { "value": "paragraph", "label": "t:shared.presets.paragraph" },
+        { "value": "h5", "label": "t:shared.presets.h5" },
+        { "value": "h6", "label": "t:shared.presets.h6" }
+      ],
+      "default": "paragraph"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.email_signup.headers.submit_button"
+    },
+    {
+      "type": "select",
+      "id": "button_style",
+      "label": "t:blocks.email_signup.settings.button_style.label",
+      "info": "t:blocks.email_signup.settings.button_style.info",
+      "options": [
+        { "value": "link", "label": "t:blocks.email_signup.settings.button_style.options__1.label" },
+        { "value": "primary", "label": "t:blocks.email_signup.settings.button_style.options__2.label" },
+        { "value": "secondary", "label": "t:blocks.email_signup.settings.button_style.options__3.label" }
+      ],
+      "default": "link"
+    },
+    {
+      "type": "color",
+      "id": "link_text_color",
+      "label": "t:blocks.email_signup.settings.link_text_color.label"
+    },
+    {
+      "type": "select",
+      "id": "button_display",
+      "label": "t:blocks.email_signup.settings.button_display.label",
+      "options": [
+        { "value": "text", "label": "t:blocks.email_signup.settings.button_display.options__1.label" },
+        { "value": "arrow", "label": "t:blocks.email_signup.settings.button_display.options__2.label" }
+      ],
+      "default": "arrow"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.spacing.block_header"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "padding_left",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "padding_right",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0
+    }
+  ],
+  "presets": [{ "name": "t:blocks.email_signup.name" }]
+}
+{% endschema %}

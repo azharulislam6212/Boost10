@@ -834,12 +834,28 @@
       padding-block-end: var(--section-padding-block-end-mobile, var(--section-padding-block-end, 0px));
     }
 
+    /* An explicit mobile value wins; otherwise the desktop value is scaled, which
+       is what every block did before per-device padding existed. Written as a
+       fallback chain rather than a second rule so there is one declaration per
+       side and no question about which of two rules applies. */
     .block-spacing,
     [data-block-spacing] {
-      padding-block-start: calc(var(--block-padding-block-start, 0px) * var(--block-padding-scale-mobile, 0.75));
-      padding-inline-end: calc(var(--block-padding-inline-end, 0px) * var(--block-padding-scale-mobile, 0.75));
-      padding-block-end: calc(var(--block-padding-block-end, 0px) * var(--block-padding-scale-mobile, 0.75));
-      padding-inline-start: calc(var(--block-padding-inline-start, 0px) * var(--block-padding-scale-mobile, 0.75));
+      padding-block-start: var(
+        --block-padding-block-start-mobile,
+        calc(var(--block-padding-block-start, 0px) * var(--block-padding-scale-mobile, 0.75))
+      );
+      padding-inline-end: var(
+        --block-padding-inline-end-mobile,
+        calc(var(--block-padding-inline-end, 0px) * var(--block-padding-scale-mobile, 0.75))
+      );
+      padding-block-end: var(
+        --block-padding-block-end-mobile,
+        calc(var(--block-padding-block-end, 0px) * var(--block-padding-scale-mobile, 0.75))
+      );
+      padding-inline-start: var(
+        --block-padding-inline-start-mobile,
+        calc(var(--block-padding-inline-start, 0px) * var(--block-padding-scale-mobile, 0.75))
+      );
     }
   }
 
@@ -5212,7 +5228,13 @@
   .block-group {
     position: relative;
     display: flex;
-    gap: var(--group-gap, var(--space-4));
+
+    /* Row gap first, column gap second — the CSS `gap` order, which is the
+       opposite of how the two controls read in the editor. `--group-gap` is the
+       fallback for a group saved before the axes existed. */
+    gap: var(--group-gap-y, var(--group-gap, var(--space-4)))
+      var(--group-gap-x, var(--group-gap, var(--space-4)));
+    order: var(--group-order, 0);
 
     /* Both, because a group is only a flex item when its parent is another
        group. `flex` is inert at the top level of a section, and `inline-size` is
@@ -5302,10 +5324,25 @@
     outline-offset: 2px;
   }
 
+  /* ---- sticky ----
+     Desktop only, and offset by the header so a pinned group does not slide
+     under it. `--header-height` is published by the header section from the
+     merchant's own settings before first paint, so this is correct on the frame
+     it renders rather than after a module loads. */
+  @media screen and (min-width: 750px) {
+    .block-group--sticky {
+      position: sticky;
+      inset-block-start: calc(var(--header-height, 0px) + var(--space-5));
+      align-self: flex-start;
+    }
+  }
+
   @media screen and (max-width: 749px) {
     .block-group {
       flex: var(--group-width-mobile, var(--group-width, 0 0 auto));
       inline-size: var(--group-width-mobile-size, var(--group-width-size, 100%));
+      gap: var(--group-gap-y-mobile, var(--group-gap-y, var(--group-gap, var(--space-4))))
+        var(--group-gap-x-mobile, var(--group-gap-x, var(--group-gap, var(--space-4))));
     }
 
     /* A row of columns on a phone is a stack, unless the merchant said
@@ -5314,6 +5351,44 @@
       flex-direction: column;
       justify-content: var(--group-block, start);
       align-items: var(--group-inline, start);
+    }
+
+    /* ---- swipe ----
+
+       Scroll-snap, not a carousel. The children are already a flex row; making
+       that row scroll and snap is four declarations, needs no script, and keeps
+       one DOM at every width — which matters because the blocks inside a group
+       are the merchant's, and cloning them into slides would mean a different
+       tree on a phone than on a desktop.
+
+       It beats `--stack-mobile` on purpose: a merchant who switches swipe on has
+       said what the row should do on a phone, and stacking it as well would
+       leave a column that scrolls sideways by one item. */
+    .block-group--swipe-mobile.block-group--row,
+    .block-group--swipe-mobile.block-group--row.block-group--stack-mobile {
+      flex-direction: row;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      overscroll-behavior-inline: contain;
+      scroll-snap-type: x mandatory;
+
+      /* The scrollbar is hidden, and the row stays keyboard-scrollable and
+         screen-reader-navigable — this only removes the visual bar. */
+      scrollbar-width: none;
+    }
+
+    .block-group--swipe-mobile.block-group--row::-webkit-scrollbar {
+      display: none;
+    }
+
+    .block-group--swipe-mobile.block-group--row > .block-group__content {
+      display: contents;
+    }
+
+    .block-group--swipe-mobile.block-group--row > .block-group__content > * {
+      flex: 0 0 var(--group-swipe-width, 100%);
+      max-inline-size: var(--group-swipe-width, 100%);
+      scroll-snap-align: start;
     }
   }
 

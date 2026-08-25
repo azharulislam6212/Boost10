@@ -1,0 +1,822 @@
+/**
+ * footer.css — Boost10
+ *
+ * The footer and its composition blocks: Column, Menu, Email signup, Social
+ * media links, plus the contact bar, the wordmark and the localization pickers
+ * as they appear down there.
+ *
+ * Kept out of base.css for the same reason search.css is: this is one feature
+ * with a lot of surface, it is the first thing an agency restyles, and one
+ * addressable file makes that a contained change rather than a hunt through nine
+ * thousand lines.
+ *
+ * Declared inside `@layer components`, so it takes part in the same cascade as
+ * everything else and merchant Custom CSS — injected unlayered by theme.liquid —
+ * still wins without `!important`.
+ *
+ * Every colour reads a custom property from the section's colour scheme. The
+ * gradient, the panel and the wordmark are built from `--color-background-rgb`
+ * and `--color-primary-button-background`, so a merchant who changes the footer
+ * scheme changes all three and nothing here needs editing.
+ */
+
+@layer components {
+  /* ==========================================================================
+     Tokens
+     ========================================================================== */
+
+  .footer {
+    --footer-panel-radius: 2.4rem;
+    --footer-panel-border: 1px solid rgb(var(--color-border-rgb, 255 255 255) / 0.14);
+    --footer-panel-surface: rgb(var(--color-background-rgb) / 0.04);
+    --footer-rule: rgb(var(--color-border-rgb, 255 255 255) / 0.14);
+
+    --footer-column-gap: var(--space-7);
+    --footer-row-gap: var(--space-6);
+
+    --footer-accent: var(--color-primary-button-background);
+    --footer-heading-color: var(--color-heading);
+    --footer-muted: var(--color-accent-text);
+
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* The gradient is painted on a pseudo-element rather than the section, so the
+     panel's translucent surface has something to sit on and a merchant's Custom
+     CSS `background` on `.footer` does not have to fight a shorthand. */
+  .footer--gradient::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(
+        120% 90% at 50% 0%,
+        rgb(var(--color-primary-button-background-rgb, 0 200 83) / 0.16) 0%,
+        transparent 60%
+      ),
+      linear-gradient(180deg, rgb(var(--color-background-rgb) / 0) 0%, rgb(var(--color-background-rgb) / 0.55) 100%);
+  }
+
+  /* Everything above the gradient. One rule rather than a z-index on each part:
+     the container is the only direct child that paints. */
+  .footer > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ==========================================================================
+     The panel
+     ========================================================================== */
+
+  .footer__panel {
+    display: block;
+  }
+
+  .footer__panel--card {
+    padding: var(--space-8) var(--space-7);
+    border: var(--footer-panel-border);
+    border-radius: var(--footer-panel-radius);
+    background-color: var(--footer-panel-surface);
+  }
+
+  /* ==========================================================================
+     Columns
+     --------------------------------------------------------------------------
+     A row of columns whose widths are shares, not sizes: `--column-width` is a
+     percentage of the row and feeds `flex-basis`, so three columns at 100% split
+     into thirds and one at 150% beside them takes proportionally more. A
+     merchant never has to make the numbers add up.
+     ========================================================================== */
+
+  .footer__columns {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--footer-row-gap) var(--footer-column-gap);
+    align-items: flex-start;
+  }
+
+  .footer-column {
+    flex: 1 1 0;
+    /* `flex-grow` carries the share. `flex-basis: 0` with a grow factor divides
+       the free space in the ratio of the widths, which is what makes 150% next
+       to three 100%s land at the design's proportions. */
+    flex-grow: calc(var(--column-width, 100%) / 100%);
+    min-inline-size: 0;
+    order: var(--column-order, 0);
+  }
+
+  .footer-column__content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    min-inline-size: 0;
+  }
+
+  /* "Show divider" is one setting with two shapes, because a divider is only
+     ever drawn between things and the columns run in different directions at
+     the two sizes. Side by side it is a rule down the inline-start edge, with
+     the gap split so the line sits between the columns rather than against one
+     of them; stacked, it is a rule above — which is the rule further down in
+     the small-screen block. */
+  @media screen and (min-width: 750px) {
+    .footer-column[data-divider] {
+      padding-inline-start: var(--footer-column-gap);
+      margin-inline-start: calc(var(--footer-column-gap) * -0.5);
+      border-inline-start: 1px solid var(--footer-rule);
+    }
+  }
+
+  .footer-column__summary,
+  .footer-menu__summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .footer-column__summary::-webkit-details-marker,
+  .footer-menu__summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .footer-column__heading {
+    font-family: var(--font-heading-family, var(--font-body-family));
+    font-size: var(--font-size-h5, 1.8rem);
+    font-weight: 600;
+    color: var(--footer-heading-color);
+  }
+
+  /* The chevron only exists while the disclosure is a control. Above the
+     breakpoint `<accordion-element>` marks the summary static, and a marker
+     beside a heading that cannot be tapped is a promise the footer does not
+     keep. */
+  .footer-column__icon,
+  .footer-menu__icon {
+    flex: 0 0 auto;
+    transition: transform var(--transition-fast);
+  }
+
+  .footer-column[open] > .footer-column__summary .footer-column__icon,
+  .footer-menu[open] > .footer-menu__summary .footer-menu__icon {
+    transform: rotate(180deg);
+  }
+
+  [data-static] > .footer-column__summary,
+  [data-static] > .footer-menu__summary {
+    cursor: default;
+  }
+
+  [data-static] > .footer-column__summary .footer-column__icon,
+  [data-static] > .footer-menu__summary .footer-menu__icon,
+  .footer-menu[data-no-collapse] > .footer-menu__summary .footer-menu__icon {
+    display: none;
+  }
+
+  /* ==========================================================================
+     Menu block
+     ========================================================================== */
+
+  .footer-menu {
+    display: block;
+    min-inline-size: 0;
+    background-color: var(--menu-background, transparent);
+    color: var(--menu-color, inherit);
+  }
+
+  .footer-menu__heading {
+    display: block;
+    margin-block-end: var(--space-4);
+    color: var(--menu-heading-color, var(--footer-accent));
+    font-family: var(--font-heading-family, var(--font-body-family));
+    font-weight: 500;
+  }
+
+  /* The heading preset is an attribute, not a class per size: one declaration
+     block per preset, selected by the value the merchant picked. */
+  .footer-menu[data-heading-preset='h1'] .footer-menu__heading { font-size: var(--font-size-h1); }
+  .footer-menu[data-heading-preset='h2'] .footer-menu__heading { font-size: var(--font-size-h2); }
+  .footer-menu[data-heading-preset='h3'] .footer-menu__heading { font-size: var(--font-size-h3); }
+  .footer-menu[data-heading-preset='h4'] .footer-menu__heading { font-size: var(--font-size-h4, 2.2rem); }
+  .footer-menu[data-heading-preset='h5'] .footer-menu__heading { font-size: var(--font-size-h5, 1.8rem); }
+  .footer-menu[data-heading-preset='h6'] .footer-menu__heading { font-size: var(--font-size-h6, 1.6rem); }
+  .footer-menu[data-heading-preset='paragraph'] .footer-menu__heading { font-size: var(--font-size-md); }
+
+  .footer-menu__list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--menu-gap, 4px);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .footer-menu[data-link-preset='h5'] .footer-menu__link { font-size: var(--font-size-h5, 1.8rem); }
+  .footer-menu[data-link-preset='h6'] .footer-menu__link { font-size: var(--font-size-h6, 1.6rem); }
+
+  .footer-menu__link {
+    display: inline-block;
+    padding-block: 0.4rem;
+    color: inherit;
+    text-decoration: none;
+    transition: color var(--transition-fast), transform var(--transition-fast);
+  }
+
+  .footer-menu__link:hover,
+  .footer-menu__link[aria-current='page'] {
+    color: var(--footer-accent);
+  }
+
+  /* A nudge rather than an underline. At this size an underline on hover shifts
+     the row's optical baseline; the translation does not. */
+  .footer-menu__link:hover {
+    transform: translateX(0.2rem);
+  }
+
+  [dir='rtl'] .footer-menu__link:hover {
+    transform: translateX(-0.2rem);
+  }
+
+  /* ==========================================================================
+     Email signup
+     ========================================================================== */
+
+  .email-signup {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    inline-size: var(--signup-width, 100%);
+    max-inline-size: 100%;
+  }
+
+  .email-signup[data-width='fill'] {
+    inline-size: 100%;
+  }
+
+  .email-signup__heading {
+    margin: 0;
+    color: var(--signup-heading-color, var(--footer-heading-color));
+    font-family: var(--font-heading-family, var(--font-body-family));
+    text-wrap: balance;
+  }
+
+  .email-signup[data-heading-preset='h2'] .email-signup__heading { font-size: var(--font-size-h2); }
+  .email-signup[data-heading-preset='h3'] .email-signup__heading { font-size: var(--font-size-h3); }
+  .email-signup[data-heading-preset='h4'] .email-signup__heading { font-size: var(--font-size-h4, 2.2rem); }
+  .email-signup[data-heading-preset='h5'] .email-signup__heading { font-size: var(--font-size-h5, 1.8rem); }
+  .email-signup[data-heading-preset='h6'] .email-signup__heading { font-size: var(--font-size-h6, 1.6rem); }
+  .email-signup[data-heading-preset='paragraph'] .email-signup__heading { font-size: var(--font-size-md); }
+
+  .email-signup__text {
+    max-inline-size: 52ch;
+    color: var(--footer-muted);
+    font-size: var(--font-size-sm);
+    text-wrap: pretty;
+  }
+
+  .email-signup__form {
+    inline-size: 100%;
+  }
+
+  /* The field is the pill: the border lives on this wrapper, not on the input,
+     so the submit control sits inside it and the three border styles are one
+     rule each instead of one per part. */
+  .email-signup__field {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: 0.6rem 0.6rem 0.6rem var(--space-5);
+    border-radius: 999px;
+    /* Enough surface to read as a field on a dark ground. Below about 0.1 the
+       pill disappears and the placeholder looks like loose text with an arrow
+       beside it. */
+    background-color: rgb(var(--color-background-rgb) / 0.14);
+  }
+
+  .email-signup[data-border='all'] .email-signup__field {
+    border: var(--signup-input-border-width, 1px) solid
+      var(--signup-input-border-color, rgb(var(--color-border-rgb, 255 255 255) / 0.24));
+  }
+
+  .email-signup[data-border='underline'] .email-signup__field {
+    border-block-end: var(--signup-input-border-width, 1px) solid
+      var(--signup-input-border-color, rgb(var(--color-border-rgb, 255 255 255) / 0.24));
+    border-radius: 0;
+    padding-inline: 0;
+    background-color: transparent;
+  }
+
+  .email-signup[data-border='none'] .email-signup__field {
+    border: 0;
+  }
+
+  /* The input is a bare field inside that pill. Every visible edge belongs to
+     the wrapper, so base.css's own input chrome is cleared here rather than
+     fought with per-state overrides. */
+  .email-signup__input {
+    flex: 1 1 auto;
+    min-inline-size: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--signup-input-color, var(--color-text));
+    font-size: var(--font-size-md);
+  }
+
+  .email-signup__input:hover,
+  .email-signup__input:focus {
+    background: none;
+  }
+
+  .email-signup[data-text-preset='h5'] .email-signup__input { font-size: var(--font-size-h5, 1.8rem); }
+  .email-signup[data-text-preset='h6'] .email-signup__input { font-size: var(--font-size-h6, 1.6rem); }
+
+  .email-signup__submit {
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    min-inline-size: 4rem;
+    block-size: 4rem;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    color: var(--signup-button-color, var(--color-heading));
+    transition: background-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+  }
+
+  /* Arrow: a filled circle, which is why the field carries 0.6rem of padding —
+     the control has to sit inside the pill, not on its edge. */
+  .email-signup[data-button-display='arrow'] .email-signup__submit {
+    background-color: var(--color-background);
+    color: var(--color-heading);
+  }
+
+  .email-signup[data-button-display='text'] .email-signup__submit {
+    padding-inline: var(--space-4);
+  }
+
+  .email-signup[data-button-style='primary'] .email-signup__submit {
+    background-color: var(--color-primary-button-background);
+    color: var(--color-primary-button-text);
+  }
+
+  .email-signup[data-button-style='secondary'] .email-signup__submit {
+    background-color: var(--color-secondary-button-background);
+    color: var(--color-secondary-button-text);
+  }
+
+  .email-signup__submit:hover {
+    transform: scale(1.04);
+  }
+
+  .email-signup__error {
+    color: var(--color-sale-price);
+    font-size: var(--font-size-sm);
+  }
+
+  .email-signup__success {
+    color: var(--footer-accent);
+    font-size: var(--font-size-sm);
+  }
+
+  /* ==========================================================================
+     Social media links
+     ========================================================================== */
+
+  .social-links {
+    display: flex;
+    flex-direction: column;
+    align-items: inherit;
+    gap: var(--space-3);
+    color: var(--social-color, inherit);
+  }
+
+  .social-links__heading {
+    margin: 0;
+    color: var(--footer-heading-color);
+    font-size: var(--font-size-md);
+  }
+
+  .social-links__list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .social-links__link {
+    display: grid;
+    place-items: center;
+    inline-size: 4rem;
+    block-size: 4rem;
+    border-radius: 50%;
+    background-color: rgb(var(--color-background-rgb) / 0.1);
+    color: currentcolor;
+    transition:
+      background-color var(--transition-fast),
+      color var(--transition-fast),
+      transform var(--transition-fast);
+  }
+
+  .social-links__link:hover,
+  .social-links__link:focus-visible {
+    background-color: var(--footer-accent);
+    color: var(--color-primary-button-text);
+    transform: translateY(-0.2rem);
+  }
+
+  /* ==========================================================================
+     Policy row
+     ========================================================================== */
+
+  .footer__policies {
+    margin-block-start: var(--space-7);
+    padding-block-start: var(--space-6);
+    border-block-start: 1px solid var(--footer-rule);
+  }
+
+  .footer__policies-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-4) var(--space-8);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .footer__policy-link {
+    color: inherit;
+    font-size: var(--font-size-sm);
+    text-decoration: none;
+    transition: color var(--transition-fast);
+  }
+
+  .footer__policy-link:hover {
+    color: var(--footer-accent);
+  }
+
+  /* ==========================================================================
+     Contact and localization bar
+     ========================================================================== */
+
+  .footer__bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-5);
+    margin-block-start: var(--space-7);
+    padding: var(--space-5) var(--space-6);
+    border: var(--footer-panel-border);
+    border-radius: var(--footer-panel-radius);
+    background-color: var(--footer-panel-surface);
+  }
+
+  .footer__contact {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-6) var(--space-8);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .footer__contact-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .footer__contact-icon {
+    display: grid;
+    place-items: center;
+    inline-size: 4rem;
+    block-size: 4rem;
+    border-radius: 50%;
+    background-color: var(--footer-accent);
+    color: var(--color-primary-button-text);
+  }
+
+  .footer__contact-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-inline-size: 0;
+  }
+
+  .footer__contact-label {
+    font-size: 1.1rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--footer-heading-color);
+  }
+
+  .footer__contact-value {
+    color: var(--footer-muted);
+    font-size: var(--font-size-sm);
+    text-decoration: none;
+    transition: color var(--transition-fast);
+  }
+
+  a.footer__contact-value:hover {
+    color: var(--footer-accent);
+  }
+
+  /* ==========================================================================
+     Payment marks, copyright
+     ========================================================================== */
+
+  .footer__meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    margin-block-start: var(--space-7);
+  }
+
+  .footer__payment-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .footer__payment-icon {
+    block-size: 2.4rem;
+    inline-size: auto;
+  }
+
+  .footer__copyright {
+    margin: 0;
+    color: var(--footer-muted);
+    font-size: var(--font-size-sm);
+  }
+
+  /* ==========================================================================
+     The wordmark
+     --------------------------------------------------------------------------
+     Type as texture: a single line, clipped to a gradient, sized from the
+     viewport so it spans the footer at every width. `cqi`-free on purpose —
+     `vw` is what makes it track the page rather than its container, which is
+     the effect in the design.
+     ========================================================================== */
+
+  .footer__logo {
+    display: block;
+    margin-block-start: var(--space-8);
+  }
+
+  .footer__logo-inner {
+    position: relative;
+    display: block;
+    overflow: hidden;
+    line-height: 0.82;
+  }
+
+  .footer__logo-text {
+    display: block;
+    font-family: var(--font-heading-family, var(--font-body-family));
+    font-size: clamp(6rem, 17vw, 24rem);
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    text-align: center;
+    white-space: nowrap;
+
+    /* The gradient is the ink. `background-clip: text` needs a painted
+       background and a transparent fill; the `color` fallback below it is what
+       a browser without the property shows, so the wordmark is never invisible. */
+    color: var(--footer-accent);
+    background-image: linear-gradient(
+      180deg,
+      var(--footer-accent) 0%,
+      rgb(var(--color-primary-button-background-rgb, 0 200 83) / 0.35) 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+  }
+
+  @supports (background-clip: text) or (-webkit-background-clip: text) {
+    .footer__logo-text {
+      color: transparent;
+    }
+  }
+
+  .footer__logo-media {
+    inline-size: 100%;
+  }
+
+  /* The shimmer: one highlight sweeping across the wordmark, on a delay long
+     enough to land after the slide-up reveal rather than during it. `mix-blend`
+     rather than opacity so it lightens the letters it crosses and nothing else,
+     and `pointer-events: none` because it covers the whole line. */
+  .footer__logo-shine {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: -60%;
+    inline-size: 45%;
+    pointer-events: none;
+    background: linear-gradient(
+      100deg,
+      transparent 0%,
+      rgb(255 255 255 / 0.28) 45%,
+      rgb(255 255 255 / 0.42) 50%,
+      rgb(255 255 255 / 0.28) 55%,
+      transparent 100%
+    );
+    mix-blend-mode: overlay;
+    animation: footer-logo-shine 4.5s var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)) 1.1s infinite;
+  }
+
+  @keyframes footer-logo-shine {
+    0% {
+      transform: translateX(0);
+    }
+
+    /* The sweep is a fifth of the cycle; the rest is the pause between passes.
+       A highlight crossing continuously reads as a loading state. */
+    35%,
+    100% {
+      transform: translateX(320%);
+    }
+  }
+
+  [dir='rtl'] .footer__logo-shine {
+    animation-name: footer-logo-shine-rtl;
+  }
+
+  @keyframes footer-logo-shine-rtl {
+    0% {
+      transform: translateX(0);
+    }
+
+    35%,
+    100% {
+      transform: translateX(-320%);
+    }
+  }
+
+  /* ==========================================================================
+     Disclaimer
+     ========================================================================== */
+
+  .footer__disclaimer {
+    display: flex;
+    justify-content: center;
+    margin-block-start: var(--space-7);
+  }
+
+  .footer__disclaimer-inner {
+    max-inline-size: 78rem;
+    padding: var(--space-4) var(--space-6);
+    border: 1px dashed rgb(var(--color-border-rgb, 255 255 255) / 0.3);
+    border-radius: 1.2rem;
+    color: var(--footer-muted);
+    font-size: var(--font-size-sm);
+    text-align: center;
+    text-wrap: pretty;
+  }
+
+  .footer__disclaimer-inner p {
+    margin: 0;
+  }
+
+  /* ==========================================================================
+     Localization pickers
+     --------------------------------------------------------------------------
+     The panels rise into place. Every other overlay in the theme animates, and
+     a picker that simply appears reads as a rendering glitch next to them.
+     ========================================================================== */
+
+  .footer__localization {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    flex: 0 0 auto;
+  }
+
+  .footer__localization .localization__trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border: var(--footer-panel-border);
+    border-radius: 999px;
+    background-color: rgb(var(--color-background-rgb) / 0.14);
+    color: inherit;
+    font-size: var(--font-size-sm);
+    transition: border-color var(--transition-fast), background-color var(--transition-fast);
+  }
+
+  .footer__localization .localization__trigger:hover {
+    border-color: var(--footer-accent);
+  }
+
+  /* `hidden` is `display: none`, which cannot transition — so the panel is shown
+     and hidden by the component while the entrance is an animation that runs on
+     the frame it becomes visible. */
+  .footer__localization .localization__panel:not([hidden]) {
+    animation: footer-picker-rise var(--duration-base, 250ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1))
+      backwards;
+  }
+
+  @keyframes footer-picker-rise {
+    from {
+      opacity: 0;
+      transform: translateY(1.2rem);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* ==========================================================================
+     Small screens
+     ========================================================================== */
+
+  @media screen and (max-width: 749px) {
+    .footer {
+      --footer-panel-radius: 1.6rem;
+    }
+
+    .footer__panel--card {
+      padding: var(--space-5);
+    }
+
+    .footer__columns {
+      display: block;
+    }
+
+    /* Stacked, and each one a row with a rule under it — the accordion look. The
+       flex share is meaningless in this layout, so it is cleared rather than
+       left to resolve against a container that is no longer a row. */
+    .footer-column {
+      inline-size: 100%;
+      flex: none;
+    }
+
+    .footer-column + .footer-column,
+    .footer-column[data-divider] {
+      border-block-start: 1px solid var(--footer-rule);
+    }
+
+    .footer-column__summary,
+    .footer-menu__summary {
+      padding-block: var(--space-4);
+    }
+
+    .footer-column__content {
+      padding-block-end: var(--space-4);
+    }
+
+    .footer-menu + .footer-menu {
+      border-block-start: 1px solid var(--footer-rule);
+    }
+
+    .footer__bar,
+    .footer__meta {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .footer__contact {
+      gap: var(--space-4);
+    }
+
+    .footer__logo-text {
+      font-size: clamp(4rem, 20vw, 12rem);
+    }
+  }
+
+  /* ==========================================================================
+     Motion
+     ========================================================================== */
+
+  @media (prefers-reduced-motion: reduce) {
+    .footer__logo-shine {
+      animation: none;
+      opacity: 0;
+    }
+
+    .footer__localization .localization__panel:not([hidden]) {
+      animation: none;
+    }
+
+    .footer-menu__link:hover,
+    .social-links__link:hover,
+    .email-signup__submit:hover {
+      transform: none;
+    }
+  }
+}

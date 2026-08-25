@@ -1,0 +1,163 @@
+{% comment %}
+  blocks/social-follow.liquid
+
+  A follow row: one link per social account, each pasted into this block.
+
+  Public, and named for what it does rather than for where it started. It is
+  deliberately not `blocks/social-icons.liquid`, which renders the theme-wide
+  accounts from Theme settings › Social and nothing else. Both exist for a
+  reason: a store has one set of accounts, so the theme-wide list is right almost
+  everywhere — but one place on the site usually wants a different subset or a
+  campaign account, and duplicating the theme settings to get it is how a
+  merchant ends up with two lists that disagree.
+
+  So this block overrides per link and falls back per link. Leave Instagram blank
+  here and it uses the theme's Instagram; fill it in and it does not.
+
+  ## Only what is filled in
+
+  A network with no URL in either place is not rendered. A row showing three of
+  thirteen networks is normal; placeholders for the rest are not.
+{% endcomment %}
+
+{%- liquid
+  comment
+    One list, in the order the design shows them. `handle` is both the icon name
+    in snippets/icon.liquid and the settings key here and in Theme settings,
+    which is what lets the fallback below be a single lookup rather than
+    thirteen branches.
+  endcomment
+  assign handles = 'facebook,instagram,youtube,tiktok,x,threads,linkedin,bluesky,snapchat,pinterest,tumblr,vimeo'
+  assign handles = handles | split: ','
+
+  comment
+    Resolved once, here. Shopify's `render` tag does not accept filters in an
+    argument — the parser stops at the pipe and the whole tag is a syntax
+    error — so `size: block.settings.icon_size | default: 18` has to become a
+    plain variable before it is passed.
+  endcomment
+  assign icon_size = block.settings.icon_size | default: 18
+-%}
+
+{%- capture social_styles -%}
+  {%- if block.settings.color != blank -%}
+    --social-color: {{ block.settings.color }};
+  {%- endif -%}
+{%- endcapture -%}
+
+<div
+  class="social-links"
+  style="{{ social_styles | strip }}"
+  {{ block.shopify_attributes }}
+>
+  {%- if block.settings.heading != blank -%}
+    <p class="social-links__heading">{{ block.settings.heading }}</p>
+  {%- endif -%}
+
+  <ul class="social-links__list" role="list">
+    {%- for handle in handles -%}
+      {%- liquid
+        assign block_key = 'social_' | append: handle
+        assign theme_key = 'social_' | append: handle | append: '_link'
+
+        assign url = block.settings[block_key]
+        if url == blank
+          assign url = settings[theme_key]
+        endif
+
+        comment
+          The same accessible name the rest of the theme uses for a social
+          link — "Share on Instagram" — rather than a second string family
+          saying the same thing in a slightly different way.
+        endcomment
+        assign platform = handle | capitalize
+        assign label = 'general.share.share_on' | t: platform: platform
+      -%}
+
+      {%- if url != blank -%}
+        <li class="social-links__item">
+          <a
+            class="social-links__link"
+            href="{{ url }}"
+            target="_blank"
+            rel="noopener"
+            aria-label="{{ label | escape }}"
+          >
+            {% render 'icon', icon: handle, size: icon_size %}
+          </a>
+        </li>
+      {%- endif -%}
+    {%- endfor -%}
+
+    {%- if block.settings.social_custom != blank -%}
+      <li class="social-links__item">
+        <a
+          class="social-links__link"
+          href="{{ block.settings.social_custom }}"
+          target="_blank"
+          rel="noopener"
+          aria-label="{{ block.settings.social_custom_label | default: shop.name | escape }}"
+        >
+          {% render 'icon', icon: 'external', size: icon_size %}
+        </a>
+      </li>
+    {%- endif -%}
+  </ul>
+</div>
+
+{% schema %}
+{
+  "name": "t:blocks.social_follow.name",
+  "tag": null,
+  "settings": [
+    {
+      "type": "header",
+      "content": "t:blocks.social_follow.headers.appearance"
+    },
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "t:shared.heading.label"
+    },
+    {
+      "type": "color",
+      "id": "color",
+      "label": "t:blocks.social_follow.settings.color.label"
+    },
+    {
+      "type": "range",
+      "id": "icon_size",
+      "label": "t:blocks.icon_with_text.settings.icon_size.label",
+      "min": 12,
+      "max": 32,
+      "step": 2,
+      "unit": "px",
+      "default": 18
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.social_follow.headers.links"
+    },
+    { "type": "url", "id": "social_facebook", "label": "t:blocks.social_follow.networks.facebook" },
+    { "type": "url", "id": "social_instagram", "label": "t:blocks.social_follow.networks.instagram" },
+    { "type": "url", "id": "social_youtube", "label": "t:blocks.social_follow.networks.youtube" },
+    { "type": "url", "id": "social_tiktok", "label": "t:blocks.social_follow.networks.tiktok" },
+    { "type": "url", "id": "social_x", "label": "t:blocks.social_follow.networks.x" },
+    { "type": "url", "id": "social_threads", "label": "t:blocks.social_follow.networks.threads" },
+    { "type": "url", "id": "social_linkedin", "label": "t:blocks.social_follow.networks.linkedin" },
+    { "type": "url", "id": "social_bluesky", "label": "t:blocks.social_follow.networks.bluesky" },
+    { "type": "url", "id": "social_snapchat", "label": "t:blocks.social_follow.networks.snapchat" },
+    { "type": "url", "id": "social_pinterest", "label": "t:blocks.social_follow.networks.pinterest" },
+    { "type": "url", "id": "social_tumblr", "label": "t:blocks.social_follow.networks.tumblr" },
+    { "type": "url", "id": "social_vimeo", "label": "t:blocks.social_follow.networks.vimeo" },
+    { "type": "url", "id": "social_custom", "label": "t:blocks.social_follow.settings.custom.label" },
+    {
+      "type": "text",
+      "id": "social_custom_label",
+      "label": "t:blocks.social_follow.settings.custom_label.label",
+      "visible_if": "{{ block.settings.social_custom != blank }}"
+    }
+  ],
+  "presets": [{ "name": "t:blocks.social_follow.name" }]
+}
+{% endschema %}

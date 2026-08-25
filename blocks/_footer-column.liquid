@@ -1,0 +1,161 @@
+{% comment %}
+  blocks/_footer-column.liquid
+
+  A column of the footer grid, and the outermost level of the hierarchy:
+
+      Column  ›  Group  ›  Elements
+
+  Private. It is meaningful only inside a footer — a "Column" offered on a
+  product page would be a box with a width setting and no grid to sit in — so it
+  is reachable from the footer and from a group, and nowhere else. Private does
+  not mean static: the footer lists `_footer-column` in its own `blocks`, which
+  is what puts "Column" in the editor's Add block menu with its own Add block
+  inside it.
+
+  ## Width is a share, not a size
+
+  `width` is a percentage of the row, emitted as `--column-width` and read by a
+  `flex-basis`. Three columns at 100% divide the row into thirds; one at 200%
+  beside two at 100% takes half. A merchant never has to make the numbers add up
+  to anything.
+
+  ## The heading is optional and never empty
+
+  With a heading the column is a `<details>` and collapses on small screens like
+  a menu does. Without one there is nothing to tap, so it renders as a plain
+  `<div>` — a newsletter form behind a closed summary is a newsletter form
+  nobody uses.
+
+  "Open by default on mobile" is off by default, and that is the right default
+  rather than a cautious one: the reason to collapse a footer at all is so a
+  customer can see every column heading without scrolling past one column's
+  worth of links, and a column that loads expanded takes that back.
+
+  ## What goes inside
+
+  Content blocks sit directly in a Column. A Group inside a Column is for
+  bundling and laying out what is already there — a heading beside a form — not
+  a second place to put content, which is why the content types are listed here
+  and not in the group's own schema.
+{% endcomment %}
+
+{%- liquid
+  assign heading = block.settings.heading
+  assign heading_size = block.settings.heading_size | default: 'h5'
+  assign width = block.settings.width | default: 100
+  assign order = block.settings.column_order | default: 0 | plus: 0
+
+  assign collapsible = false
+  if heading != blank
+    assign collapsible = true
+  endif
+-%}
+
+{%- capture column_styles -%}
+  --column-width: {{ width }}%;
+  --column-order: {{ order }};
+{%- endcapture -%}
+
+{%- capture column_children -%}
+  {% content_for 'blocks' %}
+{%- endcapture -%}
+
+{%- if collapsible -%}
+  <details
+    class="footer-column footer-column--collapsible"
+    data-heading-preset="{{ heading_size }}"
+    {% if block.settings.open_by_default %}data-default-open open{% endif %}
+    {% if block.settings.show_divider %}data-divider{% endif %}
+    style="{{ column_styles | strip }}"
+    {{ block.shopify_attributes }}
+  >
+    <summary class="footer-column__summary">
+      <span class="footer-column__heading">{{ heading }}</span>
+      {% render 'icon', icon: 'chevron-down', class: 'footer-column__icon', size: 14 %}
+    </summary>
+
+    <div class="footer-column__content">
+      {{ column_children }}
+    </div>
+  </details>
+{%- else -%}
+  <div
+    class="footer-column"
+    {% if block.settings.show_divider %}data-divider{% endif %}
+    style="{{ column_styles | strip }}"
+    {{ block.shopify_attributes }}
+  >
+    <div class="footer-column__content">
+      {{ column_children }}
+    </div>
+  </div>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "t:blocks.footer_column.name",
+  "tag": null,
+  "blocks": [
+    { "type": "group" },
+    { "type": "menu" },
+    { "type": "email-signup" },
+    { "type": "social-follow" },
+    { "type": "@theme" },
+    { "type": "@app" }
+  ],
+  "settings": [
+    {
+      "type": "range",
+      "id": "width",
+      "label": "t:blocks.footer_column.settings.width.label",
+      "min": 20,
+      "max": 200,
+      "step": 5,
+      "unit": "%",
+      "default": 100
+    },
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "t:shared.heading.label"
+    },
+    {
+      "type": "select",
+      "id": "heading_size",
+      "label": "t:blocks.footer_column.settings.heading_size.label",
+      "options": [
+        { "value": "h2", "label": "t:shared.presets.h2" },
+        { "value": "h3", "label": "t:shared.presets.h3" },
+        { "value": "h4", "label": "t:shared.presets.h4" },
+        { "value": "h5", "label": "t:shared.presets.h5" },
+        { "value": "h6", "label": "t:shared.presets.h6" }
+      ],
+      "default": "h5"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.footer_column.headers.mobile_layout"
+    },
+    {
+      "type": "checkbox",
+      "id": "open_by_default",
+      "label": "t:blocks.footer_column.settings.open_by_default.label",
+      "info": "t:blocks.footer_column.settings.open_by_default.info",
+      "default": false
+    },
+    {
+      "type": "checkbox",
+      "id": "show_divider",
+      "label": "t:blocks.footer_column.settings.show_divider.label",
+      "default": false
+    },
+    {
+      "type": "text",
+      "id": "column_order",
+      "label": "t:blocks.footer_column.settings.column_order.label",
+      "info": "t:blocks.footer_column.settings.column_order.info",
+      "default": "0"
+    }
+  ]
+}
+{% endschema %}

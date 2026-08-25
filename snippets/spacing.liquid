@@ -34,9 +34,10 @@
   ## Two property sets, not one
 
   A section pads block-start and block-end and takes an explicit mobile
-  override. A block pads all four sides and scales the desktop value down on
-  small screens by a percentage. Different shapes, so different property names,
-  matching what `base.css` reads:
+  override. A block pads all four sides and, on small screens, either scales the
+  desktop value by a percentage or takes an explicit per-side mobile value where
+  the block offers one. Different shapes, so different property names, matching
+  what `base.css` reads:
 
       --section-padding-block-start / -end          (+ `-mobile` variants)
       --block-padding-block-start / -end / -inline-start / -inline-end
@@ -207,6 +208,31 @@
     endif
     if b_right > 0
       assign out = out | append: '--block-padding-inline-end:' | append: b_right | append: 'px;'
+    endif
+
+    comment
+      Per-device padding. A block that offers a Desktop/Mobile switch writes
+      `padding_top_mobile` and friends, and `base.css` prefers those over the
+      scaled desktop value. A block that does not offer them emits nothing here,
+      so the scale below stays in charge — which is what every existing block
+      relies on.
+    endcomment
+    assign b_top_mobile = b.padding_top_mobile | default: 0 | plus: 0
+    assign b_bottom_mobile = b.padding_bottom_mobile | default: 0 | plus: 0
+    assign b_left_mobile = b.padding_left_mobile | default: 0 | plus: 0
+    assign b_right_mobile = b.padding_right_mobile | default: 0 | plus: 0
+
+    if b_top_mobile > 0
+      assign out = out | append: '--block-padding-block-start-mobile:' | append: b_top_mobile | append: 'px;'
+    endif
+    if b_bottom_mobile > 0
+      assign out = out | append: '--block-padding-block-end-mobile:' | append: b_bottom_mobile | append: 'px;'
+    endif
+    if b_left_mobile > 0
+      assign out = out | append: '--block-padding-inline-start-mobile:' | append: b_left_mobile | append: 'px;'
+    endif
+    if b_right_mobile > 0
+      assign out = out | append: '--block-padding-inline-end-mobile:' | append: b_right_mobile | append: 'px;'
     endif
 
     comment
