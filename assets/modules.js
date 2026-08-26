@@ -62,6 +62,23 @@ import { prefersReducedMotion, rafThrottle, isRTL, debounce, themeString, announ
  * drives it — and above the breakpoint the summaries are marked `data-static`,
  * which the stylesheet uses to remove the pointer cursor and the marker.
  */
+/**
+ * The accordion group a disclosure belongs to.
+ *
+ * @param {Element} element
+ * @returns {AccordionElement|null}
+ */
+function nearestAccordion(element) {
+  let node = element.parentElement;
+
+  while (node) {
+    if (node instanceof AccordionElement) return node;
+    node = node.parentElement;
+  }
+
+  return null;
+}
+
 export class AccordionElement extends BaseComponent {
   /** @type {WeakMap<HTMLDetailsElement, Animation>} */
   #animations = new WeakMap();
@@ -175,10 +192,16 @@ export class AccordionElement extends BaseComponent {
    * marked nothing static, and every column on a phone stayed a wall of links.
    *
    * Depth is now unbounded and ownership is what limits the search instead. A
-   * `<details>` inside a nested `<accordion-element>` belongs to that group, not
-   * to this one, and a block that opted out with `data-no-collapse` is not a
-   * disclosure at all — it is markup that happens to be a `<details>` so it can
-   * share one stylesheet with the ones that are.
+   * `<details>` inside a nested accordion belongs to that group, not to this
+   * one, and a block that opted out with `data-no-collapse` is not a disclosure
+   * at all — it is markup that happens to be a `<details>` so it can share one
+   * stylesheet with the ones that are.
+   *
+   * Ownership is decided by walking up to the nearest element that *is* an
+   * accordion, not by matching the tag name `accordion-element`. A subclass
+   * registered under its own name — `<footer-columns>` — is still an accordion,
+   * and a `closest('accordion-element')` test silently returns nothing for
+   * every disclosure inside one.
    *
    * @returns {HTMLDetailsElement[]}
    * @private
@@ -186,7 +209,7 @@ export class AccordionElement extends BaseComponent {
   #items() {
     const found = this.querySelectorAll('details:not([data-no-collapse])');
 
-    return Array.from(found).filter((item) => item.closest('accordion-element') === this);
+    return Array.from(found).filter((item) => nearestAccordion(item) === this);
   }
 
   /**
@@ -351,6 +374,99 @@ export class AccordionElement extends BaseComponent {
 }
 
 defineComponent('accordion-element', AccordionElement);
+
+/* ==========================================================================
+   <footer-columns>
+   --------------------------------------------------------------------------
+   The footer panel's grid, measured from its own children.
+
+   Every block a merchant adds to the footer arrives through one
+   `{% content_for 'blocks' %}`, and — as `sections/header.liquid` already
+   notes — a section cannot iterate those blocks: `section.blocks` returns
+   nothing for them. So the three numbers the panel's layout depends on cannot
+   be worked out in Liquid, however the section is written:
+
+     --panel-tracks         one `fr` track per column, in the width share each
+                            column carries, so three at 100% and one at 150%
+                            become `1fr 1fr 1fr 1.5fr`
+     --panel-card-rows      the rows the card covers — the columns' row, plus
+                            the policy links' row when there is one. Declaring
+                            them as the *explicit* grid is what lets the card
+                            say `1 / -1` and have that mean "not the utility
+                            rows", which are implicit and land underneath
+     --policy-span          how many tracks the policy links run across: up to
+                            the column carrying the divider, so they stop at the
+                            rule instead of passing under the newsletter
+
+   Each column already publishes its own width as `--column-width`, so this
+   reads them off the children rather than being told. It extends
+   `AccordionElement` rather than sitting beside it because the same element is
+   both the grid and the thing that collapses on a phone.
+
+   The stylesheet has a working fallback for all three, so a page where this
+   never runs still gets a sensible footer — equal columns and a card around the
+   first two rows — rather than a broken one.
+   ========================================================================== */
+
+export class FooterColumns extends AccordionElement {
+  /** @type {MutationObserver|null} */
+  #watcher = null;
+
+  setup() {
+    super.setup();
+    this.#measure();
+
+    // The theme editor adds, removes and reorders blocks in place, and a column
+    // resized with the width slider rewrites its own `style` attribute. Both
+    // change the answer, and neither re-runs `setup()`.
+    this.#watcher = new MutationObserver(() => this.#measure());
+    this.#watcher.observe(this, {
+      childList: true,
+      subtree: false,
+      attributes: true,
+      attributeFilter: ['style', 'data-divider'],
+    });
+  }
+
+  teardown() {
+    super.teardown();
+    this.#watcher?.disconnect();
+    this.#watcher = null;
+  }
+
+  /** @private */
+  #measure() {
+    const children = Array.from(this.children);
+    const columns = children.filter((el) => el.classList.contains('footer-column'));
+    const policy = children.find((el) => el.classList.contains('footer__policies'));
+
+    const tracks = columns
+      .map((el) => {
+        // `--column-width` is a percentage share, not a size: 150% next to three
+        // 100%s means "half again as wide as one of those", which is what an
+        // `fr` already means.
+        const share = parseFloat(getComputedStyle(el).getPropertyValue('--column-width'));
+        return `${Number.isFinite(share) && share > 0 ? (share / 100).toFixed(4) : 1}fr`;
+      })
+      .join(' ');
+
+    const cardRows = 1 + (policy ? 1 : 0);
+    const mobileRows = Math.max(columns.length, 1) + (policy ? 1 : 0);
+
+    // The divider marks the aside. Everything before it is the menu area, and
+    // that is exactly how far the policy links run.
+    const dividerIndex = columns.findIndex((el) => el.hasAttribute('data-divider'));
+    const span = dividerIndex > 0 ? dividerIndex : Math.max(columns.length, 1);
+
+    this.style.setProperty('--panel-tracks', tracks || '1fr');
+    this.style.setProperty('--panel-card-rows', 'auto '.repeat(cardRows).trim());
+    this.style.setProperty('--panel-card-rows-mobile', 'auto '.repeat(mobileRows).trim());
+    this.style.setProperty('--policy-span', String(span));
+    this.toggleAttribute('data-measured', columns.length > 0);
+  }
+}
+
+defineComponent('footer-columns', FooterColumns);
 
 /* ==========================================================================
    <tabs-element>

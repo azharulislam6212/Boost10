@@ -1,0 +1,435 @@
+{% comment %}
+  blocks/_footer-legal.liquid
+
+  The closing band of the footer: the oversized wordmark and the legal
+  disclaimer.
+
+  ## It was a section, and that was the problem
+
+  As its own section it had its own colour scheme, and two schemes stacked on
+  one gradient is a seam: the footer's ramp ends on one colour and the band
+  below starts the same ramp again, or lands on a flat fill that does not quite
+  match. There was a "Background" setting to paper over it, which is a setting
+  that exists to correct a structural mistake.
+
+  As a block it is inside the footer, on the footer's own ground, and there is
+  nothing to match — one background, one gradient, no seam and no setting.
+
+  Private, and offered by the footer only: an 18vw wordmark is not something to
+  be able to drop onto a product page. It is a full-width row like the utility
+  rows, so it lands in an implicit grid row below the panel's card.
+
+  ## The animation
+
+  One rise, once, when the band scrolls into view. Slower than the theme's
+  default on purpose — this is the largest piece of type on the page, and a
+  reveal that reads as considered at 2rem reads as a flinch at 300px. The
+  duration is a setting, and it starts at a second and a half.
+
+  ## The flash it used to cause
+
+  `motion-engine` hides an element from JavaScript, deliberately: nothing is
+  hidden by CSS, so a page whose scripts fail still shows all of its content.
+  The cost is a gap — first paint happens, then the module loads and applies the
+  resting state — and at this size that gap is a very visible flash of the
+  finished wordmark before it vanishes and rises again.
+
+  The `data-motion-armed` attribute set by the inline script below closes it. It
+  is parser-blocking and sits immediately after the element, so it lands in the
+  same paint as the markup: the wordmark is hidden from its very first frame,
+  and CSS releases it the moment `data-motion-revealed` arrives. With scripting
+  off the attribute is never written, which keeps the original guarantee intact;
+  and if the module itself fails to load, the same script clears the attribute
+  after a timeout, so the wordmark appears rather than staying hidden for ever.
+{% endcomment %}
+
+{%- liquid
+  assign st = block.settings
+  assign logo_source = st.logo_source | default: 'text'
+  assign wordmark = st.logo_text | default: shop.name
+  assign animation = st.logo_animation | default: 'reveal'
+
+  comment
+    The rise itself is the engine's own reveal-up preset, not a keyframe written
+    here: it clips the wordmark from the baseline and lifts it, it is already
+    tuned to the theme's easing, and — the part that matters — the engine writes
+    the hidden state in JavaScript at the moment it takes charge. A resting state
+    written in CSS would leave the wordmark invisible on any page where the
+    script failed to load.
+
+    none is passed through as a real "no animation", which the master switch in
+    Theme settings can also force.
+  endcomment
+  assign wordmark_effect = 'reveal-up'
+  if animation == 'none'
+    assign wordmark_effect = 'none'
+  endif
+
+  assign reveal_duration = st.animation_duration | default: 1500 | plus: 0
+
+  assign wordmark_id = 'FooterWordmark-' | append: block.id
+
+  assign has_logo = false
+  if logo_source == 'text' and wordmark != blank
+    assign has_logo = true
+  elsif logo_source == 'image' and st.logo_image != blank
+    assign has_logo = true
+  endif
+
+  assign has_disclaimer = false
+  if st.disclaimer != blank
+    assign has_disclaimer = true
+  endif
+
+  capture legal_spacing
+    render 'spacing', block: st, declarations: true
+  endcapture
+-%}
+
+{%- capture legal_styles -%}
+  --legal-logo-size: {{ st.logo_size | default: 22 }}vw;
+
+  {%- comment -%}
+    How many characters the wordmark is.
+
+    A vw font size with nowrap is a promise the viewport cannot keep: seven
+    characters at 22vw is about 380px of type inside a 342px phone, so the last
+    one was simply cut off. The stylesheet needs to know how long the word is to
+    cap the size at something that fits, and Liquid is the only place that knows.
+  {%- endcomment -%}
+  --legal-logo-chars: {{ wordmark | strip | size }};
+  --legal-logo-opacity: {{ st.logo_opacity | default: 100 | divided_by: 100.0 }};
+  {%- if st.logo_color != blank -%}--legal-logo-from: {{ st.logo_color }};{%- endif -%}
+  {%- if st.logo_color_end != blank -%}--legal-logo-to: {{ st.logo_color_end }};{%- endif -%}
+  {%- if st.text_color != blank -%}--legal-text-color: {{ st.text_color }};{%- endif -%}
+  {{- legal_spacing | strip -}}
+{%- endcapture -%}
+
+{%- if has_logo or has_disclaimer -%}
+  <div
+    class="footer-legal"
+    data-align="{{ st.text_alignment | default: 'center' }}"
+    {% if st.show_divider %}data-divider{% endif %}
+    data-block-spacing
+    style="{{ legal_styles | strip_newlines | strip }}"
+    {{ block.shopify_attributes }}
+  >
+    {%- if has_logo -%}
+      {%- comment -%}
+        `data-effect` is on this element already — `motion-attrs` writes it —
+        and the stylesheet reads it, so a merchant who switches the theme's
+        reveal animations off gets a wordmark that is simply there, with no
+        hidden state waiting to be released.
+      {%- endcomment -%}
+      <motion-effect
+        id="{{ wordmark_id }}"
+        class="footer-legal__wordmark"
+        data-animation="{{ animation }}"
+        data-distance="10"
+        data-easing="outQuint"
+        {% render 'motion-attrs',
+          kind: 'text',
+          block: st,
+          effect: wordmark_effect,
+          duration: reveal_duration,
+          delay: 120
+        %}
+      >
+        {%- if logo_source == 'image' -%}
+          {% render 'image',
+            image: st.logo_image,
+            class: 'footer-legal__wordmark-image',
+            wrapper_class: 'footer-legal__wordmark-media',
+            sizes: '100vw',
+            ratio: 'adapt'
+          %}
+        {%- else -%}
+          <span class="footer-legal__wordmark-text">{{ wordmark }}</span>
+        {%- endif -%}
+      </motion-effect>
+
+      {%- if animation != 'none' -%}
+        {%- comment -%}
+          Parser-blocking on purpose, and it has to run here rather than in a
+          module: the whole point is that the attribute exists in the same paint
+          as the element above it, before the browser has a chance to show the
+          wordmark at full size and then hide it again.
+
+          The setTimeout is the safety catch — if motion-effect.js never
+          arrives, nothing would ever write data-motion-revealed, and a wordmark
+          hidden by CSS with no one left to reveal it is worse than no animation
+          at all.
+        {%- endcomment -%}
+        <script>
+          (function () {
+            var el = document.getElementById({{ wordmark_id | json }});
+            if (!el) return;
+            el.setAttribute('data-motion-armed', '');
+            setTimeout(function () {
+              if (!el.hasAttribute('data-motion-revealed')) el.removeAttribute('data-motion-armed');
+            }, 4000);
+          })();
+        </script>
+      {%- endif -%}
+    {%- endif -%}
+
+    {%- if has_disclaimer -%}
+      <motion-effect
+        class="footer-legal__disclaimer footer-legal__disclaimer--{{ st.disclaimer_style | default: 'boxed' }}"
+        data-easing="outQuint"
+        {% render 'motion-attrs', kind: 'text', block: st, duration: reveal_duration, delay: 220 %}
+      >
+        <div class="footer-legal__disclaimer-inner">
+          {{ st.disclaimer }}
+        </div>
+      </motion-effect>
+    {%- endif -%}
+  </div>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "t:blocks.footer_legal.name",
+  "tag": null,
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "t:blocks.footer_legal.paragraph"
+    },
+    {
+      "type": "select",
+      "id": "text_alignment",
+      "label": "t:shared.alignment.label",
+      "options": [
+        { "value": "left", "label": "t:shared.alignment.options__1.label" },
+        { "value": "center", "label": "t:shared.alignment.options__2.label" },
+        { "value": "right", "label": "t:shared.alignment.options__3.label" }
+      ],
+      "default": "center"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_divider",
+      "label": "t:blocks.footer_legal.settings.show_divider.label",
+      "default": false
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.footer_legal.headers.watermark"
+    },
+    {
+      "type": "select",
+      "id": "logo_source",
+      "label": "t:blocks.footer_legal.settings.logo_source.label",
+      "options": [
+        { "value": "text", "label": "t:blocks.footer_legal.settings.logo_source.options__1.label" },
+        { "value": "image", "label": "t:blocks.footer_legal.settings.logo_source.options__2.label" },
+        { "value": "none", "label": "t:shared.options.none" }
+      ],
+      "default": "text"
+    },
+    {
+      "type": "text",
+      "id": "logo_text",
+      "label": "t:blocks.footer_legal.settings.logo_text.label",
+      "info": "t:blocks.footer_legal.settings.logo_text.info",
+      "visible_if": "{{ block.settings.logo_source == 'text' }}"
+    },
+    {
+      "type": "image_picker",
+      "id": "logo_image",
+      "label": "t:blocks.footer_legal.settings.logo_image.label",
+      "visible_if": "{{ block.settings.logo_source == 'image' }}"
+    },
+    {
+      "type": "range",
+      "id": "logo_size",
+      "label": "t:blocks.footer_legal.settings.logo_size.label",
+      "info": "t:blocks.footer_legal.settings.logo_size.info",
+      "min": 8,
+      "max": 40,
+      "step": 1,
+      "unit": "%",
+      "default": 22,
+      "visible_if": "{{ block.settings.logo_source != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "logo_opacity",
+      "label": "t:blocks.footer_legal.settings.logo_opacity.label",
+      "min": 10,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 100,
+      "visible_if": "{{ block.settings.logo_source != 'none' }}"
+    },
+    {
+      "type": "color",
+      "id": "logo_color",
+      "label": "t:blocks.footer_legal.settings.logo_color.label",
+      "visible_if": "{{ block.settings.logo_source == 'text' }}"
+    },
+    {
+      "type": "color",
+      "id": "logo_color_end",
+      "label": "t:blocks.footer_legal.settings.logo_color_end.label",
+      "info": "t:blocks.footer_legal.settings.logo_color_end.info",
+      "visible_if": "{{ block.settings.logo_source == 'text' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.footer_legal.headers.disclaimer"
+    },
+    {
+      "type": "richtext",
+      "id": "disclaimer",
+      "label": "t:blocks.footer_legal.settings.disclaimer.label",
+      "default": "<p>* These statements have not been evaluated by the Food and Drug Administration. Products are not intended to diagnose, treat, cure, or prevent any disease.</p>"
+    },
+    {
+      "type": "select",
+      "id": "disclaimer_style",
+      "label": "t:blocks.footer_legal.settings.disclaimer_style.label",
+      "options": [
+        { "value": "boxed", "label": "t:blocks.footer_legal.settings.disclaimer_style.options__1.label" },
+        { "value": "plain", "label": "t:blocks.footer_legal.settings.disclaimer_style.options__2.label" }
+      ],
+      "default": "boxed"
+    },
+    {
+      "type": "color",
+      "id": "text_color",
+      "label": "t:blocks.footer_legal.settings.text_color.label"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.animation.header"
+    },
+    {
+      "type": "select",
+      "id": "logo_animation",
+      "label": "t:blocks.footer_legal.settings.logo_animation.label",
+      "info": "t:blocks.footer_legal.settings.logo_animation.info",
+      "options": [
+        { "value": "reveal", "label": "t:blocks.footer_legal.settings.logo_animation.options__2.label" },
+        { "value": "none", "label": "t:shared.options.none" }
+      ],
+      "default": "reveal"
+    },
+    {
+      "type": "range",
+      "id": "animation_duration",
+      "label": "t:shared.animation.animation_duration.label",
+      "info": "t:shared.animation.animation_duration.info",
+      "min": 400,
+      "max": 2400,
+      "step": 100,
+      "unit": "ms",
+      "default": 1500
+    },
+    {
+      "type": "header",
+      "content": "t:shared.spacing.block_header"
+    },
+    {
+      "type": "select",
+      "id": "padding_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        { "value": "desktop", "label": "t:shared.spacing.devices.options__1.label" },
+        { "value": "mobile", "label": "t:shared.spacing.devices.options__2.label" }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 120,
+      "step": 4,
+      "unit": "px",
+      "default": 24,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 120,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 120,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 120,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 120,
+      "step": 4,
+      "unit": "px",
+      "default": 16,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 120,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left_mobile",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 120,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right_mobile",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 120,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    }
+  ]
+}
+{% endschema %}

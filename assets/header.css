@@ -770,6 +770,7 @@ sticky-header:not([data-transparent]) .site-header__logo--prefers-inverse .site-
 }
 
 .dropdown__link {
+  position: relative;
   display: block;
   padding: 9px var(--space-3);
   border-radius: 12px;
@@ -782,6 +783,74 @@ sticky-header:not([data-transparent]) .site-header__logo--prefers-inverse .site-
 
 .dropdown__link:hover {
   background-color: color-mix(in srgb, currentColor 6%, transparent);
+}
+
+/* ==========================================================================
+   The underline
+   --------------------------------------------------------------------------
+   The same line the footer menus draw, on the same curve, so a customer moving
+   from the header to the footer sees one behaviour rather than two. The
+   canonical version and the reasoning behind the origin swap are in
+   footer.css; the short version is that the origin is the end edge at rest and
+   the start edge on hover, which draws the line out from the left and retracts
+   it the way it came without a second keyframe.
+
+   `inset-inline` is inset by the link's own padding on the dropdown, so the
+   rule sits under the text rather than under the whole hit area.
+   ========================================================================== */
+
+.dropdown__link::after,
+.megamenu__link::after {
+  content: '';
+  position: absolute;
+  inset-block-end: 5px;
+  block-size: 1px;
+  background-color: currentcolor;
+  transform: scaleX(0);
+  transform-origin: right center;
+  transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+
+.dropdown__link::after {
+  inset-inline: var(--space-3);
+}
+
+.megamenu__link::after {
+  inset-inline: 0;
+}
+
+[dir='rtl'] .dropdown__link::after,
+[dir='rtl'] .megamenu__link::after {
+  transform-origin: left center;
+}
+
+.dropdown__link:hover::after,
+.dropdown__link:focus-visible::after,
+.megamenu__link:hover::after,
+.megamenu__link:focus-visible::after {
+  transform: scaleX(1);
+  transform-origin: left center;
+}
+
+[dir='rtl'] .dropdown__link:hover::after,
+[dir='rtl'] .dropdown__link:focus-visible::after,
+[dir='rtl'] .megamenu__link:hover::after,
+[dir='rtl'] .megamenu__link:focus-visible::after {
+  transform-origin: right center;
+}
+
+/* The parent row is a `<summary>` with a chevron on the far side; a rule drawn
+   the full width of it would run under the chevron too. */
+.dropdown__link--parent::after {
+  content: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dropdown__link::after,
+  .megamenu__link::after {
+    transition: none;
+  }
 }
 
 /* The parent item is the `<summary>` itself — it has to be the first child of
@@ -944,7 +1013,8 @@ sticky-header:not([data-transparent]) .site-header__logo--prefers-inverse .site-
 }
 
 .megamenu__link {
-  display: block;
+  position: relative;
+  display: inline-block;
   padding-block: 5px;
   font-size: var(--font-size-sm);
   color: var(--color-accent-text, var(--color-text));

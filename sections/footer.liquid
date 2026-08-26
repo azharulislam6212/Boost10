@@ -18,6 +18,32 @@
   blocks — they were section settings, which meant the section decided both what
   they said and where they went.
 
+  ## Two layouts, and what the card actually wraps
+
+  Every block a merchant adds arrives through one `content_for 'blocks'`, so
+  they are all siblings in one container and nothing here can wrap a subset of
+  them in a `<div>`. That matters, because the card belongs around the columns
+  and the policy links — not around the contact bar or the bottom bar, which the
+  design draws as their own surfaces below it.
+
+  Grid solves it without extra markup. The panel is the grid, every block is a
+  grid item, and the card is a `::before` pseudo-element — itself a grid item —
+  spanning from the first row down to the row before the first utility row. So
+  the card is a real painted box around exactly the right region, and anything
+  after it sits outside on the footer's own ground.
+
+      Fixed      the rules are drawn: a vertical one between the menus and the
+                 aside beside them, and one above the policy links. The layout
+                 in the design.
+
+      Flexible   the same layout with no rules in it. Nothing moves — the
+                 columns keep their widths, the policy links keep their place —
+                 the panel is simply left open.
+
+  The layout is identical either way on purpose. Two layouts that also moved
+  things around would be two footers to keep working, and the difference a
+  merchant actually wants here is whether the panel is ruled or plain.
+
   ## The background comes from the colour scheme
 
   Both the colour and the gradient. `.color-scheme-container` paints
@@ -28,7 +54,8 @@
 
   ## Collapsing
 
-  One `<accordion-element>` wraps the columns, always. It used to be behind a
+  One `<footer-columns>` — an accordion that also measures its own grid —
+  wraps the blocks, always. It used to be behind a
   "Collapse columns on mobile" checkbox with a breakpoint slider beside it — two
   settings for a decision no merchant makes differently, and a footer that reads
   as a wall of links on a phone when either one is wrong. The breakpoint is the
@@ -50,11 +77,38 @@
   endif
 
   comment
-    `declarations: true`, not the default. This element already has a `style`
-    attribute of its own, and a tag with two of them keeps the first and drops
-    the second — which is how a padding slider ends up moving a value that never
-    reaches the page. The `data-section-spacing` hook is written by hand below
-    because that attribute, not the properties, is what base.css selects on.
+    The panel's geometry is measured in the browser, not worked out here.
+
+    Every block a merchant adds arrives through one `content_for 'blocks'`, and
+    a section cannot iterate those blocks — `section.blocks` returns nothing for
+    them, exactly as sections/header.liquid already records. So the track list,
+    the rows the card covers and how far the policy links run cannot be derived
+    in Liquid however this file is written. An earlier version of this section
+    tried, found no columns, and fell back to a single track: every column in
+    the footer stacked on top of the next.
+
+    The footer-columns element in assets/modules.js reads the same three
+    numbers off the rendered children, where they can actually be seen. Each column publishes
+    its own width share, so nothing here has to know how many there are.
+
+    What this file still decides is what it genuinely owns: whether there is a
+    policy row at all — that is a section setting, not a block — and which of
+    the two layouts is in use.
+  endcomment
+  assign has_policy = false
+  if st.policy_menu != blank and st.policy_menu.links.size > 0
+    assign has_policy = true
+  endif
+
+  assign panel_layout = st.panel_layout | default: 'fixed'
+
+  comment
+    Spacing is asked for as declarations, not as its own attribute. This element
+    already has a style attribute of its own, and a tag with two of them keeps
+    the first and drops the second — which is how a padding slider ends up
+    moving a value that never reaches the page. The data-section-spacing hook is
+    written by hand below because that attribute, not the properties, is what
+    base.css selects on.
   endcomment
   capture section_spacing
     render 'spacing', section: st, declarations: true
@@ -90,31 +144,59 @@
 >
   <div class="{% render 'container', width: st.container_width %}">
     {%- if section.blocks.size > 0 -%}
+      {%- comment -%}
+        The accordion and the grid are the same element now.
+
+        They used to be nested — a panel wrapping an accordion wrapping the
+        blocks — which put the contact bar and the bottom bar inside the card
+        along with the columns. One container, with the card painted by a
+        pseudo-element over part of it, is what lets the same set of siblings be
+        partly inside the card and partly below it.
+
+        The accordion behaviour is unaffected: it only ever looked for the
+        `<details>` elements it owns, and those are the columns.
+      {%- endcomment -%}
       <motion-effect
         class="footer__panel footer__panel--{{ st.panel_style | default: 'card' }}"
-        {% render 'motion-attrs', kind: 'text', section: st, children: true, stagger: 90 %}
+        data-easing="outQuint"
+        {% render 'motion-attrs', kind: 'text', section: st, children: true %}
       >
-        <accordion-element class="footer__columns" data-collapse-below="750">
+        <footer-columns
+          class="footer__columns"
+          data-layout="{{ panel_layout }}"
+          {% if has_policy %}data-has-policy{% endif %}
+          data-collapse-below="750"
+        >
           {% content_for 'blocks' %}
-        </accordion-element>
 
-        {%- comment -%}
-          The policy row stays a section setting, exactly as it was. A merchant
-          can reorder every other part of the footer; the one row that has to be
-          there on a store that sells anything is not something to be able to
-          drag out by accident.
-        {%- endcomment -%}
-        {%- if st.policy_menu != blank and st.policy_menu.links.size > 0 -%}
-          <div class="footer__policies">
-            <ul class="footer__policies-list" role="list">
-              {%- for link in st.policy_menu.links -%}
-                <li>
-                  <a class="footer__policy-link" href="{{ link.url }}">{{ link.title }}</a>
-                </li>
-              {%- endfor -%}
-            </ul>
-          </div>
-        {%- endif -%}
+          {%- comment -%}
+            The policy row lives *inside* the columns, not under the bottom bar.
+
+            It was in the copyright row, which is where a theme puts it when the
+            footer is a stack of bars. This footer is a panel of columns, and the
+            design puts the policy links on their own line directly beneath the
+            menu columns, above the rule. Rendering it here — as the last item in
+            the same flex container — is what makes it share the columns' grid
+            and sit under the menus rather than under the whole panel.
+
+            It stays a section setting rather than a block: a merchant can
+            rearrange every other part of this footer by dragging, and the one
+            row a store selling anything is obliged to show is not something to
+            be able to drag out by accident. `--column-order: 2` puts it after
+            the columns (which run -3 … 1) and before the utility rows.
+          {%- endcomment -%}
+          {%- if has_policy -%}
+            <div class="footer__policies" style="--column-order: 2;">
+              <ul class="footer__policies-list" role="list">
+                {%- for link in st.policy_menu.links -%}
+                  <li>
+                    <a class="footer__policy-link" href="{{ link.url }}">{{ link.title }}</a>
+                  </li>
+                {%- endfor -%}
+              </ul>
+            </div>
+          {%- endif -%}
+        </footer-columns>
       </motion-effect>
     {%- endif -%}
   </div>
@@ -129,6 +211,9 @@
     },
     {
       "type": "_footer-utilities"
+    },
+    {
+      "type": "_footer-legal"
     },
     {
       "type": "group"
@@ -178,6 +263,23 @@
         }
       ],
       "default": "standard"
+    },
+    {
+      "type": "select",
+      "id": "panel_layout",
+      "label": "t:sections.footer.settings.panel_layout.label",
+      "info": "t:sections.footer.settings.panel_layout.info",
+      "options": [
+        {
+          "value": "fixed",
+          "label": "t:sections.footer.settings.panel_layout.options__1.label"
+        },
+        {
+          "value": "flexible",
+          "label": "t:sections.footer.settings.panel_layout.options__2.label"
+        }
+      ],
+      "default": "fixed"
     },
     {
       "type": "select",
@@ -331,6 +433,17 @@
         }
       ],
       "default": "inherit"
+    },
+    {
+      "type": "range",
+      "id": "animation_duration",
+      "label": "t:shared.animation.animation_duration.label",
+      "info": "t:shared.animation.animation_duration.info",
+      "min": 0,
+      "max": 2000,
+      "step": 100,
+      "unit": "ms",
+      "default": 1000
     },
     {
       "type": "range",

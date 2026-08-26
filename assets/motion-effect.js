@@ -12,6 +12,7 @@
  *     {{ image }}
  *   </motion-effect>
  *
+ *
  *   <motion-effect data-effect="fade-up" data-children data-stagger="90">
  *     {%- for block in section.blocks -%}<div>…</div>{%- endfor -%}
  *   </motion-effect>
@@ -61,7 +62,7 @@
  */
 
 import { BaseComponent, defineComponent } from '@theme/component';
-import { reveal, parallax, marquee, unsplitText, getPreset, motionEnabled } from '@theme/motion-engine';
+import { reveal, parallax, marquee, unsplitText, getPreset, motionEnabled, EASING } from '@theme/motion-engine';
 
 /** Effects that run continuously rather than once on entry. */
 const CONTINUOUS = new Set(['parallax', 'marquee']);
@@ -141,6 +142,12 @@ export class MotionEffect extends BaseComponent {
       distance: this.#number('distance'),
       threshold: this.#number('threshold'),
       rootMargin: this.dataset.rootMargin,
+      // A named curve from the engine's own table, or a raw `cubic-bezier(…)`.
+      // `reveal()` has always accepted one; there was simply no way for a
+      // section to ask for it, so every element on the page used its preset's
+      // default however long it was told to run for. At a second and a half an
+      // ease-in-out reads as a hesitation followed by a lunge.
+      easing: this.dataset.easing ? EASING[this.dataset.easing] || this.dataset.easing : undefined,
       once: this.dataset.once !== 'false',
       loadCascade: this.dataset.loadCascade !== 'false'
     });

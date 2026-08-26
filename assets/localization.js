@@ -42,8 +42,6 @@
 import { BaseComponent, defineComponent } from '@theme/component';
 import { debounce, themeString, announce, getFocusableElements } from '@theme/utilities';
 
-/** Above this many options, the filter field earns its place. */
-const FILTER_THRESHOLD = 12;
 
 export class LocalizationForm extends BaseComponent {
   static requiredRefs = ['trigger', 'panel'];
@@ -69,11 +67,16 @@ export class LocalizationForm extends BaseComponent {
       const filter = debounce((value) => this.filter(value), 150);
       this.on(this.refs.filter, 'input', (event) => filter(event.target.value));
 
-      // Hide the filter entirely on a short list: a search box above six items
-      // is noise, and on mobile it opens a keyboard over the options.
-      this.refs.filter
-        .closest('[data-filter-wrapper]')
-        ?.toggleAttribute('hidden', this.options.length < FILTER_THRESHOLD);
+      // The field is always shown, and the threshold that used to hide it is
+      // gone.
+      //
+      // It was a reasonable-sounding rule — a search box over a handful of
+      // options is noise, and on a phone it opens a keyboard over the very list
+      // it is meant to help with — and it was wrong here for one reason: what a
+      // customer looks for in this control is a currency, and a store selling in
+      // two markets is exactly where the field disappeared. The search box was
+      // in the markup the whole time and simply never rendered.
+      this.refs.filter.closest('[data-filter-wrapper]')?.removeAttribute('hidden');
     }
 
     // Arrow keys move through the options once the panel is open.
@@ -164,7 +167,10 @@ export class LocalizationForm extends BaseComponent {
     let visible = 0;
 
     for (const option of this.options) {
-      const label = (option.dataset.label || option.textContent || '').toLowerCase();
+      // `data-label` first, then the row's own text — which is what carries the
+      // currency code. Matching only `data-label` meant typing "USD" found
+      // nothing, in the one control where a currency is what people search for.
+      const label = `${option.dataset.label || ''} ${option.textContent || ''}`.toLowerCase();
       const matches = needle === '' || label.includes(needle);
 
       const row = option.closest('li') || option;

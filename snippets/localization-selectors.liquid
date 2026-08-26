@@ -13,11 +13,25 @@
     {% render 'localization-selectors', id_prefix: 'Footer' %}
 {% enddoc %}
 
-{% assign id_prefix = id_prefix | default: 'country' %}
+{%- liquid
+  assign id_prefix = id_prefix | default: 'Localization'
+
+  comment
+    Two forms, two ids.
+
+    Both `form 'localization'` tags were handed the same `id`, so a page with
+    both pickers rendered two elements carrying one id. The second is
+    unreachable by that id — getElementById returns the first — and it is the
+    kind of thing Shopify theme check flags outright. One id per form now, and
+    the panel ids are derived from the same pair.
+  endcomment
+  assign country_id = id_prefix | append: 'Country'
+  assign language_id = id_prefix | append: 'Language'
+-%}
 <div class="localization {{ class }}">
   {%- if settings.enable_country_selector and localization.available_countries.size > 1 -%}
     <localization-form data-type="country">
-      {%- form 'localization', id: id_prefix, class: 'localization__form' -%}
+      {%- form 'localization', id: country_id, class: 'localization__form' -%}
         <input type="hidden" name="country_code" value="{{ localization.country.iso_code }}" data-ref="input">
 
         <button
@@ -25,20 +39,20 @@
           class="localization__trigger"
           data-ref="trigger"
           aria-expanded="false"
-          aria-controls="{{ id_prefix }}CountryPanel"
+          aria-controls="{{ country_id }}Panel"
         >
           <span class="visually-hidden">{{ 'localization.country_label' | t }}</span>
           <span aria-hidden="true">{{ localization.country.name }} ({{ cart.currency.iso_code }})</span>
           {% render 'icon', icon: 'chevron-down' %}
         </button>
 
-        <div class="localization__panel" id="{{ id_prefix }}CountryPanel" data-ref="panel" data-lenis-prevent hidden>
+        <div class="localization__panel" id="{{ country_id }}Panel" data-ref="panel" data-lenis-prevent hidden>
           <div data-filter-wrapper>
-            <label class="visually-hidden" for="{{ id_prefix }}CountryFilter">
+            <label class="visually-hidden" for="{{ country_id }}Filter">
               {{ 'localization.search_countries' | t }}
             </label>
             <input
-              id="{{ id_prefix }}CountryFilter"
+              id="{{ country_id }}Filter"
               type="search"
               data-ref="filter"
               autocomplete="off"
@@ -54,7 +68,7 @@
                   name="country_code"
                   value="{{ country.iso_code }}"
                   data-option
-                  data-label="{{ country.name | escape }}"
+                  data-label="{{ country.name | escape }} {{ country.currency.iso_code | escape }}"
                   {% if country.iso_code == localization.country.iso_code %}aria-selected="true"{% endif %}
                 >
                   {{ country.name }}
@@ -74,11 +88,8 @@
 
   {%- if settings.enable_language_selector and localization.available_languages.size > 1 -%}
 
-    {% assign id_prefix = id_prefix | default: 'Language' %}
-
-
     <localization-form data-type="language">
-      {%- form 'localization', id: id_prefix, class: 'localization__form' -%}
+      {%- form 'localization', id: language_id, class: 'localization__form' -%}
         <input type="hidden" name="locale_code" value="{{ localization.language.iso_code }}" data-ref="input">
 
         <button
@@ -86,14 +97,14 @@
           class="localization__trigger"
           data-ref="trigger"
           aria-expanded="false"
-          aria-controls="{{ id_prefix }}LanguagePanel"
+          aria-controls="{{ language_id }}Panel"
         >
           <span class="visually-hidden">{{ 'localization.language_label' | t }}</span>
           <span aria-hidden="true">{{ localization.language.endonym_name | capitalize }}</span>
           {% render 'icon', icon: 'chevron-down' %}
         </button>
 
-        <div class="localization__panel" id="{{ id_prefix }}LanguagePanel" data-ref="panel" hidden>
+        <div class="localization__panel" id="{{ language_id }}Panel" data-ref="panel" hidden>
           <ul class="localization__list" data-ref="list" role="listbox">
             {%- for language in localization.available_languages -%}
               <li>

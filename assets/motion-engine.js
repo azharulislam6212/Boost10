@@ -13,6 +13,7 @@
  *   - `parallax()`    transform-only parallax driven by one rAF loop
  *   - `marquee()`     infinite ticker with a real pause control
  *
+ *
  * Four rules hold everywhere in this file:
  *
  *   1. Reduced motion wins. Every helper skips straight to the final visual
@@ -45,6 +46,10 @@ import { clamp, prefersReducedMotion, isTouchDevice, isRTL } from '@theme/utilit
 export const EASING = {
   outExpo: 'cubic-bezier(0.16, 1, 0.3, 1)',
   outQuart: 'cubic-bezier(0.25, 1, 0.5, 1)',
+  // The gentlest of the settles: no acceleration at the start, a long tail. For
+  // anything large and slow, where an ease-in-out reads as a hesitation
+  // followed by a lunge.
+  outQuint: 'cubic-bezier(0.22, 1, 0.36, 1)',
   outBack: 'cubic-bezier(0.34, 1.4, 0.64, 1)',
   inOutQuart: 'cubic-bezier(0.76, 0, 0.24, 1)',
   linear: 'linear'
@@ -441,12 +446,121 @@ export function observe(element, callback, options = {}) {
     observerPool.set(key, entry);
   }
 
-  entry.callbacks.set(element, callback);
+  // One firing, whichever route gets there first, and one cleanup.
+  let done = false;
+  const fire = (item) => {
+    if (done) return;
+    done = true;
+    releaseFloor();
+    callback(item);
+  };
+
+  entry.callbacks.set(element, (item) => fire(item));
   entry.observer.observe(element);
 
+  const releaseFloor = watchScrollFloor(element, () =>
+    fire({ target: element, isIntersecting: true, intersectionRatio: 1 })
+  );
+
   return () => {
+    done = true;
+    releaseFloor();
     entry.callbacks.delete(element);
     entry.observer.unobserve(element);
+  };
+}
+
+/* ==========================================================================
+   The scroll floor
+   --------------------------------------------------------------------------
+   `rootMargin: '0px 0px -8% 0px'` is what stops content animating the instant
+   a single pixel of it clears the fold: an element has to be properly on screen
+   before it plays. It also carves 8% off the bottom of the viewport, and for
+   anything inside the last 8% of the *document* that region is unreachable —
+   the page runs out of scroll before the element ever enters the shrunken root.
+   Those elements stay in their resting state, which for a reveal preset means
+   `opacity: 0`, for the life of the page.
+
+   It is easy to miss, because it only bites the very last thing on the page and
+   only when that thing is short: the footer's disclaimer, a closing line of
+   copy, a final badge row. Then it does not "animate late" — it never appears
+   at all.
+
+   So the bottom of the document is a floor. Once the page can scroll no
+   further, anything still waiting that is genuinely on screen is released. One
+   shared listener for the whole page, passive, on rAF, and it removes itself as
+   soon as nothing is waiting on it.
+   ========================================================================== */
+
+/** @type {Set<{ element: Element, fire: () => void }>} */
+const waitingOnFloor = new Set();
+
+/** @type {(() => void)|null} */
+let floorListener = null;
+
+function checkScrollFloor() {
+  const doc = document.documentElement;
+  const atEnd = window.innerHeight + window.scrollY >= doc.scrollHeight - 2;
+  if (!atEnd) return;
+
+  for (const item of [...waitingOnFloor]) {
+    const rect = item.element.getBoundingClientRect();
+    // In the real viewport, not the inset one.
+    const onScreen = rect.top < window.innerHeight && rect.bottom > 0 && rect.height > 0;
+    if (!onScreen) continue;
+
+    waitingOnFloor.delete(item);
+    item.fire();
+  }
+
+  if (waitingOnFloor.size === 0) stopFloorListener();
+}
+
+function startFloorListener() {
+  if (floorListener) return;
+
+  let queued = false;
+  const onScroll = () => {
+    if (queued) return;
+    queued = true;
+    requestAnimationFrame(() => {
+      queued = false;
+      checkScrollFloor();
+    });
+  };
+
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('resize', onScroll, { passive: true });
+  floorListener = () => {
+    window.removeEventListener('scroll', onScroll);
+    window.removeEventListener('resize', onScroll);
+  };
+
+  // A short page can already be at its end with nothing left to scroll.
+  onScroll();
+}
+
+function stopFloorListener() {
+  floorListener?.();
+  floorListener = null;
+}
+
+/**
+ * Wait for the document to run out of scroll, as a backstop for an element the
+ * inset root can never reach.
+ *
+ * @param {Element} element
+ * @param {() => void} fire
+ * @returns {() => void} Stop waiting.
+ */
+function watchScrollFloor(element, fire) {
+  const item = { element, fire };
+  waitingOnFloor.add(item);
+  startFloorListener();
+
+  return () => {
+    waitingOnFloor.delete(item);
+    if (waitingOnFloor.size === 0) stopFloorListener();
   };
 }
 

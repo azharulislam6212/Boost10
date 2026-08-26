@@ -49,12 +49,32 @@
 
   .footer {
     --footer-panel-radius: 2.4rem;
-    --footer-panel-border: 1px solid rgb(var(--color-border-rgb, 255 255 255) / 0.14);
+    /* Rules and edges are mixed from the text colour, not from the scheme's
+       border colour.
+
+       A border token is chosen against the scheme's *background* — on this
+       footer that is a dark green border on a dark green ground, which at 14%
+       alpha is invisible. The divider between the menus and the newsletter, and
+       the line above the policy links, were both being drawn and neither could
+       be seen. Mixed from `currentColor` they contrast with whatever the scheme
+       puts behind them, light or dark, with no second token to keep in step.
+
+       The plain `rgb()` line above each `color-mix()` is the fallback for a
+       browser without it. */
+    --footer-panel-border-color: rgb(255 255 255 / 0.16);
+    --footer-panel-border-color: color-mix(in srgb, currentColor 18%, transparent);
+    --footer-panel-border: 1px solid var(--footer-panel-border-color);
     --footer-panel-surface: rgb(var(--color-background-rgb) / 0.04);
-    --footer-rule: rgb(var(--color-border-rgb, 255 255 255) / 0.14);
+    --footer-rule: rgb(255 255 255 / 0.16);
+    --footer-rule: color-mix(in srgb, currentColor 18%, transparent);
 
     --footer-column-gap: var(--space-7);
     --footer-row-gap: var(--space-6);
+
+    /* How far the card reaches beyond the columns it wraps. This was the
+       panel's `padding`; as a pseudo-element it is a negative margin instead. */
+    --footer-panel-pad-block: var(--space-8);
+    --footer-panel-pad-inline: var(--space-7);
 
     --footer-accent: var(--color-primary-button-background);
     --footer-heading-color: var(--color-heading);
@@ -79,38 +99,126 @@
 
   /* ==========================================================================
      The panel
+     --------------------------------------------------------------------------
+     `.footer__panel` is now a plain wrapper — the `<motion-effect>` host, and
+     nothing else. The card moved down onto `.footer__columns`, drawn there by a
+     pseudo-element that covers only part of the grid.
+
+     Why: every block a merchant adds arrives through one `content_for 'blocks'`,
+     so the columns, the contact bar and the bottom bar are all siblings in one
+     container. A card wrapped around that container is a card around all of
+     them — which is how the utility rows ended up inside a surface the design
+     draws them below. There is no `<div>` to add, because the section cannot
+     get between blocks it does not render individually.
+
+     A pseudo-element can be a grid item, though, and a grid item can be told to
+     span a range of rows. So the card became one: same border, same radius,
+     same tint, sized to the rows the columns and the policy links occupy, and
+     stopping before everything after them.
      ========================================================================== */
 
   .footer__panel {
     display: block;
   }
 
-  .footer__panel--card {
-    padding: var(--space-8) var(--space-7);
-    border: var(--footer-panel-border);
-    border-radius: var(--footer-panel-radius);
-    background-color: var(--footer-panel-surface);
-  }
-
   /* ==========================================================================
      Columns
      --------------------------------------------------------------------------
-     A row of columns whose widths are shares, not sizes: `--column-width` is a
-     percentage of the row and feeds the grow factor, so three columns at 100%
-     split into thirds and one at 150% beside them takes proportionally more. A
-     merchant never has to make the numbers add up.
+     Two layouts, one grid.
+
+       fixed      One track per column, sized by the share the merchant set —
+                  three columns at 100 and one at 150 become `1fr 1fr 1fr 1.5fr`.
+                  The policy links run under the menu tracks only, and the column
+                  carrying the divider spans down beside them. The design.
+
+       flexible   Equal tracks. Column widths are ignored on purpose: a footer
+                  whose column count changes should not need its shares retuned
+                  every time one is added.
+
+     Both take their track list from `--panel-tracks`, and the difference
+     between them is only which rules are drawn — see "the rules" below.
      ========================================================================== */
 
   .footer__columns {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    /* `--panel-tracks`, `--panel-card-rows` and `--policy-span` are written by
+       `<footer-columns>` in modules.js, which reads them off the columns
+       themselves. A section cannot see blocks rendered through `content_for` —
+       `section.blocks` returns nothing for them — so Liquid has no way to work
+       them out, and an earlier version of this file that tried found no columns
+       and fell back to a single track: every column stacked on the next.
+
+       These fallbacks are what a page gets if that script never runs. Columns
+       that share the row evenly and a card around the first two rows: not the
+       exact proportions the merchant set, but a footer that reads correctly. */
+    grid-template-columns: var(--panel-tracks, repeat(auto-fit, minmax(min(100%, 18rem), 1fr)));
+
+    /* The explicit grid is *the card*, and nothing more.
+
+       Negative grid lines count back from the end of the explicit grid, so
+       declaring exactly the card's rows here is what lets the card say
+       `1 / -1` and have it mean "the columns and the policy row". Every block
+       after them lands in an implicit row underneath, outside the card, with no
+       counting to keep in sync. */
+    grid-template-rows: var(--panel-card-rows, auto auto);
+
     gap: var(--footer-row-gap) var(--footer-column-gap);
-    align-items: flex-start;
+    align-items: stretch;
+
+    /* The card's containing block, and a stacking context so the card can sit
+       at `z-index: -1` — behind the columns, but still in front of the footer's
+       own background rather than disappearing behind it. */
+    position: relative;
+    isolation: isolate;
+  }
+
+  /* The card's inset. Padding on the grid rather than on the card, because the
+     card is measured from the grid's border box and the columns need to sit
+     inside it. No bottom padding: the card's own negative margin closes that
+     edge, and a bottom padding here would push the utility rows down by the
+     same amount a second time. */
+  .footer__panel--card .footer__columns {
+    padding: var(--footer-panel-pad-block) var(--footer-panel-pad-inline) 0;
+  }
+
+  /* The card, and the one detail that makes it work: it is out of flow.
+
+     An in-flow grid item with a definite position occupies its cells before
+     anything auto-placed can use them — and it is placed in that first pass
+     whatever its document order, so moving it from `::before` to `::after`
+     changes nothing. Spanning every column of rows one and two, it pushed all
+     four columns out of the very rows it was meant to be painting behind.
+
+     Absolutely positioned, it keeps its grid placement — the grid area is its
+     containing block — but takes no cells at all, so auto-placement carries on
+     as though it were not there. Which is exactly what a background should do.
+
+     Negative margins on all four sides then grow it past that area: the grid's
+     padding becomes the card's inset, and the bottom edge clears the last row
+     it covers. */
+  .footer__panel--card .footer__columns::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    grid-column: 1 / -1;
+    grid-row: 1 / -1;
+    z-index: -1;
+    margin: calc(var(--footer-panel-pad-block) * -1) calc(var(--footer-panel-pad-inline) * -1);
+    border: var(--footer-panel-border);
+    border-radius: var(--footer-panel-radius);
+    background-color: var(--footer-panel-surface);
+    pointer-events: none;
+  }
+
+  /* Everything below the card runs to the grid's own edges — which is where the
+     card's edges are too, so the contact bar and the bottom bar line up with the
+     panel above them exactly as the design draws them. */
+  .footer__panel--card .footer-utilities,
+  .footer__panel--card .footer-legal {
+    margin-inline: calc(var(--footer-panel-pad-inline) * -1);
   }
 
   .footer-column {
-    flex: 1 1 0;
-    flex-grow: calc(var(--column-width, 100%) / 100%);
     min-inline-size: 0;
     order: var(--column-order, 0);
 
@@ -119,6 +227,17 @@
        conditional would mean a second attribute for no gain. */
     background-color: var(--column-background, transparent);
     border-radius: 1.6rem;
+  }
+
+  /* The aside — the column with the divider — spans the policy row as well, so
+     its rule runs the full height of the card rather than stopping level with
+     its own last line. Placed on the last track explicitly: an item with a
+     definite row and an automatic column is positioned before the fully
+     automatic ones, and without a column of its own it would land in the first
+     track and push the menus sideways. */
+  .footer__columns[data-has-policy] .footer-column[data-divider] {
+    grid-column: -2 / -1;
+    grid-row: 1 / -1;
   }
 
   .footer-column__content {
@@ -133,10 +252,21 @@
      the two sizes. Side by side it is a rule down the inline-start edge, with
      the gap split so the line sits between the columns rather than against one
      of them; stacked, it is a rule above — which is in the small-screen block. */
+  /* ---- the rules, and the only thing the two layouts disagree about --------
+     Fixed draws them; flexible leaves the panel open. Nothing else changes
+     between the two, so switching never moves anything on the page.
+     ----------------------------------------------------------------------- */
+
   @media screen and (min-width: 750px) {
+    /* The offsets are unconditional: they put the column's content where it
+       belongs whether or not a line is drawn there, so the columns do not shift
+       sideways when the rules come off. */
     .footer-column[data-divider] {
       padding-inline-start: var(--footer-column-gap);
       margin-inline-start: calc(var(--footer-column-gap) * -0.5);
+    }
+
+    .footer__columns[data-layout='fixed'] .footer-column[data-divider] {
       border-inline-start: 1px solid var(--footer-rule);
     }
   }
@@ -146,6 +276,13 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--space-3);
+
+    /* No top padding. The column heading is the first thing in the panel and a
+       leading gap above it pushed the whole footer's optical top line down
+       below where the design puts it. Breathing room below the summary is what
+       separates it from its own links, so that half stays. */
+    padding-block-start: 0;
+
     cursor: pointer;
     list-style: none;
   }
@@ -261,27 +398,75 @@
   .footer-menu[data-link-preset='h5'] .footer-menu__link { font-size: var(--font-size-h5, 1.8rem); }
   .footer-menu[data-link-preset='h6'] .footer-menu__link { font-size: var(--font-size-h6, 1.6rem); }
 
-  .footer-menu__link {
+  /* ---- the underline ----------------------------------------------------
+     One animation, used by every link in the footer and — in header.css — by
+     the dropdown and mega-menu links too, so the whole site draws the same
+     line the same way.
+
+     It is a scaled pseudo-element, not `text-decoration`, for two reasons: the
+     line is drawn rather than switched on, and the box never changes size, so
+     nothing on the row reflows under the pointer. The previous hover was a 2px
+     nudge to the right, which moved the link away from the cursor.
+
+     The direction comes from swapping `transform-origin`, which is the whole
+     trick: at rest the origin is the end edge, so scaling to 0 retracts the
+     line the way it came; on hover the origin is the start edge, so it draws
+     out from the left. In and out are mirror images without a second keyframe,
+     and both flip automatically in a right-to-left locale because the origin
+     is expressed in logical terms.
+     ----------------------------------------------------------------------- */
+
+  .footer-menu__link,
+  .footer__policy-link {
+    position: relative;
     display: inline-block;
-    padding-block: 0.4rem;
     color: inherit;
     text-decoration: none;
-    transition: color var(--transition-fast), transform var(--transition-fast);
+    transition: color var(--transition-fast);
+  }
+
+  .footer-menu__link::after,
+  .footer__policy-link::after {
+    content: '';
+    position: absolute;
+    inset-inline: 0;
+    inset-block-end: 0.1em;
+    block-size: 1px;
+    background-color: currentcolor;
+    transform: scaleX(0);
+    transform-origin: right center;
+    transition: transform 0.32s var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+  }
+
+  [dir='rtl'] .footer-menu__link::after,
+  [dir='rtl'] .footer__policy-link::after {
+    transform-origin: left center;
+  }
+
+  .footer-menu__link:hover::after,
+  .footer-menu__link:focus-visible::after,
+  .footer-menu__link[aria-current='page']::after,
+  .footer__policy-link:hover::after,
+  .footer__policy-link:focus-visible::after {
+    transform: scaleX(1);
+    transform-origin: left center;
+  }
+
+  [dir='rtl'] .footer-menu__link:hover::after,
+  [dir='rtl'] .footer-menu__link:focus-visible::after,
+  [dir='rtl'] .footer-menu__link[aria-current='page']::after,
+  [dir='rtl'] .footer__policy-link:hover::after,
+  [dir='rtl'] .footer__policy-link:focus-visible::after {
+    transform-origin: right center;
+  }
+
+  .footer-menu__link {
+    padding-block: 0.4rem;
   }
 
   .footer-menu__link:hover,
   .footer-menu__link[aria-current='page'] {
     color: var(--footer-accent);
-  }
-
-  /* A nudge rather than an underline. At this size an underline on hover shifts
-     the row's optical baseline; the translation does not. */
-  .footer-menu__link:hover {
-    transform: translateX(0.2rem);
-  }
-
-  [dir='rtl'] .footer-menu__link:hover {
-    transform: translateX(-0.2rem);
   }
 
   /* ==========================================================================
@@ -351,6 +536,20 @@
        pill disappears and the placeholder looks like loose text with an arrow
        beside it. */
     background-color: rgb(var(--color-background-rgb) / 0.14);
+
+    /* The focus ring belongs to the pill, not the input.
+       Declared here — transparent — rather than only in the focus rule, because
+       a shadow can only animate between two shadows: from `none` it snaps. */
+    box-shadow: 0 0 0 0 rgb(var(--color-primary-button-background-rgb, 0 200 83) / 0);
+    transition: box-shadow 0.25s var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+  }
+
+  /* `:focus-within`, not `:has()` — same result, and it has been in every
+     browser for years. The keyboard ring the customer sees is now drawn around
+     the whole control, matching what they perceive as the field, instead of a
+     rectangle around the bare input inside a rounded pill. */
+  .email-signup__field:focus-within {
+    box-shadow: 0 0 0 2px rgb(var(--color-primary-button-background-rgb, 0 200 83) / 0.55);
   }
 
   .email-signup[data-border='all'] .email-signup__field {
@@ -384,8 +583,14 @@
   }
 
   .email-signup__input:hover,
-  .email-signup__input:focus {
+  .email-signup__input:focus,
+  .email-signup__input:focus-visible {
     background: none;
+    /* The input's own ring is removed because the pill above draws one for it.
+       Removing an outline is only safe when something else takes over the job,
+       and `:focus-within` on the field is that something. */
+    outline: none;
+    box-shadow: none;
   }
 
   .email-signup[data-text-preset='h5'] .email-signup__input { font-size: var(--font-size-h5, 1.8rem); }
@@ -484,25 +689,60 @@
     justify-content: flex-end;
   }
 
+  /* The disc is sized from the icon, so a merchant who takes the icon from 14px
+     to 28px gets a badge that still fits around it rather than a 40px circle
+     with a glyph rattling inside. */
   .social-links__link {
     display: grid;
     place-items: center;
-    inline-size: 4rem;
-    block-size: 4rem;
+    inline-size: calc(var(--social-icon-size, 18px) * 2.2);
+    block-size: calc(var(--social-icon-size, 18px) * 2.2);
+    border: 1px solid transparent;
     border-radius: 50%;
-    background-color: rgb(var(--color-background-rgb) / 0.1);
-    color: currentcolor;
+    background-color: var(--social-icon-bg, rgb(var(--color-background-rgb) / 0.1));
+    color: var(--social-icon-color, currentcolor);
+
+    /* Every property that moves is named, and they all share one curve. The old
+       `var(--transition-fast)` was a flat ease over a shorter time, which is
+       what made the hover read as a switch rather than a movement. */
     transition:
-      background-color var(--transition-fast),
-      color var(--transition-fast),
-      transform var(--transition-fast);
+      background-color 0.28s var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+      border-color 0.28s var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+      color 0.28s var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+      transform 0.32s var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+  }
+
+  /* Outline: the ring is the badge. */
+  .social-links[data-icon-style='outline'] .social-links__link {
+    background-color: transparent;
+    border-color: var(--social-icon-bg, rgb(var(--color-border-rgb, 255 255 255) / 0.3));
+  }
+
+  /* Transparent: no badge at all, just the mark. The box keeps its size so a
+     row of icons stays on the same rhythm as a row of discs. */
+  .social-links[data-icon-style='transparent'] .social-links__link {
+    background-color: transparent;
+    border-color: transparent;
   }
 
   .social-links__link:hover,
   .social-links__link:focus-visible {
-    background-color: var(--footer-accent);
+    background-color: var(--social-icon-hover, var(--footer-accent));
+    border-color: var(--social-icon-hover, var(--footer-accent));
     color: var(--color-primary-button-text);
-    transform: translateY(-0.2rem);
+    transform: translateY(-0.3rem) scale(1.06);
+  }
+
+  /* On the two styles with no fill of their own, the hover colour goes on the
+     mark rather than behind it — filling a "transparent" badge on hover is a
+     different component, not a hover state. */
+  .social-links[data-icon-style='outline'] .social-links__link:hover,
+  .social-links[data-icon-style='outline'] .social-links__link:focus-visible,
+  .social-links[data-icon-style='transparent'] .social-links__link:hover,
+  .social-links[data-icon-style='transparent'] .social-links__link:focus-visible {
+    background-color: transparent;
+    border-color: var(--social-icon-hover, var(--footer-accent));
+    color: var(--social-icon-hover, var(--footer-accent));
   }
 
   /* ==========================================================================
@@ -518,8 +758,15 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--utilities-gap-y, 20px) var(--utilities-gap-x, 32px);
-    flex: 1 1 100%;
+
+    /* A row of its own, spanning every track, in an implicit grid row — which
+       is to say: below the card, on the footer's own ground. */
+    grid-column: 1 / -1;
     order: var(--column-order, 0);
+
+    /* Clear of the card's bottom overhang. The grid's own row gap measures from
+       the last column row, not from the edge of a card that reaches past it. */
+    margin-block-start: var(--footer-panel-pad-block);
     border-radius: var(--utilities-radius, 2.4rem);
     background-color: var(--utilities-background, transparent);
     border: var(--utilities-border-width, 0px) solid var(--utilities-border-color, transparent);
@@ -748,9 +995,17 @@
      Policy row
      ========================================================================== */
 
+  /* The policy links span the tracks before the divider — `--policy-span`,
+     measured by `<footer-columns>`. Grid resolves the width and the gaps
+     together, so the row ends exactly at the rule instead of near it. */
   .footer__policies {
-    margin-block-start: var(--space-7);
+    display: block;
+    grid-column: 1 / span var(--policy-span, 1);
+    order: var(--column-order, 2);
     padding-block-start: var(--space-6);
+  }
+
+  .footer__columns[data-layout='fixed'] .footer__policies {
     border-block-start: 1px solid var(--footer-rule);
   }
 
@@ -777,21 +1032,29 @@
   /* ==========================================================================
      Legal band
      --------------------------------------------------------------------------
-     Its own section, below the footer panel: the disclaimer and the oversized
-     wordmark. Type as texture — a single line, clipped to a gradient, sized from
-     the viewport so it spans the page at every width. `vw` rather than `cqi` on
-     purpose: tracking the page is the effect.
+     A block now, not a section — a full-width row below the panel's card, on
+     the footer's own background. As a section it carried a colour scheme of its
+     own, and two schemes stacked on one gradient is a seam: the footer's ramp
+     ends on one colour and the band below either restarts it or lands on a flat
+     fill that does not quite match. Inside the footer there is nothing to match.
+
+     Type as texture — a single line, clipped to a gradient, sized from the
+     viewport so it spans the page at every width, then capped so it always fits.
      ========================================================================== */
 
   .footer-legal {
-    --legal-rule: rgb(var(--color-border-rgb, 255 255 255) / 0.14);
+    --legal-rule: rgb(255 255 255 / 0.16);
+    --legal-rule: color-mix(in srgb, currentColor 18%, transparent);
     --legal-muted: var(--color-accent-text);
 
     position: relative;
+    grid-column: 1 / -1;
+    order: var(--column-order, 7);
     overflow: hidden;
-    margin-block-start: var(--legal-margin-block-start, 0px);
-    margin-block-end: var(--legal-margin-block-end, 0px);
     color: var(--legal-text-color, inherit);
+
+    /* Clear of the card's bottom overhang, the same as the utility rows. */
+    margin-block-start: var(--footer-panel-pad-block);
   }
 
   .footer-legal[data-divider] {
@@ -802,11 +1065,14 @@
   .footer-legal[data-align='center'] { text-align: center; }
   .footer-legal[data-align='right'] { text-align: end; }
 
-  /* ---- disclaimer ---- */
+  /* ---- disclaimer ----
+     Rendered after the wordmark now, so the margin is on top of it rather than
+     underneath: the small print closes the page, it does not introduce it. */
 
   .footer-legal__disclaimer {
     display: flex;
     justify-content: center;
+    margin-block-start: var(--space-6);
   }
 
   .footer-legal[data-align='left'] .footer-legal__disclaimer { justify-content: flex-start; }
@@ -819,9 +1085,12 @@
     text-wrap: pretty;
   }
 
+  /* The dashed rule from the design. It is drawn in the accent rather than the
+     border token because on this ground the border token is nearly the
+     background — the box was there in the markup and invisible on the page. */
   .footer-legal__disclaimer--boxed .footer-legal__disclaimer-inner {
     padding: var(--space-4) var(--space-6);
-    border: 1px dashed var(--legal-rule);
+    border: 1px dashed var(--legal-dash-color, rgb(var(--color-primary-button-background-rgb, 0 200 83) / 0.45));
     border-radius: 1.2rem;
   }
 
@@ -835,15 +1104,61 @@
     position: relative;
     display: block;
     overflow: hidden;
-    margin-block-start: var(--space-6);
     line-height: 0.82;
     opacity: var(--legal-logo-opacity, 1);
+
+    /* A size container, so the type below can be measured against the width it
+       actually has rather than against the viewport. */
+    container-type: inline-size;
+  }
+
+  /* ---- the pre-paint hidden state ---------------------------------------
+     `data-motion-armed` is written by a parser-blocking script beside the
+     element, so it is present in the element's first paint. That is the whole
+     point: `motion-engine` hides from JavaScript on purpose — a page whose
+     scripts fail must still show its content — but the module cannot run until
+     after first paint, and at this size the finished wordmark flashing once
+     before it hides and rises is impossible to miss.
+
+     The state mirrors `reveal-up`'s own first keyframe exactly, so when the
+     engine takes over there is no second jump: it animates from where CSS
+     already had it.
+
+     Three ways out, and the wordmark ends up visible in all of them: the
+     animation runs and `data-motion-revealed` releases it; scripting is off, so
+     the attribute was never written; or the module fails to load and the script
+     clears the attribute itself after four seconds.
+     ----------------------------------------------------------------------- */
+  .footer-legal__wordmark[data-motion-armed]:not([data-motion-revealed]) {
+    clip-path: inset(100% 0 0 0);
+    transform: translate3d(0, 16px, 0);
+  }
+
+  /* Reduced motion never wants the hidden state at all — there is no animation
+     coming to undo it. */
+  @media (prefers-reduced-motion: reduce) {
+    .footer-legal__wordmark[data-motion-armed]:not([data-motion-revealed]) {
+      clip-path: none;
+      transform: none;
+    }
   }
 
   .footer-legal__wordmark-text {
     display: block;
     font-family: var(--font-heading-family, var(--font-body-family));
-    font-size: clamp(4rem, var(--legal-logo-size, 17vw), 24rem);
+    /* Two limits, and the smaller wins.
+
+       The first is the merchant's setting — a share of the viewport, which is
+       what makes the wordmark track the page. The second is the width it has to
+       fit into: roughly `container ÷ characters`, scaled by 1.6 because a
+       heading glyph averages a little over half its own point size in advance
+       width. Whatever the shop is called and however wide the screen is, the
+       word ends up inside its box instead of losing its last letter off the
+       edge. */
+    font-size: min(
+      clamp(4rem, var(--legal-logo-size, 22vw), 32rem),
+      calc(100cqi / var(--legal-logo-chars, 8) * 1.6)
+    );
     font-weight: 500;
     letter-spacing: -0.02em;
     white-space: nowrap;
@@ -871,89 +1186,6 @@
     inline-size: 100%;
   }
 
-  /* ---- the sweep --------------------------------------------------------
-     One pass, once, after the wordmark has finished rising — and then nothing.
-     The previous version ran `infinite`, so a highlight crossed the letters
-     every few seconds for as long as the page was open: it reads as a loading
-     skeleton and it keeps the compositor awake at the bottom of every page.
-
-     Three gates, all of them cheap:
-       [data-animation='sheen']   the merchant asked for it
-       [data-motion-revealed]     the band is actually on screen
-       :not([data-effect='none']) reveal animations are switched on
-
-     Resting opacity is 0 and the keyframes return to 0, so if none of the gates
-     open there is nothing to see and nothing running.
-     ----------------------------------------------------------------------- */
-
-  .footer-legal__wordmark-sheen {
-    position: absolute;
-    inset-block: 0;
-    inset-inline-start: -60%;
-    inline-size: 45%;
-    opacity: 0;
-    pointer-events: none;
-    background: linear-gradient(
-      100deg,
-      transparent 0%,
-      rgb(255 255 255 / 0.28) 45%,
-      rgb(255 255 255 / 0.42) 50%,
-      rgb(255 255 255 / 0.28) 55%,
-      transparent 100%
-    );
-    mix-blend-mode: overlay;
-  }
-
-  .footer-legal__wordmark[data-animation='sheen'][data-motion-revealed]:not([data-effect='none'])
-    .footer-legal__wordmark-sheen {
-    animation: footer-legal-sheen 1.5s var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)) 0.75s 1 both;
-  }
-
-  @keyframes footer-legal-sheen {
-    from {
-      opacity: 0;
-      transform: translateX(0);
-    }
-
-    20% {
-      opacity: 1;
-    }
-
-    80% {
-      opacity: 1;
-    }
-
-    to {
-      opacity: 0;
-      transform: translateX(320%);
-    }
-  }
-
-  [dir='rtl'] .footer-legal__wordmark[data-animation='sheen'][data-motion-revealed]:not([data-effect='none'])
-    .footer-legal__wordmark-sheen {
-    animation-name: footer-legal-sheen-rtl;
-  }
-
-  @keyframes footer-legal-sheen-rtl {
-    from {
-      opacity: 0;
-      transform: translateX(0);
-    }
-
-    20% {
-      opacity: 1;
-    }
-
-    80% {
-      opacity: 1;
-    }
-
-    to {
-      opacity: 0;
-      transform: translateX(-320%);
-    }
-  }
-
   /* ==========================================================================
      Small screens
      ========================================================================== */
@@ -963,26 +1195,49 @@
       --footer-panel-radius: 1.6rem;
     }
 
-    .footer__panel--card {
-      padding: var(--space-5);
+    .footer {
+      --footer-panel-pad-block: var(--space-5);
+      --footer-panel-pad-inline: var(--space-5);
     }
 
+    /* One track, and one row per column — which is exactly what the mobile row
+       count Liquid emits describes, so the card still stops in the right place
+       once the columns have stacked. */
     .footer__columns {
-      display: block;
+      grid-template-columns: 1fr;
+      grid-template-rows: var(--panel-card-rows-mobile, auto);
+      row-gap: 0;
     }
 
-    /* Stacked, and each one a row with a rule under it — the accordion look. The
-       flex share is meaningless in this layout, so it is cleared rather than
-       left to resolve against a container that is no longer a row. */
-    .footer-column {
-      inline-size: 100%;
-      flex: none;
+    .footer-column,
+    .footer__columns[data-has-policy] .footer-column[data-divider],
+    .footer__policies {
+      grid-column: 1 / -1;
+      grid-row: auto;
     }
 
-    .footer-column + .footer-column,
-    .footer-column[data-divider] {
+    /* Stacked, the vertical rule has nothing to divide, so the separator is the
+       line above each column — and it is still only drawn in fixed. */
+    .footer__columns[data-layout='fixed'] .footer-column + .footer-column,
+    .footer__columns[data-layout='fixed'] .footer-column[data-divider] {
       border-block-start: 1px solid var(--footer-rule);
+    }
+
+    .footer-column {
       border-radius: 0;
+    }
+
+    .footer__policies {
+      margin-block-start: var(--space-4);
+    }
+
+    /* Stacked, the row gap is zero so the columns read as one list with rules
+       between them — which leaves the rows below the card with nothing but the
+       card's own overhang between them and it. The gap is added back here, on
+       the two things that need it. */
+    .footer-utilities,
+    .footer-legal {
+      margin-block-start: calc(var(--footer-panel-pad-block) + var(--footer-row-gap));
     }
 
     .footer-column__summary {
@@ -1008,7 +1263,10 @@
     }
 
     .footer-legal__wordmark-text {
-      font-size: clamp(3.2rem, calc(var(--legal-logo-size, 17vw) * 1.2), 12rem);
+      font-size: min(
+        clamp(3.2rem, calc(var(--legal-logo-size, 22vw) * 1.15), 16rem),
+        calc(100cqi / var(--legal-logo-chars, 8) * 1.6)
+      );
     }
   }
 
@@ -1017,25 +1275,20 @@
      ========================================================================== */
 
   @media (prefers-reduced-motion: reduce) {
-    /* The full selector, repeated. A media query adds no specificity, so a bare
-       `.footer-legal__wordmark-sheen { animation: none }` here would lose to the
-       five-component rule above and the sweep would run anyway. */
-    .footer-legal__wordmark[data-animation='sheen'][data-motion-revealed]:not([data-effect='none'])
-      .footer-legal__wordmark-sheen,
-    [dir='rtl'] .footer-legal__wordmark[data-animation='sheen'][data-motion-revealed]:not([data-effect='none'])
-      .footer-legal__wordmark-sheen {
-      animation: none;
-      opacity: 0;
-    }
-
     .footer__localization .localization__panel:not([hidden]) {
       animation: none;
     }
 
-    .footer-menu__link:hover,
     .social-links__link:hover,
     .email-signup__submit:hover {
       transform: none;
+    }
+
+    /* The underline still appears — it is the affordance — it just arrives
+       without the draw. */
+    .footer-menu__link::after,
+    .footer__policy-link::after {
+      transition: none;
     }
   }
 }
