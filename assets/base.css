@@ -3097,20 +3097,46 @@
   /* The chevron turns over when the panel opens. `aria-expanded` is already on
      the trigger — the component keeps it accurate — so the state that screen
      readers use is the same state the arrow is drawn from, and there is no
-     second class to keep in sync. */
+     second class to keep in sync.
+
+     Same duration and same curve as the panel below, because they are one
+     movement: an arrow that snaps over in 200ms while the panel it belongs to
+     is still travelling reads as two unrelated things happening at once. */
   .localization__trigger .icon {
-    transition: transform var(--transition-fast, 0.2s ease);
+    transform-origin: center;
+    transition: transform 0.3s var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
   }
 
   .localization__trigger[aria-expanded='true'] .icon {
     transform: rotate(180deg);
   }
 
+  /* ---- the panel, and why it is not `display: none` ------------------------
+     `hidden` is `display: none`, and `display: none` cannot be animated: the
+     panel appeared in one frame and vanished in one frame, which is the jump.
+     The component's contract is the `hidden` attribute, so rather than change
+     it, the attribute is restyled — the panel stays in the layout and is taken
+     out of play by `visibility`, `opacity` and `pointer-events` instead.
+
+     That is a safe substitution, not a shortcut around it: `visibility: hidden`
+     removes an element from the accessibility tree and from the tab order
+     exactly as `display: none` does, and this panel is absolutely positioned,
+     so it occupies no space either way. What it buys is an exit animation —
+     the panel can now fall back down instead of blinking out.
+     ----------------------------------------------------------------------- */
+
   .localization__panel {
     position: absolute;
     inset-block-end: 100%;
     inset-inline-start: 0;
     z-index: var(--z-sticky);
+
+    /* It rises from the trigger it belongs to, so it grows from that edge. */
+    transform-origin: bottom center;
+    transition:
+      opacity 0.3s var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+      transform 0.3s var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+      visibility 0.3s;
 
     /* Was a flat `26rem`, which is wider than a 320px phone once the page
        gutter is taken off — the panel ran under the edge of the screen and took
@@ -3126,6 +3152,32 @@
     border: 1px solid var(--color-border);
     border-radius: var(--radius-card);
     box-shadow: var(--shadow-drawer);
+  }
+
+  .localization__panel[hidden] {
+    /* Overriding the browser's own `[hidden] { display: none }` — see above. */
+    display: block;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(1.2rem) scale(0.98);
+    pointer-events: none;
+  }
+
+  .localization__panel:not([hidden]) {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .localization__panel,
+    .localization__trigger .icon {
+      transition: none;
+    }
+
+    .localization__panel[hidden] {
+      transform: none;
+    }
   }
 
   /* The last picker in a row sits closest to the end edge, so its panel hangs
@@ -6032,7 +6084,19 @@
 
   html.no-js .no-js-hidden { display: none !important; }
   html:not(.no-js) .js-hidden { display: none !important; }
-  [hidden] { display: none !important; }
+
+  /* `!important` because `[hidden]` is a plain attribute selector and loses to
+     any class that sets a display — `display: grid` on a component that is
+     sometimes hidden being the usual case.
+
+     The one exception is written into the selector rather than fought with a
+     second `!important` further down. An element that is `display: none` cannot
+     transition, in either direction: it appears in one frame and vanishes in
+     one frame. The localization panel needs to animate out as well as in, so it
+     is hidden by `visibility` instead — which removes it from the accessibility
+     tree and the tab order just as completely — and its own rule near the top of
+     this file is where that happens. */
+  [hidden]:not(.localization__panel) { display: none !important; }
 
   /* Scroll lock. The body is pinned from JavaScript with inline styles, which
      cannot be defeated by merchant CSS; this only hides the scrollbar. */

@@ -1,0 +1,323 @@
+{% comment %}
+  blocks/_footer-contact.liquid
+
+  The brand block: a logo, a line or two about the shop, and the address.
+
+  It is the one thing a footer column almost always opens with and the only one
+  the theme had no block for — a merchant was left composing it out of an image
+  block, a text block and a second text block, three sets of spacing settings
+  deep, with nothing tying the three together.
+
+  Private, and offered inside the footer only: the Column, the Utilities row and
+  a Group. On a product page this is an image with two paragraphs under it, which
+  the theme already has blocks for.
+
+  ## The logo is the shop's, unless it is not
+
+  Left alone it renders the logo from Theme settings, so a merchant who has
+  already set one has nothing to do here. An image picker overrides it, and the
+  text option falls back to the shop name — which is also what a browser with a
+  broken image shows, since that name is the `alt`.
+
+  ## Address is a `richtext`, not three fields
+
+  Addresses do not have a shape. A street, a unit, a city, a state, a postcode
+  and a country is one country's idea of an address and wrong nearly everywhere
+  else, and six fields to fill in for a block that renders them one after
+  another is six chances to get the order wrong. One field, line breaks where
+  the merchant puts them.
+{% endcomment %}
+
+{%- liquid
+  assign st = block.settings
+  assign logo_source = st.logo_source | default: 'image'
+
+  assign logo_image = st.logo_image
+  if logo_image == blank
+    assign logo_image = settings.logo
+  endif
+
+  assign wordmark = st.logo_text | default: shop.name
+
+  assign show_logo = false
+  if logo_source == 'image' and logo_image != blank
+    assign show_logo = true
+  elsif logo_source == 'text' and wordmark != blank
+    assign show_logo = true
+  endif
+
+  assign logo_width = st.logo_width | default: 160 | plus: 0
+
+  capture contact_spacing
+    render 'spacing', block: st, declarations: true
+  endcapture
+-%}
+
+{%- capture contact_styles -%}
+  --contact-logo-width: {{ logo_width }}px;
+  --contact-gap: {{ st.vertical_gap | default: 16 }}px;
+  {%- if st.text_color != blank -%}--contact-text-color: {{ st.text_color }};{%- endif -%}
+  {%- if st.heading_color != blank -%}--contact-heading-color: {{ st.heading_color }};{%- endif -%}
+  {{- contact_spacing | strip -}}
+{%- endcapture -%}
+
+<div
+  class="footer-contact"
+  data-align="{{ st.alignment | default: 'left' }}"
+  data-block-spacing
+  style="{{ contact_styles | strip_newlines | strip }}"
+  {{ block.shopify_attributes }}
+>
+  {%- if show_logo -%}
+    <div class="footer-contact__logo">
+      {%- if logo_source == 'image' -%}
+        {% render 'image',
+          image: logo_image,
+          alt: shop.name,
+          class: 'footer-contact__logo-image',
+          wrapper_class: 'footer-contact__logo-media',
+          ratio: 'adapt',
+          sizes: '240px',
+          widths: '160,240,320,480'
+        %}
+      {%- else -%}
+        <span class="footer-contact__logo-text">{{ wordmark }}</span>
+      {%- endif -%}
+    </div>
+  {%- endif -%}
+
+  {%- if st.text != blank -%}
+    <div class="footer-contact__text rte">{{ st.text }}</div>
+  {%- endif -%}
+
+  {%- if st.address != blank -%}
+    <div class="footer-contact__address">
+      {%- if st.address_label != blank -%}
+        <span class="footer-contact__label">{{ st.address_label }}</span>
+      {%- endif -%}
+
+      {%- comment -%}
+        A real `<address>`. It is the element for the contact details of the
+        page or of its nearest article — which is exactly what this is — and it
+        is what tells a screen reader, and a search engine reading the markup,
+        that these lines are a place rather than a paragraph.
+      {%- endcomment -%}
+      <address class="footer-contact__address-body rte">{{ st.address }}</address>
+    </div>
+  {%- endif -%}
+</div>
+
+
+{% schema %}
+{
+  "name": "t:blocks.footer_contact.name",
+  "tag": null,
+  "settings": [
+    {
+      "type": "header",
+      "content": "t:blocks.footer_contact.headers.logo"
+    },
+    {
+      "type": "select",
+      "id": "logo_source",
+      "label": "t:blocks.footer_contact.settings.logo_source.label",
+      "info": "t:blocks.footer_contact.settings.logo_source.info",
+      "options": [
+        { "value": "image", "label": "t:blocks.footer_contact.settings.logo_source.options__1.label" },
+        { "value": "text", "label": "t:blocks.footer_contact.settings.logo_source.options__2.label" },
+        { "value": "none", "label": "t:shared.options.none" }
+      ],
+      "default": "image"
+    },
+    {
+      "type": "image_picker",
+      "id": "logo_image",
+      "label": "t:blocks.footer_contact.settings.logo_image.label",
+      "info": "t:blocks.footer_contact.settings.logo_image.info",
+      "visible_if": "{{ block.settings.logo_source == 'image' }}"
+    },
+    {
+      "type": "text",
+      "id": "logo_text",
+      "label": "t:blocks.footer_contact.settings.logo_text.label",
+      "info": "t:blocks.footer_contact.settings.logo_text.info",
+      "visible_if": "{{ block.settings.logo_source == 'text' }}"
+    },
+    {
+      "type": "range",
+      "id": "logo_width",
+      "label": "t:blocks.footer_contact.settings.logo_width.label",
+      "min": 60,
+      "max": 320,
+      "step": 10,
+      "unit": "px",
+      "default": 160,
+      "visible_if": "{{ block.settings.logo_source != 'none' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.footer_contact.headers.brand"
+    },
+    {
+      "type": "richtext",
+      "id": "text",
+      "label": "t:blocks.footer_contact.settings.text.label",
+      "default": "<p>Clinically studied ingredients, made in small batches and tested in every one.</p>"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.footer_contact.headers.address"
+    },
+    {
+      "type": "text",
+      "id": "address_label",
+      "label": "t:blocks.footer_contact.settings.address_label.label"
+    },
+    {
+      "type": "richtext",
+      "id": "address",
+      "label": "t:blocks.footer_contact.settings.address.label",
+      "info": "t:blocks.footer_contact.settings.address.info",
+      "default": "<p>123 Main St Apt 4B<br/>New York, NY 10001</p>"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.footer_contact.headers.appearance"
+    },
+    {
+      "type": "select",
+      "id": "alignment",
+      "label": "t:shared.alignment.label",
+      "options": [
+        { "value": "left", "label": "t:shared.alignment.options__1.label" },
+        { "value": "center", "label": "t:shared.alignment.options__2.label" },
+        { "value": "right", "label": "t:shared.alignment.options__3.label" }
+      ],
+      "default": "left"
+    },
+    {
+      "type": "range",
+      "id": "vertical_gap",
+      "label": "t:blocks.menu.settings.vertical_gap.label",
+      "min": 0,
+      "max": 40,
+      "step": 2,
+      "unit": "px",
+      "default": 16
+    },
+    {
+      "type": "color",
+      "id": "heading_color",
+      "label": "t:blocks.footer_contact.settings.heading_color.label"
+    },
+    {
+      "type": "color",
+      "id": "text_color",
+      "label": "t:blocks.footer_contact.settings.text_color.label"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.spacing.block_header"
+    },
+    {
+      "type": "select",
+      "id": "padding_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        { "value": "desktop", "label": "t:shared.spacing.devices.options__1.label" },
+        { "value": "mobile", "label": "t:shared.spacing.devices.options__2.label" }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left_mobile",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right_mobile",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    }
+  ],
+  "presets": [{ "name": "t:blocks.footer_contact.name" }]
+}
+{% endschema %}

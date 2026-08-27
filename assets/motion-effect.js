@@ -12,7 +12,6 @@
  *     {{ image }}
  *   </motion-effect>
  *
- *
  *   <motion-effect data-effect="fade-up" data-children data-stagger="90">
  *     {%- for block in section.blocks -%}<div>…</div>{%- endfor -%}
  *   </motion-effect>

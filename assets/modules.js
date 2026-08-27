@@ -30,6 +30,23 @@ import { prefersReducedMotion, rafThrottle, isRTL, debounce, themeString, announ
    ========================================================================== */
 
 /**
+ * The accordion group a disclosure belongs to.
+ *
+ * @param {Element} element
+ * @returns {AccordionElement|null}
+ */
+function nearestAccordion(element) {
+  let node = element.parentElement;
+
+  while (node) {
+    if (node instanceof AccordionElement) return node;
+    node = node.parentElement;
+  }
+
+  return null;
+}
+
+/**
  * A group of `<details>` disclosures with animated height and optional
  * single-open behaviour.
  *
@@ -62,23 +79,6 @@ import { prefersReducedMotion, rafThrottle, isRTL, debounce, themeString, announ
  * drives it — and above the breakpoint the summaries are marked `data-static`,
  * which the stylesheet uses to remove the pointer cursor and the marker.
  */
-/**
- * The accordion group a disclosure belongs to.
- *
- * @param {Element} element
- * @returns {AccordionElement|null}
- */
-function nearestAccordion(element) {
-  let node = element.parentElement;
-
-  while (node) {
-    if (node instanceof AccordionElement) return node;
-    node = node.parentElement;
-  }
-
-  return null;
-}
-
 export class AccordionElement extends BaseComponent {
   /** @type {WeakMap<HTMLDetailsElement, Animation>} */
   #animations = new WeakMap();
@@ -389,14 +389,16 @@ defineComponent('accordion-element', AccordionElement);
      --panel-tracks         one `fr` track per column, in the width share each
                             column carries, so three at 100% and one at 150%
                             become `1fr 1fr 1fr 1.5fr`
-     --panel-card-rows      the rows the card covers — the columns' row, plus
-                            the policy links' row when there is one. Declaring
-                            them as the *explicit* grid is what lets the card
-                            say `1 / -1` and have that mean "not the utility
-                            rows", which are implicit and land underneath
+     --panel-card-rows      the rows the card covers — however many rows the
+                            columns actually took, plus the policy links' row
+                            when there is one. Declaring them as the *explicit*
+                            grid is what lets the card say `1 / -1` and have that
+                            mean "not the utility rows", which are implicit and
+                            land underneath
+     --aside-column         the track the column carrying the divider sits in
      --policy-span          how many tracks the policy links run across: up to
-                            the column carrying the divider, so they stop at the
-                            rule instead of passing under the newsletter
+                            the aside, so they stop at the rule instead of
+                            passing under the newsletter
 
    Each column already publishes its own width as `--column-width`, so this
    reads them off the children rather than being told. It extends
@@ -408,9 +410,26 @@ defineComponent('accordion-element', AccordionElement);
    first two rows — rather than a broken one.
    ========================================================================== */
 
+/**
+ * How many columns share a row before the next one wraps.
+ *
+ * Not a limit on how many columns a footer may have — a seventh is fine, it
+ * simply starts a second row.
+ */
+const FOOTER_MAX_COLUMNS = 6;
+
 export class FooterColumns extends AccordionElement {
   /** @type {MutationObserver|null} */
   #watcher = null;
+
+  /** @type {ResizeObserver|null} */
+  #resizer = null;
+
+  /** @type {number} */
+  #pending = 0;
+
+  /** @type {number} Re-measure passes since the last settled layout. */
+  #passes = 0;
 
   setup() {
     super.setup();
@@ -419,12 +438,40 @@ export class FooterColumns extends AccordionElement {
     // The theme editor adds, removes and reorders blocks in place, and a column
     // resized with the width slider rewrites its own `style` attribute. Both
     // change the answer, and neither re-runs `setup()`.
-    this.#watcher = new MutationObserver(() => this.#measure());
+    this.#watcher = new MutationObserver(() => this.#schedule(true));
     this.#watcher.observe(this, {
       childList: true,
       subtree: false,
       attributes: true,
       attributeFilter: ['style', 'data-divider'],
+    });
+
+    // The number of rows the columns occupy changes with the width, so the
+    // measurement has to follow it. One observer on the grid itself catches the
+    // breakpoint, an orientation change and a resized editor preview alike.
+    if (typeof ResizeObserver === 'function') {
+      this.#resizer = new ResizeObserver(() => this.#schedule(true));
+      this.#resizer.observe(this);
+    }
+  }
+
+  /**
+   * Coalesce measurements to one per frame.
+   *
+   * Setting the track list changes the layout, which is what the row count is
+   * read from — and writing a property from inside a ResizeObserver callback
+   * can schedule another one. A frame between them keeps that from becoming a
+   * loop, and keeps a burst of editor mutations to a single pass.
+   *
+   * @private
+   */
+  #schedule(reset = false) {
+    if (reset) this.#passes = 0;
+    if (this.#pending) return;
+
+    this.#pending = requestAnimationFrame(() => {
+      this.#pending = 0;
+      this.#measure();
     });
   }
 
@@ -432,6 +479,10 @@ export class FooterColumns extends AccordionElement {
     super.teardown();
     this.#watcher?.disconnect();
     this.#watcher = null;
+    this.#resizer?.disconnect();
+    this.#resizer = null;
+    if (this.#pending) cancelAnimationFrame(this.#pending);
+    this.#pending = 0;
   }
 
   /** @private */
@@ -440,7 +491,22 @@ export class FooterColumns extends AccordionElement {
     const columns = children.filter((el) => el.classList.contains('footer-column'));
     const policy = children.find((el) => el.classList.contains('footer__policies'));
 
+    if (columns.length === 0) {
+      this.removeAttribute('data-measured');
+      return;
+    }
+
+    // Six tracks at most.
+    //
+    // One track per column reads well up to about six and then stops being a
+    // footer: a seventh column makes seven columns of roughly two hundred pixels
+    // each, and every menu inside them wraps. Capping the track list is what
+    // makes the seventh column wrap to a second row instead — grid puts anything
+    // that does not fit the declared tracks on the next row by itself, which is
+    // exactly the behaviour wanted, and the row count below measures the result
+    // rather than assuming one row.
     const tracks = columns
+      .slice(0, FOOTER_MAX_COLUMNS)
       .map((el) => {
         // `--column-width` is a percentage share, not a size: 150% next to three
         // 100%s means "half again as wide as one of those", which is what an
@@ -450,19 +516,121 @@ export class FooterColumns extends AccordionElement {
       })
       .join(' ');
 
-    const cardRows = 1 + (policy ? 1 : 0);
-    const mobileRows = Math.max(columns.length, 1) + (policy ? 1 : 0);
+    // Where the aside sits, as a track number.
+    //
+    // It used to be pinned to the last track with `-2 / -1`, on the assumption
+    // that the column carrying the divider is the last one. Add a sixth column
+    // after it and that assumption is simply false: the aside was yanked to the
+    // end of the row, the columns behind it shuffled up, and — because the aside
+    // also spans down beside the policy links — the policy row could no longer
+    // fit on its own row and dropped through to an implicit one *below the card*,
+    // taking a column with it. That is the block that went missing.
+    //
+    // Measured, it lands wherever the merchant actually put it.
+    const asideIndex = columns.findIndex((el) => el.hasAttribute('data-divider'));
+    const hasAside = asideIndex >= 0;
 
-    // The divider marks the aside. Everything before it is the menu area, and
-    // that is exactly how far the policy links run.
-    const dividerIndex = columns.findIndex((el) => el.hasAttribute('data-divider'));
-    const span = dividerIndex > 0 ? dividerIndex : Math.max(columns.length, 1);
+    // The policy links run up to the aside, and across everything when there is
+    // no aside to stop at. Never fewer than one track, and never more than the
+    // grid actually has — which is the capped count, not the column count.
+    const trackCount = Math.min(columns.length, FOOTER_MAX_COLUMNS);
+    const span = Math.min(Math.max(hasAside ? asideIndex : trackCount, 1), trackCount);
 
-    this.style.setProperty('--panel-tracks', tracks || '1fr');
-    this.style.setProperty('--panel-card-rows', 'auto '.repeat(cardRows).trim());
-    this.style.setProperty('--panel-card-rows-mobile', 'auto '.repeat(mobileRows).trim());
+    this.style.setProperty('--panel-tracks', tracks);
     this.style.setProperty('--policy-span', String(span));
-    this.toggleAttribute('data-measured', columns.length > 0);
+
+    // Only pin the aside when it is on the first row of tracks. Past that it is
+    // an ordinary column on a later row, and pinning it to a track it does not
+    // sit in would drag it back up.
+    const pinAside = hasAside && asideIndex < trackCount;
+
+    if (pinAside) {
+      this.style.setProperty('--aside-column', String(asideIndex + 1));
+    } else {
+      this.style.removeProperty('--aside-column');
+    }
+
+    // The attribute is what the stylesheet keys the placement off. Without it,
+    // the rule's definite row would still apply once the aside had wrapped past
+    // the last track: an item with a definite row and an automatic column is
+    // placed before the fully automatic ones, so the aside would jump back up to
+    // the first row and push an ordinary column down in its place.
+    this.toggleAttribute('data-aside-pinned', pinAside);
+
+    // How far the aside reaches down.
+    //
+    // In the design it spans its own row and the policy links' row, so its rule
+    // runs the full height of the card. That only holds while those two rows are
+    // adjacent — which they are in the ordinary footer, and are not the moment
+    // a full-width block joins them inside the card. Then the aside is asking to
+    // span across a row that needs every track, the grid resolves the conflict
+    // by pushing that block further down, and the rows the aside reserved are
+    // left empty: a gap in the middle of the card with nothing in it.
+    //
+    // So it only spans when the shape it was drawn for is actually there.
+    const others = children.filter(
+      (el) =>
+        el !== policy &&
+        !el.classList.contains('footer-column') &&
+        !el.classList.contains('footer-utilities') &&
+        !el.classList.contains('footer-legal')
+    );
+    const columnRows = new Set(columns.map((el) => Math.round(el.getBoundingClientRect().top))).size;
+    const spansPolicy =
+      Boolean(policy) && columnRows === 1 && others.length === 0 && columns.length <= trackCount;
+
+    this.style.setProperty('--aside-span', spansPolicy ? '2' : '1');
+
+    this.toggleAttribute('data-measured', true);
+
+    // The row count has to be read back from the laid-out grid rather than
+    // assumed, because how many rows these blocks occupy is not a fact about the
+    // markup: side by side the columns are one row, stacked on a phone they are
+    // one row each, and a narrow window can wrap them into any number in
+    // between. Setting the tracks above is what decides it, so this reads the
+    // answer after that has taken effect.
+    //
+    // And it counts every block that belongs *inside* the card, not just the
+    // columns. A full-width block among them — the brand block, say — takes a
+    // row of its own, and counting only columns left the card one or two rows
+    // short: it closed above the policy links, which then sat outside a card
+    // they are supposed to be in.
+    const rows = this.#rowCount();
+    const value = 'auto '.repeat(rows).trim();
+
+    if (this.style.getPropertyValue('--panel-card-rows') === value) return;
+
+    this.style.setProperty('--panel-card-rows', value);
+
+    // Changing the explicit rows can change the layout that was just measured —
+    // a first pass with too few rows pushes a block into an implicit one, and
+    // the corrected grid pulls it back. One more pass settles it. The guard is
+    // there because "measure, write, re-measure" is exactly the shape a layout
+    // loop takes, and this one must always stop.
+    if (this.#passes < 4) {
+      this.#passes += 1;
+      this.#schedule();
+    }
+  }
+
+  /**
+   * How many grid rows the card covers.
+   *
+   * Everything except the rows the design puts *below* the card: the utility
+   * rows and the legal band. Those are the blocks that land in implicit rows,
+   * which is what puts them outside it.
+   *
+   * @returns {number}
+   * @private
+   */
+  #rowCount() {
+    const inside = Array.from(this.children).filter(
+      (el) => !el.classList.contains('footer-utilities') && !el.classList.contains('footer-legal')
+    );
+
+    const offsets = new Set(inside.map((el) => Math.round(el.getBoundingClientRect().top)));
+
+    return Math.max(offsets.size, 1);
   }
 }
 

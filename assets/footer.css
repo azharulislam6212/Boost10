@@ -135,8 +135,8 @@
                   whose column count changes should not need its shares retuned
                   every time one is added.
 
-     Both take their track list from `--panel-tracks`, and the difference
-     between them is only which rules are drawn — see "the rules" below.
+     The track list comes from `--panel-tracks`; which rules are drawn comes
+     from the panel style — see "the rules" below.
      ========================================================================== */
 
   .footer__columns {
@@ -231,13 +231,19 @@
 
   /* The aside — the column with the divider — spans the policy row as well, so
      its rule runs the full height of the card rather than stopping level with
-     its own last line. Placed on the last track explicitly: an item with a
+     its own last line.
+
+     It needs an explicit column as well as an explicit row: an item with a
      definite row and an automatic column is positioned before the fully
-     automatic ones, and without a column of its own it would land in the first
-     track and push the menus sideways. */
-  .footer__columns[data-has-policy] .footer-column[data-divider] {
-    grid-column: -2 / -1;
-    grid-row: 1 / -1;
+     automatic ones, and without a track of its own it would land in the first
+     one and push the menus sideways. That track is `--aside-column`, measured
+     from the markup. It used to be hard-coded to the last track, which holds
+     only while the aside happens to be the last column — add a sixth column
+     after it and the aside jumped to the end, the policy row no longer fitted
+     beside it, and a column dropped out of the card altogether. */
+  .footer__columns[data-has-policy][data-aside-pinned] .footer-column[data-divider] {
+    grid-column: var(--aside-column, -2) / span 1;
+    grid-row: 1 / span var(--aside-span, 2);
   }
 
   .footer-column__content {
@@ -252,21 +258,27 @@
      the two sizes. Side by side it is a rule down the inline-start edge, with
      the gap split so the line sits between the columns rather than against one
      of them; stacked, it is a rule above — which is in the small-screen block. */
-  /* ---- the rules, and the only thing the two layouts disagree about --------
-     Fixed draws them; flexible leaves the panel open. Nothing else changes
-     between the two, so switching never moves anything on the page.
+  /* ---- the rules -----------------------------------------------------------
+     Card draws them; plain leaves the panel open. That is the whole difference
+     between the two panel styles, and it is one decision rather than two: a
+     surface with a border around it wants its inner divisions drawn, and a
+     panel with no surface wants nothing but space.
+
+     There was a second setting for exactly this — "Panel layout", fixed or
+     flexible — and it is gone. Two controls that both meant "how ruled is this
+     panel" is one control with a confusing name beside it.
      ----------------------------------------------------------------------- */
 
   @media screen and (min-width: 750px) {
     /* The offsets are unconditional: they put the column's content where it
        belongs whether or not a line is drawn there, so the columns do not shift
-       sideways when the rules come off. */
+       sideways between the two panel styles. */
     .footer-column[data-divider] {
       padding-inline-start: var(--footer-column-gap);
       margin-inline-start: calc(var(--footer-column-gap) * -0.5);
     }
 
-    .footer__columns[data-layout='fixed'] .footer-column[data-divider] {
+    .footer__panel--card .footer-column[data-divider] {
       border-inline-start: 1px solid var(--footer-rule);
     }
   }
@@ -746,6 +758,97 @@
   }
 
   /* ==========================================================================
+     Contact block
+     --------------------------------------------------------------------------
+     Logo, a line about the shop, address. One block rather than three, because
+     the three are always in that order and always share their spacing — and a
+     merchant assembling them by hand ends up tuning three sets of padding to
+     get the rhythm the theme could just have.
+     ========================================================================== */
+
+  .footer-contact {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--contact-gap, var(--space-4));
+    min-inline-size: 0;
+    order: var(--column-order, 0);
+    color: var(--contact-text-color, inherit);
+  }
+
+  /* Dropped straight into the footer rather than into a column, it is a row of
+     its own — it carries no width share, so it has no track to sit in. */
+  .footer__columns > .footer-contact {
+    grid-column: 1 / -1;
+  }
+
+  .footer-contact[data-align='center'] {
+    align-items: center;
+    text-align: center;
+  }
+
+  .footer-contact[data-align='right'] {
+    align-items: flex-end;
+    text-align: end;
+  }
+
+  .footer-contact__logo {
+    display: block;
+    inline-size: var(--contact-logo-width, 160px);
+    max-inline-size: 100%;
+  }
+
+  .footer-contact__logo-media,
+  .footer-contact__logo-image {
+    inline-size: 100%;
+    block-size: auto;
+  }
+
+  .footer-contact__logo-text {
+    display: block;
+    color: var(--contact-heading-color, var(--footer-heading-color));
+    font-family: var(--font-heading-family, var(--font-body-family));
+    font-size: var(--font-size-h4, 2.2rem);
+    font-weight: 600;
+    line-height: 1.1;
+  }
+
+  .footer-contact__text {
+    max-inline-size: 46ch;
+    color: var(--contact-text-color, var(--footer-muted));
+    font-size: var(--font-size-sm);
+    text-wrap: pretty;
+  }
+
+  .footer-contact__text p,
+  .footer-contact__address-body p {
+    margin: 0;
+  }
+
+  .footer-contact__address {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .footer-contact__label {
+    color: var(--contact-heading-color, var(--footer-heading-color));
+    font-size: 1.1rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /* `<address>` is italic in every user agent stylesheet, which is a default
+     from a different era and not what an address looks like in this footer. */
+  .footer-contact__address-body {
+    color: var(--contact-text-color, var(--footer-muted));
+    font-size: var(--font-size-sm);
+    font-style: normal;
+    line-height: 1.6;
+  }
+
+  /* ==========================================================================
      Utility row
      --------------------------------------------------------------------------
      A full-width row inside the columns flex container — contact details, the
@@ -912,26 +1015,6 @@
     border-color: var(--footer-accent);
   }
 
-  /* `hidden` is `display: none`, which cannot transition — so the panel is shown
-     and hidden by the component while the entrance is an animation that runs on
-     the frame it becomes visible. */
-  .footer__localization .localization__panel:not([hidden]) {
-    animation: footer-picker-rise var(--duration-base, 250ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1))
-      backwards;
-  }
-
-  @keyframes footer-picker-rise {
-    from {
-      opacity: 0;
-      transform: translateY(1.2rem);
-    }
-
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
   /* ==========================================================================
      Bottom bar
      ========================================================================== */
@@ -1005,7 +1088,7 @@
     padding-block-start: var(--space-6);
   }
 
-  .footer__columns[data-layout='fixed'] .footer__policies {
+  .footer__panel--card .footer__policies {
     border-block-start: 1px solid var(--footer-rule);
   }
 
@@ -1200,26 +1283,25 @@
       --footer-panel-pad-inline: var(--space-5);
     }
 
-    /* One track, and one row per column — which is exactly what the mobile row
-       count Liquid emits describes, so the card still stops in the right place
-       once the columns have stacked. */
+    /* One track. The row count is measured rather than assumed, so the card
+       still stops in the right place once the columns have stacked — and the
+       same measurement covers every width in between. */
     .footer__columns {
       grid-template-columns: 1fr;
-      grid-template-rows: var(--panel-card-rows-mobile, auto);
       row-gap: 0;
     }
 
     .footer-column,
-    .footer__columns[data-has-policy] .footer-column[data-divider],
+    .footer__columns[data-has-policy][data-aside-pinned] .footer-column[data-divider],
     .footer__policies {
       grid-column: 1 / -1;
       grid-row: auto;
     }
 
     /* Stacked, the vertical rule has nothing to divide, so the separator is the
-       line above each column — and it is still only drawn in fixed. */
-    .footer__columns[data-layout='fixed'] .footer-column + .footer-column,
-    .footer__columns[data-layout='fixed'] .footer-column[data-divider] {
+       line above each column — and it is still only drawn on a card. */
+    .footer__panel--card .footer-column + .footer-column,
+    .footer__panel--card .footer-column[data-divider] {
       border-block-start: 1px solid var(--footer-rule);
     }
 
@@ -1275,10 +1357,6 @@
      ========================================================================== */
 
   @media (prefers-reduced-motion: reduce) {
-    .footer__localization .localization__panel:not([hidden]) {
-      animation: none;
-    }
-
     .social-links__link:hover,
     .email-signup__submit:hover {
       transform: none;

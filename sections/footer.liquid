@@ -18,6 +18,21 @@
   blocks — they were section settings, which meant the section decided both what
   they said and where they went.
 
+  ## Why this list has no `@theme` in it
+
+  `@theme` means "every public theme block", and a `blocks` array that contains
+  it stops honouring the individual types listed beside it — which is every
+  private block this footer is built from. That is why the theme editor offered
+  no Column, no Brand and address, no Utilities row: they were listed, and the
+  `@theme` sitting in the same array meant only public blocks were ever shown.
+
+  `blocks/mega-menu.liquid` is the pattern that has always worked here: it names
+  every child type it accepts and never reaches for `@theme`.
+
+  So the public blocks that belong in a footer are named one by one instead. It
+  is a longer list and a shorter answer: a merchant sees exactly what is useful
+  here, private pieces included.
+
   ## Two layouts, and what the card actually wraps
 
   Every block a merchant adds arrives through one `content_for 'blocks'`, so
@@ -32,17 +47,18 @@
   the card is a real painted box around exactly the right region, and anything
   after it sits outside on the footer's own ground.
 
-      Fixed      the rules are drawn: a vertical one between the menus and the
-                 aside beside them, and one above the policy links. The layout
-                 in the design.
+      Card    a surface with a border and rounded corners, and the divisions
+              inside it drawn: a vertical rule between the menus and the aside,
+              and a line above the policy links.
 
-      Flexible   the same layout with no rules in it. Nothing moves — the
-                 columns keep their widths, the policy links keep their place —
-                 the panel is simply left open.
+      Plain   no surface and no rules. Nothing moves — the columns keep their
+              widths, the policy links keep their place — the panel is simply
+              left open.
 
-  The layout is identical either way on purpose. Two layouts that also moved
-  things around would be two footers to keep working, and the difference a
-  merchant actually wants here is whether the panel is ruled or plain.
+  That used to be two settings: a panel *style* that drew the surface and a
+  panel *layout* that drew the rules. They were never usefully independent — a
+  bordered card with no divisions in it, or divisions floating with no card
+  around them, is not a thing anyone asked for — so it is one control now.
 
   ## The background comes from the colour scheme
 
@@ -92,15 +108,12 @@
     its own width share, so nothing here has to know how many there are.
 
     What this file still decides is what it genuinely owns: whether there is a
-    policy row at all — that is a section setting, not a block — and which of
-    the two layouts is in use.
+    policy row at all, which is a section setting rather than a block.
   endcomment
   assign has_policy = false
   if st.policy_menu != blank and st.policy_menu.links.size > 0
     assign has_policy = true
   endif
-
-  assign panel_layout = st.panel_layout | default: 'fixed'
 
   comment
     Spacing is asked for as declarations, not as its own attribute. This element
@@ -163,7 +176,6 @@
       >
         <footer-columns
           class="footer__columns"
-          data-layout="{{ panel_layout }}"
           {% if has_policy %}data-has-policy{% endif %}
           data-collapse-below="750"
         >
@@ -210,6 +222,9 @@
       "type": "_footer-column"
     },
     {
+      "type": "_footer-contact"
+    },
+    {
       "type": "_footer-utilities"
     },
     {
@@ -228,7 +243,34 @@
       "type": "social-follow"
     },
     {
-      "type": "@theme"
+      "type": "social-icons"
+    },
+    {
+      "type": "text"
+    },
+    {
+      "type": "image"
+    },
+    {
+      "type": "button"
+    },
+    {
+      "type": "buttons"
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "spacer"
+    },
+    {
+      "type": "icon-with-text"
+    },
+    {
+      "type": "custom-html"
+    },
+    {
+      "type": "custom-liquid"
     },
     {
       "type": "@app"
@@ -263,23 +305,6 @@
         }
       ],
       "default": "standard"
-    },
-    {
-      "type": "select",
-      "id": "panel_layout",
-      "label": "t:sections.footer.settings.panel_layout.label",
-      "info": "t:sections.footer.settings.panel_layout.info",
-      "options": [
-        {
-          "value": "fixed",
-          "label": "t:sections.footer.settings.panel_layout.options__1.label"
-        },
-        {
-          "value": "flexible",
-          "label": "t:sections.footer.settings.panel_layout.options__2.label"
-        }
-      ],
-      "default": "fixed"
     },
     {
       "type": "select",

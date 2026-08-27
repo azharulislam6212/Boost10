@@ -13,7 +13,6 @@
  *   - `parallax()`    transform-only parallax driven by one rAF loop
  *   - `marquee()`     infinite ticker with a real pause control
  *
- *
  * Four rules hold everywhere in this file:
  *
  *   1. Reduced motion wins. Every helper skips straight to the final visual
