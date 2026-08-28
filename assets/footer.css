@@ -1319,8 +1319,43 @@
       border-radius: 0;
     }
 
+    /* ---- the policy row moves up ------------------------------------------
+       On a wide screen the subscribe column is an aside pinned to the right, so
+       the policy links sitting below the menus are beside it and the reading
+       order is menus → policies → aside. Stacked, that same source order puts
+       the policy links *after* the whole subscribe block, which reads as a
+       loose row of legal links dropped between the newsletter and the contact
+       details.
+
+       `order` is the fix rather than moving the markup: the menu columns run
+       -3 … -1 and the aside is 1, so 0 slots the policies between them without
+       touching the DOM, the desktop grid, or anything `<footer-columns>`
+       measures. */
     .footer__policies {
+      order: 0;
       margin-block-start: var(--space-4);
+
+      /* The rule above the policy links is now the only separator between this
+         row and the newsletter under it, so the row has to carry its own space
+         on both sides — otherwise the last policy link and the newsletter
+         heading sit on touching baselines. */
+      padding-block-end: var(--space-6);
+    }
+
+    /* `--space-8` between links is a desktop gap: it fits three or four links
+       across a full-width row and only two across a phone. At the smaller size
+       the links read as a group rather than as separate rows. */
+    .footer__policies-list {
+      gap: var(--space-3) var(--space-4);
+      font-size: var(--font-size-sm);
+    }
+
+    /* With the policy row above it, the aside's own rule would be the second
+       line in three elements — the policy row already carries one. Only
+       suppressed when there *is* a policy row; without one this is still the
+       separator between the last menu and the newsletter. */
+    .footer__panel--card .footer__columns[data-has-policy] .footer-column[data-divider] {
+      border-block-start: 0;
     }
 
     /* Stacked, the row gap is zero so the columns read as one list with rules
@@ -1340,25 +1375,118 @@
       padding-block-end: var(--space-4);
     }
 
+    /* ---- newsletter and social, centred -----------------------------------
+       At this width the column is the full screen and the input spans all of
+       it, so a left-aligned heading over a full-bleed field reads as a
+       mis-set block rather than a choice. Centring is the responsive
+       behaviour, not an override of intent — which is why an explicitly
+       right-aligned block is left alone. */
+    .footer .email-signup:not([data-align='right']),
+    .footer .social-links:not([data-align='right']) {
+      align-items: center;
+      text-align: center;
+    }
+
+    .footer .social-links:not([data-align='right']) .social-links__list {
+      justify-content: center;
+    }
+
+    /* Six icons wrapped to a second row for the sake of four pixels: the discs
+       are 2.2× the icon, and six of them plus five `--space-3` gaps came to
+       297px inside a 295px column.
+
+       The gap tightens, and the disc gains a viewport ceiling so the row keeps
+       fitting down to a 320px phone. `min()` means the merchant's icon size is
+       still the maximum — this can only make the disc smaller, never larger
+       than what they set. */
+    .footer .social-links__list {
+      gap: var(--space-2);
+    }
+
+    .footer .social-links__link {
+      --social-disc: min(calc(var(--social-icon-size, 18px) * 2.2), 10vw);
+
+      inline-size: var(--social-disc);
+      block-size: var(--social-disc);
+    }
+
     .footer-utilities {
       flex-direction: column;
-      align-items: flex-start;
+
+      /* `stretch`, not `flex-start`: the children are now the full width of the
+         column, which is what gives the pickers below a full-width pill to sit
+         in. The items themselves still lay their content out from the start. */
+      align-items: stretch;
     }
 
     .footer-utilities[data-align='center'] {
       align-items: center;
     }
 
-    .footer-bottom[data-layout='split'] {
+    /* ---- country and language, one per row --------------------------------
+       Side by side they had roughly 130px each — enough for a short country
+       name and nothing else, with the chevron crowding the label. Stacked and
+       full width, the label sits at the start and the chevron at the end, which
+       is the shape a select has on a phone. */
+    .footer__localization {
       flex-direction: column;
-      align-items: flex-start;
+      align-items: stretch;
+      inline-size: 100%;
     }
 
+    .footer-localization-block,
+    .footer__localization localization-form,
+    .footer__localization .localization__form {
+      inline-size: 100%;
+    }
+
+    .footer__localization localization-form {
+      display: block;
+    }
+
+    .footer__localization .localization__trigger {
+      inline-size: 100%;
+      justify-content: space-between;
+    }
+
+    /* The panel is as wide as the pill it belongs to, rather than a fixed 26rem
+       hanging off one edge of it. */
+    .footer__localization .localization__panel {
+      inline-size: 100%;
+      inset-inline: 0;
+    }
+
+    /* ---- payment row and copyright, centred ------------------------------- */
+    .footer-bottom[data-layout='split'] {
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+
+    .footer-bottom[data-layout='split'] .footer-bottom__payment-list,
+    .footer-bottom[data-layout='split'] .footer-bottom__meta {
+      justify-content: center;
+    }
+
+    /* Nine payment marks at the desktop 2.4rem came to two rows, the second
+       holding two lonely cards. At 2rem with a tighter gap the full set is one
+       row on a 375px phone, and a store with more marks than that still wraps —
+       it just wraps later. */
+    .footer-bottom__payment-list {
+      gap: var(--space-1);
+    }
+
+    .footer-bottom__payment-icon {
+      block-size: 2rem;
+    }
+
+    /* The wordmark fills the width it is given. The `22vw` ceiling was the
+       binding constraint before the character-count term, so the two together
+       capped it well short of the column; the count term alone now decides,
+       which is what keeps a long shop name from overflowing while a short one
+       runs edge to edge. */
     .footer-legal__wordmark-text {
-      font-size: min(
-        clamp(3.2rem, calc(var(--legal-logo-size, 22vw) * 1.15), 16rem),
-        calc(100cqi / var(--legal-logo-chars, 8) * 1.6)
-      );
+      font-size: min(calc(100cqi / var(--legal-logo-chars, 8) * 1.78), 16rem);
     }
   }
 
