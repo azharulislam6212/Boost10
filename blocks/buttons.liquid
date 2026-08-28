@@ -1,35 +1,189 @@
-{% comment %}
+{% doc %}
   blocks/buttons.liquid
 
   Two buttons side by side.
 
   A separate block rather than "add the button block twice", because a pair of
-  buttons is a single design decision: they share alignment, they wrap together
-  on mobile, and the second is almost always the quieter one. Two independent
-  blocks give a merchant two ways to get that subtly wrong.
-{% endcomment %}
+  buttons is a single design decision: they share alignment, they share a size,
+  they wrap together on mobile, and the second is almost always the quieter one.
+  Two independent blocks give a merchant two ways to get that subtly wrong.
+
+  ## What each button owns, and what the pair owns
+
+  Everything that makes the two read as a *pair* is set once: size, corner
+  radius, border, width, icon size, hover effect, alignment. A merchant cannot
+  accidentally ship a large pill beside a small square, because there is nowhere
+  to express that.
+
+  Everything that distinguishes them is per button: label, link, new tab,
+  variant, the six Custom colours, and the icon. That is the full set the
+  standalone Button block offers, so a design moved from one block to the other
+  loses nothing.
+
+  ## Defaults
+
+  Both buttons start Primary, Solid icon badge, right arrow — the theme's house
+  call to action — and the second is authored Secondary so the pair has an
+  obvious hierarchy the moment it is added. Nothing here is a new class or a new
+  styling mechanism: every value below is one that `snippets/button.liquid`
+  already accepts.
+
+  ## Why a placeholder in the editor
+
+  A button with no label renders nothing, which is right on a live page and
+  wrong in the Theme Editor: an empty block has no box to click, nothing to
+  highlight when it is selected, and nothing that visibly changes when a setting
+  moves — so the preview looks broken rather than empty. In `design_mode` only,
+  a blank label falls back to a placeholder, so both buttons are always present
+  and every edit is visible immediately. On a live page a blank label still
+  renders nothing at all.
+{% enddoc %}
+
+{%- liquid
+  assign s = block.settings
+
+  comment
+    One `style` attribute, never two. The spacing snippet emits its own by
+    default, and a tag carrying two of them keeps the first and silently drops
+    the second — which is how a padding slider ends up moving a value that never
+    reaches the page. Declarations only, concatenated into the tag below.
+  endcomment
+  capture pair_spacing
+    render 'spacing', block: s, declarations: true
+  endcapture
+
+  assign label_1 = s.label_1
+  assign label_2 = s.label_2
+  if request.design_mode
+    assign label_1 = label_1 | default: 'Button'
+    assign label_2 = label_2 | default: 'Button'
+  endif
+
+  comment
+    The six Custom properties, per button. Written only for the button actually
+    set to Custom, and named to match what `base.css` reads so nothing has to
+    translate between the two.
+  endcomment
+  assign colors_1 = ''
+  if s.style_1 == 'custom'
+    if s.custom_1_background != blank
+      assign colors_1 = colors_1 | append: '--button-custom-background:' | append: s.custom_1_background | append: ';'
+    endif
+    if s.custom_1_text != blank
+      assign colors_1 = colors_1 | append: '--button-custom-foreground:' | append: s.custom_1_text | append: ';'
+    endif
+    if s.custom_1_border != blank
+      assign colors_1 = colors_1 | append: '--button-custom-border:' | append: s.custom_1_border | append: ';'
+    endif
+    if s.custom_1_hover_background != blank
+      assign colors_1 = colors_1 | append: '--button-custom-hover-background:' | append: s.custom_1_hover_background | append: ';'
+    endif
+    if s.custom_1_hover_text != blank
+      assign colors_1 = colors_1 | append: '--button-custom-hover-foreground:' | append: s.custom_1_hover_text | append: ';'
+    endif
+    if s.custom_1_hover_border != blank
+      assign colors_1 = colors_1 | append: '--button-custom-hover-border:' | append: s.custom_1_hover_border | append: ';'
+    endif
+  endif
+
+  assign colors_2 = ''
+  if s.style_2 == 'custom'
+    if s.custom_2_background != blank
+      assign colors_2 = colors_2 | append: '--button-custom-background:' | append: s.custom_2_background | append: ';'
+    endif
+    if s.custom_2_text != blank
+      assign colors_2 = colors_2 | append: '--button-custom-foreground:' | append: s.custom_2_text | append: ';'
+    endif
+    if s.custom_2_border != blank
+      assign colors_2 = colors_2 | append: '--button-custom-border:' | append: s.custom_2_border | append: ';'
+    endif
+    if s.custom_2_hover_background != blank
+      assign colors_2 = colors_2 | append: '--button-custom-hover-background:' | append: s.custom_2_hover_background | append: ';'
+    endif
+    if s.custom_2_hover_text != blank
+      assign colors_2 = colors_2 | append: '--button-custom-hover-foreground:' | append: s.custom_2_hover_text | append: ';'
+    endif
+    if s.custom_2_hover_border != blank
+      assign colors_2 = colors_2 | append: '--button-custom-hover-border:' | append: s.custom_2_hover_border | append: ';'
+    endif
+  endif
+
+  comment
+    Radius and thickness fall through to Theme settings unless the merchant
+    moved them off "theme" — a -1 sentinel rather than 0, because 0 is a
+    legitimate value a merchant may want and cannot otherwise express. Shared,
+    because two buttons in a pair with different corner radii is not a design.
+  endcomment
+  assign shape = ''
+  assign radius = s.corner_radius | default: -1 | plus: 0
+  if radius >= 0
+    assign shape = shape | append: '--radius-button:' | append: radius | append: 'px;'
+  endif
+  assign thickness = s.border_thickness | default: -1 | plus: 0
+  if thickness >= 0
+    assign shape = shape | append: '--buttons-border-thickness:' | append: thickness | append: 'px;'
+  endif
+
+  assign inline_1 = colors_1 | append: shape
+  assign inline_2 = colors_2 | append: shape
+
+  comment
+    `button--custom-size` is the size class; `button--custom` is the colour
+    variant. One name for two independent choices meant whichever rule came
+    second silently won.
+  endcomment
+  assign size_class = s.size | default: 'medium'
+  if size_class == 'custom'
+    assign size_class = 'custom-size'
+  endif
+-%}
 
 <div
-  class="block-buttons block-buttons--{{ block.settings.alignment }}"
-  {% render 'spacing', block: block.settings %}
+  class="block-buttons block-buttons--{{ s.alignment | default: 'start' }}"
+  data-block-spacing
+  style="{{ pair_spacing | strip_newlines | strip }}"
   {{ block.shopify_attributes }}
 >
-  {%- if block.settings.label_1 != blank -%}
+  {%- if label_1 != blank -%}
     {% render 'button',
-       label: block.settings.label_1,
-       href: block.settings.link_1,
-       variant: block.settings.style_1,
-       size: block.settings.size,
-       custom_height: block.settings.buttons_height_custom %}
+       label: label_1,
+       href: s.link_1,
+       new_tab: s.new_tab_1,
+       variant: s.style_1,
+       size: size_class,
+       custom_height: s.buttons_height_custom,
+       icon: s.icon_1,
+       icon_style: s.icon_style_1,
+       icon_position: s.icon_position_1,
+       icon_size: s.icon_size,
+       icon_radius: s.icon_radius,
+       border_style: s.border_style,
+       underline_size: s.underline_thickness,
+       width: s.width,
+       min_width: s.min_width,
+       effect: s.hover_effect,
+       colors: inline_1 %}
   {%- endif -%}
 
-  {%- if block.settings.label_2 != blank -%}
+  {%- if label_2 != blank -%}
     {% render 'button',
-       label: block.settings.label_2,
-       href: block.settings.link_2,
-       variant: block.settings.style_2,
-       size: block.settings.size,
-       custom_height: block.settings.buttons_height_custom %}
+       label: label_2,
+       href: s.link_2,
+       new_tab: s.new_tab_2,
+       variant: s.style_2,
+       size: size_class,
+       custom_height: s.buttons_height_custom,
+       icon: s.icon_2,
+       icon_style: s.icon_style_2,
+       icon_position: s.icon_position_2,
+       icon_size: s.icon_size,
+       icon_radius: s.icon_radius,
+       border_style: s.border_style,
+       underline_size: s.underline_thickness,
+       width: s.width,
+       min_width: s.min_width,
+       effect: s.hover_effect,
+       colors: inline_2 %}
   {%- endif -%}
 </div>
 
@@ -38,28 +192,159 @@
   "name": "t:blocks.buttons.name",
   "tag": null,
   "settings": [
+    { "type": "header", "content": "t:blocks.buttons.headers.button_1" },
     { "type": "text", "id": "label_1", "label": "t:blocks.buttons.settings.label_1.label", "default": "Shop now" },
     { "type": "url", "id": "link_1", "label": "t:blocks.buttons.settings.link_1.label" },
+    { "type": "checkbox", "id": "new_tab_1", "label": "t:blocks.button.settings.new_tab.label", "default": false },
     {
       "type": "select", "id": "style_1", "label": "t:blocks.buttons.settings.style_1.label",
       "options": [
         { "value": "primary", "label": "t:blocks.button.settings.style.options__1.label" },
         { "value": "secondary", "label": "t:blocks.button.settings.style.options__2.label" },
-        { "value": "outline", "label": "t:blocks.button.settings.style.options__3.label" }
+        { "value": "outline", "label": "t:blocks.button.settings.style.options__3.label" },
+        { "value": "secondary-outline", "label": "t:blocks.button.settings.style.options__5.label" },
+        { "value": "link", "label": "t:blocks.button.settings.style.options__4.label" },
+        { "value": "custom", "label": "t:blocks.button.settings.style.options__6.label" }
       ],
       "default": "primary"
     },
-    { "type": "text", "id": "label_2", "label": "t:blocks.buttons.settings.label_2.label" },
+    { "type": "color", "id": "custom_1_background", "label": "t:blocks.button.settings.custom_background.label", "visible_if": "{{ block.settings.style_1 == 'custom' }}" },
+    { "type": "color", "id": "custom_1_text", "label": "t:blocks.button.settings.custom_text.label", "visible_if": "{{ block.settings.style_1 == 'custom' }}" },
+    { "type": "color", "id": "custom_1_border", "label": "t:blocks.button.settings.custom_border.label", "visible_if": "{{ block.settings.style_1 == 'custom' }}" },
+    { "type": "color", "id": "custom_1_hover_background", "label": "t:blocks.button.settings.custom_hover_background.label", "visible_if": "{{ block.settings.style_1 == 'custom' }}" },
+    { "type": "color", "id": "custom_1_hover_text", "label": "t:blocks.button.settings.custom_hover_text.label", "visible_if": "{{ block.settings.style_1 == 'custom' }}" },
+    { "type": "color", "id": "custom_1_hover_border", "label": "t:blocks.button.settings.custom_hover_border.label", "visible_if": "{{ block.settings.style_1 == 'custom' }}" },
+    {
+      "type": "select", "id": "icon_1", "label": "t:blocks.button.settings.icon.label",
+      "options": [
+        { "value": "none", "label": "t:blocks.button.settings.icon.options__none.label" },
+        { "value": "arrow-right", "label": "Arrow right" },
+        { "value": "arrow-left", "label": "Arrow left" },
+        { "value": "chevron-right", "label": "Chevron right" },
+        { "value": "chevron-left", "label": "Chevron left" },
+        { "value": "external", "label": "External" },
+        { "value": "cart", "label": "Cart" },
+        { "value": "bag", "label": "Bag" },
+        { "value": "tag", "label": "Tag" },
+        { "value": "truck", "label": "Truck" },
+        { "value": "heart", "label": "Heart" },
+        { "value": "star", "label": "Star" },
+        { "value": "play", "label": "Play" },
+        { "value": "plus", "label": "Plus" },
+        { "value": "check", "label": "Check" },
+        { "value": "search", "label": "Search" },
+        { "value": "lock", "label": "Lock" },
+        { "value": "share", "label": "Share" }
+      ],
+      "default": "arrow-right"
+    },
+    {
+      "type": "select", "id": "icon_style_1", "label": "t:blocks.button.settings.icon_style.label", "info": "t:blocks.button.settings.icon_style.info",
+      "options": [
+        { "value": "default", "label": "t:blocks.button.settings.icon_style.options__1.label" },
+        { "value": "solid", "label": "t:blocks.button.settings.icon_style.options__2.label" }
+      ],
+      "default": "solid",
+      "visible_if": "{{ block.settings.icon_1 != 'none' }}"
+    },
+    {
+      "type": "select", "id": "icon_position_1", "label": "t:blocks.button.settings.icon_position.label",
+      "options": [
+        { "value": "start", "label": "t:blocks.button.settings.icon_position.options__1.label" },
+        { "value": "end", "label": "t:blocks.button.settings.icon_position.options__2.label" }
+      ],
+      "default": "end",
+      "visible_if": "{{ block.settings.icon_1 != 'none' }}"
+    },
+
+    { "type": "header", "content": "t:blocks.buttons.headers.button_2" },
+    { "type": "text", "id": "label_2", "label": "t:blocks.buttons.settings.label_2.label", "default": "Learn more" },
     { "type": "url", "id": "link_2", "label": "t:blocks.buttons.settings.link_2.label" },
+    { "type": "checkbox", "id": "new_tab_2", "label": "t:blocks.button.settings.new_tab.label", "default": false },
     {
       "type": "select", "id": "style_2", "label": "t:blocks.buttons.settings.style_2.label",
       "options": [
         { "value": "primary", "label": "t:blocks.button.settings.style.options__1.label" },
         { "value": "secondary", "label": "t:blocks.button.settings.style.options__2.label" },
         { "value": "outline", "label": "t:blocks.button.settings.style.options__3.label" },
-        { "value": "link", "label": "t:blocks.button.settings.style.options__4.label" }
+        { "value": "secondary-outline", "label": "t:blocks.button.settings.style.options__5.label" },
+        { "value": "link", "label": "t:blocks.button.settings.style.options__4.label" },
+        { "value": "custom", "label": "t:blocks.button.settings.style.options__6.label" }
       ],
       "default": "secondary"
+    },
+    { "type": "color", "id": "custom_2_background", "label": "t:blocks.button.settings.custom_background.label", "visible_if": "{{ block.settings.style_2 == 'custom' }}" },
+    { "type": "color", "id": "custom_2_text", "label": "t:blocks.button.settings.custom_text.label", "visible_if": "{{ block.settings.style_2 == 'custom' }}" },
+    { "type": "color", "id": "custom_2_border", "label": "t:blocks.button.settings.custom_border.label", "visible_if": "{{ block.settings.style_2 == 'custom' }}" },
+    { "type": "color", "id": "custom_2_hover_background", "label": "t:blocks.button.settings.custom_hover_background.label", "visible_if": "{{ block.settings.style_2 == 'custom' }}" },
+    { "type": "color", "id": "custom_2_hover_text", "label": "t:blocks.button.settings.custom_hover_text.label", "visible_if": "{{ block.settings.style_2 == 'custom' }}" },
+    { "type": "color", "id": "custom_2_hover_border", "label": "t:blocks.button.settings.custom_hover_border.label", "visible_if": "{{ block.settings.style_2 == 'custom' }}" },
+    {
+      "type": "select", "id": "icon_2", "label": "t:blocks.button.settings.icon.label",
+      "options": [
+        { "value": "none", "label": "t:blocks.button.settings.icon.options__none.label" },
+        { "value": "arrow-right", "label": "Arrow right" },
+        { "value": "arrow-left", "label": "Arrow left" },
+        { "value": "chevron-right", "label": "Chevron right" },
+        { "value": "chevron-left", "label": "Chevron left" },
+        { "value": "external", "label": "External" },
+        { "value": "cart", "label": "Cart" },
+        { "value": "bag", "label": "Bag" },
+        { "value": "tag", "label": "Tag" },
+        { "value": "truck", "label": "Truck" },
+        { "value": "heart", "label": "Heart" },
+        { "value": "star", "label": "Star" },
+        { "value": "play", "label": "Play" },
+        { "value": "plus", "label": "Plus" },
+        { "value": "check", "label": "Check" },
+        { "value": "search", "label": "Search" },
+        { "value": "lock", "label": "Lock" },
+        { "value": "share", "label": "Share" }
+      ],
+      "default": "arrow-right"
+    },
+    {
+      "type": "select", "id": "icon_style_2", "label": "t:blocks.button.settings.icon_style.label", "info": "t:blocks.button.settings.icon_style.info",
+      "options": [
+        { "value": "default", "label": "t:blocks.button.settings.icon_style.options__1.label" },
+        { "value": "solid", "label": "t:blocks.button.settings.icon_style.options__2.label" }
+      ],
+      "default": "solid",
+      "visible_if": "{{ block.settings.icon_2 != 'none' }}"
+    },
+    {
+      "type": "select", "id": "icon_position_2", "label": "t:blocks.button.settings.icon_position.label",
+      "options": [
+        { "value": "start", "label": "t:blocks.button.settings.icon_position.options__1.label" },
+        { "value": "end", "label": "t:blocks.button.settings.icon_position.options__2.label" }
+      ],
+      "default": "end",
+      "visible_if": "{{ block.settings.icon_2 != 'none' }}"
+    },
+
+    { "type": "header", "content": "t:blocks.buttons.headers.shared" },
+    {
+      "type": "select", "id": "hover_effect", "label": "t:blocks.button.settings.hover_effect.label", "info": "t:blocks.button.settings.hover_effect.info",
+      "options": [
+        { "value": "auto", "label": "t:blocks.button.settings.hover_effect.options__1.label" },
+        { "value": "swap", "label": "t:blocks.button.settings.hover_effect.options__2.label" },
+        { "value": "sweep", "label": "t:blocks.button.settings.hover_effect.options__3.label" },
+        { "value": "none", "label": "t:blocks.button.settings.hover_effect.options__4.label" }
+      ],
+      "default": "auto"
+    },
+    {
+      "type": "range", "id": "icon_size", "label": "t:blocks.button.settings.icon_size.label", "info": "t:blocks.button.settings.icon_size.info",
+      "min": 10, "max": 32, "step": 1, "unit": "px", "default": 16
+    },
+    {
+      "type": "range", "id": "icon_radius", "label": "t:blocks.button.settings.icon_radius.label", "info": "t:blocks.button.settings.icon_radius.info",
+      "min": 0, "max": 50, "step": 5, "unit": "%", "default": 50
+    },
+    {
+      "type": "range", "id": "underline_thickness", "label": "t:blocks.button.settings.underline_thickness.label",
+      "min": 1, "max": 6, "step": 1, "unit": "px", "default": 2,
+      "visible_if": "{{ block.settings.style_1 == 'link' or block.settings.style_2 == 'link' }}"
     },
     {
       "type": "select", "id": "size", "label": "t:blocks.button.settings.size.label",
@@ -71,17 +356,42 @@
       ],
       "default": "medium"
     },
-      {
-        "type": "range",
-        "id": "buttons_height_custom",
-        "label": "t:settings_schema.buttons.settings.height.label",
-        "min": 30,
-        "max": 80,
-        "step": 1,
-        "unit": "px",
-        "default": 60,
-         "visible_if": "{{ block.settings.size == \"custom\" }}"
-      },
+    {
+      "type": "range", "id": "buttons_height_custom", "label": "t:settings_schema.buttons.settings.height.label",
+      "min": 30, "max": 80, "step": 1, "unit": "px", "default": 60,
+      "visible_if": "{{ block.settings.size == 'custom' }}"
+    },
+    {
+      "type": "range", "id": "corner_radius", "label": "t:blocks.button.settings.corner_radius.label", "info": "t:blocks.button.settings.corner_radius.info",
+      "min": 0, "max": 100, "step": 1, "unit": "px", "default": 50
+    },
+    {
+      "type": "select", "id": "border_style", "label": "t:blocks.button.settings.border_style.label",
+      "options": [
+        { "value": "solid", "label": "t:blocks.button.settings.border_style.options__1.label" },
+        { "value": "dashed", "label": "t:blocks.button.settings.border_style.options__2.label" },
+        { "value": "dotted", "label": "t:blocks.button.settings.border_style.options__3.label" }
+      ],
+      "default": "solid"
+    },
+    {
+      "type": "range", "id": "border_thickness", "label": "t:blocks.button.settings.border_thickness.label", "info": "t:blocks.button.settings.border_thickness.info",
+      "min": -1, "max": 6, "step": 1, "unit": "px", "default": -1
+    },
+    {
+      "type": "select", "id": "width", "label": "t:blocks.button.settings.width.label", "info": "t:blocks.button.settings.width.info",
+      "options": [
+        { "value": "auto", "label": "t:blocks.button.settings.width.options__1.label" },
+        { "value": "min", "label": "t:blocks.button.settings.width.options__2.label" },
+        { "value": "full", "label": "t:blocks.button.settings.width.options__3.label" }
+      ],
+      "default": "min"
+    },
+    {
+      "type": "range", "id": "min_width", "label": "t:blocks.button.settings.min_width.label",
+      "min": 80, "max": 400, "step": 4, "unit": "px", "default": 196,
+      "visible_if": "{{ block.settings.width == 'min' }}"
+    },
     {
       "type": "select", "id": "alignment", "label": "t:blocks.group.settings.alignment.label",
       "options": [
@@ -89,14 +399,112 @@
         { "value": "center", "label": "t:blocks.group.settings.alignment.options__2.label" },
         { "value": "end", "label": "t:blocks.group.settings.alignment.options__3.label" }
       ],
-      "default": "start"
+      "default": "start",
+      "visible_if": "{{ block.settings.width != 'full' }}"
     },
-    { "type": "header", "content": "t:shared.spacing.block_header" },
-    { "type": "range", "id": "padding_top", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
-    { "type": "range", "id": "padding_right", "label": "t:shared.spacing.padding_right.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
-    { "type": "range", "id": "padding_bottom", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
-    { "type": "range", "id": "padding_left", "label": "t:shared.spacing.padding_left.label", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 0 },
-    { "type": "range", "id": "padding_scale_mobile", "label": "t:shared.spacing.padding_scale_mobile.label", "info": "t:shared.spacing.padding_scale_mobile.info", "min": 25, "max": 100, "step": 5, "unit": "%", "default": 75 }
+
+    {
+      "type": "header",
+      "content": "t:shared.spacing.block_header"
+    },
+    {
+      "type": "select",
+      "id": "padding_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        { "value": "desktop", "label": "t:shared.spacing.devices.options__1.label" },
+        { "value": "mobile", "label": "t:shared.spacing.devices.options__2.label" }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left_mobile",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right_mobile",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    }
   ],
   "presets": [{ "name": "t:blocks.buttons.name" }]
 }

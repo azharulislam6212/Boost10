@@ -55,9 +55,9 @@
   @param {boolean} [full] - Full width
   @param {boolean} [disabled]
   @param {boolean} [loading] - Shows a spinner and sets aria-busy
-  @param {string} [icon] - Icon name from snippets/icon.liquid
+  @param {string} [icon] - Icon name from snippets/icon.liquid. Defaults to 'arrow-right' — the theme's house call to action. Pass 'none' for a bare label
   @param {string} [icon_position] - 'start' | 'end'. Default 'end'
-  @param {string} [icon_style] - 'default' | 'solid'. Solid puts the icon in a filled circular badge. Default 'default'
+  @param {string} [icon_style] - 'default' | 'solid'. Solid puts the icon in a filled circular badge. Default 'solid', except on the 'link' variant and icon-only buttons, which have no box to put a badge beside
   @param {number} [icon_size] - Glyph size in px. The solid badge is derived from it, so both scale together
   @param {number} [icon_radius] - Badge corner radius as a percentage. 50 is a circle; 0 is a square
   @param {string} [border_style] - 'solid' | 'dashed' | 'dotted'
@@ -99,12 +99,36 @@
     assign resolved_size = 'custom-size'
   endif
   assign resolved_icon_position = icon_position | default: 'end'
-  assign resolved_icon_style = icon_style | default: 'default'
   assign resolved_type = type | default: 'button'
   assign accessible_name = aria_label | default: label
 
+  comment
+    The theme's default call to action is a solid right arrow.
+
+    It is settled here rather than at sixty call sites: a caller that says
+    nothing about icons gets the house style, and every caller that already
+    names one — `close` on the overlay buttons, `plus` on the product card — is
+    untouched, because `default` only replaces nil and the empty string.
+
+    Opting out is `icon: 'none'`, which is a real value and therefore survives
+    the filter. That is the same word the Button block's schema uses, so a
+    merchant choosing "None" and a developer writing it mean the same thing.
+  endcomment
+  assign resolved_icon = icon | default: 'arrow-right'
+  assign resolved_icon_style = icon_style | default: 'solid'
+
+  comment
+    Never a badge on the link variant. That variant draws no box at all — it is
+    a run of underlined text — so a filled circle beside it is a button's
+    ornament attached to something that is not a button. It still takes the
+    arrow, as a plain glyph.
+  endcomment
+  if resolved_variant == 'link'
+    assign resolved_icon_style = icon_style | default: 'default'
+  endif
+
   assign has_icon = false
-  if icon != blank and icon != 'none'
+  if resolved_icon != blank and resolved_icon != 'none'
     assign has_icon = true
   endif
 
@@ -282,7 +306,7 @@
   <span class="button-text">
     {%- if has_icon and resolved_icon_position == 'start' -%}
       <span class="button__icon button__icon--start">
-        {% render 'icon', icon: icon %}
+        {% render 'icon', icon: resolved_icon %}
       </span>
     {%- endif -%}
 
@@ -290,7 +314,7 @@
 
     {%- if has_icon and resolved_icon_position == 'end' -%}
       <span class="button__icon button__icon--end">
-        {% render 'icon', icon: icon %}
+        {% render 'icon', icon: resolved_icon %}
       </span>
     {%- endif -%}
   </span>
