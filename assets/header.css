@@ -1296,10 +1296,74 @@ a.menu-promo:hover .menu-promo__cta svg {
   outline-offset: -2px;
 }
 
+/* The ring is inset, like the tab buttons' own two lines above.
+ *
+ * It used to sit 4px outside the panel, and the panel fills its container
+ * exactly — so once `.tabs__panels` started clipping (see the rise animation
+ * below) a keyboard user tabbing into the panel got no visible ring at all. An
+ * inset ring cannot be clipped by the box it is inside, whatever that box's
+ * overflow is, so this is robust rather than dependent on `overflow-clip-margin`
+ * being supported. */
 .tabs__panel:focus-visible {
   outline: 2px solid currentColor;
-  outline-offset: 4px;
+  outline-offset: -2px;
   border-radius: 8px;
+}
+
+/* --------------------------------------------------------------------------
+   The panel rises when the tab changes
+   --------------------------------------------------------------------------
+   An `animation`, not a `transition`, and that is the whole reason this works.
+
+   `<tab-group>` switches panels with the `hidden` attribute, and `hidden` is
+   `display: none`. A `display: none` element has no running animations and
+   nothing to transition *from* — which is why the content used to appear in one
+   frame however the panels were styled.
+
+   But the same fact is what makes an animation fire: an element that starts
+   being rendered starts its animations from the beginning. So the new panel
+   plays this on every switch, without `tabs.js` having to stamp a class on it
+   and take it off again, and without any state to get out of step with the
+   attribute that actually decides what is shown.
+
+   `both` holds the opening frame, so there is no flash of the finished position
+   before the animation takes over. The travel is deliberately small — content
+   this wide sliding a long way reads as the panel falling into place rather
+   than as a response to the tap. */
+@keyframes tab-panel-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.tabs__panel:not([hidden]) {
+  animation: tab-panel-rise 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* The rise happens inside the panel area. Without this the 14px of travel is
+   14px of overflow for the length of the animation, which on a mega menu whose
+   height is already at the viewport's limit is a scrollbar that appears and
+   disappears on every tab change. `clip` rather than `hidden` because it
+   establishes no scroll container of its own. */
+.tabs__panels {
+  overflow: clip;
+
+  /* A little bleed, so a card's hover lift or a shadow inside the panel is not
+     shaved off at the edge. It costs nothing at rest and never creates a scroll
+     container — `clip` cannot scroll, so this only changes what is painted. */
+  overflow-clip-margin: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tabs__panel:not([hidden]) {
+    animation: none;
+  }
 }
 
 .tabs__panel-grid {
@@ -2034,15 +2098,39 @@ a.menu-promo:hover .menu-promo__panel {
   }
 }
 
+/* The field is styled against the PANEL, not against the header bar.
+ *
+ * Section 29 resets `--color-background`, `--color-text`, `--color-heading` and
+ * `--color-border` on this panel so it keeps the header's base scheme while the
+ * bar swaps to its sticky or transparent one. `--color-input-background` was
+ * not in that list, so it kept coming from whatever scheme the bar was wearing
+ * — and once the header pinned and turned charcoal, the search field was drawn
+ * black on a white panel with a placeholder nobody could read.
+ *
+ * Adding one more token to the reset would only move the problem: the panel's
+ * surface and the field's surface would still be two independent values that
+ * happen to agree. Mixing the field out of the panel's own two colours makes
+ * disagreement impossible — the field is the panel's background lifted
+ * slightly, and its text is the panel's text, in every header state.
+ *
+ * Each `color-mix()` is preceded by a flat value for browsers without it. */
 .market-picker__search input {
   inline-size: 100%;
   padding: 8px var(--space-3);
   border: 1px solid var(--color-border);
+  border: 1px solid color-mix(in srgb, var(--color-text) 22%, transparent);
   border-radius: 10px;
-  background-color: var(--color-input-background, transparent);
-  color: inherit;
+  background-color: var(--color-background);
+  background-color: color-mix(in srgb, var(--color-text) 6%, var(--color-background));
+  color: var(--color-text);
   font-family: inherit;
   font-size: var(--font-size-sm);
+}
+
+.market-picker__search input::placeholder {
+  color: var(--color-text);
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  opacity: 1;
 }
 
 .market-picker__search input:focus-visible {
