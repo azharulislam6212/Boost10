@@ -47,6 +47,18 @@ export class LocalizationForm extends BaseComponent {
   static requiredRefs = ['trigger', 'panel'];
 
   setup() {
+    // The panel stops being hidden by the `hidden` attribute the moment this
+    // element takes charge of it.
+    //
+    // `hidden` is `display: none`, and `display: none` cannot be transitioned in
+    // either direction — the panel appeared in one frame and vanished in one
+    // frame however carefully the animation was written. The attribute stays in
+    // the markup so the panel is properly hidden before this script runs, and
+    // from here on the open state is `data-open` on this element, which CSS can
+    // animate, while `inert` does the job `hidden` was doing for focus and for
+    // assistive technology.
+    this.refs.panel.removeAttribute('hidden');
+
     this.close();
 
     this.on(this.refs.trigger, 'click', () => this.toggle());
@@ -116,29 +128,37 @@ export class LocalizationForm extends BaseComponent {
   open() {
     if (this.isOpen) return;
 
-    // Two open selectors overlap and neither is usable.
+    // Two open selectors overlap and neither is usable. Closing the other one
+    // first is also what makes the hand-off read properly: it animates out on
+    // the same curve this one animates in on, rather than blinking away.
     for (const other of document.querySelectorAll('localization-form[data-open]')) {
       if (other !== this) other.close?.();
     }
 
     this.setAttribute('data-open', '');
-    this.refs.panel.hidden = false;
+    this.refs.panel.removeAttribute('inert');
+    this.refs.panel.removeAttribute('aria-hidden');
     this.refs.trigger.setAttribute('aria-expanded', 'true');
 
+    // One frame later, so the panel is interactive and in place before focus
+    // lands in it. Focusing an element that is still mid-transition is what
+    // makes a browser jump the page to it.
     const first = this.refs.filter instanceof HTMLElement ? this.refs.filter : this.#selectedOption();
-    first?.focus({ preventScroll: true });
+    requestAnimationFrame(() => {
+      if (this.isOpen) first?.focus({ preventScroll: true });
+    });
   }
 
   close() {
-    if (!this.isOpen) {
-      this.refs.panel.hidden = true;
-      this.refs.trigger.setAttribute('aria-expanded', 'false');
-      return;
-    }
-
     this.removeAttribute('data-open');
-    this.refs.panel.hidden = true;
     this.refs.trigger.setAttribute('aria-expanded', 'false');
+
+    // `inert` immediately, not after the animation: it takes the panel out of
+    // the tab order and out of the accessibility tree straight away, which is
+    // what `hidden` used to do. The fade out is CSS, keyed off `data-open`, and
+    // is unaffected by it.
+    this.refs.panel.setAttribute('inert', '');
+    this.refs.panel.setAttribute('aria-hidden', 'true');
   }
 
   toggle() {

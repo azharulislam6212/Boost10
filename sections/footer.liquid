@@ -110,6 +110,8 @@
     What this file still decides is what it genuinely owns: whether there is a
     policy row at all, which is a section setting rather than a block.
   endcomment
+  assign columns_id = 'FooterColumns-' | append: section.id
+
   assign has_policy = false
   if st.policy_menu != blank and st.policy_menu.links.size > 0
     assign has_policy = true
@@ -175,6 +177,7 @@
         {% render 'motion-attrs', kind: 'text', section: st, children: true %}
       >
         <footer-columns
+          id="{{ columns_id }}"
           class="footer__columns"
           {% if has_policy %}data-has-policy{% endif %}
           data-collapse-below="750"
@@ -209,6 +212,45 @@
             </div>
           {%- endif -%}
         </footer-columns>
+
+        {%- comment -%}
+          The desktop state of the columns, decided before the first paint.
+
+          Above the breakpoint a footer column is not a disclosure at all — it is
+          a headed list, always open. `<accordion-element>` is what opens them,
+          and it cannot run until its module has loaded, so the browser paints
+          four collapsed rows first and the page jumps when the script catches
+          up. That is the flash on reload.
+
+          It cannot be fixed with CSS alone: a closed `<details>` hides its
+          content in the user agent stylesheet, and no rule reliably reopens it
+          across browsers — the `open` attribute has to actually change. So it
+          changes here, in a parser-blocking script sitting immediately after the
+          markup it acts on, which means it lands in the same paint.
+
+          Below the breakpoint nothing is touched: the columns are authored
+          closed, which is already correct, and the component takes over from
+          there. With scripting off, `<details>` still opens on tap.
+        {%- endcomment -%}
+        <script>
+          (function () {
+            var el = document.getElementById({{ columns_id | json }});
+            if (!el || !window.matchMedia('(min-width: 750px)').matches) return;
+
+            var items = el.querySelectorAll('details.footer-column');
+            for (var i = 0; i < items.length; i++) {
+              items[i].open = true;
+              var summary = items[i].querySelector('summary');
+              if (!summary) continue;
+              // Not a control at this width, so not a tab stop either. The
+              // component sets the same two attributes when it upgrades.
+              summary.setAttribute('data-static', '');
+              summary.setAttribute('tabindex', '-1');
+            }
+
+            el.setAttribute('data-static', '');
+          })();
+        </script>
       </motion-effect>
     {%- endif -%}
   </div>

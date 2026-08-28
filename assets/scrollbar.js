@@ -197,7 +197,50 @@ export class SmoothScrollbar extends BaseComponent {
     });
 
     this.#unsubscribe = this.#lenis.on?.('scroll', this.#onLenisScroll) ?? null;
+    this.#adoptRestoredScroll();
     this.#startLoop();
+  }
+
+  /**
+   * Take on whatever scroll position the browser restored.
+   *
+   * This is what was pulling the page back to the top on reload, and it is not
+   * a scroll-restoration bug — the browser restores the position correctly.
+   * Lenis reads the scroll once, when it is constructed, into the target it
+   * animates towards. This module is a deferred import, so construction happens
+   * around the same moment the browser is restoring: read a fraction too early
+   * and Lenis's target is 0 while the real position is the footer, and on its
+   * first frame it dutifully animates the page back to the target it recorded.
+   *
+   * Reading again — now, on the next frame, and once more after `load` — closes
+   * the window. `immediate` sets the position without animating, so where a
+   * reload had already put the customer is simply where they stay.
+   *
+   * @private
+   */
+  #adoptRestoredScroll() {
+    const adopt = () => {
+      const lenis = this.#lenis;
+      if (!lenis) return;
+
+      const actual = window.scrollY;
+      // A pixel of slack: `animatedScroll` is fractional mid-animation, and a
+      // hard comparison would re-seek on every frame it is called.
+      if (Math.abs(actual - (lenis.animatedScroll ?? 0)) <= 1) return;
+
+      lenis.scrollTo(actual, { immediate: true, force: true });
+    };
+
+    adopt();
+    requestAnimationFrame(adopt);
+
+    // `load` fires after images have settled, which is the last moment the
+    // restored position can still move.
+    if (document.readyState === 'complete') {
+      setTimeout(adopt, 0);
+    } else {
+      this.on(window, 'load', adopt, { once: true });
+    }
   }
 
   /** @private */
