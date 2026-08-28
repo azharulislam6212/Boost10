@@ -808,14 +808,39 @@ function shuffledIndices(length) {
    ========================================================================== */
 
 /**
- * Split an element's text into animatable spans without breaking screen readers.
+ * Split an element's text into animatable spans without destroying its markup.
  *
- * The original string is preserved on the container as `aria-label` and the
- * generated spans are hidden from assistive technology. Without that, a split
- * heading is announced one letter at a time.
+ * ## Text nodes are replaced; elements are not
  *
- * Words are always wrapped, even when splitting by character, so that lines
- * still break between words rather than mid-word.
+ * This used to read `element.textContent`, build a flat list of spans and call
+ * `element.replaceChildren()`. That threw away every tag inside — and the way
+ * the theme uses this, the tag inside is the whole point:
+ *
+ *     <motion-effect data-effect="words-slide-up">
+ *       <h1 class="product-title__text">{{ product.title }}</h1>
+ *     </motion-effect>
+ *
+ * Nine sections and blocks wrap a heading exactly like that, with no
+ * `data-target`, so the host is what got split — and the `<h1>` was gone from
+ * the document the moment the animation ran. Every `h1` rule stopped matching,
+ * so a product title rendered at body size; the page lost its heading outline;
+ * and a link or an `<em>` inside a heading simply vanished.
+ *
+ * So the walk is over text nodes now. Each one is replaced by a span holding
+ * the pieces, and every element around it — the heading, the emphasis, the link
+ * — is left exactly where the section put it.
+ *
+ * ## What a screen reader hears
+ *
+ * The pieces are decoration and are marked `aria-hidden`; a real copy of the
+ * text rides alongside them in a `visually-hidden` span. That replaces the old
+ * `aria-label` on the container, which only ever worked by accident: an
+ * `aria-label` on an element with no role — `<motion-effect>` has none — is
+ * ignored, so a split heading whose pieces were all hidden had, to assistive
+ * technology, no text at all. A visible-to-AT copy needs no role to work.
+ *
+ * Words are always wrapped, even when splitting by character, so lines still
+ * break between words rather than mid-word.
  *
  * @param {HTMLElement} element
  * @param {Object} [options]
@@ -827,45 +852,93 @@ export function splitText(element, { by = 'chars' } = {}) {
     return Array.from(element.querySelectorAll('[data-motion-part]'));
   }
 
-  const text = element.textContent?.replace(/\s+/g, ' ').trim() ?? '';
-  if (text.length === 0) return [];
+  // Only text nodes that actually carry text. The whitespace between two tags
+  // is a text node too, and turning it into a span would add a word.
+  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+  const textNodes = [];
+  while (walker.nextNode()) {
+    if (walker.currentNode.nodeValue && walker.currentNode.nodeValue.trim()) {
+      textNodes.push(walker.currentNode);
+    }
+  }
+
+  if (textNodes.length === 0) return [];
 
   element.setAttribute('data-motion-split', by);
-  if (!element.hasAttribute('aria-label')) element.setAttribute('aria-label', text);
 
-  const fragment = document.createDocumentFragment();
   const parts = [];
 
-  text.split(' ').forEach((word, index, all) => {
-    const wordSpan = document.createElement('span');
-    wordSpan.className = 'motion-word';
-    wordSpan.setAttribute('aria-hidden', 'true');
-    wordSpan.style.display = 'inline-block';
-    wordSpan.style.whiteSpace = 'pre';
+  for (const node of textNodes) {
+    const original = node.nodeValue ?? '';
+    const collapsed = original.replace(/\s+/g, ' ');
 
-    if (by === 'words') {
-      wordSpan.textContent = word;
-      wordSpan.setAttribute('data-motion-part', '');
-      parts.push(wordSpan);
-    } else {
-      for (const character of Array.from(word)) {
-        const charSpan = document.createElement('span');
-        charSpan.className = 'motion-char';
-        charSpan.setAttribute('data-motion-part', '');
-        charSpan.style.display = 'inline-block';
-        charSpan.style.whiteSpace = 'pre';
-        charSpan.textContent = character;
-        wordSpan.appendChild(charSpan);
-        parts.push(charSpan);
-      }
+    // One wrapper per split site, carrying the original string. `unsplitText`
+    // puts that string back, so a replay or a Theme Editor morph restores the
+    // node it started from rather than a best guess reassembled from spans.
+    const site = document.createElement('span');
+    site.className = 'motion-split';
+    site.setAttribute('data-motion-split-site', '');
+    site.dataset.motionText = original;
+
+    // A per-character split is the only one that needs an accessible copy.
+    //
+    // Word spans read naturally: a screen reader joins adjacent inline text and
+    // announces "Clinically studied ingredients" whether or not there are spans
+    // between the words. Characters do not — several screen readers spell a
+    // run of one-letter elements out loud — so those are hidden and the real
+    // string rides alongside them.
+    //
+    // Splitting the two cases matters because the copy is duplicated text: it
+    // is in `innerText`, in a selection, and in what a crawler reads. Paying
+    // that on every heading in the theme to solve a problem only `chars` has
+    // would be the wrong trade.
+    if (by !== 'words') {
+      const label = document.createElement('span');
+      label.className = 'visually-hidden';
+      label.textContent = collapsed;
+      site.append(label);
     }
 
-    fragment.appendChild(wordSpan);
+    // Leading and trailing spaces belong to the flow around this node — the gap
+    // between a heading's own text and an `<em>` that follows it. Dropping them
+    // runs the two together.
+    if (/^\s/.test(collapsed)) site.append(document.createTextNode(' '));
 
-    if (index < all.length - 1) fragment.appendChild(document.createTextNode(' '));
-  });
+    const words = collapsed.trim().split(' ');
 
-  element.replaceChildren(fragment);
+    words.forEach((word, index) => {
+      const wordSpan = document.createElement('span');
+      wordSpan.className = 'motion-word';
+      if (by !== 'words') wordSpan.setAttribute('aria-hidden', 'true');
+      wordSpan.style.display = 'inline-block';
+      wordSpan.style.whiteSpace = 'pre';
+
+      if (by === 'words') {
+        wordSpan.textContent = word;
+        wordSpan.setAttribute('data-motion-part', '');
+        parts.push(wordSpan);
+      } else {
+        for (const character of Array.from(word)) {
+          const charSpan = document.createElement('span');
+          charSpan.className = 'motion-char';
+          charSpan.setAttribute('data-motion-part', '');
+          charSpan.style.display = 'inline-block';
+          charSpan.style.whiteSpace = 'pre';
+          charSpan.textContent = character;
+          wordSpan.appendChild(charSpan);
+          parts.push(charSpan);
+        }
+      }
+
+      site.append(wordSpan);
+
+      if (index < words.length - 1) site.append(document.createTextNode(' '));
+    });
+
+    if (/\s$/.test(collapsed)) site.append(document.createTextNode(' '));
+
+    node.replaceWith(site);
+  }
 
   return parts;
 }
@@ -878,9 +951,18 @@ export function splitText(element, { by = 'chars' } = {}) {
 export function unsplitText(element) {
   if (!element.hasAttribute('data-motion-split')) return;
 
-  const original = element.getAttribute('aria-label') ?? element.textContent ?? '';
   element.removeAttribute('data-motion-split');
-  element.textContent = original;
+
+  // Each site restores its own text node. Reading `textContent` back off the
+  // site would return the accessible copy *and* the pieces — the string twice —
+  // which is why the original is stored on the wrapper when it is built.
+  for (const site of element.querySelectorAll('[data-motion-split-site]')) {
+    site.replaceWith(document.createTextNode(site.dataset.motionText ?? ''));
+  }
+
+  // Adjacent text nodes left by the replacements are merged, so a second split
+  // sees the same single node the first one did.
+  element.normalize();
 }
 
 /* ==========================================================================

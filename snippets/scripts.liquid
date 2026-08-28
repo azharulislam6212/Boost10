@@ -130,6 +130,34 @@
   document.documentElement.classList.remove('no-js');
   document.documentElement.classList.add('js');
 
+  // ---- arm the entrance animations, before anything paints ---------------
+  //
+  // Every `<motion-effect>` used to be hidden by JavaScript only, on the
+  // principle that a script which never loads must never leave a page blank.
+  // The principle is right; the timing was not. Modules are deferred, so the
+  // browser painted the finished page first and the engine then pulled each
+  // element back to its resting state and animated it — a flash of the settled
+  // content, a jump, and only then the animation. On every reload.
+  //
+  // The stylesheet holds the resting opacity from the first paint instead, and
+  // only while this attribute is present. It is set here rather than written
+  // into the markup because this line runs only when scripting is on: with
+  // JavaScript off the attribute never appears and nothing is ever hidden,
+  // which is the original guarantee, kept.
+  document.documentElement.setAttribute('data-motion-arm', '');
+
+  // The other half of that guarantee: scripting can be on and the module still
+  // never arrive — a failed bundle, a blocked CDN, a browser that cannot parse
+  // it. `motion-effect` is defined by that module, so its absence after a
+  // generous wait is the signal that nothing is coming. Disarming then shows
+  // every element at once, which is what a page with no motion engine should
+  // look like.
+  setTimeout(function () {
+    if (!window.customElements || !customElements.get('motion-effect')) {
+      document.documentElement.removeAttribute('data-motion-arm');
+    }
+  }, 2500);
+
   window.Theme = window.Theme || {};
 
   window.Theme.routes = {

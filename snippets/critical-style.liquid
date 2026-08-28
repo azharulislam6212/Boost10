@@ -395,5 +395,44 @@
         html.no-js .no-js-hidden { display: none !important; }
         html:not(.no-js) .js-hidden { display: none !important; }
         [hidden] { display: none !important; }
+
+        /* ---- the resting opacity, held from the first paint ---------------
+           This is the whole fix for "the content appears, then jumps, then the
+           animation starts". The engine hid each element from JavaScript, and
+           modules are deferred — so the browser had already painted the settled
+           page by the time anything was hidden.
+
+           Only opacity is held here, deliberately. Every preset's resting state
+           is opacity plus a transform or a clip-path, and neither of those
+           affects layout, so this reserves the element's real box and nothing
+           reflows when the engine takes over. Holding a transform here as well
+           would mean guessing which preset each element ended up with.
+
+           The stylesheet lets go as soon as `<motion-effect>` says it is in
+           charge. `data-motion-pending` is written on the host the moment the
+           engine applies its own resting state, and that state is also opacity
+           0, so the handoff itself cannot be seen. `data-motion-revealed`
+           covers the paths that never animate at all: effect "none", an unknown
+           preset name, and a visitor who has asked for reduced motion.
+
+           `data-motion-arm` on `<html>` is set by the head script in
+           `snippets/scripts.liquid`, so it exists only when scripting does, and
+           is removed again if the motion module never arrives. Parallax and
+           marquee are excluded — they are continuous effects with no entrance,
+           so there is nothing to wait for. */
+        /* Wrapped in `no-preference` rather than paired with a `reduce`
+           override. Someone who has asked the operating system for less
+           movement should never wait for a module to load before they can read
+           the page — and an override would have to out-specify the six `:not()`
+           tests above, which is a specificity race that only has to be lost
+           once. Not arming at all is the same answer with nothing to get wrong.
+
+           A browser too old to report the preference matches neither branch, so
+           it simply keeps the previous behaviour. */
+        @media (prefers-reduced-motion: no-preference) {
+          html[data-motion-arm] motion-effect[data-effect]:not([data-effect='none']):not([data-effect='']):not([data-effect='parallax']):not([data-effect='marquee']):not([data-motion-pending]):not([data-motion-revealed]) {
+            opacity: 0;
+          }
+        }
       }
     {% endstyle %}

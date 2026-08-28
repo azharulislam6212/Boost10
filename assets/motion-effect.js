@@ -130,8 +130,27 @@ export class MotionEffect extends BaseComponent {
 
     const targets = this.#targets();
 
+    // The handoff from the stylesheet to this component, stated on the host.
+    //
+    // `snippets/critical-style.liquid` hides an armed `<motion-effect>` before
+    // the first paint. Hiding from JavaScript alone means the browser paints
+    // the content at full opacity and this module then yanks it back to the
+    // resting state — which is exactly the flash-then-jump on reload. The
+    // stylesheet lets go the moment `data-motion-pending` appears here, and
+    // both states are `opacity: 0`, so the handoff itself is invisible.
+    //
+    // It has to be written here rather than left to `reveal()`. For a splitting
+    // preset with a `data-target`, `reveal()` is handed the target, so its own
+    // `data-motion-pending` lands on a child and the host would stay hidden for
+    // the life of the page. `onReveal` closes the same loop at the other end.
+    this.setAttribute('data-motion-pending', '');
+
     this.#cancelReveal = reveal(preset.split && targets.length === 1 ? targets[0] : this, {
       effect,
+      onReveal: () => {
+        this.removeAttribute('data-motion-pending');
+        this.setAttribute('data-motion-revealed', '');
+      },
       // Text presets split their own target, so no explicit target list is
       // passed for them unless the section asked for several elements.
       targets: preset.split && targets.length <= 1 ? undefined : targets,

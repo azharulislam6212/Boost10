@@ -28,6 +28,7 @@
   @param {string} [axis]
   @param {string} [direction]
   @param {string} [speed]
+  @param {boolean} [block_level] - Resolve the text cascade as usual, then map any word- or letter-splitting preset onto the whole-element preset that moves the same way. For wrappers whose contents must not come apart — a button, a badge, a pill.
 
   Setting ids read from `block` and `section`:
     animation_text, animation_image, animation_delay, animation_duration,
@@ -96,6 +97,32 @@
   assign resolved = resolved | default: 'none'
   if resolved == '' or resolved == 'inherit'
     assign resolved = 'none'
+  endif
+
+  # ---- block_level: follow the text setting, but never split the text ----
+  #
+  # A button wants the same entrance as the words around it, and nothing at all
+  # happening inside it. The text family's presets split their element into
+  # words or letters and animate the pieces, which on a button means the label
+  # coming apart while the pill sits still — the opposite of what is wanted.
+  #
+  # So the cascade resolves exactly as it always does and only the answer is
+  # translated: each splitting preset maps to the whole-element preset that
+  # moves the same way. A section set to `words-slide-up` gets buttons that
+  # slide up in one piece, same direction, same timing.
+  if block_level
+    case resolved
+      when 'words-slide-up', 'letters-slide-up'
+        assign resolved = 'slide-up'
+      when 'letters-slide-down'
+        assign resolved = 'slide-down'
+      when 'words-slide-from-right'
+        assign resolved = 'slide-left'
+      when 'letters-fade-in', 'letters-fade-in-random'
+        assign resolved = 'fade-in'
+      when 'words-rotate-in', 'split-text'
+        assign resolved = 'fade-up'
+    endcase
   endif
 
   # Master switch always wins.
