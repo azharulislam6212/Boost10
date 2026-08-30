@@ -1,0 +1,922 @@
+{% doc %}
+  blocks/subheading.liquid
+
+  An eyebrow — the short line that sits above a heading — optionally with an
+  icon beside it.
+
+  ## Why this is a file and not an eleventh preset on the Text block
+
+  `blocks/text.liquid` already has a Subheading preset, and it stays: a run of
+  text set in the small-caps treatment is a *typography* choice, and that is
+  what a preset is for. This block is a different thing standing next to it —
+  a row. It holds an icon and a line of words on one line, with a gap between
+  them, and a preset cannot introduce a second child element.
+
+  Everything that is *not* the row is the Text block's, unchanged and by
+  reference rather than by copy:
+
+    typography, colour, presets   `snippets/block-typography.liquid`, and the
+                                  `.block-text--*` classes in `assets/base.css`
+    alignment, width              the same `.block-text--align-*` classes
+    background panel              `.block-text--has-background`, driven by the
+                                  same `--block-text-background` / `-radius`
+    highlight                     the same `.block-text--highlight-*` classes
+    padding                       `snippets/spacing.liquid`
+    entrance animation            `snippets/motion-attrs.liquid`
+
+  So this file's root element carries `.block-text` as well as its own class,
+  and a change to Theme settings › Typography moves the Subheading block with
+  every other run of text on the page. There is no second copy of the type map
+  here, and nothing to keep in step by hand.
+
+  ## The icon has two sources and a switch, not three fields
+
+  `blocks/badge-highlight.liquid` tries three sources in order — pasted SVG,
+  then an upload, then the theme set — and the merchant discovers which one won
+  by clearing fields until the right icon appears. Here the source is stated:
+  **None**, **Icon** or **Image**, and only the field belonging to the chosen
+  source is shown. There is no precedence to learn because there is no contest.
+
+  **Gap** follows the same rule. With no icon there is nothing for a gap to sit
+  between, so the control is hidden rather than left in the panel doing nothing.
+
+  ## `block_level: true` on the animation
+
+  The splitting presets — words, letters — take an element's text apart and
+  animate the pieces. On a pill with an icon in it that reads as the label
+  coming apart while the icon sits still. `block_level` resolves the merchant's
+  cascade exactly as usual and then maps any splitting preset onto the
+  whole-element preset that travels the same way, which is what the parameter
+  exists for.
+
+  ## One style attribute
+
+  Spacing and typography are pulled in as declarations rather than as their own
+  attributes. Two `style` attributes on one element is invalid HTML, the browser
+  keeps the first and discards the rest, and that is how padding sliders end up
+  moving a value that never reaches the page.
+{% enddoc %}
+
+{%- liquid
+  assign s = block.settings
+
+  assign preset = s.preset | default: 'subheading'
+  assign alignment = s.alignment | default: 'start'
+  assign alignment_mobile = s.alignment_mobile | default: 'start'
+  assign color_mode = s.color | default: 'inherit'
+  assign highlight = s.highlight_style | default: 'none'
+  assign background_mode = s.background | default: 'inherit'
+  assign icon_source = s.icon_source | default: 'none'
+
+  # ---- tag ----------------------------------------------------------------
+  # Identical to blocks/text.liquid, deliberately. The preset select offers the
+  # same ten options, so it has to mean the same ten things: `Default` leaves
+  # the merchant's markup alone, and any heading preset normalises the tags to
+  # that level so the size and the document outline agree.
+  assign heading_levels = 'h1 h2 h3 h4 h5 h6'
+  assign is_heading = false
+  if heading_levels contains preset
+    assign is_heading = true
+  endif
+
+  assign body = s.text
+
+  if is_heading
+    assign open_tag = '<' | append: preset | append: '>'
+    assign close_tag = '</' | append: preset | append: '>'
+    assign body = body | replace: '<p>', open_tag | replace: '</p>', close_tag
+
+    assign levels = heading_levels | split: ' '
+    for level in levels
+      unless level == preset
+        assign find_open = '<' | append: level | append: '>'
+        assign find_close = '</' | append: level | append: '>'
+        assign body = body | replace: find_open, open_tag | replace: find_close, close_tag
+      endunless
+    endfor
+  endif
+
+  # ---- icon ---------------------------------------------------------------
+  # The source decides, and the field belonging to it has to actually hold
+  # something: a merchant who picks Image and has not uploaded one yet gets the
+  # text on its own rather than an empty box holding a gap open.
+  assign has_icon = false
+  if icon_source == 'icon' and s.icon != blank and s.icon != 'none'
+    assign has_icon = true
+  elsif icon_source == 'image' and s.icon_image != blank
+    assign has_icon = true
+  endif
+
+  assign icon_size = s.icon_size | default: 20 | plus: 0
+
+  comment
+    `icon_style` is the *box* around the glyph, and it is the one control that
+    decides whether there is a box at all:
+
+      none     no box. The glyph or image sits straight beside the words at
+               Icon size, and width, height, border and radius are hidden
+               because there is nothing for them to apply to.
+      solid    a filled box, painted from the scheme's primary button colours
+      outline  a transparent box carrying the border below
+
+    Written this way there is no combination that does nothing. The alternative
+    — a box that always exists, plus a separate "show background" toggle — has
+    two settings able to contradict each other, which is the state the header
+    notes on `sections/header.liquid` describe as the one worth designing out.
+
+    The solid colours are derived rather than exposed as two more swatches, the
+    same way `snippets/color-schemes.liquid` derives the cart bubble and the
+    badges from the scheme it is already in: a merchant who switches scheme gets
+    an icon that still belongs to it, and nobody has to remember a second pair
+    of colours per scheme.
+  endcomment
+  assign icon_style = s.icon_style | default: 'none'
+
+  assign icon_box_width = s.icon_width | default: 40 | plus: 0
+  assign icon_box_height = s.icon_height | default: 40 | plus: 0
+  assign icon_radius = s.icon_border_radius | default: 0 | plus: 0
+  assign icon_border_style = s.icon_border_style | default: 'none'
+  assign icon_border_width = s.icon_border_thickness | default: 0 | plus: 0
+
+  comment
+    The image is sized by the same Icon size the glyph uses — one number for
+    both sources, so switching between them does not resize the icon — and it
+    keeps its own aspect ratio. `ratio: 'square'` used to be passed here, which
+    forced a 1:1 box and cropped anything that was not square; omitting it lets
+    `snippets/image.liquid` fall through to `adapt`, which reserves the upload's
+    real proportions.
+
+    `sizes` follows the same number rather than a hardcoded `48px`. A hint that
+    says 48 while the merchant has asked for 20 is asking the browser for a file
+    more than twice the width it will paint.
+  endcomment
+  assign icon_image_sizes = icon_size | append: 'px'
+
+  comment
+    The divider is a rule *between* the icon and the words, so it cannot exist
+    without both. Tied to `has_icon` rather than to the Show divider checkbox
+    alone: a merchant who turns the icon off and leaves the checkbox on would
+    otherwise get a stray vertical line at the start of the eyebrow with nothing
+    on the other side of it.
+
+    It is an empty element rather than a border on the icon box or a `::before`
+    on the text. A border on the box cannot be inset from the box's own edges,
+    which is the whole look — the rule is shorter than the row and centred on
+    it. A pseudo-element on the text would have to be positioned out of flow to
+    sit in the gap, and would then ignore the Gap slider entirely; as a flex
+    child it simply takes the gap on both sides, for free.
+  endcomment
+  assign has_divider = false
+  if has_icon and s.show_divider
+    assign has_divider = true
+  endif
+
+  # ---- the block's own border ---------------------------------------------
+  # Independent of the background: an outlined pill with nothing behind it is a
+  # shape merchants ask for constantly, and gating the outline on a background
+  # would make it unreachable. Radius is independent of both, which is why it
+  # is no longer hidden when the background is set to Inherit.
+  assign border_style = s.border_style | default: 'none'
+  assign border_width = s.border_thickness | default: 0 | plus: 0
+  assign has_border = false
+  if border_style != 'none' and border_width > 0
+    assign has_border = true
+  endif
+
+  # ---- width --------------------------------------------------------------
+  # Both a `flex` and an `inline-size`, for the reason `blocks/text.liquid`
+  # records: this block is only a flex *item* when its parent is a group, so at
+  # the top level of a section a `flex` declaration is inert and Fit would do
+  # nothing on its own.
+  #
+  # Fit is the default here where Fill is the default on the Text block. A
+  # subheading with a background is a pill, and a pill that spans the container
+  # is a band — so the box hugs its contents and the alignment classes move it,
+  # which is the shape the design asks for without a single new rule.
+  if s.width == 'fill'
+    assign width_flex = '1 1 0%'
+    assign width_size = '100%'
+  else
+    assign width_flex = '0 0 auto'
+    assign width_size = 'fit-content'
+  endif
+
+  if s.width_mobile == 'fill'
+    assign width_flex_mobile = '1 1 0%'
+    assign width_size_mobile = '100%'
+  else
+    assign width_flex_mobile = '0 0 auto'
+    assign width_size_mobile = 'fit-content'
+  endif
+
+  # ---- the row's own alignment --------------------------------------------
+  # `.block-text--align-*` moves the *box* — `text-align`, `align-self` and an
+  # auto margin. None of those position flex children, so a block set to Fill is
+  # a full-width row with its icon and words stuck at the start whatever the
+  # alignment says.
+  #
+  # Emitted as custom properties rather than three more classes, which is what
+  # `snippets/alignment.liquid` does for the same reason: the setting's three
+  # values map one-for-one onto flex keywords, so a lookup table in CSS would be
+  # a second copy of a map that already exists here.
+  case alignment
+    when 'center'
+      assign justify = 'center'
+    when 'end'
+      assign justify = 'flex-end'
+    else
+      assign justify = 'flex-start'
+  endcase
+
+  case alignment_mobile
+    when 'center'
+      assign justify_mobile = 'center'
+    when 'end'
+      assign justify_mobile = 'flex-end'
+    else
+      assign justify_mobile = 'flex-start'
+  endcase
+
+  # ---- classes ------------------------------------------------------------
+  # `.block-text` and `.rte` sit on this element alongside `.block-subheading`,
+  # which is what hands the whole Text block stylesheet to this block. The
+  # preset, colour and highlight rules in `assets/base.css` all select on
+  # `.block-text…`, and several of them need `.rte` on the same element.
+  assign classes = 'block-subheading block-text rte'
+  assign classes = classes | append: ' block-text--' | append: preset
+  assign classes = classes | append: ' block-text--align-' | append: alignment
+  assign classes = classes | append: ' block-text--align-mobile-' | append: alignment_mobile
+
+  comment
+    The Text block's two wrapping controls — Measure and "Keep on one line on
+    mobile" — are deliberately not offered here. Both govern where a paragraph
+    breaks, and an eyebrow is one short line: a measure it never reaches, and a
+    wrap it never makes. Leaving them in would be two settings a merchant can
+    move all day with nothing happening on the page, which is the failure this
+    theme's own notes keep coming back to.
+  endcomment
+
+  if color_mode == 'gradient'
+    assign classes = classes | append: ' block-text--gradient'
+  elsif color_mode != 'inherit' and color_mode != blank
+    assign classes = classes | append: ' block-text--colored'
+  endif
+
+  if highlight != 'none' and highlight != blank
+    assign highlight_target = s.highlight_target | default: 'em'
+    assign classes = classes | append: ' block-text--highlight block-text--highlight-' | append: highlight
+    assign classes = classes | append: ' block-text--hl-' | append: highlight_target
+  endif
+
+  comment
+    `inherit` emits no background at all, so whatever colour scheme the section
+    is using shows through — the same contract the Text block's colour select
+    keeps, and the reason neither needs a "transparent" swatch. Only `custom`
+    turns the panel on, and with it `.block-text--has-background` brings the
+    padding that keeps a background off the words.
+  endcomment
+  if background_mode == 'custom'
+    assign classes = classes | append: ' block-text--has-background'
+  endif
+
+  comment
+    A border needs the same padding a background needs, and for the same reason
+    the Text block's note gives: a rule drawn flush against its own words reads
+    as a mistake, and making the merchant go and find the spacing sliders to fix
+    it makes the control feel broken. The class only sets `--block-padding-*`
+    defaults, so a slider that has left zero still wins.
+  endcomment
+  if has_border
+    assign classes = classes | append: ' block-subheading--bordered'
+  endif
+
+  comment
+    No `--has-icon` class. The icon element either exists or it does not, and the
+    gap is only emitted when it does — a class saying the same thing a third
+    time is a fact free to disagree with the other two. `snippets/button.liquid`
+    records what that costs: `button--fx-swap` was dropped and every rule still
+    naming it went dead in silence.
+
+    The icon's *surface* does get one, because solid and outline are two
+    discrete treatments rather than a number — the same split the theme keeps
+    everywhere: presets are classes, measurements are custom properties.
+  endcomment
+  assign icon_classes = 'block-subheading__icon block-subheading__icon--' | append: icon_style
+-%}
+
+{%- capture block_style -%}
+  {%- render 'spacing', block: s, declarations: true -%}
+  {%- render 'block-typography', block: s -%}
+  --block-text-flex: {{ width_flex }};
+  --block-text-width: {{ width_size }};
+  --block-text-flex-mobile: {{ width_flex_mobile }};
+  --block-text-width-mobile: {{ width_size_mobile }};
+  --subheading-justify: {{ justify }};
+  --subheading-justify-mobile: {{ justify_mobile }};
+  {%- if has_icon -%}
+    --subheading-icon-size: {{ icon_size }}px;
+    --subheading-gap: {{ s.gap | default: 8 | plus: 0 }}px;
+    {%- comment -%}
+      Nothing about the box is emitted for the `none` style, so the fallbacks in
+      `assets/base.css` — `auto` for both axes, `0` for the radius and the
+      border — leave the glyph sitting on its own with no box to size.
+    {%- endcomment -%}
+    {%- comment -%}
+      Every colour below is emitted only when the merchant actually picked one.
+      Left blank, the property is never written and the fallback in
+      `assets/base.css` resolves — which is the scheme's own colour, not a
+      hardcoded hex. That is what keeps an icon belonging to whatever scheme the
+      section is set to until somebody deliberately overrides it.
+    {%- endcomment -%}
+    {%- if s.icon_color != blank -%}
+      --subheading-icon-color: {{ s.icon_color }};
+    {%- endif -%}
+    {%- if icon_style != 'none' -%}
+      --subheading-icon-box-width: {{ icon_box_width }}px;
+      --subheading-icon-box-height: {{ icon_box_height }}px;
+      --subheading-icon-radius: {{ icon_radius }}px;
+      {%- if icon_style == 'solid' and s.icon_background != blank -%}
+        --subheading-icon-background: {{ s.icon_background }};
+      {%- endif -%}
+      {%- if icon_border_style != 'none' and icon_border_width > 0 -%}
+        --subheading-icon-border-width: {{ icon_border_width }}px;
+        --subheading-icon-border-style: {{ icon_border_style }};
+        {%- if s.icon_border_color != blank -%}
+          --subheading-icon-border-color: {{ s.icon_border_color }};
+        {%- endif -%}
+      {%- endif -%}
+    {%- endif -%}
+    {%- if has_divider and s.divider_color != blank -%}
+      --subheading-divider-color: {{ s.divider_color }};
+    {%- endif -%}
+  {%- endif -%}
+  {%- if highlight != 'none' and s.highlight_color != blank -%}
+    --block-highlight-color: {{ s.highlight_color }};
+  {%- endif -%}
+  {%- comment -%}
+    The radius is emitted whatever the background is set to. It used to sit
+    inside the `custom` branch, which tied it to a setting it has nothing to do
+    with: a merchant outlining a transparent pill got a radius control that
+    silently did nothing until they also turned a background on.
+
+    It keeps the name `--block-text-radius` rather than gaining a
+    `--subheading-` twin, because `.block-text--has-background` already reads
+    that property. Two names for one number is how the two rounded corners end
+    up disagreeing.
+  {%- endcomment -%}
+  --block-text-radius: {{ s.border_radius | default: 0 | plus: 0 }}px;
+  {%- if background_mode == 'custom' and s.background_color != blank -%}
+    --block-text-background: {{ s.background_color }};
+  {%- endif -%}
+  {%- if has_border -%}
+    --subheading-border-width: {{ border_width }}px;
+    --subheading-border-style: {{ border_style }};
+    {%- if s.border_color != blank -%}
+      --subheading-border-color: {{ s.border_color }};
+    {%- endif -%}
+  {%- endif -%}
+{%- endcapture -%}
+
+{%- if s.text != blank -%}
+  <motion-effect
+    {% render 'motion-attrs', kind: 'text', block: s, block_level: true %}
+    class="{{ classes }}"
+    data-block-spacing
+    style="{{ block_style | strip_newlines | strip }}"
+    {{ block.shopify_attributes }}
+  >
+    {%- if has_icon -%}
+      {%- comment -%}
+        No `aria-hidden` on this box, and that is a change rather than an
+        omission.
+
+        It used to be here on the grounds that an eyebrow announcing "star, new
+        arrivals" reads the ornament aloud before the thing it decorates — true
+        of the glyph, and `snippets/icon.liquid` already marks every glyph it
+        renders `aria-hidden`, so that case was covered twice.
+
+        It is not true of an upload. An **Alt text** field now sits beside the
+        image picker, and `aria-hidden` on the wrapper would suppress whatever
+        the merchant typed into it — a field that looks like it works and is
+        silently discarded before it reaches anyone. Left off, each source
+        carries its own semantics: the glyph hides itself, and an image is
+        decorative exactly when its alt is empty, which is the rule the platform
+        already has.
+      {%- endcomment -%}
+      <span class="{{ icon_classes }}">
+        {%- if icon_source == 'image' -%}
+          {% render 'image',
+             image: s.icon_image,
+             alt: s.icon_image_alt,
+             sizes: icon_image_sizes,
+             wrapper_class: 'block-subheading__image' %}
+        {%- else -%}
+          {% render 'icon', icon: s.icon, size: icon_size %}
+        {%- endif -%}
+      </span>
+    {%- endif -%}
+
+    {%- if has_divider -%}
+      <span class="block-subheading__divider" aria-hidden="true"></span>
+    {%- endif -%}
+
+    <div class="block-subheading__text">{{ body }}</div>
+  </motion-effect>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "t:blocks.subheading.name",
+  "tag": null,
+  "settings": [
+    { "type": "richtext", "id": "text", "label": "t:shared.text.label", "default": "<p>Subheading</p>" },
+
+    { "type": "header", "content": "t:blocks.subheading.headers.icon" },
+    { "type": "paragraph", "content": "t:blocks.subheading.paragraph" },
+    {
+      "type": "select", "id": "icon_source", "label": "t:blocks.subheading.settings.icon_source.label",
+      "options": [
+        { "value": "none", "label": "t:shared.none.label" },
+        { "value": "icon", "label": "t:blocks.subheading.settings.icon_source.options__2.label" },
+        { "value": "image", "label": "t:blocks.subheading.settings.icon_source.options__3.label" }
+      ],
+      "default": "icon"
+    },
+    {
+      "type": "select", "id": "icon", "label": "t:blocks.subheading.settings.icon.label",
+      "options": [
+        { "value": "star", "label": "t:blocks.subheading.settings.icon.options__1.label" },
+        { "value": "check", "label": "t:blocks.subheading.settings.icon.options__2.label" },
+        { "value": "heart", "label": "t:blocks.subheading.settings.icon.options__3.label" },
+        { "value": "tag", "label": "t:blocks.subheading.settings.icon.options__4.label" },
+        { "value": "truck", "label": "t:blocks.subheading.settings.icon.options__5.label" },
+        { "value": "refresh", "label": "t:blocks.subheading.settings.icon.options__6.label" },
+        { "value": "lock", "label": "t:blocks.subheading.settings.icon.options__7.label" },
+        { "value": "clock", "label": "t:blocks.subheading.settings.icon.options__8.label" },
+        { "value": "location", "label": "t:blocks.subheading.settings.icon.options__9.label" },
+        { "value": "mail", "label": "t:blocks.subheading.settings.icon.options__10.label" },
+        { "value": "note", "label": "t:blocks.subheading.settings.icon.options__11.label" },
+        { "value": "info", "label": "t:blocks.subheading.settings.icon.options__12.label" }
+      ],
+      "default": "star",
+      "visible_if": "{{ block.settings.icon_source == 'icon' }}"
+    },
+    {
+      "type": "image_picker", "id": "icon_image", "label": "t:blocks.subheading.settings.icon_image.label", "info": "t:blocks.subheading.settings.icon_image.info",
+      "visible_if": "{{ block.settings.icon_source == 'image' }}"
+    },
+    {
+      "type": "text", "id": "icon_image_alt", "label": "t:blocks.subheading.settings.icon_image_alt.label", "info": "t:blocks.subheading.settings.icon_image_alt.info",
+      "visible_if": "{{ block.settings.icon_source == 'image' }}"
+    },
+    {
+      "type": "range", "id": "icon_size", "label": "t:blocks.subheading.settings.icon_size.label", "info": "t:blocks.subheading.settings.icon_size.info",
+      "min": 12, "max": 48, "step": 2, "unit": "px", "default": 20,
+      "visible_if": "{{ block.settings.icon_source != 'none' }}"
+    },
+    {
+      "type": "select", "id": "icon_style", "label": "t:blocks.subheading.settings.icon_style.label", "info": "t:blocks.subheading.settings.icon_style.info",
+      "options": [
+        { "value": "none", "label": "t:shared.none.label" },
+        { "value": "solid", "label": "t:blocks.subheading.settings.icon_style.options__2.label" },
+        { "value": "outline", "label": "t:blocks.subheading.settings.icon_style.options__3.label" }
+      ],
+      "default": "solid",
+      "visible_if": "{{ block.settings.icon_source != 'none' }}"
+    },
+    {
+      "type": "color", "id": "icon_background", "label": "t:blocks.subheading.settings.icon_background.label", "info": "t:blocks.subheading.settings.icon_background.info",
+      "visible_if": "{{ block.settings.icon_source != 'none' and block.settings.icon_style == 'solid' }}"
+    },
+    {
+      "type": "color", "id": "icon_color", "label": "t:blocks.subheading.settings.icon_color.label", "info": "t:blocks.subheading.settings.icon_color.info",
+      "visible_if": "{{ block.settings.icon_source == 'icon' }}"
+    },
+    {
+      "type": "range", "id": "icon_width", "label": "t:blocks.subheading.settings.icon_width.label",
+      "min": 16, "max": 96, "step": 2, "unit": "px", "default": 40,
+      "visible_if": "{{ block.settings.icon_source != 'none' and block.settings.icon_style != 'none' }}"
+    },
+    {
+      "type": "range", "id": "icon_height", "label": "t:blocks.subheading.settings.icon_height.label",
+      "min": 16, "max": 96, "step": 2, "unit": "px", "default": 40,
+      "visible_if": "{{ block.settings.icon_source != 'none' and block.settings.icon_style != 'none' }}"
+    },
+    {
+      "type": "select", "id": "icon_border_style", "label": "t:blocks.subheading.settings.icon_border_style.label",
+      "options": [
+        { "value": "none", "label": "t:shared.none.label" },
+        { "value": "solid", "label": "t:shared.border.style.options__1.label" },
+        { "value": "dashed", "label": "t:shared.border.style.options__2.label" }
+      ],
+      "default": "none",
+      "visible_if": "{{ block.settings.icon_source != 'none' and block.settings.icon_style != 'none' }}"
+    },
+    {
+      "type": "range", "id": "icon_border_thickness", "label": "t:shared.border.thickness.label",
+      "min": 0, "max": 8, "step": 1, "unit": "px", "default": 1,
+      "visible_if": "{{ block.settings.icon_source != 'none' and block.settings.icon_style != 'none' and block.settings.icon_border_style != 'none' }}"
+    },
+    {
+      "type": "color", "id": "icon_border_color", "label": "t:blocks.subheading.settings.icon_border_color.label",
+      "visible_if": "{{ block.settings.icon_source != 'none' and block.settings.icon_style != 'none' and block.settings.icon_border_style != 'none' }}"
+    },
+    {
+      "type": "range", "id": "icon_border_radius", "label": "t:shared.border.radius.label", "info": "t:blocks.subheading.settings.icon_border_radius.info",
+      "min": 0, "max": 50, "step": 2, "unit": "px", "default": 50,
+      "visible_if": "{{ block.settings.icon_source != 'none' and block.settings.icon_style != 'none' }}"
+    },
+    {
+      "type": "checkbox", "id": "show_divider", "label": "t:blocks.subheading.settings.show_divider.label", "info": "t:blocks.subheading.settings.show_divider.info",
+      "default": true,
+      "visible_if": "{{ block.settings.icon_source != 'none' }}"
+    },
+    {
+      "type": "color", "id": "divider_color", "label": "t:blocks.subheading.settings.divider_color.label",
+      "visible_if": "{{ block.settings.icon_source != 'none' and block.settings.show_divider }}"
+    },
+    {
+      "type": "range", "id": "gap", "label": "t:blocks.subheading.settings.gap.label", "info": "t:blocks.subheading.settings.gap.info",
+      "min": 0, "max": 24, "step": 2, "unit": "px", "default": 8,
+      "visible_if": "{{ block.settings.icon_source != 'none' }}"
+    },
+
+    { "type": "header", "content": "t:shared.typography.header" },
+    { "type": "paragraph", "content": "t:shared.typography.paragraph" },
+    {
+      "type": "select", "id": "preset", "label": "t:shared.typography.preset.label", "info": "t:shared.typography.preset.info",
+      "options": [
+        { "value": "default", "label": "t:shared.typography.preset.options__1.label" },
+        { "value": "paragraph", "label": "t:shared.typography.preset.options__2.label" },
+        { "value": "subheading", "label": "t:shared.typography.preset.options__3.label" },
+        { "value": "h1", "label": "t:shared.typography.preset.options__4.label" },
+        { "value": "h2", "label": "t:shared.typography.preset.options__5.label" },
+        { "value": "h3", "label": "t:shared.typography.preset.options__6.label" },
+        { "value": "h4", "label": "t:shared.typography.preset.options__7.label" },
+        { "value": "h5", "label": "t:shared.typography.preset.options__8.label" },
+        { "value": "h6", "label": "t:shared.typography.preset.options__9.label" },
+        { "value": "custom", "label": "t:shared.typography.preset.options__10.label" }
+      ],
+      "default": "subheading"
+    },
+    {
+      "type": "select", "id": "font_family", "label": "t:shared.typography.font_family.label",
+      "options": [
+        { "value": "body", "label": "t:shared.typography.font_family.options__2.label" },
+        { "value": "heading", "label": "t:shared.typography.font_family.options__1.label" },
+        { "value": "accent", "label": "t:shared.typography.font_family.options__3.label" }
+      ],
+      "default": "body",
+      "visible_if": "{{ block.settings.preset == 'custom' }}"
+    },
+    {
+      "type": "select", "id": "font_weight", "label": "t:shared.typography.font_weight.label",
+      "options": [
+        { "value": "inherit", "label": "t:shared.typography.font_weight.options__1.label" },
+        { "value": "300", "label": "300" }, { "value": "400", "label": "400" },
+        { "value": "500", "label": "500" }, { "value": "600", "label": "600" },
+        { "value": "700", "label": "700" }, { "value": "800", "label": "800" },
+        { "value": "900", "label": "900" }
+      ],
+      "default": "inherit",
+      "visible_if": "{{ block.settings.preset == 'custom' }}"
+    },
+    {
+      "type": "select", "id": "font_size", "label": "t:shared.typography.font_size.label",
+      "options": [
+        { "value": "12", "label": "12px" }, { "value": "14", "label": "14px" },
+        { "value": "16", "label": "16px" }, { "value": "18", "label": "18px" },
+        { "value": "20", "label": "20px" }, { "value": "24", "label": "24px" },
+        { "value": "28", "label": "28px" }, { "value": "32", "label": "32px" },
+        { "value": "40", "label": "40px" }, { "value": "48", "label": "48px" },
+        { "value": "56", "label": "56px" }, { "value": "64", "label": "64px" },
+        { "value": "72", "label": "72px" }, { "value": "80", "label": "80px" },
+        { "value": "96", "label": "96px" }
+      ],
+      "default": "16",
+      "visible_if": "{{ block.settings.preset == 'custom' }}"
+    },
+    {
+      "type": "select", "id": "font_size_mobile", "label": "t:shared.typography.font_size_mobile.label", "info": "t:shared.typography.font_size_mobile.info",
+      "options": [
+        { "value": "12", "label": "12px" }, { "value": "13", "label": "13px" },
+        { "value": "14", "label": "14px" }, { "value": "15", "label": "15px" },
+        { "value": "16", "label": "16px" }, { "value": "18", "label": "18px" },
+        { "value": "20", "label": "20px" }, { "value": "24", "label": "24px" },
+        { "value": "28", "label": "28px" }, { "value": "32", "label": "32px" },
+        { "value": "40", "label": "40px" }, { "value": "48", "label": "48px" }
+      ],
+      "default": "15",
+      "visible_if": "{{ block.settings.preset == 'custom' }}"
+    },
+    {
+      "type": "select", "id": "line_height", "label": "t:shared.typography.line_height.label",
+      "options": [
+        { "value": "tight", "label": "t:shared.typography.line_height.options__1.label" },
+        { "value": "normal", "label": "t:shared.typography.line_height.options__2.label" },
+        { "value": "loose", "label": "t:shared.typography.line_height.options__3.label" }
+      ],
+      "default": "normal",
+      "visible_if": "{{ block.settings.preset == 'custom' }}"
+    },
+    {
+      "type": "select", "id": "letter_spacing", "label": "t:shared.typography.letter_spacing.label",
+      "options": [
+        { "value": "tight", "label": "t:shared.typography.letter_spacing.options__1.label" },
+        { "value": "normal", "label": "t:shared.typography.letter_spacing.options__2.label" },
+        { "value": "wide", "label": "t:shared.typography.letter_spacing.options__3.label" }
+      ],
+      "default": "normal",
+      "visible_if": "{{ block.settings.preset == 'custom' }}"
+    },
+    {
+      "type": "select", "id": "text_transform", "label": "t:shared.typography.text_transform.label",
+      "options": [
+        { "value": "inherit", "label": "t:shared.typography.text_transform.options__1.label" },
+        { "value": "none", "label": "t:shared.typography.text_transform.options__2.label" },
+        { "value": "capitalize", "label": "t:shared.typography.text_transform.options__3.label" },
+        { "value": "uppercase", "label": "t:shared.typography.text_transform.options__4.label" },
+        { "value": "lowercase", "label": "t:shared.typography.text_transform.options__5.label" }
+      ],
+      "default": "inherit",
+      "visible_if": "{{ block.settings.preset == 'custom' }}"
+    },
+    {
+      "type": "select", "id": "color", "label": "t:shared.typography.color.label", "info": "t:shared.typography.color.info",
+      "options": [
+        { "value": "inherit", "label": "t:shared.typography.color.options__1.label" },
+        { "value": "muted", "label": "t:shared.typography.color.options__2.label" },
+        { "value": "custom", "label": "t:shared.typography.color.options__3.label" },
+        { "value": "gradient", "label": "t:shared.typography.color.options__4.label" }
+      ],
+      "default": "inherit"
+    },
+
+    { "type": "header", "content": "t:blocks.group.headers.appearance" },
+    {
+      "type": "color", "id": "text_color_custom", "label": "t:shared.typography.text_color.label", "info": "t:shared.typography.text_color.info",
+      "visible_if": "{{ block.settings.color == 'custom' }}"
+    },
+    {
+      "type": "color_background", "id": "text_gradient", "label": "t:shared.typography.text_gradient.label", "info": "t:shared.typography.text_gradient.info",
+      "visible_if": "{{ block.settings.color == 'gradient' }}"
+    },
+    {
+      "type": "select", "id": "background", "label": "t:shared.appearance.background.label", "info": "t:shared.appearance.background.info",
+      "options": [
+        { "value": "inherit", "label": "t:shared.appearance.background.options__1.label" },
+        { "value": "custom", "label": "t:shared.appearance.background.options__2.label" }
+      ],
+      "default": "inherit"
+    },
+    {
+      "type": "color_background", "id": "background_color", "label": "t:shared.appearance.background_color.label",
+      "default": "#000000",
+      "visible_if": "{{ block.settings.background == 'custom' }}"
+    },
+    {
+      "type": "select", "id": "border_style", "label": "t:shared.border.style.label", "info": "t:shared.border.style.info",
+      "options": [
+        { "value": "none", "label": "t:shared.none.label" },
+        { "value": "solid", "label": "t:shared.border.style.options__1.label" },
+        { "value": "dashed", "label": "t:shared.border.style.options__2.label" }
+      ],
+      "default": "dashed"
+    },
+    {
+      "type": "range", "id": "border_thickness", "label": "t:shared.border.thickness.label",
+      "min": 0, "max": 8, "step": 1, "unit": "px", "default": 1,
+      "visible_if": "{{ block.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "color", "id": "border_color", "label": "t:shared.border.color.label", "info": "t:blocks.subheading.settings.border_color.info",
+      "visible_if": "{{ block.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range", "id": "border_radius", "label": "t:shared.appearance.border_radius.label", "info": "t:shared.appearance.border_radius.info",
+      "min": 0, "max": 60, "step": 2, "unit": "px", "default": 40
+    },
+
+    { "type": "header", "content": "t:shared.highlight.header" },
+    { "type": "paragraph", "content": "t:shared.highlight.paragraph" },
+    {
+      "type": "select", "id": "highlight_style", "label": "t:shared.highlight.style.label",
+      "options": [
+        { "value": "none", "label": "t:shared.highlight.style.options__1.label" },
+        { "value": "standard", "label": "t:shared.highlight.style.options__2.label" },
+        { "value": "wavy", "label": "t:shared.highlight.style.options__3.label" },
+        { "value": "solid", "label": "t:shared.highlight.style.options__4.label" },
+        { "value": "marker", "label": "t:shared.highlight.style.options__5.label" },
+        { "value": "underline", "label": "t:shared.highlight.style.options__6.label" },
+        { "value": "outline", "label": "t:shared.highlight.style.options__7.label" },
+        { "value": "strikethrough", "label": "t:shared.highlight.style.options__8.label" }
+      ],
+      "default": "none"
+    },
+    {
+      "type": "select", "id": "highlight_target", "label": "t:shared.highlight.target.label", "info": "t:shared.highlight.target.info",
+      "options": [
+        { "value": "em", "label": "t:shared.highlight.target.options__1.label" },
+        { "value": "strong", "label": "t:shared.highlight.target.options__2.label" },
+        { "value": "all", "label": "t:shared.highlight.target.options__3.label" }
+      ],
+      "default": "em",
+      "visible_if": "{{ block.settings.highlight_style != 'none' }}"
+    },
+    {
+      "type": "color", "id": "highlight_color", "label": "t:shared.highlight.color.label", "info": "t:shared.highlight.color.info",
+      "visible_if": "{{ block.settings.highlight_style != 'none' }}"
+    },
+
+    { "type": "header", "content": "t:shared.layout.header" },
+    {
+      "type": "select", "id": "width", "label": "t:shared.layout.width.label", "info": "t:shared.layout.width.info",
+      "options": [
+        { "value": "fit", "label": "t:blocks.group.settings.width.options__1.label" },
+        { "value": "fill", "label": "t:blocks.group.settings.width.options__2.label" }
+      ],
+      "default": "fit"
+    },
+    {
+      "type": "select", "id": "alignment", "label": "t:blocks.group.settings.alignment.label",
+      "options": [
+        { "value": "start", "label": "t:blocks.group.settings.alignment.options__1.label" },
+        { "value": "center", "label": "t:blocks.group.settings.alignment.options__2.label" },
+        { "value": "end", "label": "t:blocks.group.settings.alignment.options__3.label" }
+      ],
+      "default": "start"
+    },
+    {
+      "type": "select", "id": "width_mobile", "label": "t:shared.layout.width_mobile.label",
+      "options": [
+        { "value": "fit", "label": "t:blocks.group.settings.width.options__1.label" },
+        { "value": "fill", "label": "t:blocks.group.settings.width.options__2.label" }
+      ],
+      "default": "fit"
+    },
+    {
+      "type": "select", "id": "alignment_mobile", "label": "t:shared.layout.alignment_mobile.label",
+      "options": [
+        { "value": "start", "label": "t:blocks.group.settings.alignment.options__1.label" },
+        { "value": "center", "label": "t:blocks.group.settings.alignment.options__2.label" },
+        { "value": "end", "label": "t:blocks.group.settings.alignment.options__3.label" }
+      ],
+      "default": "start"
+    },
+
+    { "type": "header", "content": "t:shared.animation.header" },
+    {
+      "type": "select", "id": "animation_text", "label": "t:shared.animation.animation_text.label",
+      "options": [
+        { "value": "inherit", "label": "t:shared.animation.animation_text.options__1.label" },
+        { "value": "none", "label": "t:shared.animation.animation_text.options__2.label" },
+        { "value": "fade-in", "label": "t:shared.animation.animation_text.options__3.label" },
+        { "value": "fade-up", "label": "t:shared.animation.animation_text.options__4.label" },
+        { "value": "slide-up", "label": "t:shared.animation.animation_text.options__5.label" },
+        { "value": "scale", "label": "t:shared.animation.animation_text.options__6.label" },
+        { "value": "blur", "label": "t:shared.animation.animation_text.options__7.label" }
+      ],
+      "default": "inherit"
+    },
+    {
+      "type": "range", "id": "animation_duration", "label": "t:shared.animation.animation_duration.label", "info": "t:shared.animation.animation_duration.info",
+      "min": 0, "max": 1600, "step": 50, "unit": "ms", "default": 0,
+      "visible_if": "{{ block.settings.animation_text != 'none' }}"
+    },
+    {
+      "type": "range", "id": "animation_delay", "label": "t:shared.animation.animation_delay.label", "info": "t:shared.animation.animation_delay.info",
+      "min": 0, "max": 1200, "step": 50, "unit": "ms", "default": 0,
+      "visible_if": "{{ block.settings.animation_text != 'none' }}"
+    },
+
+    {
+      "type": "header",
+      "content": "t:shared.spacing.block_header"
+    },
+    {
+      "type": "select",
+      "id": "padding_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        { "value": "desktop", "label": "t:shared.spacing.devices.options__1.label" },
+        { "value": "mobile", "label": "t:shared.spacing.devices.options__2.label" }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left_mobile",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right_mobile",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    }
+  ],
+  "presets": [
+    {
+      "name": "t:blocks.subheading.name",
+      "settings": {
+        "text": "<p>Subheading</p>",
+        "preset": "subheading",
+        "width": "fit",
+        "icon_source": "icon",
+        "icon": "star",
+        "icon_style": "solid",
+        "icon_size": 14,
+        "icon_width": 22,
+        "icon_height": 22,
+        "icon_border_radius": 50,
+        "show_divider": true,
+        "gap": 8,
+        "border_style": "dashed",
+        "border_thickness": 1,
+        "border_radius": 40,
+        "padding_top": 4,
+        "padding_bottom": 4,
+        "padding_left": 4,
+        "padding_right": 16
+      }
+    }
+  ]
+}
+{% endschema %}

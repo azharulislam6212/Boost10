@@ -9204,6 +9204,223 @@ swiper-carousel {
 }
 
 /* ==========================================================================
+   Subheading block
+   ==========================================================================
+   The eyebrow above a heading: one short line, optionally with an icon beside
+   it. Driven by `blocks/subheading.liquid`.
+
+   ## Almost none of this block is here
+
+   Typography, the ten presets, colour, the gradient clip, the highlight styles,
+   the alignment classes and the background panel are all the Text block's,
+   above. `blocks/subheading.liquid` puts `.block-text` and `.rte` on
+   the same element as `.block-subheading`, so every one of those rules already
+   matches and a change to Theme settings › Typography moves this block with
+   every other run of text on the page. There is no second copy of the type map
+   in this section, and nothing to keep in step by hand.
+
+   What is left is the one thing a run of text does not need: a row. The icon
+   and the words on one centred line with a gap between them, and the gap only
+   when there is an icon for it to sit between.
+
+   ## Why it is unlayered
+
+   Same reason as the Text block section above: the `.rte` rules are unlayered,
+   and an unlayered rule beats every `@layer` however specific the layered one
+   is. Everything here is scoped to `.block-subheading`, so leaving the layer
+   costs nothing elsewhere.
+   -------------------------------------------------------------------------- */
+
+.block-subheading {
+  display: flex;
+  align-items: center;
+
+  /* `.block-text--align-*` moves the *box* — text-align, align-self and an auto
+     margin — which is the whole answer while the block is set to Fit and hugs
+     its contents. Set to Fill it is a full-width row, and none of those three
+     position a flex child: without this the icon and the words sit at the start
+     whatever the alignment says. Written by the block from the same setting, so
+     the two never disagree. */
+  justify-content: var(--subheading-justify, flex-start);
+
+  /* No gap unless the block emitted one, and it only emits one when an icon is
+     actually going to render. A gap with a single child is invisible either
+     way — but declaring `0` here rather than a guessed default is what makes
+     the merchant's Gap slider the only thing that decides the number. */
+  gap: var(--subheading-gap, 0);
+
+  /* The block's own outline and corners. Both are independent of the
+     background: an outlined pill with nothing behind it is a shape merchants
+     ask for constantly, and the radius rounds a background, a border or both.
+
+     `border-style` defaults to `solid` and the *width* to `0`, so the shorthand
+     is inert until the merchant sets a thickness — and a merchant who picks
+     "None" gets `border-style: none`, which kills the border whatever the
+     thickness says. No second guard needed in Liquid. */
+  border-width: var(--subheading-border-width, 0);
+  border-style: var(--subheading-border-style, solid);
+  border-color: var(--subheading-border-color, currentColor);
+  border-radius: var(--block-text-radius, 0);
+
+  /* Block-direction margin, explicitly none.
+     `.rte` is on this element, and the `.rte` group in section 4 sets margins
+     on nearly everything a rich text field can emit. The two `.rte > *` resets
+     only reach the *first* and *last* child, which here are the icon box and
+     the text wrapper — so anything the merchant's markup put margins on was
+     free to push the row around. An eyebrow's spacing is the padding sliders'
+     job, and nothing else's.
+
+     Inline margin is deliberately left alone: `.block-text--align-*` uses
+     `margin-inline: auto` to centre the box, and zeroing it here would break
+     alignment on every block set to Fit. */
+  margin-block: 0;
+}
+
+/* ---- the text wrapper ----
+   `align-items: center` centres a flex item's *margin box*, so any block-
+   direction margin inside this wrapper pushes the words off the icon's centre
+   line — the row stops looking aligned even though the alignment is working
+   exactly as asked.
+
+   `.rte` is on the row, and section 4 gives margins to nearly everything a
+   rich text field can emit. Its own two resets cannot help here: they are
+   `.rte > *:first-child` and `:last-child`, and the direct children of the row
+   are the icon box and this wrapper — never the paragraph or heading inside it.
+   So a heading preset, which normalises the tags to real headings, picked up
+   `.rte :is(h1…h6)`'s `var(--space-6)` above and dropped the text 2.4rem.
+
+   Two things this needs that the previous version got wrong:
+
+     * the wrapper itself, not only its contents. A child's top margin collapses
+       out through a plain block wrapper, so zeroing the children alone still
+       left a wrapper that had inherited the margin it was supposed to absorb.
+     * a descendant combinator, not `>`. Merchant markup nests — a heading
+       inside a list item, text inside a `<strong>` inside a `<p>` — and a
+       child-only reset stops at the first level.
+
+   Naming the elements rather than using `*` is what carries the specificity:
+   `(0,2,1)` against `.rte :is(h1…h6)`, `.rte ul`, `.rte ol`, `.rte li` and
+   `.rte blockquote`, which are all `(0,1,1)`. A universal selector adds
+   nothing and would tie with them instead. */
+.block-subheading .block-subheading__text,
+.block-subheading .block-subheading__text :is(p, h1, h2, h3, h4, h5, h6, ul, ol, li, blockquote) {
+  margin-block: 0;
+}
+
+/* Lets a long line wrap rather than pushing the icon out of the row. A flex
+   item's `min-inline-size` is `auto`, which means "never smaller than the
+   content" — the default that makes long words overflow flex containers. */
+.block-subheading__text {
+  min-inline-size: 0;
+}
+
+/* ---- the icon box ----
+   Three treatments, one box. `none` is the bare glyph: no width, no height, no
+   border, no radius, because there is no box to give them to — which is why the
+   block emits none of those properties for it and every fallback below is the
+   "no box" answer.
+
+   `flex: 0 0 auto` on all three, so a long line of text never squeezes the icon
+   narrower than the merchant set it. */
+.block-subheading__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+
+  inline-size: var(--subheading-icon-box-width, auto);
+  block-size: var(--subheading-icon-box-height, auto);
+
+  border-width: var(--subheading-icon-border-width, 0);
+  border-style: var(--subheading-icon-border-style, solid);
+  border-color: var(--subheading-icon-border-color, currentColor);
+  border-radius: var(--subheading-icon-radius, 0);
+
+  /* Declared on the base rule, not only on `--solid`, so **Icon color** reaches
+     an outlined badge and a bare glyph too. `inherit` is the fallback here —
+     an icon with no box belongs to the text beside it — and the solid rule
+     below swaps the fallback for the one that reads on a filled badge. */
+  color: var(--subheading-icon-color, inherit);
+}
+
+/* Painted from the scheme rather than from two more swatches, the same way
+   `snippets/color-schemes.liquid` derives the cart bubble and the badges. A
+   merchant who switches colour scheme gets an icon that still belongs to it.
+
+   `color` rather than `fill`: every glyph in `snippets/icon.liquid` is drawn
+   with `stroke="currentColor"`, so setting the text colour recolours the glyph
+   and an uploaded image is left alone. */
+.block-subheading__icon--solid {
+  background-color: var(--subheading-icon-background, var(--color-primary-button-background));
+  color: var(--subheading-icon-color, var(--color-primary-button-text));
+}
+
+/* The glyph keeps the size it was rendered at — `snippets/icon.liquid` writes
+   `--icon-size` inline from the `size:` parameter — so the box is free to be
+   larger than it without stretching it. */
+.block-subheading__icon > svg.icon {
+  flex: 0 0 auto;
+}
+
+/* ---- the divider ----
+   The rule between the icon and the words. An empty flex child rather than a
+   border on the icon box or a pseudo-element on the text, for two reasons: a
+   border cannot be inset from its own box's edges, and the rule is deliberately
+   shorter than the row and centred on it; and as a real child it sits in the
+   flow, so the Gap slider spaces it on both sides with nothing extra to write.
+
+   Sized in `em` so it tracks the type — a Subheading set to H2 gets a taller
+   rule without a second setting — and `align-self: center` rather than
+   `stretch`, which is the flex default and would run it the full height of the
+   row.
+
+   `currentColor` is the fallback because in the design the rule is the same
+   colour as the words it separates, and that stays true through a scheme
+   change. */
+.block-subheading__divider {
+  margin-block: 0;
+  flex: 0 0 auto;
+  align-self: center;
+  inline-size: var(--subheading-divider-width, 1px);
+  block-size: var(--subheading-divider-height, 1.2em);
+  background-color: var(--subheading-divider-color, currentColor);
+}
+
+/* The upload is sized by the same Icon size the glyph uses and keeps its own
+   proportions: `snippets/image.liquid` reserves the ratio on the wrapper, so
+   only the width is stated here and the height follows from it. The two `max-`
+   caps stop a tall or wide upload spilling out of a box that is smaller than
+   it, and `contain` scales it down whole rather than cropping. */
+.block-subheading__image {
+  inline-size: var(--subheading-icon-size, 2rem);
+  max-inline-size: 100%;
+  max-block-size: 100%;
+}
+
+.block-subheading__image img {
+  object-fit: contain;
+}
+
+/* A border needs breathing room for the same reason a background does — see
+   `.block-text--has-background` above, whose values these match so a pill with
+   both does not sit differently from a pill with one. Custom properties rather
+   than `padding`, because `[data-block-spacing]` reads those and a `padding`
+   shorthand here would win outright and kill all four sliders. */
+.block-subheading--bordered {
+  --block-padding-block-start: var(--space-1);
+  --block-padding-block-end: var(--space-1);
+  --block-padding-inline-start: var(--space-1);
+  --block-padding-inline-end: var(--space-4);
+}
+
+@media screen and (max-width: 749px) {
+  .block-subheading {
+    justify-content: var(--subheading-justify-mobile, var(--subheading-justify, flex-start));
+  }
+}
+
+
+/* ==========================================================================
    Shopify dynamic checkout — "Buy it now"
    ==========================================================================
    Shopify injects this button and its stylesheet from the platform, not from
