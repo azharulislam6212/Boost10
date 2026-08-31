@@ -52,6 +52,8 @@
 
   @param {object} settings - Block settings
   @param {string} [children] - Rendered child blocks
+  @param {string} [extra_classes] - Extra classes for the wrapper, so a block
+    built on top of a group can name itself without forking this snippet
   @param {string} [shopify_attributes] - Editor attributes
 
   @example
@@ -97,6 +99,11 @@
   # with `!= blank`. An unset setting is nil in Shopify and Undefined in other
   # Liquid engines, and only one of those is blank — a difference that silently
   # emitted `--group-inline:` with no value.
+
+  # The alignment on its own, captured before a distribution can replace it.
+  # See `--group-align` below for what reads it.
+  assign alignment_axis = inline_axis
+
   assign distribution = settings.distribution | default: 'none'
   if is_row and distribution != 'none'
     assign inline_axis = distribution
@@ -220,6 +227,14 @@
   if sticky_desktop
     assign classes = classes | append: ' block-group--sticky'
   endif
+
+  # Appended last so a caller's own modifier always sits after the group's own
+  # classes, and a block built on this snippet can style itself without forking
+  # it.
+  if extra_classes != blank
+    assign classes = classes | append: ' ' | append: extra_classes
+  endif
+
   assign inherit_color_scheme = settings.inherit_color_scheme | default: false
   assign scheme = settings.color_scheme | default: ''
   if inherit_color_scheme == false and scheme != ''
@@ -252,6 +267,21 @@
     --group-swipe-width: {{ column_width_mobile }}%;
   {%- endif -%}
   --group-inline: {{ inline_axis }};
+  {%- comment -%}
+    The alignment on its own, with no distribution folded into it.
+
+    `--group-inline` is the main axis and legitimately carries `space-between`
+    on a row, where it lands on `justify-content`. Once that row stacks on a
+    phone the same value lands on `align-items`, and `align-items:
+    space-between` is not valid — the declaration is dropped and the stack
+    falls back to `stretch`. That is how a right-hand button ends up spanning
+    the full width on a phone.
+
+    So the raw alignment travels alongside it and the mobile rule prefers this
+    one. A group saved before this property existed has no `--group-align` and
+    falls back to `--group-inline`, exactly as it behaved before.
+  {%- endcomment -%}
+  --group-align: {{ alignment_axis }};
   --group-block: {{ block_axis }};
   --group-width: {{ width_value }};
   --group-width-size: {{ width_size }};

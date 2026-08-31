@@ -5521,11 +5521,20 @@
     }
 
     /* A row of columns on a phone is a stack, unless the merchant said
-       otherwise — two 40% columns at 390px is two unreadable columns. */
+       otherwise — two 40% columns at 390px is two unreadable columns.
+
+       `--group-align` rather than `--group-inline`, because the two differ
+       exactly when a distribution is set: `--group-inline` then carries
+       `space-between`, which is valid on the `justify-content` it feeds on a
+       desktop row and *invalid* on the `align-items` it would feed here. An
+       invalid declaration is dropped, so the stack silently fell back to
+       `stretch` and a right-hand button spanned the full width of a phone.
+       `--group-align` is the same value with no distribution folded in; a group
+       saved before it existed falls back to `--group-inline` and is unchanged. */
     .block-group--row.block-group--stack-mobile {
       flex-direction: column;
       justify-content: var(--group-block, start);
-      align-items: var(--group-inline, start);
+      align-items: var(--group-align, var(--group-inline, start));
     }
 
     /* ---- swipe ----
@@ -5565,6 +5574,33 @@
       max-inline-size: var(--group-swipe-width, 100%);
       scroll-snap-align: start;
     }
+  }
+
+  /* ==========================================================================
+     Section header
+     ==========================================================================
+     A group with a name. Every layout control it has is the group's, and
+     `blocks/section-header.liquid` renders `snippets/group.liquid` to get them —
+     so there is nothing to restate here about direction, gaps, alignment or the
+     mobile stack.
+
+     What the class is for is the one promise the settings alone cannot keep:
+     in the horizontal preset the button sits *beside* the copy, never under it.
+     A group row wraps by default, which is right for a row of arbitrary columns
+     and wrong for a two-sided header — a long headline would push the call to
+     action onto its own line at some width nobody tested, and the layout would
+     look like a mistake rather than a choice.
+
+     The left-hand side fills (`flex: 1 1 0%`), so it yields rather than wrapping
+     and the pair stays on one line at every desktop width. Below 750px the
+     group's own stacking rule turns the row into a column and `nowrap` becomes
+     irrelevant, which is where the button is meant to move under the copy.
+     -------------------------------------------------------------------------- */
+
+  /* Two classes, so this wins over `.block-group--row`'s `wrap` wherever the two
+     end up sitting in the file. */
+  .block-group--row.block-section-header--horizontal {
+    flex-wrap: nowrap;
   }
 
   /* ==========================================================================
