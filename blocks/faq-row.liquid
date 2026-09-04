@@ -1,0 +1,367 @@
+{% doc %}
+  blocks/faq-row.liquid
+
+  One question and whatever answers it, inside a `<faq-accordion>`.
+
+  ## The answer is blocks, not a rich text field
+
+  It used to be one `richtext` setting, which meant an answer could only ever be
+  prose. Half the questions a store actually gets are answered better by
+  something else — a size table, a delivery banner, an image of the returns
+  label, a button to the policy page — and none of that fits in a rich text
+  field.
+
+  So the panel is `{% content_for 'blocks' %}` and the row accepts `@theme`:
+  every block the theme has is available inside an answer, and the Text block is
+  what the preset puts there, so the default row is still a question and a
+  paragraph. Nothing here knows what a Text block is.
+
+  A linked **Page** still renders after the blocks. That is admin HTML rather
+  than blocks, so it keeps the `.rte` wrapper the blocks supply for themselves.
+
+  ## Still a `<details>`
+
+
+  Same reasoning as `blocks/collapsible.liquid`: the disclosure is native, so the
+  answer is on the page with JavaScript off, `<summary>` is already a button with
+  an expanded state to a screen reader, and the browser's own in-page search
+  finds the text. Nothing here re-implements that with a `<button>` and an
+  `aria-expanded` of its own.
+
+  The open and close motion belongs to `<accordion-element>` in
+  `assets/modules.js` — a measured WAAPI height animation that every other
+  disclosure group in the theme already uses. This file contributes markup, not a
+  second animation system: the panel is a plain wrapper precisely so that
+  animation has a single box to measure.
+
+  ## The icon is the Subheading block's, by reference
+
+  `blocks/subheading.liquid` settled how an icon is chosen in this theme —
+  **None**, **Icon** or **Image**, one field per source, the chosen one shown and
+  the others hidden — and the same four setting ids are used here (`icon_source`,
+  `icon`, `icon_image`, `icon_image_alt`) so a merchant who has configured a
+  Subheading already knows this control. The glyph comes from
+  `snippets/icon.liquid` and an upload from `snippets/image.liquid`, which is
+  where every other icon and image in the theme comes from.
+
+  Only the box is this file's own, and it is derived rather than configured: the
+  merchant sets **Icon size** and the tile around it follows, so the two can
+  never disagree.
+{% enddoc %}
+
+{%- liquid
+  assign s = block.settings
+
+  assign question = s.question
+  assign icon_source = s.icon_source | default: 'none'
+  assign icon_size = s.icon_size | default: 16 | plus: 0
+
+  assign has_icon = false
+  if icon_source == 'icon' and s.icon != blank
+    assign has_icon = true
+  endif
+  if icon_source == 'image' and s.icon_image != blank
+    assign has_icon = true
+  endif
+
+  assign toggle = s.toggle_style | default: 'plus'
+
+  # The icon tile grows with the glyph rather than taking a second slider that
+  # can be set smaller than the thing it contains.
+  assign icon_box = icon_size | plus: 12
+-%}
+
+{%- if question != blank -%}
+  {%- capture row_style -%}
+    {%- render 'spacing', block: s, declarations: true -%}
+    {%- if has_icon -%}
+      --faq-row-icon-size: {{ icon_size }}px;
+      --faq-row-icon-box: {{ icon_box }}px;
+    {%- endif -%}
+  {%- endcapture -%}
+
+  <details
+    class="faq-row faq-row--toggle-{{ toggle }}{% if has_icon %} faq-row--has-icon{% endif %}"
+    {% if s.open_by_default %}open data-default-open{% endif %}
+    data-block-spacing
+    style="{{ row_style | strip_newlines | strip }}"
+    {{ block.shopify_attributes }}
+  >
+    <summary class="faq-row__summary">
+      {%- if has_icon -%}
+        {%- comment -%}
+          No `aria-hidden` on the tile. `snippets/icon.liquid` already hides the
+          glyphs it renders, and an upload carries its own **Alt text** field —
+          hiding the wrapper would silently discard whatever the merchant typed
+          into it. Each source keeps its own semantics, as in the Subheading
+          block.
+        {%- endcomment -%}
+        <span class="faq-row__icon">
+          {%- if icon_source == 'image' -%}
+            {% render 'image',
+               image: s.icon_image,
+               alt: s.icon_image_alt,
+               sizes: '48px',
+               wrapper_class: 'faq-row__icon-image' %}
+          {%- else -%}
+            {% render 'icon', icon: s.icon, size: icon_size %}
+          {%- endif -%}
+        </span>
+      {%- endif -%}
+
+      <span class="faq-row__question">{{ question }}</span>
+
+      {%- comment -%}
+        Decorative. `<summary>` conveys the expanded state already, so labelling
+        this would announce the same thing twice.
+      {%- endcomment -%}
+      <span class="faq-row__toggle" aria-hidden="true">
+        {%- if toggle == 'arrow' -%}
+          {% render 'icon', icon: 'chevron-down', size: 14, class: 'faq-row__chevron' %}
+        {%- else -%}
+          <span class="faq-row__plus"></span>
+        {%- endif -%}
+      </span>
+    </summary>
+
+    {%- comment -%}
+      A plain wrapper, deliberately. `<accordion-element>` animates the height of
+      the `<details>` itself and measures this box to find the end value; a
+      `grid-template-rows` trick here would animate against that measurement and
+      land with a visible jump.
+    {%- endcomment -%}
+    <div class="faq-row__panel">
+      <div class="faq-row__answer">
+        {% content_for 'blocks' %}
+
+        {%- comment -%}
+          A linked page keeps a rich text wrapper of its own. It is a body of
+          HTML the merchant wrote in the admin rather than blocks, so nothing is
+          bringing `.rte` typography with it the way a Text block does.
+        {%- endcomment -%}
+        {%- if s.page != blank -%}
+          <div class="rte">{{ s.page.content }}</div>
+        {%- endif -%}
+      </div>
+    </div>
+  </details>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "t:blocks.faq_row.name",
+  "tag": null,
+  "blocks": [
+    { "type": "@theme" },
+    { "type": "@app" }
+  ],
+  "settings": [
+    {
+      "type": "text",
+      "id": "question",
+      "label": "t:blocks.faq_row.settings.question.label",
+      "default": "How long does delivery take?"
+    },
+    {
+      "type": "page",
+      "id": "page",
+      "label": "t:blocks.faq_row.settings.page.label",
+      "info": "t:blocks.faq_row.settings.page.info"
+    },
+    {
+      "type": "checkbox",
+      "id": "open_by_default",
+      "label": "t:blocks.faq_row.settings.open_by_default.label",
+      "info": "t:blocks.faq_row.settings.open_by_default.info",
+      "default": false
+    },
+
+    { "type": "header", "content": "t:blocks.subheading.headers.icon" },
+    { "type": "paragraph", "content": "t:blocks.faq_row.paragraphs.icon" },
+    {
+      "type": "select",
+      "id": "icon_source",
+      "label": "t:blocks.subheading.settings.icon_source.label",
+      "options": [
+        { "value": "none", "label": "t:shared.none.label" },
+        { "value": "icon", "label": "t:blocks.subheading.settings.icon_source.options__2.label" },
+        { "value": "image", "label": "t:blocks.subheading.settings.icon_source.options__3.label" }
+      ],
+      "default": "icon"
+    },
+    {
+      "type": "select",
+      "id": "icon",
+      "label": "t:blocks.subheading.settings.icon.label",
+      "options": [
+        { "value": "star", "label": "t:blocks.subheading.settings.icon.options__1.label" },
+        { "value": "check", "label": "t:blocks.subheading.settings.icon.options__2.label" },
+        { "value": "heart", "label": "t:blocks.subheading.settings.icon.options__3.label" },
+        { "value": "tag", "label": "t:blocks.subheading.settings.icon.options__4.label" },
+        { "value": "truck", "label": "t:blocks.subheading.settings.icon.options__5.label" },
+        { "value": "refresh", "label": "t:blocks.subheading.settings.icon.options__6.label" },
+        { "value": "lock", "label": "t:blocks.subheading.settings.icon.options__7.label" },
+        { "value": "clock", "label": "t:blocks.subheading.settings.icon.options__8.label" },
+        { "value": "location", "label": "t:blocks.subheading.settings.icon.options__9.label" },
+        { "value": "mail", "label": "t:blocks.subheading.settings.icon.options__10.label" },
+        { "value": "note", "label": "t:blocks.subheading.settings.icon.options__11.label" },
+        { "value": "info", "label": "t:blocks.subheading.settings.icon.options__12.label" }
+      ],
+      "default": "note",
+      "visible_if": "{{ block.settings.icon_source == 'icon' }}"
+    },
+    {
+      "type": "image_picker",
+      "id": "icon_image",
+      "label": "t:blocks.subheading.settings.icon_image.label",
+      "info": "t:blocks.subheading.settings.icon_image.info",
+      "visible_if": "{{ block.settings.icon_source == 'image' }}"
+    },
+    {
+      "type": "text",
+      "id": "icon_image_alt",
+      "label": "t:blocks.subheading.settings.icon_image_alt.label",
+      "info": "t:blocks.subheading.settings.icon_image_alt.info",
+      "visible_if": "{{ block.settings.icon_source == 'image' }}"
+    },
+    {
+      "type": "range",
+      "id": "icon_size",
+      "label": "t:blocks.subheading.settings.icon_size.label",
+      "info": "t:blocks.faq_row.settings.icon_size.info",
+      "min": 12,
+      "max": 40,
+      "step": 2,
+      "unit": "px",
+      "default": 16,
+      "visible_if": "{{ block.settings.icon_source != 'none' }}"
+    },
+
+    { "type": "header", "content": "t:blocks.collapsible.headers.toggle" },
+    {
+      "type": "select",
+      "id": "toggle_style",
+      "label": "t:blocks.collapsible.settings.toggle_style.label",
+      "options": [
+        { "value": "plus", "label": "t:blocks.collapsible.settings.toggle_style.options__1.label" },
+        { "value": "arrow", "label": "t:blocks.collapsible.settings.toggle_style.options__2.label" }
+      ],
+      "default": "plus"
+    },
+
+    { "type": "header", "content": "t:shared.spacing.block_header" },
+    {
+      "type": "select",
+      "id": "padding_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        { "value": "desktop", "label": "t:shared.spacing.devices.options__1.label" },
+        { "value": "mobile", "label": "t:shared.spacing.devices.options__2.label" }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left_mobile",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right_mobile",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    }
+  ],
+  "presets": [
+    {
+      "name": "t:blocks.faq_row.name",
+      "blocks": [
+        {
+          "type": "text",
+          "settings": {
+            "text": "<p>Orders ship within two working days. You will get a tracking link as soon as the parcel leaves us.</p>",
+            "preset": "paragraph"
+          }
+        }
+      ]
+    }
+  ]
+}
+{% endschema %}

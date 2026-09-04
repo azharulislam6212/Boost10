@@ -1020,105 +1020,6 @@ export class DeferredMedia extends BaseComponent {
 defineComponent('deferred-media', DeferredMedia);
 
 /* ==========================================================================
-   <faq-search>
-   ========================================================================== */
-
-/**
- * Live filtering for a list of questions.
- *
- * Filters what is already on the page rather than querying anything. A store's
- * FAQ is twenty rows, not twenty thousand, and a request per keystroke to search
- * content the browser already has is a worse experience and a worse bill.
- *
- * Matching runs over the question *and* its answer, because customers search for
- * the word in the answer — "refund", "tracking number" — far more often than for
- * the phrasing the merchant chose for the heading.
- *
- * The result count is announced politely rather than assertively: a live region
- * that interrupts on every keystroke makes a screen reader unusable while typing.
- *
- * Markup:
- *
- *   <faq-search>
- *     <input type="search" data-ref="input">
- *     <p data-ref="status" class="visually-hidden" role="status"></p>
- *   </faq-search>
- */
-export class FaqSearch extends BaseComponent {
-  static requiredRefs = ['input'];
-
-  setup() {
-    this.on(this.refs.input, 'input', debounce(() => this.filter(this.refs.input.value), 200));
-
-    this.on(this.refs.input, 'keydown', (event) => {
-      if (event.key !== 'Escape') return;
-      this.refs.input.value = '';
-      this.filter('');
-    });
-  }
-
-  /**
-   * @returns {HTMLElement[]}
-   */
-  get rows() {
-    const scope = this.closest('[data-faq-root]') || document;
-    return Array.from(scope.querySelectorAll('[data-faq-row]'));
-  }
-
-  /**
-   * @param {string} query
-   */
-  filter(query) {
-    const term = query.trim().toLowerCase();
-    let matches = 0;
-
-    for (const row of this.rows) {
-      const hit = term === '' || row.textContent.toLowerCase().includes(term);
-      row.toggleAttribute('hidden', !hit);
-
-      // A row matched on its answer is worth opening: the customer is looking at
-      // a heading that does not obviously contain what they searched for.
-      if (hit && term !== '' && row instanceof HTMLDetailsElement) {
-        const heading = row.querySelector('summary')?.textContent?.toLowerCase() ?? '';
-        row.open = !heading.includes(term);
-      }
-
-      if (hit) matches += 1;
-    }
-
-    // Groups that lost every row would otherwise leave a heading over nothing.
-    const scope = this.closest('[data-faq-root]') || document;
-    for (const group of scope.querySelectorAll('[data-faq-group]')) {
-      const visible = group.querySelectorAll('[data-faq-row]:not([hidden])').length;
-      group.toggleAttribute('hidden', visible === 0);
-    }
-
-    this.toggleAttribute('data-filtering', term !== '');
-    this.#status(term, matches);
-  }
-
-  /**
-   * @param {string} term
-   * @param {number} matches
-   * @private
-   */
-  #status(term, matches) {
-    const target = this.refs.status;
-    if (!(target instanceof HTMLElement)) return;
-
-    target.textContent = term === ''
-      ? ''
-      : themeString('faqResults', '', { count: matches });
-
-    const empty = this.closest('[data-faq-root]')?.querySelector('[data-faq-empty]');
-    if (empty instanceof HTMLElement) empty.toggleAttribute('hidden', matches > 0 || term === '');
-  }
-}
-
-defineComponent('faq-search', FaqSearch);
-
-
-/* ==========================================================================
    <share-button>
    ========================================================================== */
 
@@ -1265,4 +1166,4 @@ export class ShareButton extends BaseComponent {
 
 defineComponent('share-button', ShareButton);
 
-export default { AccordionElement, TabsElement, ShowMore, DeferredMedia, FaqSearch, ShareButton };
+export default { AccordionElement, TabsElement, ShowMore, DeferredMedia, ShareButton };

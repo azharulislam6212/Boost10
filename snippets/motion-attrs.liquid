@@ -15,6 +15,10 @@
   revealed without animating — the markup stays identical either way, so no
   section needs an if/else around its content.
 
+  The theme editor's preset preview takes the same path, so the picker's
+  thumbnail is the finished frame rather than the hidden one. See the note on
+  `request.visual_preview_mode` below.
+
   @param {string} kind - 'text' or 'image'. Chooses which setting family and which theme-level default to fall back to.
   @param {object} [block] - `block.settings`
   @param {object} [section] - `section.settings`
@@ -129,6 +133,24 @@
   unless settings.animations_reveal_on_scroll
     assign resolved = 'none'
   endunless
+
+  # ...and the theme editor's preset preview wins over that.
+  #
+  # To fill the thumbnails in the Add block / Add section picker, the editor
+  # renders the preset on a throwaway page and captures it. `<motion-effect>`
+  # hides its content the moment it takes charge and only reveals it after the
+  # load cascade plus the animation's own duration — so that capture lands on an
+  # element that is still at `opacity: 0`. A whole preset made of animated
+  # blocks captures as a blank frame, and a blank frame is what the picker
+  # reports as "No preview available".
+  #
+  # Nobody scrolls a preview, so there is nothing for a scroll reveal to do
+  # there in the first place. `none` makes the component mark itself revealed
+  # without ever writing a resting state, which is exactly the finished frame
+  # the merchant is being shown. The storefront is untouched.
+  if request.visual_preview_mode
+    assign resolved = 'none'
+  endif
 
   # ---- timing: explicit argument › block › section › preset default ------
   # Same coercion for the timings. `0` is the "unset" value here — it is what

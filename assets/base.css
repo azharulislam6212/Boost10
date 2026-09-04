@@ -4892,31 +4892,248 @@
   .main-404__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-3); margin-block-start: var(--space-7); }
   .main-404__blocks { margin-block-start: var(--space-9); }
 
-  /* ---- FAQ, about, marquee, contact, store finder ------------------------ */
+  /* ---- FAQ ---------------------------------------------------------------
+     One column of questions. The disclosure animation is
+     the accordion element, and is not restated here.
+     ---------------------------------------------------------------------- */
 
-  .main-faq__head { margin-block-end: var(--space-7); }
-  .main-faq__head--center { text-align: center; }
-  .main-faq__head--end { text-align: end; }
-  .main-faq__heading { font-size: var(--font-size-h1); }
-  .main-faq__text { margin-block-start: var(--space-3); color: var(--color-accent-text); }
-  .main-faq__group + .main-faq__group { margin-block-start: var(--space-7); }
-  .main-faq__group-title { font-size: var(--font-size-h4); margin-block-end: var(--space-3); }
-  .main-faq__empty { padding-block: var(--space-8); text-align: center; color: var(--color-accent-text); }
-  .main-faq__extra > * + * { margin-block-start: var(--space-4); }
-  .main-faq__tabs [role='tablist'] { flex-wrap: wrap; margin-block-end: var(--space-5); }
+  /* The section's own surface. Every value is zero or transparent unless the
+     merchant set it, so a section that touches none of these settings renders
+     exactly as it did before any of them existed. */
+  .faq {
+    border-radius: var(--faq-radius, 0);
 
-  .faq-search { max-inline-size: 42rem; margin-block-start: var(--space-5); margin-inline: auto; }
-  .faq-search__field { position: relative; display: flex; align-items: center; gap: var(--space-2); }
-  .faq-search__field .icon { position: absolute; inset-inline-start: var(--space-3); pointer-events: none; }
-  .faq-search__field input { padding-inline-start: var(--space-8); }
+    /* `transparent` rather than `currentColor` so a width of 0 cannot paint a
+       hairline, matching how the footer draws its own border. */
+    border: var(--faq-border-width, 0px) solid var(--faq-border-color, transparent);
 
-  .faq-rows { display: block; }
-  .faq-row { border-block-end: 1px solid var(--color-border); }
-  .faq-row__summary { display: flex; align-items: center; gap: var(--space-3); padding-block: var(--space-4); }
-  .faq-row__question { flex: 1 1 auto; font-weight: 500; }
-  .faq-row__chevron { transition: transform var(--transition-fast); }
+    margin-block-start: var(--faq-margin-block-start, 0px);
+    margin-block-end: var(--faq-margin-block-end, 0px);
+  }
+
+  /* Clipping is only needed to keep a background picture inside the rounded
+     corners, so it is scoped to the case that needs it — an unconditional
+     `overflow: hidden` here would cut off a focus ring on the outermost row.
+     `.has-background-media` already supplies `position: relative` and the
+     isolated stacking context, so z-index 1 is all the content needs. */
+  .faq.has-background-media {
+    overflow: hidden;
+  }
+
+  .faq.has-background-media > :not(.background-media) {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ---- the arrangement ----
+
+     One flex container, driven by the section's Layout settings. The vocabulary
+     is the Group block's on purpose: Alignment is always the horizontal axis and
+     Position always the vertical one, and this file is the single place that
+     knows which CSS property reads which at a given direction. A merchant who
+     has laid out a Group already knows every control here.
+
+     Every property keeps the old value as its fallback, so a section saved
+     before these settings existed renders exactly as it did — a stack with a
+     `--space-6` gap. */
+  .faq__content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--faq-content-gap-y, var(--space-6)) var(--faq-content-gap-x, var(--space-6));
+    min-inline-size: 0;
+  }
+
+  .faq__content--column {
+    flex-direction: column;
+    align-items: var(--faq-content-inline, stretch);
+    justify-content: var(--faq-content-block, start);
+  }
+
+  .faq__content--row {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: var(--faq-content-inline, start);
+    align-items: var(--faq-content-block, start);
+  }
+
+  /* Text follows the box, the same way it does inside a group. A cluster aligned
+     right whose paragraphs stayed left-aligned reads as a mistake rather than a
+     choice. */
+  .faq__content--column:where([style*='--faq-content-inline: center']) { text-align: center; }
+  .faq__content--column:where([style*='--faq-content-inline: end']) { text-align: end; }
+
+  /* Two thirds to the questions when the section runs horizontally — the
+     proportion this section has always used for a side-by-side FAQ. It is set
+     here rather than on the heading cluster because the cluster is a Section
+     header block that carries its own Width control: a merchant who wants an
+     even split sets that block to Custom and leaves this alone.
+
+     `flex-basis: 0` also overrides the `inline-size: 100%` below, which is a
+     cross-axis declaration on a row and the whole width on a column. */
+  .faq__content--row > .faq-accordion {
+    flex: 2 1 0%;
+  }
+
+  @media screen and (max-width: 749px) {
+    .faq__content {
+      gap: var(--faq-content-gap-y-mobile, var(--faq-content-gap-y, var(--space-6)))
+        var(--faq-content-gap-x-mobile, var(--faq-content-gap-x, var(--space-6)));
+    }
+
+    /* A heading cluster beside its questions is two unreadable columns at 390px,
+       so the row stacks unless the merchant said otherwise.
+
+       `--faq-content-align` rather than `--faq-content-inline`: the two differ
+       exactly when a distribution is chosen, and `align-items: space-between` is
+       invalid — the declaration would be dropped and the stack would silently
+       fall back to `stretch`. The plain alignment is carried alongside for this
+       one rule. */
+    .faq__content--row.faq__content--stack-mobile {
+      flex-direction: column;
+      justify-content: var(--faq-content-block, start);
+      align-items: var(--faq-content-align, var(--faq-content-inline, start));
+    }
+
+    /* Two thirds of nothing. Once stacked, the accordion is back on the block
+       axis where a `flex-basis` of 0 means height, not width. */
+    .faq__content--row.faq__content--stack-mobile > .faq-accordion {
+      flex: 0 1 auto;
+    }
+  }
+
+  /* ---- accordion ---- */
+
+  /* An accordion is a full-width component wherever it lands. Without the width
+     it shrink-wraps to its longest question the moment its parent stops being
+     `align-items: stretch` — which is exactly what the section's Alignment
+     control does — and three rows of different widths is not a list. */
+  .faq-accordion {
+    display: flex;
+    flex-direction: column;
+    gap: var(--faq-accordion-gap, var(--space-4));
+    inline-size: 100%;
+    min-inline-size: 0;
+  }
+
+  /* The inline padding sits on the parts, not on the `<details>`, so a
+     merchant's own Left and Right sliders add to it rather than being overruled.
+     This rule is in @layer components and would otherwise beat the
+     `[data-block-spacing]` rule in @layer layout, leaving two of the four
+     padding controls inert. */
+  .faq-row {
+    border-radius: var(--radius-card, 14px);
+    background-color: var(--color-secondary-background);
+  }
+
+  .faq-row__summary {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .faq-row__summary::-webkit-details-marker { display: none; }
+  .faq-row__summary::marker { content: ''; }
+
+  .faq-row__summary:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: calc(var(--focus-offset) * -1);
+    border-radius: var(--radius-card, 14px);
+  }
+
+  .faq-row__icon {
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    inline-size: var(--faq-row-icon-box, 28px);
+    block-size: var(--faq-row-icon-box, 28px);
+    border-radius: 6px;
+    background-color: rgb(var(--color-primary-button-background-rgb) / 0.2);
+    color: var(--color-heading);
+  }
+
+  .faq-row__icon-image { inline-size: var(--faq-row-icon-size, 16px); }
+
+  .faq-row__question {
+    flex: 1 1 auto;
+    font-weight: 500;
+    color: var(--color-heading);
+  }
+
+  .faq-row__toggle {
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    inline-size: 2.4rem;
+    block-size: 2.4rem;
+    border-radius: 8px;
+    background-color: transparent;
+    color: var(--color-heading);
+    transition: background-color var(--transition-base);
+  }
+
+  .faq-row[open] > .faq-row__summary .faq-row__toggle {
+    background-color: var(--color-primary-button-background);
+    color: var(--color-primary-button-text);
+  }
+
+  /* Two rules that cross, and the vertical one rotates away. The same
+     construction as `.collapsible__plus`, so both disclosures in the theme
+     close the same way. */
+  .faq-row__plus {
+    position: relative;
+    inline-size: 1.2rem;
+    block-size: 1.2rem;
+  }
+
+  .faq-row__plus::before,
+  .faq-row__plus::after {
+    content: '';
+    position: absolute;
+    inset-block-start: 50%;
+    inset-inline-start: 50%;
+    inline-size: 1.2rem;
+    block-size: 1.5px;
+    background-color: currentColor;
+    transform: translate(-50%, -50%);
+    transition: transform var(--transition-base);
+  }
+
+  .faq-row__plus::after { transform: translate(-50%, -50%) rotate(90deg); }
+  .faq-row[open] > .faq-row__summary .faq-row__plus::before { transform: translate(-50%, -50%) rotate(45deg); }
+  .faq-row[open] > .faq-row__summary .faq-row__plus::after { transform: translate(-50%, -50%) rotate(-45deg); }
+
+  .faq-row__chevron { transition: transform var(--transition-base); }
   .faq-row[open] > .faq-row__summary .faq-row__chevron { transform: rotate(180deg); }
-  .faq-row__answer { padding-block-end: var(--space-4); }
+
+  /* The answer is blocks now, so this is a container rather than a body of text:
+     a column with a gap, because two blocks in a panel need to be told apart and
+     a block brings its own typography but not its spacing from a sibling. Row
+     padding stays exactly where it was. */
+  .faq-row__answer {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding-inline: var(--space-4) calc(var(--space-4) + 2.4rem + var(--space-3));
+    padding-block-end: var(--space-4);
+    color: var(--color-text);
+    min-inline-size: 0;
+  }
+
+  .faq-row--has-icon .faq-row__answer {
+    padding-inline-start: calc(var(--space-4) + var(--faq-row-icon-box, 28px) + var(--space-3));
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .faq-row__plus::before,
+    .faq-row__plus::after,
+    .faq-row__chevron,
+    .faq-row__toggle { transition: none; }
+  }
+
+  /* ---- about, marquee, contact, store finder ------------------------------ */
 
   .about__lead { max-inline-size: 68ch; }
   .about__lead--center { margin-inline: auto; text-align: center; }

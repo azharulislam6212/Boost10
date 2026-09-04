@@ -160,9 +160,25 @@
   endcase
 
   # ---- border -----------------------------------------------------------
+  #
+  # Opacity goes into the colour, not onto the element: `opacity` on the group
+  # would fade its contents along with the frame.
+  #
+  # With no colour picked the border is `currentColor`, which the colour filters
+  # cannot take an alpha channel from — there is no channel to read until the
+  # scheme resolves it in the browser. `color-mix` does the same fade at that
+  # point instead, so both paths honour the slider.
   assign border_width = 0
   if settings.border_style == 'solid'
     assign border_width = settings.border_width | default: 1 | plus: 0
+
+    assign border_percent = settings.border_opacity | default: 100 | plus: 0
+    if settings.border_color == blank
+      assign border_paint = 'color-mix(in srgb, currentColor ' | append: border_percent | append: '%, transparent)'
+    else
+      assign border_alpha = border_percent | divided_by: 100.0
+      assign border_paint = settings.border_color | color_modify: 'alpha', border_alpha
+    endif
   endif
 
   assign radius = settings.border_radius | default: 0 | plus: 0
@@ -291,7 +307,7 @@
   --group-radius: {{ radius }}px;
   {%- if border_width > 0 -%}
     --group-border-width: {{ border_width }}px;
-    --group-border-color: {{ settings.border_color | default: 'currentColor' }};
+    --group-border-color: {{ border_paint }};
   {%- endif -%}
   {%- assign background_color = settings.background_color | default: '' -%}
   {%- if background_color != '' and has_media == false -%}

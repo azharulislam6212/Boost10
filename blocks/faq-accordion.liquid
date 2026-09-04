@@ -1,0 +1,131 @@
+{% doc %}
+  blocks/faq-accordion.liquid
+
+  The group its rows belong to.
+  
+
+  This is `<accordion-element>` from `assets/modules.js` and nothing else: the
+  measured open/close animation, the optional single-open behaviour and the
+  ownership rules that decide which `<details>` belongs to which group are all
+  already there, and a second implementation of any of them would be a second set
+  of bugs.
+
+  There is no cap on how many rows it takes beyond Shopify's own limit on blocks
+  per section.
+{% enddoc %}
+
+{%- liquid
+  assign s = block.settings
+  assign gap = s.gap | default: 16 | plus: 0
+-%}
+
+{%- capture accordion_style -%}
+  {%- render 'spacing', block: s, declarations: true -%}
+  --faq-accordion-gap: {{ gap }}px;
+{%- endcapture -%}
+
+<accordion-element
+  class="faq-accordion"
+  {% if s.single_open %}data-single{% endif %}
+  data-block-spacing
+  style="{{ accordion_style | strip_newlines | strip }}"
+  {{ block.shopify_attributes }}
+>
+  {% content_for 'blocks' %}
+</accordion-element>
+
+{% schema %}
+{
+  "name": "t:blocks.faq_accordion.name",
+  "tag": null,
+  "blocks": [
+    { "type": "faq-row" },
+    { "type": "@app" }
+  ],
+  "settings": [
+    {
+      "type": "range",
+      "id": "gap",
+      "label": "t:blocks.faq_accordion.settings.gap.label",
+      "min": 0,
+      "max": 40,
+      "step": 2,
+      "unit": "px",
+      "default": 16
+    },
+    {
+      "type": "checkbox",
+      "id": "single_open",
+      "label": "t:blocks.faq_accordion.settings.single_open.label",
+      "info": "t:blocks.faq_accordion.settings.single_open.info",
+      "default": false
+    },
+
+    { "type": "header", "content": "t:shared.spacing.block_header" },
+    {
+      "type": "select",
+      "id": "padding_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        { "value": "desktop", "label": "t:shared.spacing.devices.options__1.label" },
+        { "value": "mobile", "label": "t:shared.spacing.devices.options__2.label" }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    }
+  ],
+  "presets": [
+    {
+      "name": "t:blocks.faq_accordion.name",
+      "blocks": [
+        { "type": "faq-row" },
+        { "type": "faq-row" },
+        { "type": "faq-row" }
+      ]
+    }
+  ]
+}
+{% endschema %}

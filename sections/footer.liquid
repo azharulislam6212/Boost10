@@ -87,9 +87,48 @@
 {%- liquid
   assign st = section.settings
 
+  comment
+    The background is the colour scheme's until the merchant says otherwise:
+    either a colour of their own, or a picture behind the whole footer.
+
+    `snippets/background-media.liquid` owns the picture — the absolute layer,
+    the mobile crop, cover-vs-fit and the stacking order — so this section adds
+    the settings and the `has-background-media` class and nothing else. The
+    colour is emitted as a real `background` declaration rather than a custom
+    property because `color-scheme-container` paints a background *and* a
+    gradient image, and only the shorthand clears both.
+  endcomment
+  assign background_media = st.background_media | default: 'none'
+  assign has_background_media = false
+  if background_media != 'none'
+    assign has_background_media = true
+  endif
+
+  assign background_paint = ''
+  if has_background_media == false
+    assign background_paint = st.background_color | default: ''
+  endif
+
   assign border_width = 0
   if st.border_style == 'solid'
     assign border_width = st.border_width | default: 1 | plus: 0
+
+    comment
+      Opacity goes into the colour, not onto the element: `opacity` on the
+      footer would fade every column along with the frame.
+
+      With no colour picked the border is `currentColor`, which the colour
+      filters cannot take an alpha channel from — there is no channel to read
+      until the scheme resolves it in the browser. `color-mix` does the same
+      fade at that point instead, so both paths honour the slider.
+    endcomment
+    assign border_percent = st.border_opacity | default: 100 | plus: 0
+    if st.border_color == blank
+      assign border_paint = 'color-mix(in srgb, currentColor ' | append: border_percent | append: '%, transparent)'
+    else
+      assign border_alpha = border_percent | divided_by: 100.0
+      assign border_paint = st.border_color | color_modify: 'alpha', border_alpha
+    endif
   endif
 
   comment
@@ -140,7 +179,10 @@
   --footer-margin-block-end: {{ st.margin_bottom | default: 0 }}px;
   {%- if border_width > 0 -%}
     --footer-border-width: {{ border_width }}px;
-    --footer-border-color: {{ st.border_color | default: 'currentColor' }};
+    --footer-border-color: {{ border_paint }};
+  {%- endif -%}
+  {%- if background_paint != '' -%}
+    background: {{ background_paint }};
   {%- endif -%}
   {{- section_spacing | strip -}}
 {%- endcapture -%}
@@ -152,11 +194,15 @@
   merchant could reach.
 {%- endcomment -%}
 <footer
-  class="footer color-scheme-container color-{{ st.color_scheme }}"
+  class="footer color-scheme-container color-{{ st.color_scheme }}{% if has_background_media %} has-background-media{% endif %}"
   role="contentinfo"
   data-section-spacing
   style="{{ footer_styles | strip_newlines | strip }}"
 >
+  {%- if has_background_media -%}
+    {% render 'background-media', settings: st %}
+  {%- endif -%}
+
   <div class="{% render 'container', width: st.container_width %}">
     {%- if section.blocks.size > 0 -%}
       {%- comment -%}
@@ -376,17 +422,115 @@
     },
     {
       "type": "header",
-      "content": "t:shared.color_scheme.label"
-    },
-    {
-      "type": "paragraph",
-      "content": "t:sections.footer.settings.background_paragraph"
+      "content": "t:shared.appearance.header"
     },
     {
       "type": "color_scheme",
       "id": "color_scheme",
       "label": "t:shared.color_scheme.label",
       "default": "scheme-2"
+    },
+    {
+      "type": "select",
+      "id": "background_media",
+      "label": "t:shared.background.media.label",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.background.media.options__1.label"
+        },
+        {
+          "value": "image",
+          "label": "t:shared.background.media.options__2.label"
+        }
+      ],
+      "default": "none"
+    },
+    {
+      "type": "color_background",
+      "id": "background_color",
+      "label": "t:shared.background.color.label",
+      "info": "t:shared.background.color.info",
+      "visible_if": "{{ section.settings.background_media == 'none' }}"
+    },
+    {
+      "type": "image_picker",
+      "id": "image",
+      "label": "t:shared.background.image.label",
+      "visible_if": "{{ section.settings.background_media == 'image' }}"
+    },
+    {
+      "type": "image_picker",
+      "id": "image_mobile",
+      "label": "t:shared.background.image_mobile.label",
+      "info": "t:shared.background.image_mobile.info",
+      "visible_if": "{{ section.settings.background_media == 'image' }}"
+    },
+    {
+      "type": "select",
+      "id": "image_position",
+      "label": "t:shared.background.image_position.label",
+      "info": "t:shared.background.image_position.info",
+      "options": [
+        {
+          "value": "cover",
+          "label": "t:shared.background.image_position.options__1.label"
+        },
+        {
+          "value": "fit",
+          "label": "t:shared.background.image_position.options__2.label"
+        }
+      ],
+      "default": "cover",
+      "visible_if": "{{ section.settings.background_media == 'image' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.group.headers.borders"
+    },
+    {
+      "type": "select",
+      "id": "border_style",
+      "label": "t:blocks.group.settings.border_style.label",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.options.none"
+        },
+        {
+          "value": "solid",
+          "label": "t:shared.options.solid"
+        }
+      ],
+      "default": "none"
+    },
+    {
+      "type": "range",
+      "id": "border_width",
+      "label": "t:blocks.group.settings.border_width.label",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 1,
+      "visible_if": "{{ section.settings.border_style == 'solid' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_opacity",
+      "label": "t:shared.border.opacity.label",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 100,
+      "visible_if": "{{ section.settings.border_style == 'solid' }}"
+    },
+    {
+      "type": "color",
+      "id": "border_color",
+      "label": "t:blocks.group.settings.border_color.label",
+      "visible_if": "{{ section.settings.border_style == 'solid' }}"
     },
     {
       "type": "header",
@@ -431,43 +575,6 @@
       "step": 2,
       "unit": "px",
       "default": 0
-    },
-    {
-      "type": "header",
-      "content": "t:blocks.group.headers.borders"
-    },
-    {
-      "type": "select",
-      "id": "border_style",
-      "label": "t:blocks.group.settings.border_style.label",
-      "options": [
-        {
-          "value": "none",
-          "label": "t:shared.options.none"
-        },
-        {
-          "value": "solid",
-          "label": "t:shared.options.solid"
-        }
-      ],
-      "default": "none"
-    },
-    {
-      "type": "range",
-      "id": "border_width",
-      "label": "t:blocks.group.settings.border_width.label",
-      "min": 0,
-      "max": 12,
-      "step": 1,
-      "unit": "px",
-      "default": 1,
-      "visible_if": "{{ section.settings.border_style == 'solid' }}"
-    },
-    {
-      "type": "color",
-      "id": "border_color",
-      "label": "t:blocks.group.settings.border_color.label",
-      "visible_if": "{{ section.settings.border_style == 'solid' }}"
     },
     {
       "type": "header",
@@ -591,7 +698,8 @@
       "type": "range",
       "id": "margin_top",
       "label": "t:shared.spacing.margin_top.label",
-      "min": 0,
+      "info": "t:shared.spacing.margin_negative.info",
+      "min": -160,
       "max": 160,
       "step": 4,
       "unit": "px",
@@ -601,7 +709,8 @@
       "type": "range",
       "id": "margin_bottom",
       "label": "t:shared.spacing.margin_bottom.label",
-      "min": 0,
+      "info": "t:shared.spacing.margin_negative.info",
+      "min": -160,
       "max": 160,
       "step": 4,
       "unit": "px",
