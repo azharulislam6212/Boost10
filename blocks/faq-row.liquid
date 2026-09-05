@@ -16,9 +16,6 @@
   what the preset puts there, so the default row is still a question and a
   paragraph. Nothing here knows what a Text block is.
 
-  A linked **Page** still renders after the blocks. That is admin HTML rather
-  than blocks, so it keeps the `.rte` wrapper the blocks supply for themselves.
-
   ## Still a `<details>`
 
 
@@ -33,6 +30,19 @@
   disclosure group in the theme already uses. This file contributes markup, not a
   second animation system: the panel is a plain wrapper precisely so that
   animation has a single box to measure.
+
+  ## Two icons in one summary, and only one of them means "open"
+
+  The toggle is `snippets/icon.liquid` like everything else — a **plus** whose
+  upright bar travels onto the crossbar and stops there as a minus, or a
+  **chevron** that turns. It used to be two pseudo-elements crossed in CSS,
+  which is the same glyph drawn a second time in a second place.
+
+  The icon beside the question is content, and it does not move at all. That is
+  worth stating because it did: the group rule in `assets/base.css` rotated
+  every `.icon` inside an open summary, so a truck or a padlock a merchant had
+  chosen turned upside down along with the marker. The rule names the chevron
+  and the plus now.
 
   ## The icon is the Subheading block's, by reference
 
@@ -54,7 +64,10 @@
 
   assign question = s.question
   assign icon_source = s.icon_source | default: 'none'
-  assign icon_size = s.icon_size | default: 16 | plus: 0
+  capture icon_px
+    render 'icon-size', size: s.icon_size, custom: s.icon_size_custom
+  endcapture
+  assign icon_size = icon_px | plus: 0
 
   assign has_icon = false
   if icon_source == 'icon' and s.icon != blank
@@ -119,7 +132,7 @@
         {%- if toggle == 'arrow' -%}
           {% render 'icon', icon: 'chevron-down', size: 14, class: 'faq-row__chevron' %}
         {%- else -%}
-          <span class="faq-row__plus"></span>
+          {% render 'icon', icon: 'plus', size: 14, class: 'faq-row__plus' %}
         {%- endif -%}
       </span>
     </summary>
@@ -133,15 +146,6 @@
     <div class="faq-row__panel">
       <div class="faq-row__answer">
         {% content_for 'blocks' %}
-
-        {%- comment -%}
-          A linked page keeps a rich text wrapper of its own. It is a body of
-          HTML the merchant wrote in the admin rather than blocks, so nothing is
-          bringing `.rte` typography with it the way a Text block does.
-        {%- endcomment -%}
-        {%- if s.page != blank -%}
-          <div class="rte">{{ s.page.content }}</div>
-        {%- endif -%}
       </div>
     </div>
   </details>
@@ -161,12 +165,6 @@
       "id": "question",
       "label": "t:blocks.faq_row.settings.question.label",
       "default": "How long does delivery take?"
-    },
-    {
-      "type": "page",
-      "id": "page",
-      "label": "t:blocks.faq_row.settings.page.label",
-      "info": "t:blocks.faq_row.settings.page.info"
     },
     {
       "type": "checkbox",
@@ -225,16 +223,32 @@
       "visible_if": "{{ block.settings.icon_source == 'image' }}"
     },
     {
-      "type": "range",
+      "type": "select",
       "id": "icon_size",
       "label": "t:blocks.subheading.settings.icon_size.label",
       "info": "t:blocks.faq_row.settings.icon_size.info",
+      "options": [
+        { "value": "extra_small", "label": "t:shared.icon_size.options__1.label" },
+        { "value": "small", "label": "t:shared.icon_size.options__2.label" },
+        { "value": "medium", "label": "t:shared.icon_size.options__3.label" },
+        { "value": "large", "label": "t:shared.icon_size.options__4.label" },
+        { "value": "extra_large", "label": "t:shared.icon_size.options__5.label" },
+        { "value": "custom", "label": "t:shared.icon_size.options__6.label" }
+      ],
+      "default": "medium",
+      "visible_if": "{{ block.settings.icon_source != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "icon_size_custom",
+      "label": "t:shared.icon_size.custom.label",
+      "info": "t:shared.icon_size.custom.info",
       "min": 12,
       "max": 40,
       "step": 2,
       "unit": "px",
       "default": 16,
-      "visible_if": "{{ block.settings.icon_source != 'none' }}"
+      "visible_if": "{{ block.settings.icon_source != 'none' and block.settings.icon_size == 'custom' }}"
     },
 
     { "type": "header", "content": "t:blocks.collapsible.headers.toggle" },

@@ -2381,8 +2381,36 @@
     font-weight: 500;
   }
 
-  accordion-element details[open] > summary .icon { transform: rotate(180deg); }
-  accordion-element summary .icon { transition: transform var(--transition-fast); }
+  /* The chevron, and only the chevron. This was every `.icon` inside an open
+     summary, which also caught the icon a row carries as content — the truck
+     beside "How long does delivery take?", the padlock beside a payment
+     question — and spun it 180° on open. A chevron points at its state. A
+     truck does not, and a merchant who picked one did not ask for it to turn
+     upside down.
+
+     `--transition-base` rather than `--transition-fast`, so the marker and the
+     panel underneath it settle together: the height animation in
+     `assets/modules.js` runs 280ms on the same easing curve. */
+  accordion-element summary .icon--chevron-down { transition: transform var(--transition-base); }
+  accordion-element details[open] > summary .icon--chevron-down { transform: rotate(180deg); }
+
+  /* The plus does not rotate as a glyph — turning the whole icon 45° is the same
+     four pixels of movement read as a spin. Its upright bar travels down onto
+     the crossbar instead and stops there, so the open state is a minus drawn by
+     the two strokes that were already on the page.
+
+     The origin is the centre of the 24-unit viewBox, not the centre of the bar:
+     an upright line has a bounding box no wider than its own stroke, and
+     `fill-box` on a shape with no width is the one case where browsers disagree.
+     `view-box` is the same point for both bars and needs no bounding box at
+     all. */
+  accordion-element summary .icon--plus .icon__bar--v {
+    transform-box: view-box;
+    transform-origin: center;
+    transition: transform var(--transition-base);
+  }
+
+  accordion-element details[open] > summary .icon--plus .icon__bar--v { transform: rotate(90deg); }
 
   /* Above the collapse breakpoint the summary is decoration, not a control. */
   accordion-element[data-static] summary,
@@ -2395,7 +2423,8 @@
   accordion-element[data-static] summary::-webkit-details-marker,
   summary[data-static]::-webkit-details-marker { display: none; }
 
-  accordion-element[data-static] summary .icon { display: none; }
+  accordion-element[data-static] summary .icon--chevron-down,
+  accordion-element[data-static] summary .icon--plus { display: none; }
   accordion-element[data-static] details { border-block-end: 0; }
 
   [role='tablist'] {
@@ -5079,31 +5108,15 @@
     color: var(--color-primary-button-text);
   }
 
-  /* Two rules that cross, and the vertical one rotates away. The same
-     construction as `.collapsible__plus`, so both disclosures in the theme
-     close the same way. */
-  .faq-row__plus {
-    position: relative;
-    inline-size: 1.2rem;
-    block-size: 1.2rem;
-  }
+  /* The toggle was two pseudo-elements crossing, which is a plus drawn twice:
+     once here in CSS and once in `snippets/icon.liquid` for every other plus in
+     the theme. It is that icon now, so there is one plus, it inherits the icon
+     stroke, and the open state is animated by the `accordion-element` rules
+     above rather than by a second set of keyframes here.
 
-  .faq-row__plus::before,
-  .faq-row__plus::after {
-    content: '';
-    position: absolute;
-    inset-block-start: 50%;
-    inset-inline-start: 50%;
-    inline-size: 1.2rem;
-    block-size: 1.5px;
-    background-color: currentColor;
-    transform: translate(-50%, -50%);
-    transition: transform var(--transition-base);
-  }
-
-  .faq-row__plus::after { transform: translate(-50%, -50%) rotate(90deg); }
-  .faq-row[open] > .faq-row__summary .faq-row__plus::before { transform: translate(-50%, -50%) rotate(45deg); }
-  .faq-row[open] > .faq-row__summary .faq-row__plus::after { transform: translate(-50%, -50%) rotate(-45deg); }
+     Only the weight is this file's: at 14px the shared 1.5 stroke on a 24-unit
+     viewBox lands under a pixel, which reads as grey rather than as a control. */
+  .faq-row__plus { stroke-width: 2; }
 
   .faq-row__chevron { transition: transform var(--transition-base); }
   .faq-row[open] > .faq-row__summary .faq-row__chevron { transform: rotate(180deg); }
@@ -5127,8 +5140,7 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .faq-row__plus::before,
-    .faq-row__plus::after,
+    .faq-row__plus .icon__bar,
     .faq-row__chevron,
     .faq-row__toggle { transition: none; }
   }

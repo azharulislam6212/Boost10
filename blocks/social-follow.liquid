@@ -33,10 +33,12 @@
   comment
     Resolved once, here. Shopify's `render` tag does not accept filters in an
     argument — the parser stops at the pipe and the whole tag is a syntax
-    error — so `size: block.settings.icon_size | default: 18` has to become a
-    plain variable before it is passed.
+    error — so the keyword has to become a plain number before it is passed.
   endcomment
-  assign icon_size = block.settings.icon_size | default: 18
+  capture icon_px
+    render 'icon-size', size: block.settings.icon_size, custom: block.settings.icon_size_custom
+  endcapture
+  assign icon_size = icon_px | plus: 0
 -%}
 
 {%- capture social_styles -%}
@@ -145,14 +147,30 @@
       "label": "t:blocks.social_follow.settings.color.label"
     },
     {
-      "type": "range",
+      "type": "select",
       "id": "icon_size",
       "label": "t:blocks.icon_with_text.settings.icon_size.label",
+      "options": [
+        { "value": "extra_small", "label": "t:shared.icon_size.options__1.label" },
+        { "value": "small", "label": "t:shared.icon_size.options__2.label" },
+        { "value": "medium", "label": "t:shared.icon_size.options__3.label" },
+        { "value": "large", "label": "t:shared.icon_size.options__4.label" },
+        { "value": "extra_large", "label": "t:shared.icon_size.options__5.label" },
+        { "value": "custom", "label": "t:shared.icon_size.options__6.label" }
+      ],
+      "default": "medium"
+    },
+    {
+      "type": "range",
+      "id": "icon_size_custom",
+      "label": "t:shared.icon_size.custom.label",
+      "info": "t:shared.icon_size.custom.info",
       "min": 12,
       "max": 32,
       "step": 2,
       "unit": "px",
-      "default": 18
+      "default": 18,
+      "visible_if": "{{ block.settings.icon_size == 'custom' }}"
     },
     {
       "type": "select",

@@ -1,0 +1,79 @@
+{% doc %}
+  The pixel size of an icon, resolved from a keyword.
+
+  ## One vocabulary, one place that decides what it means
+
+  Every icon control in the theme used to be a slider with a range of its own —
+  16–96 on a badge, 10–32 on a button, 12–48 on a subheading — so **Icon size**
+  meant something different in each panel, the same number looked different in
+  two of them, and nothing lined up across a page. The control is now the same
+  five steps plus **Custom** everywhere, the way **Button size** already works,
+  and the steps are resolved here rather than in nine blocks.
+
+  ## The steps are the theme's own numbers
+
+      extra_small  12px
+      small        Theme settings › Colors › Icon sizes › Small   (14px)
+      medium       …› Medium                                      (20px), the default
+      large        …› Large                                       (28px)
+      extra_large  40px
+
+  Small, Medium and Large read theme settings rather than hard-coding a ladder
+  here, so a store that resizes its icons moves every block with them. Extra
+  small and Extra large are the ends of those same option lists — 12 is the
+  smallest Small offers, 40 the largest Large does — so the ladder never leaves
+  the range the theme already sanctions, and there is no fourth and fifth
+  setting to keep in order with the other three.
+
+  ## A stored number still works
+
+  Blocks kept a px number in `icon_size` before the keywords existed. Such a
+  value is passed through rather than snapped to the nearest step, so updating
+  the theme never resizes an icon a merchant had already set by hand.
+
+  @param {string} [size] - extra_small | small | medium | large | extra_large | custom. A bare px number is passed through.
+  @param {number} [custom] - The block's own **Custom size**, used when `size` is `custom`.
+
+  @example
+    {%- liquid
+      capture icon_px
+        render 'icon-size', size: s.icon_size, custom: s.icon_size_custom
+      endcapture
+      assign icon_size = icon_px | plus: 0
+    -%}
+{% enddoc %}
+
+{%- liquid
+  assign px_sm = settings.icon_size_sm | default: 14 | plus: 0
+  assign px_md = settings.icon_size_md | default: 20 | plus: 0
+  assign px_lg = settings.icon_size_lg | default: 28 | plus: 0
+
+  assign resolved = px_md
+  assign key = size | default: 'medium'
+
+  case key
+    when 'extra_small'
+      assign resolved = 12
+    when 'small'
+      assign resolved = px_sm
+    when 'medium'
+      assign resolved = px_md
+    when 'large'
+      assign resolved = px_lg
+    when 'extra_large'
+      assign resolved = 40
+    when 'custom'
+      assign resolved = custom | default: px_md | plus: 0
+    else
+      comment
+        A px number from a template written before the keywords, or a keyword a
+        schema no longer offers. Only the first survives `plus: 0` as anything
+        other than zero, so only the first is honoured.
+      endcomment
+      assign stored = key | plus: 0
+      if stored > 0
+        assign resolved = stored
+      endif
+  endcase
+-%}
+{{- resolved -}}
