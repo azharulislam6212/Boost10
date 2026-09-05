@@ -1,0 +1,152 @@
+{% doc %}
+  blocks/_article-read-time.liquid — private.
+
+  "6 min read", with an icon.
+
+  ## The number is derived, not entered
+
+  200 words a minute, rounded up to at least one — the same arithmetic
+  `snippets/article-card.liquid` already does, kept identical on purpose so the
+  blog index and a featured row never disagree about the same article. It is a
+  reading rate rather than a truth, which is why the setting is the rate itself:
+  a store whose articles are dense technical writing can say 150 and every card
+  updates.
+
+  `at_least: 1` because `divided_by` on integers floors, and a 90-word note is
+  "0 min read" without it.
+{% enddoc %}
+
+{%- liquid
+  assign article = closest.article
+  assign s = block.settings
+
+  assign rate = s.words_per_minute | default: 200 | plus: 0
+  assign words = article.content | strip_html | split: ' ' | size
+  assign minutes = words | divided_by: rate | at_least: 1
+
+  capture icon_px
+    render 'icon-size', size: s.icon_size, custom: s.icon_size_custom
+  endcapture
+  assign icon_size = icon_px | plus: 0
+
+  assign has_icon = false
+  if s.icon != 'none' and s.icon != blank
+    assign has_icon = true
+  endif
+-%}
+
+{%- capture read_time_style -%}
+  {%- render 'spacing', block: s, declarations: true -%}
+  {%- if s.text_color != blank -%}color: {{ s.text_color }};{%- endif -%}
+{%- endcapture -%}
+
+{%- if article -%}
+  <p
+    class="article-read-time block-text--{{ s.preset | default: 'subheading' }}"
+    data-block-spacing
+    style="{{ read_time_style | strip_newlines | strip }}"
+    {{ block.shopify_attributes }}
+  >
+    {%- if has_icon -%}
+      <span class="article-read-time__icon">{% render 'icon', icon: s.icon, size: icon_size %}</span>
+    {%- endif -%}
+    <span class="article-read-time__label">
+      {{- 'blogs.article.read_time' | t: minutes: minutes -}}
+    </span>
+  </p>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "t:blocks.article_read_time.name",
+  "tag": null,
+  "settings": [
+    { "type": "paragraph", "content": "t:blocks.article_read_time.paragraph" },
+    {
+      "type": "range",
+      "id": "words_per_minute",
+      "label": "t:blocks.article_read_time.settings.words_per_minute.label",
+      "info": "t:blocks.article_read_time.settings.words_per_minute.info",
+      "min": 100,
+      "max": 400,
+      "step": 10,
+      "default": 200
+    },
+
+    { "type": "header", "content": "t:blocks.subheading.headers.icon" },
+    {
+      "type": "select",
+      "id": "icon",
+      "label": "t:blocks.subheading.settings.icon.label",
+      "options": [
+        { "value": "none", "label": "t:shared.options.none" },
+        { "value": "clock", "label": "t:blocks.subheading.settings.icon.options__8.label" },
+        { "value": "note", "label": "t:blocks.subheading.settings.icon.options__11.label" },
+        { "value": "info", "label": "t:blocks.subheading.settings.icon.options__12.label" },
+        { "value": "check", "label": "t:blocks.subheading.settings.icon.options__2.label" }
+      ],
+      "default": "clock"
+    },
+    {
+      "type": "select",
+      "id": "icon_size",
+      "label": "t:blocks.subheading.settings.icon_size.label",
+      "options": [
+        { "value": "extra_small", "label": "t:shared.icon_size.options__1.label" },
+        { "value": "small", "label": "t:shared.icon_size.options__2.label" },
+        { "value": "medium", "label": "t:shared.icon_size.options__3.label" },
+        { "value": "large", "label": "t:shared.icon_size.options__4.label" },
+        { "value": "custom", "label": "t:shared.icon_size.options__6.label" }
+      ],
+      "default": "small",
+      "visible_if": "{{ block.settings.icon != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "icon_size_custom",
+      "label": "t:shared.icon_size.custom.label",
+      "min": 10,
+      "max": 32,
+      "step": 1,
+      "unit": "px",
+      "default": 14,
+      "visible_if": "{{ block.settings.icon != 'none' and block.settings.icon_size == 'custom' }}"
+    },
+
+    { "type": "header", "content": "t:shared.typography.header" },
+    {
+      "type": "select",
+      "id": "preset",
+      "label": "t:shared.typography.preset.label",
+      "options": [
+        { "value": "subheading", "label": "t:shared.typography.preset.options__3.label" },
+        { "value": "paragraph", "label": "t:shared.typography.preset.options__2.label" }
+      ],
+      "default": "subheading"
+    },
+    { "type": "color", "id": "text_color", "label": "t:shared.text.label" },
+
+    { "type": "header", "content": "t:shared.spacing.block_header" },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 0
+    }
+  ]
+}
+{% endschema %}

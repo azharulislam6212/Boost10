@@ -1,0 +1,123 @@
+{% doc %}
+  blocks/_article-title.liquid — private.
+
+  The article's title, and the card's link.
+
+  ## This block is what makes the card clickable
+
+  `base.css` stretches this anchor over the whole `.article-card-block` with an
+  absolutely positioned `::after`. That is why the card is not itself an `<a>`:
+  the read-more button and the tag pills stay independently reachable, the
+  link's accessible name is the article's title rather than the entire card, and
+  there is never an anchor inside an anchor.
+
+  It also means a card with no title block has no card-wide link — which is
+  correct rather than a bug. A merchant who removes the title has removed the
+  thing that named the destination.
+
+  ## The heading level is a setting because the surroundings are not known
+
+  A featured row under an `h2` section heading wants `h3`; the same row as the
+  only thing on a landing page wants `h2`. Nothing in this block can see which,
+  so the merchant says. The *size* comes from `block-text--<preset>`, the same
+  presets every Text block uses, so the tag and the look are chosen separately —
+  an `h3` that has to look like an `h2` does not have to lie about its level.
+{% enddoc %}
+
+{%- liquid
+  assign article = closest.article
+  assign s = block.settings
+
+  assign tag = s.heading_tag | default: 'h3'
+  assign preset = s.preset | default: 'h5'
+  assign clamp = s.max_lines | default: 0 | plus: 0
+-%}
+
+{%- capture title_style -%}
+  {%- render 'spacing', block: s, declarations: true -%}
+  {%- if clamp > 0 -%}--article-title-lines: {{ clamp }};{%- endif -%}
+  {%- if s.text_color != blank -%}color: {{ s.text_color }};{%- endif -%}
+{%- endcapture -%}
+
+{%- if article -%}
+  <{{ tag }}
+    class="article-title-block block-text--{{ preset }}{% if clamp > 0 %} article-title-block--clamped{% endif %}"
+    data-block-spacing
+    style="{{ title_style | strip_newlines | strip }}"
+    {{ block.shopify_attributes }}
+  >
+    <a class="article-title-block__link" href="{{ article.url }}">{{ article.title | escape }}</a>
+  </{{ tag }}>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "t:blocks.article_title.name",
+  "tag": null,
+  "settings": [
+    { "type": "paragraph", "content": "t:blocks.article_title.paragraph" },
+    {
+      "type": "select",
+      "id": "heading_tag",
+      "label": "t:blocks.article_title.settings.heading_tag.label",
+      "info": "t:blocks.article_title.settings.heading_tag.info",
+      "options": [
+        { "value": "h2", "label": "H2" },
+        { "value": "h3", "label": "H3" },
+        { "value": "h4", "label": "H4" },
+        { "value": "p", "label": "t:shared.typography.preset.options__2.label" }
+      ],
+      "default": "h3"
+    },
+    {
+      "type": "range",
+      "id": "max_lines",
+      "label": "t:blocks.article_title.settings.max_lines.label",
+      "info": "t:blocks.article_title.settings.max_lines.info",
+      "min": 0,
+      "max": 5,
+      "step": 1,
+      "default": 2
+    },
+
+    { "type": "header", "content": "t:shared.typography.header" },
+    {
+      "type": "select",
+      "id": "preset",
+      "label": "t:shared.typography.preset.label",
+      "info": "t:shared.typography.preset.info",
+      "options": [
+        { "value": "h2", "label": "t:shared.typography.preset.options__5.label" },
+        { "value": "h3", "label": "t:shared.typography.preset.options__6.label" },
+        { "value": "h4", "label": "t:shared.typography.preset.options__7.label" },
+        { "value": "h5", "label": "t:shared.typography.preset.options__8.label" },
+        { "value": "h6", "label": "t:shared.typography.preset.options__9.label" }
+      ],
+      "default": "h5"
+    },
+    { "type": "color", "id": "text_color", "label": "t:shared.text.label" },
+
+    { "type": "header", "content": "t:shared.spacing.block_header" },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 0
+    }
+  ]
+}
+{% endschema %}

@@ -1,0 +1,306 @@
+{% doc %}
+  blocks/_article-image.liquid — private.
+
+  The article's picture, and the pills that sit on it.
+
+  ## The frame is this block's, the picture is `snippets/image.liquid`'s
+
+  Ratio, srcset, mobile art direction and the fade-in on load all come from the
+  shared snippet, so this file adds only what a card needs on top: a border, a
+  radius, and the meta that belongs *on* the photograph rather than under it.
+
+  Ratio is the theme's usual seven names through `snippets/aspect-ratio.liquid`,
+  which is why **Landscape** here means the same shape it means on an Image
+  block and on a product card.
+
+  ## The date and the tags are pills on the image, not a line of meta
+
+  In the design they sit along the bottom edge of the picture, over a frosted
+  panel, which is why they are here and not in **Article content**: they are
+  positioned against the photograph and would have nothing to sit on anywhere
+  else. Both are off-switchable because a store whose articles are untagged
+  should not get an empty row of nothing.
+
+  Two tags at most, and that is deliberate rather than configurable. The pills
+  run along one edge of a card that is a third of a row wide; a fifth tag does
+  not wrap onto a second line, it pushes the first four off the picture.
+
+  ## The image is a link, and it is hidden from assistive technology
+
+  `tabindex="-1"` and `aria-hidden` on the wrapper: the title below is already a
+  link to the same article, and a second one with no text of its own is a stop
+  on the keyboard path that announces nothing. Sighted pointer users still get
+  the whole picture as a target, which is what they expect from a card.
+{% enddoc %}
+
+{%- liquid
+  assign article = closest.article
+  assign s = block.settings
+
+  assign ratio = s.ratio | default: 'landscape'
+  assign radius = s.border_radius | default: 24 | plus: 0
+
+  comment
+    Opacity goes into the colour rather than onto the element: `opacity` here
+    would fade the photograph along with its frame.
+
+    With no colour picked the border is `currentColor`, which the colour filters
+    cannot take an alpha channel from — there is nothing to read until the
+    scheme resolves in the browser. `color-mix` does the same fade at that point
+    instead, so both paths honour the slider.
+  endcomment
+  assign border_width = 0
+  if s.border_style != 'none' and s.border_style != blank
+    assign border_width = s.border_width | default: 1 | plus: 0
+
+    assign border_percent = s.border_opacity | default: 100 | plus: 0
+    if s.border_color == blank
+      assign border_paint = 'color-mix(in srgb, currentColor ' | append: border_percent | append: '%, transparent)'
+    else
+      assign border_alpha = border_percent | divided_by: 100.0
+      assign border_paint = s.border_color | color_modify: 'alpha', border_alpha
+    endif
+  endif
+
+  assign show_date = s.show_date
+  assign show_tags = s.show_tags
+
+  assign has_meta = false
+  if show_date or show_tags
+    assign has_meta = true
+  endif
+-%}
+
+{%- capture image_style -%}
+  {%- render 'spacing', block: s, declarations: true -%}
+  --article-image-radius: {{ radius }}px;
+  {%- if border_width > 0 -%}
+    --article-image-border-width: {{ border_width }}px;
+    --article-image-border-style: {{ s.border_style }};
+    --article-image-border-color: {{ border_paint }};
+  {%- endif -%}
+{%- endcapture -%}
+
+{%- if article -%}
+  <div
+    class="article-image-block"
+    data-block-spacing
+    style="{{ image_style | strip_newlines | strip }}"
+    {{ block.shopify_attributes }}
+  >
+    <a
+      class="article-image-block__link"
+      href="{{ article.url }}"
+      tabindex="-1"
+      aria-hidden="true"
+    >
+      {% render 'image',
+         image: article.image,
+         ratio: ratio,
+         mobile_ratio: s.ratio_mobile,
+         sizes: sizes,
+         priority: priority,
+         placeholder: 'blog-apparel-1',
+         wrapper_class: 'article-image-block__media' %}
+    </a>
+
+    {%- if has_meta -%}
+      <div class="article-image-block__meta">
+        {%- if show_date -%}
+          <span class="article-image-block__pill article-image-block__pill--date">
+            {%- if s.date_icon != 'none' and s.date_icon != blank -%}
+              <span class="article-image-block__pill-icon">
+                {% render 'icon', icon: s.date_icon, size: 14 %}
+              </span>
+            {%- endif -%}
+            <time datetime="{{ article.published_at | date: '%Y-%m-%d' }}">
+              {{- article.published_at | date: format: 'date' -}}
+            </time>
+          </span>
+        {%- endif -%}
+
+        {%- if show_tags and article.tags.size > 0 -%}
+          {%- for tag in article.tags limit: 2 -%}
+            <span class="article-image-block__pill article-image-block__pill--tag">{{ tag }}</span>
+          {%- endfor -%}
+        {%- endif -%}
+      </div>
+    {%- endif -%}
+  </div>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "t:blocks.article_image.name",
+  "tag": null,
+  "settings": [
+    {
+      "type": "select",
+      "id": "ratio",
+      "label": "t:blocks.image.settings.ratio.label",
+      "options": [
+        { "value": "adapt", "label": "t:blocks.image.settings.ratio.options__1.label" },
+        { "value": "square", "label": "t:blocks.image.settings.ratio.options__2.label" },
+        { "value": "portrait", "label": "t:blocks.image.settings.ratio.options__3.label" },
+        { "value": "landscape", "label": "t:blocks.image.settings.ratio.options__4.label" },
+        { "value": "wide", "label": "t:blocks.image.settings.ratio.options__5.label" },
+        { "value": "tall", "label": "t:blocks.image.settings.ratio.options__6.label" },
+        { "value": "long", "label": "t:blocks.image.settings.ratio.options__7.label" }
+      ],
+      "default": "landscape"
+    },
+    {
+      "type": "select",
+      "id": "ratio_mobile",
+      "label": "t:blocks.image.settings.ratio_mobile.label",
+      "info": "t:blocks.image.settings.ratio_mobile.info",
+      "options": [
+        { "value": "", "label": "t:blocks.image.settings.ratio_mobile.options__1.label" },
+        { "value": "square", "label": "t:blocks.image.settings.ratio.options__2.label" },
+        { "value": "portrait", "label": "t:blocks.image.settings.ratio.options__3.label" },
+        { "value": "landscape", "label": "t:blocks.image.settings.ratio.options__4.label" },
+        { "value": "tall", "label": "t:blocks.image.settings.ratio.options__6.label" },
+        { "value": "long", "label": "t:blocks.image.settings.ratio.options__7.label" }
+      ],
+      "default": ""
+    },
+
+    { "type": "header", "content": "t:blocks.group.headers.borders" },
+    {
+      "type": "select",
+      "id": "border_style",
+      "label": "t:blocks.group.settings.border_style.label",
+      "options": [
+        { "value": "none", "label": "t:shared.options.none" },
+        { "value": "solid", "label": "t:shared.options.solid" },
+        { "value": "dashed", "label": "t:shared.border.style.options__2.label" }
+      ],
+      "default": "none"
+    },
+    {
+      "type": "range",
+      "id": "border_width",
+      "label": "t:shared.border.thickness.label",
+      "min": 1,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 1,
+      "visible_if": "{{ block.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_opacity",
+      "label": "t:blocks.image.settings.border_opacity.label",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 100,
+      "visible_if": "{{ block.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "color",
+      "id": "border_color",
+      "label": "t:shared.border.color.label",
+      "visible_if": "{{ block.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius",
+      "label": "t:blocks.group.settings.border_radius.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 24
+    },
+
+    { "type": "header", "content": "t:blocks.article_image.headers.meta" },
+    { "type": "paragraph", "content": "t:blocks.article_image.paragraphs.meta" },
+    {
+      "type": "checkbox",
+      "id": "show_date",
+      "label": "t:blocks.article_image.settings.show_date.label",
+      "default": true
+    },
+    {
+      "type": "select",
+      "id": "date_icon",
+      "label": "t:blocks.article_image.settings.date_icon.label",
+      "options": [
+        { "value": "none", "label": "t:shared.options.none" },
+        { "value": "clock", "label": "t:blocks.subheading.settings.icon.options__8.label" },
+        { "value": "note", "label": "t:blocks.subheading.settings.icon.options__11.label" },
+        { "value": "info", "label": "t:blocks.subheading.settings.icon.options__12.label" },
+        { "value": "tag", "label": "t:blocks.subheading.settings.icon.options__4.label" }
+      ],
+      "default": "clock",
+      "visible_if": "{{ block.settings.show_date }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_tags",
+      "label": "t:blocks.article_image.settings.show_tags.label",
+      "info": "t:blocks.article_image.settings.show_tags.info",
+      "default": true
+    },
+
+    { "type": "header", "content": "t:shared.spacing.block_header" },
+    {
+      "type": "select",
+      "id": "padding_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        { "value": "desktop", "label": "t:shared.spacing.devices.options__1.label" },
+        { "value": "mobile", "label": "t:shared.spacing.devices.options__2.label" }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    }
+  ]
+}
+{% endschema %}

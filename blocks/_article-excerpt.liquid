@@ -1,0 +1,112 @@
+{% doc %}
+  blocks/_article-excerpt.liquid — private.
+
+  The article's summary.
+
+  ## `excerpt_or_content`, and why it is truncated twice
+
+  Shopify gives an article either a hand-written excerpt or nothing, and
+  `excerpt_or_content` falls back to the whole body — which on a card is a
+  thousand words of HTML where two lines were wanted. So the text is stripped of
+  its markup and cut to a word count here.
+
+  `strip_html` before `truncatewords` and not after: truncating first can cut
+  the string inside a tag, and stripping what is left then removes the opening
+  half of an element whose closing half went with the truncation, taking real
+  words with it.
+
+  A word count *and* an optional line clamp, because they answer different
+  questions. The word count decides how much text exists; the clamp decides how
+  much of it a card that is narrower than expected will show. Without the clamp
+  a two-line card and a five-line card sit side by side at different heights.
+{% enddoc %}
+
+{%- liquid
+  assign article = closest.article
+  assign s = block.settings
+
+  assign words = s.word_limit | default: 24 | plus: 0
+  assign summary = article.excerpt_or_content | strip_html | truncatewords: words
+  assign clamp = s.max_lines | default: 0 | plus: 0
+-%}
+
+{%- capture excerpt_style -%}
+  {%- render 'spacing', block: s, declarations: true -%}
+  {%- if clamp > 0 -%}--article-excerpt-lines: {{ clamp }};{%- endif -%}
+  {%- if s.text_color != blank -%}color: {{ s.text_color }};{%- endif -%}
+{%- endcapture -%}
+
+{%- if article and summary != blank -%}
+  <p
+    class="article-excerpt-block block-text--{{ s.preset | default: 'paragraph' }}{% if clamp > 0 %} article-excerpt-block--clamped{% endif %}"
+    data-block-spacing
+    style="{{ excerpt_style | strip_newlines | strip }}"
+    {{ block.shopify_attributes }}
+  >
+    {{- summary -}}
+  </p>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "t:blocks.article_excerpt.name",
+  "tag": null,
+  "settings": [
+    { "type": "paragraph", "content": "t:blocks.article_excerpt.paragraph" },
+    {
+      "type": "range",
+      "id": "word_limit",
+      "label": "t:blocks.article_excerpt.settings.word_limit.label",
+      "min": 8,
+      "max": 80,
+      "step": 2,
+      "default": 24
+    },
+    {
+      "type": "range",
+      "id": "max_lines",
+      "label": "t:blocks.article_title.settings.max_lines.label",
+      "info": "t:blocks.article_excerpt.settings.max_lines.info",
+      "min": 0,
+      "max": 8,
+      "step": 1,
+      "default": 3
+    },
+
+    { "type": "header", "content": "t:shared.typography.header" },
+    {
+      "type": "select",
+      "id": "preset",
+      "label": "t:shared.typography.preset.label",
+      "options": [
+        { "value": "paragraph", "label": "t:shared.typography.preset.options__2.label" },
+        { "value": "subheading", "label": "t:shared.typography.preset.options__3.label" }
+      ],
+      "default": "paragraph"
+    },
+    { "type": "color", "id": "text_color", "label": "t:shared.text.label" },
+
+    { "type": "header", "content": "t:shared.spacing.block_header" },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 0
+    }
+  ]
+}
+{% endschema %}

@@ -1,0 +1,191 @@
+{% doc %}
+  blocks/_article-card.liquid — private.
+
+  One article, built from blocks rather than from a snippet's settings.
+
+  ## Why it is a block and not `snippets/article-card.liquid`
+
+  The snippet still exists and still serves the blog index, where every card is
+  the same and a merchant has nothing to arrange. This is the other case: a
+  featured row where the picture, the meta pills, the title, the excerpt and the
+  call to action are each something a store wants to move, restyle or remove.
+  Every one of those is a nested block here, so the merchant arranges the card
+  once and the section repeats the arrangement across every article.
+
+  ## Private, and rendered once per article
+
+  A merchant does not add cards to a row — the row decides how many there are
+  from **Articles to show**. So the section renders this block itself, with the
+  same `id` on every pass:
+
+      {% content_for 'block', type: '_article-card', id: 'article-card',
+         closest.article: article, index: forloop.index0 %}
+
+  One id means one set of settings shared by every card, which is the point: a
+  grid whose third card could be styled differently from the first is a grid
+  that will be.
+
+  ## `closest.article` is how the children see the article
+
+  `{% content_for 'blocks' %}` passes no parameters, so a nested **Article
+  title** cannot be handed the article the way this block is. `closest.article`
+  is the mechanism that does reach them: the section sets it on this block, and
+  every block inside inherits it. `sections/main-product.liquid` passes
+  `closest.product` into `_product-details` for exactly the same reason.
+
+  ## The card is not a link
+
+  The title is, stretched over the card in `base.css`. Wrapping the whole card
+  in an `<a>` would put the read-more button and the tag pills inside it — an
+  anchor inside an anchor, which is invalid and which browsers recover from
+  unpredictably — and would make the link's accessible name the entire card
+  rather than the article's title.
+{% enddoc %}
+
+{%- liquid
+  assign article = closest.article
+  assign s = block.settings
+
+  comment
+    The stagger is the card's position in the row, not its position in the blog.
+    `modulo` keeps the delay inside one row's worth so the fourth card does not
+    wait three times as long as the first for no reason a customer can see.
+  endcomment
+  assign card_delay = 0
+  if index != blank
+    assign columns = s.stagger_span | default: 3 | plus: 0
+    assign card_delay = index | modulo: columns | times: 80
+  endif
+
+  assign gap = s.gap | default: 12 | plus: 0
+-%}
+
+{%- capture card_style -%}
+  {%- render 'spacing', block: s, declarations: true -%}
+  --article-card-gap: {{ gap }}px;
+{%- endcapture -%}
+
+{%- if article -%}
+  <motion-effect
+    class="article-card-block"
+    data-block-spacing
+    data-morph-key="article-{{ article.id }}"
+    style="{{ card_style | strip_newlines | strip }}"
+    {% render 'motion-attrs',
+       kind: 'image',
+       block: s,
+       section: section.settings,
+       target: '.article-image-block, .article-content-block',
+       delay: card_delay %}
+    {{ block.shopify_attributes }}
+  >
+    {% content_for 'blocks' %}
+  </motion-effect>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "t:blocks.article_card.name",
+  "tag": null,
+  "blocks": [
+    { "type": "_article-image" },
+    { "type": "_article-content" },
+    { "type": "@app" }
+  ],
+  "settings": [
+    { "type": "paragraph", "content": "t:blocks.article_card.paragraph" },
+    {
+      "type": "range",
+      "id": "gap",
+      "label": "t:blocks.article_card.settings.gap.label",
+      "info": "t:blocks.article_card.settings.gap.info",
+      "min": 0,
+      "max": 48,
+      "step": 2,
+      "unit": "px",
+      "default": 12
+    },
+
+    { "type": "header", "content": "t:shared.animation.header" },
+    {
+      "type": "select",
+      "id": "animation_image",
+      "label": "t:shared.animation.animation_image.label",
+      "options": [
+        { "value": "inherit", "label": "t:shared.animation.animation_text.options__1.label" },
+        { "value": "none", "label": "t:shared.animation.animation_text.options__2.label" },
+        { "value": "fade-in", "label": "t:shared.animation.animation_text.options__3.label" },
+        { "value": "fade-up", "label": "t:shared.animation.animation_text.options__4.label" },
+        { "value": "slide-up", "label": "t:shared.animation.animation_text.options__5.label" }
+      ],
+      "default": "inherit"
+    },
+    {
+      "type": "range",
+      "id": "stagger_span",
+      "label": "t:blocks.article_card.settings.stagger_span.label",
+      "info": "t:blocks.article_card.settings.stagger_span.info",
+      "min": 1,
+      "max": 6,
+      "step": 1,
+      "default": 3
+    },
+
+    { "type": "header", "content": "t:shared.spacing.block_header" },
+    {
+      "type": "select",
+      "id": "padding_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        { "value": "desktop", "label": "t:shared.spacing.devices.options__1.label" },
+        { "value": "mobile", "label": "t:shared.spacing.devices.options__2.label" }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    }
+  ]
+}
+{% endschema %}

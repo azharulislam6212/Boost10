@@ -10040,3 +10040,257 @@ swiper-carousel {
 .shopify-payment-button__more-options:hover {
   color: var(--color-text);
 }
+
+/* ==========================================================================
+   Featured blog
+   ==========================================================================
+   The section frame is `sections/main-faq.liquid`'s, property for property, so
+   a merchant who has set up one of those panels has set up this one. The grid
+   is `.product-grid`'s three-breakpoint column count, driven by the same
+   `--columns-*` properties `carousel-shell-attrs` already writes — which is
+   what lets one set of markup be a grid at one width and a Swiper track at
+   another.
+
+   Everything below the frame is the card, and the card is blocks. Each block
+   styles its own box and none reaches across into another: the picture knows
+   about its radius and the pills on it, the panel knows about its border and
+   its padding, and the four blocks inside the panel know only their own type.
+   -------------------------------------------------------------------------- */
+
+@layer components {
+  .featured-blog {
+    border-radius: var(--featured-blog-radius, 0);
+
+    /* `transparent` rather than `currentColor`, so a width of 0 cannot paint a
+       hairline — the same reason the FAQ panel and the footer write it. */
+    border: var(--featured-blog-border-width, 0px) solid
+      var(--featured-blog-border-color, transparent);
+
+    margin-block-start: var(--featured-blog-margin-block-start, 0px);
+    margin-block-end: var(--featured-blog-margin-block-end, 0px);
+  }
+
+  /* Clipping only where a background picture has to stay inside the corners.
+     An unconditional `overflow: hidden` here would cut the focus ring off the
+     outermost card. */
+  .featured-blog.has-background-media { overflow: hidden; }
+
+  .featured-blog.has-background-media > :not(.background-media) {
+    position: relative;
+    z-index: 1;
+  }
+
+  .featured-blog__header {
+    display: flex;
+    flex-direction: column;
+    margin-block-end: var(--space-7);
+  }
+
+  .featured-blog__header--center { align-items: center; text-align: center; }
+  .featured-blog__header--end { align-items: flex-end; text-align: end; }
+
+  .featured-blog__footer {
+    display: flex;
+    justify-content: center;
+    margin-block-start: var(--space-7);
+  }
+
+  .featured-blog__empty { color: var(--color-accent-text); }
+
+  /* ---- the grid --------------------------------------------------------- */
+
+  .article-grid {
+    display: grid;
+    grid-template-columns: repeat(var(--columns-mobile, 1), minmax(0, 1fr));
+    gap: var(--grid-gap-y) var(--grid-gap-x);
+  }
+
+  @media screen and (min-width: 750px) {
+    .article-grid {
+      grid-template-columns: repeat(var(--columns-tablet, 2), minmax(0, 1fr));
+    }
+  }
+
+  @media screen and (min-width: 990px) {
+    .article-grid {
+      grid-template-columns: repeat(var(--columns-desktop, 3), minmax(0, 1fr));
+    }
+  }
+
+  /* A grid item is a flex column so a card whose panel is shorter than its
+     neighbour reaches the bottom of the row anyway — three cards of three
+     different heights in one row is the thing a card grid exists to avoid. */
+  .article-grid__item { display: flex; min-inline-size: 0; }
+
+  /* ---- the card --------------------------------------------------------- */
+
+  /* `position: relative` is what the title link is measured against. Without it
+     the stretched overlay would size itself to the nearest positioned ancestor,
+     which is the section — and one card link would cover the whole row. */
+  .article-card-block {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: var(--article-card-gap, var(--space-3));
+    inline-size: 100%;
+    min-inline-size: 0;
+  }
+
+  /* ---- the picture ------------------------------------------------------ */
+
+  .article-image-block {
+    position: relative;
+    border-radius: var(--article-image-radius, 24px);
+
+    /* The radius has to clip the photograph, or a rounded frame sits over
+       square corners and reads as a rendering fault rather than a style. */
+    overflow: hidden;
+    border: var(--article-image-border-width, 0px)
+      var(--article-image-border-style, solid)
+      var(--article-image-border-color, transparent);
+  }
+
+  .article-image-block__link { display: block; border-radius: inherit; }
+
+  /* The minimum is the part that cannot be talked out of it — see the note on
+     `.block-image__media`, which had the same problem: an element carrying an
+     aspect ratio and a placeholder with an intrinsic size of its own can settle
+     on its content width rather than the box it was given. */
+  .article-image-block__media { inline-size: 100%; min-inline-size: 100%; }
+
+  /* The pills sit along the bottom edge of the picture, over it rather than
+     under it. `pointer-events: none` because the picture behind them is a link,
+     and a tag that is not itself a link should not be a dead spot in it. */
+  .article-image-block__meta {
+    position: absolute;
+    inset-inline: var(--space-4);
+    inset-block-end: var(--space-4);
+    z-index: 1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    pointer-events: none;
+  }
+
+  /* A frosted pill, so a date stays readable over any photograph. White at low
+     alpha rather than the scheme's colours, because what is behind them is a
+     picture and not a surface the scheme knows anything about. */
+  .article-image-block__pill {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-1) var(--space-3);
+    border: 1px solid rgb(255 255 255 / 0.14);
+    border-radius: 999px;
+    background-color: rgb(255 255 255 / 0.14);
+    backdrop-filter: blur(10px);
+    color: rgb(255 255 255 / 0.95);
+    font-size: var(--font-size-xs);
+    line-height: 1.9;
+    white-space: nowrap;
+  }
+
+  .article-image-block__pill-icon {
+    display: grid;
+    place-items: center;
+    inline-size: 22px;
+    block-size: 22px;
+    border: 1px dashed rgb(255 255 255 / 0.3);
+    border-radius: 50%;
+  }
+
+  /* ---- the panel -------------------------------------------------------- */
+
+  .article-content-block {
+    display: flex;
+    flex-direction: column;
+    align-items: var(--article-content-align, start);
+    gap: var(--article-content-gap, var(--space-3));
+
+    /* The panel takes the rest of the card height, so a row of cards ends level
+       whatever their titles do. */
+    flex: 1 1 auto;
+
+    border: var(--article-content-border-width, 0px)
+      var(--article-content-border-style, solid)
+      var(--article-content-border-color, transparent);
+    border-radius: var(--article-content-radius, 16px);
+    background-color: var(--article-content-background, transparent);
+    text-align: var(--article-content-align, start);
+  }
+
+  /* ---- what goes in the panel ------------------------------------------- */
+
+  .article-read-time {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin: 0;
+    color: var(--color-accent-text);
+  }
+
+  .article-read-time__icon {
+    display: grid;
+    place-items: center;
+    inline-size: 24px;
+    block-size: 24px;
+    border: 1px dashed color-mix(in srgb, currentColor 45%, transparent);
+    border-radius: 50%;
+  }
+
+  .article-title-block { margin: 0; }
+
+  /* The whole card, from one anchor.
+     ------------------------------------------------------------------------
+     A stretched `::after` rather than wrapping the card in an `<a>`: the
+     read-more button and the tag pills stay reachable in their own right, the
+     link's accessible name is the title rather than the entire card, and there
+     is never an anchor inside an anchor. */
+  .article-title-block__link {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .article-title-block__link::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+  }
+
+  .article-title-block__link:hover { text-decoration: underline; }
+
+  .article-title-block__link:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: var(--focus-offset);
+    border-radius: 4px;
+  }
+
+  .article-excerpt-block {
+    margin: 0;
+    color: var(--color-accent-text);
+  }
+
+  /* One rule each, because the two line counts are separate settings.
+     `-webkit-line-clamp` is still the only spelling every browser reads, so the
+     prefixed trio stays until the standard `line-clamp` ships unflagged. */
+  .article-title-block--clamped,
+  .article-excerpt-block--clamped {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .article-title-block--clamped { -webkit-line-clamp: var(--article-title-lines, 2); }
+  .article-excerpt-block--clamped { -webkit-line-clamp: var(--article-excerpt-lines, 3); }
+
+  /* The button sits above the title overlay, or the card-wide link swallows the
+     click that lands on it. `margin-block-start: auto` pins it to the bottom of
+     the panel, so a short excerpt and a long one still end with the call to
+     action on the same line. */
+  .article-read-more {
+    position: relative;
+    z-index: 1;
+    margin-block-start: auto;
+  }
+}

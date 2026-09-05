@@ -1,0 +1,227 @@
+{% doc %}
+  blocks/_article-read-more.liquid — private.
+
+  The card's call to action, through `snippets/button.liquid`.
+
+  ## Nothing about the button is reimplemented here
+
+  Variant, size, icon, badge, width and the hover effect are all the snippet's,
+  so this block is a label, a destination and a pass-through. A read-more that
+  drew its own anchor would be a second button in the theme, with a second set
+  of hover states to keep in step with Theme settings › Buttons.
+
+  ## It is a second link to the same place, and that is on purpose
+
+  The title above already links to the article and `base.css` stretches it over
+  the whole card. This one is the visible affordance — the thing a customer
+  looks for and clicks. Two links to one destination is only a problem when the
+  second announces nothing: the label is real text, so a screen reader user gets
+  "Read more, link" and the title link separately, which is the same choice
+  `snippets/article-card.liquid` makes on the blog index.
+
+  It raises itself above the stretched title link in `base.css`, or the card-wide
+  overlay would swallow the click that lands on it.
+{% enddoc %}
+
+{%- liquid
+  assign article = closest.article
+  assign s = block.settings
+
+  assign label = s.label
+  if label == blank
+    assign label = 'blogs.article.read_more' | t
+  endif
+
+  assign icon = s.icon | default: 'arrow-right'
+-%}
+
+{%- capture button_style -%}
+  {%- render 'spacing', block: s, declarations: true -%}
+{%- endcapture -%}
+
+{%- if article -%}
+  <div
+    class="article-read-more"
+    data-block-spacing
+    style="{{ button_style | strip_newlines | strip }}"
+    {{ block.shopify_attributes }}
+  >
+    {% render 'button',
+       label: label,
+       href: article.url,
+       variant: s.variant,
+       size: s.size,
+       icon: icon,
+       icon_position: s.icon_position,
+       icon_style: s.icon_style,
+       width: s.width,
+       class: 'article-read-more__button' %}
+  </div>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "t:blocks.article_read_more.name",
+  "tag": null,
+  "settings": [
+    {
+      "type": "text",
+      "id": "label",
+      "label": "t:blocks.button.settings.label.label",
+      "info": "t:blocks.article_read_more.settings.label.info"
+    },
+    {
+      "type": "select",
+      "id": "variant",
+      "label": "t:blocks.button.settings.style.label",
+      "options": [
+        {
+          "value": "primary",
+          "label": "t:blocks.button.settings.style.options__1.label"
+        },
+        {
+          "value": "secondary",
+          "label": "t:blocks.button.settings.style.options__2.label"
+        },
+        {
+          "value": "outline",
+          "label": "t:blocks.button.settings.style.options__3.label"
+        },
+        {
+          "value": "link",
+          "label": "t:blocks.button.settings.style.options__4.label"
+        }
+      ],
+      "default": "link"
+    },
+    {
+      "type": "select",
+      "id": "size",
+      "label": "t:blocks.button.settings.size.label",
+      "options": [
+        {
+          "value": "small",
+          "label": "t:blocks.button.settings.size.options__1.label"
+        },
+        {
+          "value": "medium",
+          "label": "t:blocks.button.settings.size.options__2.label"
+        },
+        {
+          "value": "large",
+          "label": "t:blocks.button.settings.size.options__3.label"
+        }
+      ],
+      "default": "medium"
+    },
+    {
+      "type": "select",
+      "id": "width",
+      "label": "t:blocks.button.settings.width.label",
+      "options": [
+        {
+          "value": "auto",
+          "label": "t:blocks.button.settings.width.options__1.label"
+        },
+        {
+          "value": "min",
+          "label": "t:blocks.button.settings.width.options__2.label"
+        },
+        {
+          "value": "full",
+          "label": "t:blocks.button.settings.width.options__3.label"
+        }
+      ],
+      "default": "auto",
+      "info": "t:blocks.button.settings.width.info"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.subheading.headers.icon"
+    },
+    {
+      "type": "select",
+      "id": "icon",
+      "label": "t:blocks.button.settings.icon.label",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:blocks.button.settings.icon.options__none.label"
+        },
+        {
+          "value": "arrow-right",
+          "label": "t:blocks.article_read_more.settings.icon.options__1.label"
+        },
+        {
+          "value": "chevron-right",
+          "label": "t:blocks.article_read_more.settings.icon.options__2.label"
+        },
+        {
+          "value": "external",
+          "label": "t:blocks.article_read_more.settings.icon.options__3.label"
+        }
+      ],
+      "default": "arrow-right"
+    },
+    {
+      "type": "select",
+      "id": "icon_position",
+      "label": "t:blocks.button.settings.icon_position.label",
+      "options": [
+        {
+          "value": "start",
+          "label": "t:blocks.button.settings.icon_position.options__1.label"
+        },
+        {
+          "value": "end",
+          "label": "t:blocks.button.settings.icon_position.options__2.label"
+        }
+      ],
+      "default": "end",
+      "visible_if": "{{ block.settings.icon != 'none' }}"
+    },
+    {
+      "type": "select",
+      "id": "icon_style",
+      "label": "t:blocks.button.settings.icon_style.label",
+      "options": [
+        {
+          "value": "default",
+          "label": "t:blocks.button.settings.icon_style.options__1.label"
+        },
+        {
+          "value": "solid",
+          "label": "t:blocks.button.settings.icon_style.options__2.label"
+        }
+      ],
+      "default": "default",
+      "visible_if": "{{ block.settings.icon != 'none' }}",
+      "info": "t:blocks.button.settings.icon_style.info"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.spacing.block_header"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 4
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 0
+    }
+  ]
+}
+{% endschema %}

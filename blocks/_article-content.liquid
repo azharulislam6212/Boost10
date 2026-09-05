@@ -1,0 +1,289 @@
+{% doc %}
+  blocks/_article-content.liquid — private.
+
+  The panel under the picture: a frame with a stack of blocks in it.
+
+  ## It is a frame, not a layout engine
+
+  Border, radius, background and padding are all it has, because the four things
+  that go inside it — read time, title, excerpt, read more — are blocks with
+  their own settings and their own order. The panel decides what the stack sits
+  in; the blocks decide what the stack is.
+
+  In the design that frame is a dashed rule at half opacity with a 16px radius
+  and 24px of padding, which is what the defaults here are. A store that wants a
+  solid card instead changes two settings rather than getting a second block.
+
+  ## Opacity goes into the colour
+
+  Both for the border and for the background. `opacity` on the panel would fade
+  the title and the excerpt along with the frame they sit in, which is the one
+  thing a frame must not do. `color_modify` puts the alpha in the colour, and
+  `color-mix` does the same job for the `currentColor` case the filters cannot
+  read an alpha channel from until the scheme resolves in the browser.
+
+  ## Private, and only inside a card
+
+  A panel that says "read time" and "read more" outside an article is a panel
+  with nothing to describe. It is addable inside **Article card** and nowhere
+  else, which is what the leading underscore means everywhere in this theme.
+{% enddoc %}
+
+{%- liquid
+  assign s = block.settings
+
+  assign radius = s.border_radius | default: 16 | plus: 0
+  assign gap = s.gap | default: 12 | plus: 0
+
+  assign border_width = 0
+  if s.border_style != 'none' and s.border_style != blank
+    assign border_width = s.border_width | default: 1 | plus: 0
+
+    assign border_percent = s.border_opacity | default: 50 | plus: 0
+    if s.border_color == blank
+      assign border_paint = 'color-mix(in srgb, currentColor ' | append: border_percent | append: '%, transparent)'
+    else
+      assign border_alpha = border_percent | divided_by: 100.0
+      assign border_paint = s.border_color | color_modify: 'alpha', border_alpha
+    endif
+  endif
+
+  assign background_paint = ''
+  if s.background_color != blank
+    assign background_alpha = s.background_opacity | default: 100 | plus: 0
+    assign background_alpha = background_alpha | divided_by: 100.0
+    assign background_paint = s.background_color | color_modify: 'alpha', background_alpha
+  endif
+-%}
+
+{%- capture content_style -%}
+  {%- render 'spacing', block: s, declarations: true -%}
+  --article-content-radius: {{ radius }}px;
+  --article-content-gap: {{ gap }}px;
+  --article-content-align: {{ s.alignment | default: 'start' }};
+  {%- if border_width > 0 -%}
+    --article-content-border-width: {{ border_width }}px;
+    --article-content-border-style: {{ s.border_style }};
+    --article-content-border-color: {{ border_paint }};
+  {%- endif -%}
+  {%- if background_paint != '' -%}
+    --article-content-background: {{ background_paint }};
+  {%- endif -%}
+{%- endcapture -%}
+
+<div
+  class="article-content-block"
+  data-block-spacing
+  style="{{ content_style | strip_newlines | strip }}"
+  {{ block.shopify_attributes }}
+>
+  {% content_for 'blocks' %}
+</div>
+
+{% schema %}
+{
+  "name": "t:blocks.article_content.name",
+  "tag": null,
+  "blocks": [
+    { "type": "_article-read-time" },
+    { "type": "_article-title" },
+    { "type": "_article-excerpt" },
+    { "type": "_article-read-more" },
+    { "type": "@app" }
+  ],
+  "settings": [
+    {
+      "type": "select",
+      "id": "alignment",
+      "label": "t:blocks.group.settings.alignment.label",
+      "options": [
+        { "value": "start", "label": "t:blocks.group.settings.alignment.options__1.label" },
+        { "value": "center", "label": "t:blocks.group.settings.alignment.options__2.label" },
+        { "value": "end", "label": "t:blocks.group.settings.alignment.options__3.label" }
+      ],
+      "default": "start"
+    },
+    {
+      "type": "range",
+      "id": "gap",
+      "label": "t:blocks.group.settings.gap_vertical.label",
+      "min": 0,
+      "max": 48,
+      "step": 2,
+      "unit": "px",
+      "default": 12
+    },
+
+    { "type": "header", "content": "t:blocks.group.headers.borders" },
+    {
+      "type": "select",
+      "id": "border_style",
+      "label": "t:blocks.group.settings.border_style.label",
+      "options": [
+        { "value": "none", "label": "t:shared.options.none" },
+        { "value": "solid", "label": "t:shared.options.solid" },
+        { "value": "dashed", "label": "t:shared.border.style.options__2.label" }
+      ],
+      "default": "dashed"
+    },
+    {
+      "type": "range",
+      "id": "border_width",
+      "label": "t:shared.border.thickness.label",
+      "min": 1,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 1,
+      "visible_if": "{{ block.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_opacity",
+      "label": "t:blocks.image.settings.border_opacity.label",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 50,
+      "visible_if": "{{ block.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "color",
+      "id": "border_color",
+      "label": "t:shared.border.color.label",
+      "visible_if": "{{ block.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius",
+      "label": "t:blocks.group.settings.border_radius.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 16
+    },
+
+    { "type": "header", "content": "t:shared.appearance.header" },
+    {
+      "type": "color",
+      "id": "background_color",
+      "label": "t:shared.appearance.background_color.label",
+      "info": "t:blocks.card_content.settings.background_color.info"
+    },
+    {
+      "type": "range",
+      "id": "background_opacity",
+      "label": "t:blocks.card_content.settings.background_opacity.label",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 100,
+      "visible_if": "{{ block.settings.background_color != blank }}"
+    },
+
+    { "type": "header", "content": "t:shared.spacing.block_header" },
+    { "type": "paragraph", "content": "t:shared.spacing.block_paragraph" },
+    {
+      "type": "select",
+      "id": "padding_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        { "value": "desktop", "label": "t:shared.spacing.devices.options__1.label" },
+        { "value": "mobile", "label": "t:shared.spacing.devices.options__2.label" }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 24,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 24,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 24,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 24,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 20,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 20,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left_mobile",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 20,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right_mobile",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 20,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    }
+  ]
+}
+{% endschema %}
