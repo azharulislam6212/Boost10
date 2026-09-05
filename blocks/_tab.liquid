@@ -48,10 +48,36 @@
     render 'icon-size', size: s.icon_size, custom: s.icon_size_custom
   endcapture
   assign icon_size = icon_px | plus: 0
+
+  comment
+    The space between the blocks stacked in the panel — a Section header over an
+    Accordion is the *FAQ: Tabs* preset, and until this existed the only way to
+    separate the two was to reach into the accordion and give it a top padding
+    it did not otherwise want.
+
+    `gap_vertical` / `gap_vertical_mobile` rather than a name of this block's
+    own, because that is the pair `blocks/card-content.liquid` and
+    `blocks/image-card.liquid` already use for exactly this — one stack, one
+    value per breakpoint — and a merchant who has spaced one of those has
+    spaced this.
+
+    The mobile value falls back to the desktop one rather than to a constant, so
+    a panel saved before the setting existed keeps a single consistent stack
+    instead of tightening at 749px for no reason the merchant chose.
+
+    `| default: | plus: 0` and not a blank test: an unset range is nil in
+    Shopify and Undefined elsewhere, and only one of those is blank — the
+    difference that emits `--tab-content-gap:px` and takes the whole style
+    attribute down with it.
+  endcomment
+  assign gap_block = s.gap_vertical | default: 24 | plus: 0
+  assign gap_block_mobile = s.gap_vertical_mobile | default: gap_block | plus: 0
 -%}
 
 {%- capture panel_style -%}
   {%- render 'spacing', block: s, declarations: true -%}
+  --tab-content-gap: {{ gap_block }}px;
+  --tab-content-gap-mobile: {{ gap_block_mobile }}px;
 {%- endcapture -%}
 
 {%- comment -%}
@@ -108,6 +134,29 @@
       "label": "t:blocks.tab.settings.label.label",
       "info": "t:blocks.tab.settings.label.info",
       "default": "Tab"
+    },
+
+    { "type": "header", "content": "t:blocks.group.headers.layout" },
+    {
+      "type": "range",
+      "id": "gap_vertical",
+      "label": "t:blocks.group.settings.gap_vertical.label",
+      "info": "t:blocks.tab.settings.gap_vertical.info",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 24
+    },
+    {
+      "type": "range",
+      "id": "gap_vertical_mobile",
+      "label": "t:blocks.image_card.settings.gap_vertical_mobile.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 16
     },
 
     { "type": "header", "content": "t:blocks.subheading.headers.icon" },

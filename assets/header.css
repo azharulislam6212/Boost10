@@ -1274,6 +1274,55 @@ a.menu-promo:hover .menu-promo__cta svg {
   display: none;
 }
 
+/* Dragging the strip.
+   --------------------------------------------------------------------------
+   Both attributes are `tabs.js`'s, and neither is orientation-specific: below
+   990px a vertical rail is a row that scrolls too, and it is dragged the same
+   way.
+
+   `data-draggable` is on exactly while there are more tabs than the strip can
+   show. The scrollbar is hidden, so on a desktop with no touchscreen the cursor
+   is the only thing left that says the row goes further than it looks — and a
+   grab cursor on a strip that cannot move is worse than none. */
+.tabs__list[data-draggable] {
+  cursor: grab;
+
+  /* A pull across a row of tab names is a text selection to the browser, and
+     the strip is left holding a half-highlighted label that reads as a glitch.
+
+     Here rather than on `[data-dragging]`, because a selection starts on the
+     first pixel of movement and `[data-dragging]` is deliberately five pixels
+     late — switching selection off at that point stops it growing but leaves
+     what has already been highlighted behind. On a strip whose labels are
+     button text nobody selects, the whole gesture is a scroll. */
+  user-select: none;
+}
+
+/* `.tabs` — which is on the `<tab-group>` this list belongs to — only for the
+   weight it carries. `scroll-behavior` and `scroll-snap-type` are set again by
+   `.tabs--vertical .tabs__list` below 990px and by `.drawer-nav .tabs__list`,
+   both later in this file and both exactly as specific as a class and an
+   attribute. Without the third selector a drag in a narrow window would be
+   fighting the smooth scrolling it is here to switch off. */
+.tabs .tabs__list[data-dragging] {
+  cursor: grabbing;
+
+  /* The strip is being moved a pixel at a time by a hand that is already
+     holding it. `smooth` would animate towards a position that changed two
+     frames ago, and a snap point would pull the strip back between frames —
+     both are for the programmatic scrolls (arrowing along the strip, and
+     `tabs.js` bringing the selected tab into view) and both fight a drag. */
+  scroll-behavior: auto;
+  scroll-snap-type: none;
+}
+
+/* The tabs are buttons and keep the pointer cursor at rest, because clicking
+   one is still the main thing they are for. Mid-drag they are cargo, and a hand
+   that is holding the strip should not be told it is hovering a button. */
+.tabs .tabs__list[data-dragging] .tabs__tab {
+  cursor: grabbing;
+}
+
 .tabs--horizontal .tabs__tab {
   flex: 0 0 auto;
   scroll-snap-align: start;

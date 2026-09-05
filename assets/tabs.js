@@ -12,6 +12,15 @@
 import { BaseComponent, defineComponent } from '@theme/component';
 import { rafThrottle, prefersReducedMotion, isDesignMode } from '@theme/utilities';
 
+/**
+ * How far the pointer travels before a press on the strip becomes a drag.
+ *
+ * Zero would mean every click on a tab that moved a pixel scrolled the strip
+ * instead of selecting the tab, which is most clicks made with a hand rather
+ * than a mouse mat. Below the threshold nothing moves and nothing is swallowed.
+ */
+const DRAG_THRESHOLD = 5;
+
 
 /**
  * A tab strip with animated selection.
@@ -49,6 +58,30 @@ import { rafThrottle, prefersReducedMotion, isDesignMode } from '@theme/utilitie
  * wheel over the strip is mapped across here, and handed back at either end so
  * the page keeps scrolling once the strip has run out.
  *
+ * ## And it can be dragged
+ *
+ * A touchscreen drags the strip because the browser does it — `overflow-x` and
+ * a finger is all that takes. A mouse has never had that: `overflow-x: auto`
+ * with the scrollbar hidden gives a desktop customer a strip with tabs past the
+ * edge, no bar to pull and no gesture that reaches them. Grabbing it is the
+ * obvious thing to try and it did nothing.
+ *
+ * So a press and a pull moves `scrollLeft` here. Three things make it a drag
+ * rather than a broken click:
+ *
+ *   - Nothing happens until the pointer has travelled `DRAG_THRESHOLD`, so a
+ *     click on a tab is still a click on a tab.
+ *   - The click the browser sends after the release is swallowed once. It
+ *     reports where the pointer went down and came up, and after a drag the tab
+ *     under it is not the one the customer asked for.
+ *   - `data-dragging` turns off `scroll-behavior: smooth` and the snap points
+ *     for the length of the gesture. Both exist for the programmatic scrolls
+ *     and both fight a hand that is already holding the strip.
+ *
+ * Touch pointers are left alone deliberately: the browser's own scrolling has
+ * momentum and rubber-banding, and a script that took the gesture over would be
+ * replacing that with a worse version of it.
+ *
  * Attributes:
  *   data-orientation  horizontal | vertical
  *   data-activation   auto (arrow keys select) | manual (arrow keys only move focus)
@@ -66,6 +99,12 @@ export class TabGroup extends BaseComponent {
   /** @type {boolean} Whether the strip currently has more tabs than it can show. */
   #overflowing = false;
 
+  /** @type {boolean} Whether a pointer drag is currently moving the strip. */
+  #dragging = false;
+
+  /** @type {boolean} Whether the next `click` is the tail of a drag. */
+  #swallowClick = false;
+
   setup() {
     this.#buildTabs();
 
@@ -74,6 +113,18 @@ export class TabGroup extends BaseComponent {
 
     this.delegate('click', '[role="tab"]', (event, tab) => {
       event.preventDefault();
+
+      // The click at the end of a drag. Swallowed once — see `#onPointerDown`.
+      //
+      // `detail` is the click count, and it is 0 for the click a browser
+      // synthesises from Enter or Space on a focused button. A keyboard
+      // activation has no drag behind it whatever the flag says, so it is
+      // never the one to throw away.
+      if (this.#swallowClick) {
+        this.#swallowClick = false;
+        if (/** @type {MouseEvent} */ (event).detail > 0) return;
+      }
+
       this.select(this.tabs.indexOf(tab));
     });
 
@@ -81,13 +132,18 @@ export class TabGroup extends BaseComponent {
 
     if (this.dataset.hover === 'true') {
       this.delegate('pointerenter', '[role="tab"]', (_event, tab) => {
+        // Dragging the strip moves tabs under a stationary pointer, and every
+        // one of them would open a panel on the way past.
+        if (this.#dragging) return;
         this.select(this.tabs.indexOf(tab));
       }, { capture: true });
     }
 
     // The marker is positioned from measured boxes, so anything that changes a
-    // tab's size has to move it: font loading, a container resize, a panel
-    // opening. Observing the list covers all three without a resize listener.
+    // tab's size has to move it: a container resize, a panel opening, a strip
+    // that was not painted when it was first placed. Observing the list covers
+    // those without a resize listener. Font loading is the exception, and is
+    // handled separately below.
     this.#observer = new ResizeObserver(
       rafThrottle(() => {
         this.#placeMarker(false);
@@ -99,7 +155,30 @@ export class TabGroup extends BaseComponent {
     // Not passive: the point of the handler is to take the gesture off the page.
     this.on(this.refs.list, 'wheel', (event) => this.#onWheel(event), { passive: false });
 
+    this.on(this.refs.list, 'pointerdown', (event) => this.#onPointerDown(event));
+
+    // An icon or an image inside a tab is something the browser will happily
+    // start a native drag with, and that drag ends the scroll gesture halfway
+    // through it — the ghost image follows the pointer and the strip stops.
+    // Tested against the overflow rather than against `#dragging`, because the
+    // native drag begins before the five pixels that make this one.
+    this.on(this.refs.list, 'dragstart', (event) => {
+      if (this.#overflowing) event.preventDefault();
+    });
+
     this.#syncOverflow();
+
+    // Web fonts are the one case the observer above cannot see. The list's own
+    // width comes from the grid column it sits in, so a swapped font changes
+    // every tab inside it and leaves the observed box exactly where it was —
+    // and that is the difference between a strip that fits and one that does
+    // not, which decides both where the marker goes and whether the strip can
+    // be dragged or take the wheel off the page.
+    document.fonts?.ready.then(() => {
+      if (!this.isConnected) return;
+      this.#placeMarker(false);
+      this.#syncOverflow();
+    });
 
     // The Theme Editor selects blocks the customer cannot see. A panel that is
     // not the current tab is `hidden`, so clicking "Tab — Returns" in the
@@ -122,6 +201,15 @@ export class TabGroup extends BaseComponent {
   teardown() {
     this.#observer?.disconnect();
     this.#observer = null;
+
+    // Moving an element in the DOM disconnects and reconnects it, and morphing
+    // does exactly that — so a drag can be interrupted mid-gesture. The
+    // listeners go with the AbortController; the state they were writing has to
+    // be put back by hand, or the strip comes back holding a `data-dragging`
+    // that nothing will ever remove.
+    this.#dragging = false;
+    this.#swallowClick = false;
+    this.refs.list?.removeAttribute('data-dragging');
   }
 
   /* --------------------------------------------------------- public API -- */
@@ -185,10 +273,16 @@ export class TabGroup extends BaseComponent {
   /**
    * Mark the strip while it has more tabs than it can show.
    *
-   * The attribute is Lenis's: it hands the wheel back to the browser for any
-   * gesture over this element. It is toggled rather than written once, because
-   * a strip that fits has nothing to scroll and would only be taking the page's
-   * smooth scrolling away from whoever moved a pointer across it.
+   * `data-lenis-prevent-wheel` is Lenis's: it hands the wheel back to the
+   * browser for any gesture over this element. `data-draggable` is this
+   * theme's, and is what puts the grab cursor on the strip — the only thing
+   * that tells a desktop customer the row can be pulled, since the scrollbar is
+   * hidden.
+   *
+   * Both are toggled rather than written once. A strip that fits has nothing to
+   * scroll: it would be taking the page's smooth scrolling away from whoever
+   * moved a pointer across it, and offering a grab handle for a gesture that
+   * cannot move anything.
    *
    * @private
    */
@@ -202,6 +296,85 @@ export class TabGroup extends BaseComponent {
 
     this.#overflowing = overflowing;
     list.toggleAttribute('data-lenis-prevent-wheel', overflowing);
+    list.toggleAttribute('data-draggable', overflowing);
+  }
+
+  /**
+   * Drag the strip with a pointer.
+   *
+   * Listeners go on `document` rather than on the strip, and no pointer is
+   * captured. Both are deliberate:
+   *
+   *   - `document` is what keeps the gesture alive once the pointer leaves the
+   *     strip, which it does constantly — the strip is one row of buttons tall
+   *     and a hand pulling sideways drifts out of it in a few frames.
+   *   - `setPointerCapture` would have done the same, but a captured pointer
+   *     retargets the `click` that follows to the capturing element. The click
+   *     on a tab is how a tab is selected, so capturing here would trade one
+   *     bug for a worse one.
+   *
+   * The position is recomputed from where the gesture started rather than added
+   * to frame by frame, so a frame the browser skipped cannot accumulate into
+   * drift between the pointer and the strip under it.
+   *
+   * @param {PointerEvent} event
+   * @private
+   */
+  #onPointerDown(event) {
+    // First, and before any of the guards below. A press is the start of a
+    // fresh gesture, so suppression left over from a drag that ended somewhere
+    // other than on a tab dies here rather than eating the click that is about
+    // to happen — including when the reason this handler returns early is that
+    // the strip has since stopped overflowing.
+    this.#swallowClick = false;
+
+    const list = this.refs.list;
+    if (!list || !this.#overflowing) return;
+
+    // The browser already does this for a finger, with momentum and
+    // rubber-banding that nothing here would improve on.
+    if (event.pointerType === 'touch') return;
+
+    // Primary button only: the middle one is autoscroll and the right one is a
+    // context menu, and neither belongs to this.
+    if (event.button !== 0) return;
+
+    const startX = event.clientX;
+    const startScroll = list.scrollLeft;
+
+    /** @param {PointerEvent} move */
+    const onMove = (move) => {
+      const delta = move.clientX - startX;
+
+      if (!this.#dragging) {
+        if (Math.abs(delta) < DRAG_THRESHOLD) return;
+
+        this.#dragging = true;
+        list.toggleAttribute('data-dragging', true);
+      }
+
+      list.scrollLeft = startScroll - delta;
+    };
+
+    const onUp = () => {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      document.removeEventListener('pointercancel', onUp);
+
+      if (!this.#dragging) return;
+
+      this.#dragging = false;
+      list.removeAttribute('data-dragging');
+
+      // The click the release is about to produce is the browser reporting
+      // where the pointer went down and came up. After a drag that is whichever
+      // tab happens to be under the hand, not the one the customer asked for.
+      this.#swallowClick = true;
+    };
+
+    document.addEventListener('pointermove', onMove, { signal: this.signal });
+    document.addEventListener('pointerup', onUp, { signal: this.signal });
+    document.addEventListener('pointercancel', onUp, { signal: this.signal });
   }
 
   /**

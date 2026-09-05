@@ -5031,14 +5031,17 @@
 
   /* An empty heading cluster takes no part in the layout.
 
-     The cluster is a *static* block: the section renders it whether or not the
-     arrangement wants one, and the *FAQ: Banner* preset puts a picture beside
-     the questions with no heading above them. Left in, an empty one is still a
-     flex item with a gap on either side of it — which on a row reads as a
-     column of unexplained space before the picture, and is exactly the kind of
-     thing a merchant cannot find the cause of because there is nothing there
-     to click. Declaring the block with no children in a preset is how you say
-     "not this arrangement", and this is what makes that true of the layout too.
+     The cluster is a *static* block: the section renders it whether or not
+     there is anything in it. Left in, an empty one is still a flex item with a
+     gap on either side of it — which on a row reads as a column of unexplained
+     space before the picture, and is exactly the kind of thing a merchant
+     cannot find the cause of, because a static block cannot be selected from
+     the sidebar and there is nothing on the page to click.
+
+     Every preset now ships the cluster filled, so this is no longer how a
+     preset says "not this arrangement" — it is what happens when a merchant
+     empties one, which is a thing they can do and should not be punished with
+     a column of dead space for doing.
 
      `:has()` rather than `:empty`, because a group always contains its content
      layer — what is empty is that layer, not the block. And not a group with a
@@ -5944,6 +5947,33 @@
     display: block;
     inline-size: 100%;
     min-inline-size: 0;
+  }
+
+  /* The stack inside a tab panel — a Section header over an Accordion, in the
+     *FAQ: Tabs* preset. `blocks/_tab.liquid` writes the two properties from its
+     own Space between blocks sliders.
+
+     A margin between siblings rather than `display: flex` with a `gap`, and the
+     difference matters here. Every block that renders through
+     `snippets/group.liquid` writes both a `flex` and an `inline-size` for its
+     Width setting, and Fill is `flex: 1 1 0%`. In a flex *column* that basis is
+     read on the block axis, so a full-width heading would stop being as tall as
+     its text and start being a share of the panel's height — a width control
+     silently resizing things vertically. A margin leaves the panel a block
+     container, where `inline-size` is the declaration that means anything, and
+     changes nothing about how the blocks inside it size themselves.
+
+     It is also the same idiom every other block stream in this file uses
+     (`.main-page__blocks`, `.main-article__blocks`, `.faq__intro`), so the
+     spacing between blocks has one shape across the theme. */
+  .tabs__panel-content > * + * {
+    margin-block-start: var(--tab-content-gap, var(--space-6));
+  }
+
+  @media screen and (max-width: 749px) {
+    .tabs__panel-content > * + * {
+      margin-block-start: var(--tab-content-gap-mobile, var(--tab-content-gap, var(--space-5)));
+    }
   }
 
   /* The strip carries its own width, so the wrapper has to carry it instead:
