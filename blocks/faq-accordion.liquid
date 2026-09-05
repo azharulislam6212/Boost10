@@ -12,16 +12,39 @@
 
   There is no cap on how many rows it takes beyond Shopify's own limit on blocks
   per section.
+
+  ## Alignment moves the text, not the rows
+
+  Every row is the width of the list, and that is not negotiable: `align-items`
+  on the column would size each row to its own question, and three rows of three
+  different widths is not a list — it is three buttons. So Alignment is
+  `text-align` inside the row, which moves the question and its answer while the
+  rows stay a stack of equal cards.
+
+  ## The block writes its inline padding even though it has no slider for it
+
+  `--block-padding-inline-*` inherits, and `[data-block-spacing]` reads it. An
+  accordion inside a Group with 64px of side padding was therefore given that
+  64px a second time as its own, and the rows sat inset from the column they
+  were supposed to fill — with nothing in this block's settings to explain it.
+  `snippets/spacing.liquid` writes only the sides a block has a slider for, so
+  the two inline sides are declared here instead, at the zero this block means.
 {% enddoc %}
 
 {%- liquid
   assign s = block.settings
   assign gap = s.gap | default: 16 | plus: 0
+  assign alignment = s.alignment | default: 'start'
 -%}
 
 {%- capture accordion_style -%}
   {%- render 'spacing', block: s, declarations: true -%}
+  --block-padding-inline-start: 0px;
+  --block-padding-inline-end: 0px;
+  --block-padding-inline-start-mobile: 0px;
+  --block-padding-inline-end-mobile: 0px;
   --faq-accordion-gap: {{ gap }}px;
+  --faq-accordion-align: {{ alignment }};
 {%- endcapture -%}
 
 {%- comment -%}
@@ -54,6 +77,18 @@
     { "type": "@app" }
   ],
   "settings": [
+    {
+      "type": "select",
+      "id": "alignment",
+      "label": "t:blocks.group.settings.alignment.label",
+      "info": "t:blocks.faq_accordion.settings.alignment.info",
+      "options": [
+        { "value": "start", "label": "t:blocks.group.settings.alignment.options__1.label" },
+        { "value": "center", "label": "t:blocks.group.settings.alignment.options__2.label" },
+        { "value": "end", "label": "t:blocks.group.settings.alignment.options__3.label" }
+      ],
+      "default": "start"
+    },
     {
       "type": "range",
       "id": "gap",

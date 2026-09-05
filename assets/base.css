@@ -711,10 +711,31 @@
   .container--standard { --container-width: var(--container-width-standard); }
   .container--wide { --container-width: var(--container-width-wide); }
   .container--custom { --container-width: var(--container-custom-width, var(--container-width-standard)); }
-  .container--edge { --container-width: 100vw; }
+  /* Edge to edge, and that now means the edge.
+
+     It used to be 100vw wide with the gutter still on, so a section set to Edge
+     stopped a gutter short of the screen on both sides — full width everywhere
+     except where it counts. A picture column meant to run off the side of the
+     page sat in from it instead, and no setting in the section explained the
+     gap, because the gap belonged to the container rather than to the section.
+
+     `padding-inline` is written after the `min-width: 750px` rule above and is
+     exactly as specific, so it wins on source order; the gutter properties are
+     zeroed too, because that rule computes its own padding from
+     `--container-gutter-desktop` and would otherwise put it back. */
+  .container--edge {
+    --container-gutter: 0px;
+    --container-gutter-desktop: 0px;
+    --container-width: 100vw;
+
+    padding-inline: 0;
+  }
 
   /* Nothing at all: no width, no gutter. For a section that paints its own
-     background to the screen edge and holds its own container inside. */
+     background to the screen edge and holds its own container inside. Identical
+     to Edge above, and kept because callers name it — `snippets/container.liquid`
+     accepts it as a `width`, and it says "this section is handling its own
+     container" where Edge says "this section is as wide as the screen". */
   .container--flush {
     --container-gutter: 0px;
     --container-gutter-desktop: 0px;
@@ -5010,6 +5031,27 @@
     align-items: var(--faq-content-block, start);
   }
 
+  /* The same row, painted the other way round.
+     --------------------------------------------------------------------------
+     `row-reverse` rather than an `order` on each child, and rather than a second
+     preset with the blocks written the other way: the source order is what a
+     screen reader announces and what the Tab key follows, and a picture that
+     changed sides should not change the order the page is read in.
+
+     It is only ever paired with `--row`, so the two classes together are as
+     specific as the mobile stack below and come first — which is what lets the
+     stack win at 749px. A reversed row that stayed reversed once stacked would
+     be a column with the questions above the heading, which is the one thing
+     this must not do.
+
+     Note that `justify-content` flips meaning with the direction: on a reversed
+     row, `start` packs against the right. Nothing here compensates, because
+     that is what reversing the row means — the whole arrangement mirrors, and
+     an alignment that stayed put would be the one thing that did not. */
+  .faq__content--row.faq__content--reverse {
+    flex-direction: row-reverse;
+  }
+
   /* Text follows the box, the same way it does inside a group. A cluster aligned
      right whose paragraphs stayed left-aligned reads as a mistake rather than a
      choice. */
@@ -5146,6 +5188,21 @@
   }
 
   .faq-row__icon-image { inline-size: var(--faq-row-icon-size, 16px); }
+
+  /* The accordion's Alignment, applied to the text rather than to the rows.
+     `--faq-accordion-align` is written on `<accordion-element>` and inherits, so
+     one declaration there reaches the question and the answer in every row.
+
+     `align-items` on the column was the other option and is the wrong one: it
+     would size each row to its own question and turn a stack of equal cards into
+     three buttons of three different widths. The question already takes the
+     line — `flex: 1 1 auto` below — so moving the text inside it is the whole
+     job. `start` / `end` rather than `left` / `right` so it follows the writing
+     direction and flips for right-to-left on its own. */
+  .faq-row__question,
+  .faq-row__answer {
+    text-align: var(--faq-accordion-align, start);
+  }
 
   .faq-row__question {
     flex: 1 1 auto;
