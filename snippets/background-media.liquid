@@ -37,6 +37,10 @@
 
   @param {object} [settings] - A settings object carrying the keys below. Passing the whole object means a section adds background support by adding settings, with no change to its markup.
   @param {boolean} [priority] - Eager-load the image. Above-the-fold only.
+  @param {string} [placeholder] - Draw this placeholder when Image is chosen and
+    none is uploaded. Opt-in: a section that merely offers a background wants an
+    empty slot to stay empty, and a block whose whole subject is the photograph
+    wants to show its shape before anything is uploaded.
   @param {string} [classes] - Extra classes on the wrapper.
 
   Settings read:
@@ -70,10 +74,16 @@
   # merchant who picked Video but uploaded nothing still got an empty positioned
   # wrapper laid over the content. nil is falsy in every engine.
   assign has_layer = false
+  assign show_placeholder = false
   case media
     when 'image'
       if settings.image
         assign has_layer = true
+      elsif placeholder != blank
+        # Same wrapper, same box, same corners — so the card the merchant is
+        # laying out is the size it will be once the picture arrives.
+        assign has_layer = true
+        assign show_placeholder = true
       endif
     when 'video'
       assign video_url = settings.video_url | default: ''
@@ -92,13 +102,17 @@
   <div class="background-media {{ classes }}" aria-hidden="true">
     {%- case media -%}
       {%- when 'image' -%}
-        {% render 'background-image',
-           image: settings.image,
-           mobile_image: settings.image_mobile,
-           position: settings.image_position,
-           parallax: settings.image_parallax,
-           speed: settings.image_parallax_speed,
-           priority: priority %}
+        {%- if show_placeholder -%}
+          {% render 'image', placeholder: placeholder, wrapper_class: 'background-media__placeholder' %}
+        {%- else -%}
+          {% render 'background-image',
+             image: settings.image,
+             mobile_image: settings.image_mobile,
+             position: settings.image_position,
+             parallax: settings.image_parallax,
+             speed: settings.image_parallax_speed,
+             priority: priority %}
+        {%- endif -%}
 
       {%- when 'video' -%}
         {%- comment -%}

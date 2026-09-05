@@ -79,6 +79,37 @@
 
   assign toggle = s.toggle_style | default: 'plus'
 
+  comment
+    ---- the frame ----
+
+    One border decision, three lines. The frame around the row, the tile behind
+    the leading icon and the tile behind the toggle all take it, because three
+    controls for three lines a merchant will always set the same way is three
+    chances for them to disagree.
+
+    `none` is a zero width rather than `border-style: none`, so the row keeps
+    its box either way and turning the border off does not move the text.
+  endcomment
+  assign border_style = s.border_style | default: 'none'
+  assign border_width = 0
+  if border_style != 'none'
+    assign border_width = s.border_width | default: 1 | plus: 0
+
+    comment
+      With no colour picked the line is `currentColor`, which the colour filters
+      cannot take an alpha channel from — there is no channel to read until the
+      scheme resolves it in the browser. `color-mix` fades it at that point
+      instead, so an unset colour is a hairline rather than a hard rule.
+    endcomment
+    if s.border_color == blank
+      assign border_paint = 'color-mix(in srgb, currentColor 20%, transparent)'
+    else
+      assign border_paint = s.border_color
+    endif
+  endif
+
+  assign radius = s.border_radius | default: 14 | plus: 0
+
   # The icon tile grows with the glyph rather than taking a second slider that
   # can be set smaller than the thing it contains.
   assign icon_box = icon_size | plus: 12
@@ -91,8 +122,27 @@
       --faq-row-icon-size: {{ icon_size }}px;
       --faq-row-icon-box: {{ icon_box }}px;
     {%- endif -%}
+    --faq-row-radius: {{ radius }}px;
+    {%- if s.background_color != blank -%}
+      --faq-row-background: {{ s.background_color }};
+    {%- endif -%}
+    {%- if border_width > 0 -%}
+      --faq-row-border-width: {{ border_width }}px;
+      --faq-row-border-style: {{ border_style }};
+      --faq-row-border-color: {{ border_paint }};
+    {%- endif -%}
   {%- endcapture -%}
 
+  {%- comment -%}
+    A row animates as one thing. There is no stagger setting on it, because the
+    only two boxes inside are the question and the answer — and the answer is
+    hidden until it is opened, so "one after the other" would be a delay on
+    nothing. The list cascades from the Accordion above it instead.
+  {%- endcomment -%}
+  <motion-effect
+    class="faq-row-motion"
+    {% render 'motion-attrs', kind: 'text', block: s %}
+  >
   <details
     class="faq-row faq-row--toggle-{{ toggle }}{% if has_icon %} faq-row--has-icon{% endif %}"
     {% if s.open_by_default %}open data-default-open{% endif %}
@@ -149,6 +199,7 @@
       </div>
     </div>
   </details>
+  </motion-effect>
 {%- endif -%}
 
 {% schema %}
@@ -251,18 +302,94 @@
       "visible_if": "{{ block.settings.icon_source != 'none' and block.settings.icon_size == 'custom' }}"
     },
 
+    { "type": "header", "content": "t:shared.appearance.header" },
+    {
+      "type": "color",
+      "id": "background_color",
+      "label": "t:shared.background.color.label",
+      "info": "t:blocks.faq_row.settings.background_color.info"
+    },
+    {
+      "type": "select",
+      "id": "border_style",
+      "label": "t:blocks.group.settings.border_style.label",
+      "info": "t:blocks.faq_row.settings.border_style.info",
+      "options": [
+        { "value": "none", "label": "t:shared.options.none" },
+        { "value": "solid", "label": "t:shared.options.solid" },
+        { "value": "dashed", "label": "t:shared.border.style.options__2.label" }
+      ],
+      "default": "none"
+    },
+    {
+      "type": "range",
+      "id": "border_width",
+      "label": "t:shared.border.thickness.label",
+      "min": 1,
+      "max": 6,
+      "step": 1,
+      "unit": "px",
+      "default": 1,
+      "visible_if": "{{ block.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "color",
+      "id": "border_color",
+      "label": "t:shared.border.color.label",
+      "info": "t:shared.border.color.info",
+      "visible_if": "{{ block.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius",
+      "label": "t:shared.corner_radius.label",
+      "min": 0,
+      "max": 40,
+      "step": 2,
+      "unit": "px",
+      "default": 14
+    },
+
     { "type": "header", "content": "t:blocks.collapsible.headers.toggle" },
     {
       "type": "select",
       "id": "toggle_style",
       "label": "t:blocks.collapsible.settings.toggle_style.label",
+      "info": "t:blocks.faq_row.settings.toggle_style.info",
       "options": [
         { "value": "plus", "label": "t:blocks.collapsible.settings.toggle_style.options__1.label" },
+        { "value": "cross", "label": "t:blocks.collapsible.settings.toggle_style.options__3.label" },
         { "value": "arrow", "label": "t:blocks.collapsible.settings.toggle_style.options__2.label" }
       ],
       "default": "plus"
     },
 
+    { "type": "header", "content": "t:shared.animation.header" },
+    {
+      "type": "select",
+      "id": "animation_text",
+      "label": "t:shared.animation.animation_text.label",
+      "options": [
+        { "value": "inherit", "label": "t:shared.animation.animation_text.options__1.label" },
+        { "value": "none", "label": "t:shared.animation.animation_text.options__2.label" },
+        { "value": "fade-in", "label": "t:shared.animation.animation_text.options__3.label" },
+        { "value": "fade-up", "label": "t:shared.animation.animation_text.options__4.label" },
+        { "value": "slide-up", "label": "t:shared.animation.animation_text.options__5.label" }
+      ],
+      "default": "inherit"
+    },
+    {
+      "type": "range",
+      "id": "animation_duration",
+      "label": "t:shared.animation.animation_duration.label",
+      "info": "t:shared.animation.animation_duration.info",
+      "min": 0,
+      "max": 2000,
+      "step": 100,
+      "unit": "ms",
+      "default": 1000,
+      "visible_if": "{{ block.settings.animation_text != 'none' }}"
+    },
     { "type": "header", "content": "t:shared.spacing.block_header" },
     {
       "type": "select",

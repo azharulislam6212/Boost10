@@ -1,32 +1,34 @@
-{%- comment -%}
-  Kept deliberately, and not yet called from anywhere.
-
-  The generic tab shell. The mega menu writes its own for now.
-
-  Theme Check reports this as `OrphanedSnippet`, and that report is correct:
-  nothing calls it yet. It is a warning, not an error, and it stands until the
-  file is wired up - which is the fix, rather than silencing the check.
-{%- endcomment -%}
-
 {% doc %}
   A tab strip and its panels.
 
-  Generic on purpose. The mega menu is the first caller, but nothing here knows
-  about navigation — a product page, a size guide or a comparison table can
-  render the same shell and get the same keyboard behaviour and the same sliding
-  marker for free.
+  Generic on purpose. Nothing here knows about navigation or about questions and
+  answers — `blocks/tabs.liquid` renders a set of theme blocks through it, and a
+  product page, a size guide or a comparison table can render the same shell and
+  get the same keyboard behaviour and the same sliding marker for free.
 
-  ## The caller builds the tabs and panels
+  ## The caller builds the panels, and usually not the tabs
 
   Passing captured strings rather than a list of objects is how `carousel-shell`
   works in this theme, and for the same reason: the caller already has the loop,
   the ids and the content, and rebuilding all three inside a snippet means every
   new use has to bend its data into a shape the snippet invented.
 
-  Each tab must be a `<button role="tab">` carrying `id`, `aria-controls`,
-  `aria-selected` and `tabindex`, and each panel a `role="tabpanel"` carrying
-  `id` and `aria-labelledby`. The first tab is the selected one; every other
-  panel is `hidden`.
+  There are two ways to fill it, and the second is the common one:
+
+  **Both.** Pass `tabs` and `panels`. Each tab is a `<button role="tab">`
+  carrying `id`, `aria-controls`, `aria-selected` and `tabindex`, and each panel
+  a `role="tabpanel"` carrying `id` and `aria-labelledby`. The first tab is the
+  selected one; every other panel is `hidden`.
+
+  **Panels only.** Give each panel a `data-tab-label` and leave `tabs` unset.
+  `<tab-group>` in `assets/tabs.js` builds the buttons from those labels, sets
+  every id and every relationship, and hides all but the first.
+
+  The second exists because a block that renders one panel per nested block
+  cannot render the buttons too: `{% content_for 'blocks' %}` is one stream of
+  output and the buttons belong in a different container from the panels. Either
+  they are generated, or the merchant types every tab name twice and keeps two
+  lists in the same order by hand.
 
   ## The marker
 
@@ -35,12 +37,15 @@
   `aria-hidden`, so it is decoration to assistive technology and geometry to the
   browser.
 
-  @param {string} tabs - The `role="tab"` buttons
-  @param {string} panels - The `role="tabpanel"` elements
+  @param {string} [panels] - The `role="tabpanel"` elements
+  @param {string} [tabs] - The `role="tab"` buttons. Omit when the panels carry `data-tab-label`
   @param {string} [orientation] - horizontal | vertical. Default: horizontal
   @param {string} [activation] - auto | manual. Default: auto
   @param {boolean} [hover] - Select on pointer hover as well as click
   @param {string} [label] - Accessible name for the tablist
+  @param {string} [id] - Element id. `tabs.js` derives generated panel ids from it
+  @param {string} [styles] - Declarations for the group's own `style` attribute
+  @param {string} [attributes] - Raw attributes, e.g. `block.shopify_attributes`
   @param {string} [classes]
 
   @example
@@ -53,10 +58,13 @@
 -%}
 
 <tab-group
+  {% if id != blank %}id="{{ id }}"{% endif %}
   class="tabs tabs--{{ tab_orientation }} {{ classes }}"
   data-orientation="{{ tab_orientation }}"
   data-activation="{{ tab_activation }}"
   {% if hover %}data-hover="true"{% endif %}
+  {% if styles != blank %}style="{{ styles | strip_newlines | strip }}"{% endif %}
+  {{ attributes }}
 >
   <div class="tabs__rail">
     <div

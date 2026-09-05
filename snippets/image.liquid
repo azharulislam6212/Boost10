@@ -116,48 +116,24 @@
   assign resolved_alt = alt | default: image.alt | escape
 
   # ---- aspect ratios -------------------------------------------------------
+  #
+  # The seven names resolve in `snippets/aspect-ratio.liquid`. They used to
+  # resolve here, in two case blocks, which was fine while an `<img>` was the
+  # only thing in the theme with a shape — `blocks/image-card.liquid` gives the
+  # ratio to a card whose picture is a background, and a second copy of the
+  # numbers is the copy that drifts.
   assign ratio_key = ratio | default: 'adapt'
-
-  case ratio_key
-    when 'square'
-      assign aspect = '1 / 1'
-    when 'portrait'
-      assign aspect = '3 / 4'
-    when 'landscape'
-      assign aspect = '4 / 3'
-    when 'wide'
-      assign aspect = '16 / 9'
-    when 'tall'
-      assign aspect = '2 / 3'
-    when 'long'
-      assign aspect = '9 / 16'
-    when 'adapt'
-      assign aspect = image.aspect_ratio | default: 1
-    else
-      assign aspect = ratio_key
-  endcase
-
   assign mobile_ratio_key = mobile_ratio | default: ratio_key
 
-  case mobile_ratio_key
-    when 'square'
-      assign mobile_aspect = '1 / 1'
-    when 'portrait'
-      assign mobile_aspect = '3 / 4'
-    when 'landscape'
-      assign mobile_aspect = '4 / 3'
-    when 'wide'
-      assign mobile_aspect = '16 / 9'
-    when 'tall'
-      assign mobile_aspect = '2 / 3'
-    when 'long'
-      assign mobile_aspect = '9 / 16'
-    when 'adapt'
-      assign fallback_mobile = mobile_image.aspect_ratio | default: image.aspect_ratio | default: 1
-      assign mobile_aspect = fallback_mobile
-    else
-      assign mobile_aspect = mobile_ratio_key
-  endcase
+  capture aspect
+    render 'aspect-ratio', ratio: ratio_key, image: image
+  endcapture
+
+  # The mobile fallback is the desktop image, so a mobile-only `adapt` with no
+  # second upload keeps the shape the first one had.
+  capture mobile_aspect
+    render 'aspect-ratio', ratio: mobile_ratio_key, image: mobile_image, fallback: image.aspect_ratio
+  endcapture
 
   assign loading_attr = 'lazy'
   assign decoding_attr = 'async'

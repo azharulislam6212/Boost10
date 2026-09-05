@@ -1217,7 +1217,7 @@ a.menu-promo:hover .menu-promo__cta svg {
 
 .tabs {
   display: grid;
-  gap: var(--space-6);
+  gap: var(--tabs-gap, var(--space-6));
 }
 
 .tabs--horizontal {
@@ -1233,11 +1233,58 @@ a.menu-promo:hover .menu-promo__cta svg {
   position: relative;
   display: flex;
   gap: var(--space-1);
+
+  /* `base.css` puts a rule under every `[role="tablist"]`. That is the underline
+     tab pattern, and it is the right default for a tablist with no styling of
+     its own — but this component says which tab is selected with a marker that
+     slides between them, and a line under the strip on top of that is a second
+     answer to a question already answered.
+
+     Laid out vertically it is worse than redundant: the list is a column, so
+     the rule lands under the last tab name and reads as a divider belonging to
+     nothing. Off in both arrangements, and off for the mega menu too, which was
+     inheriting the same stray line. */
+  border-block-end: 0;
 }
 
+/* A row of tabs scrolls; it does not wrap.
+
+   Wrapping looks harmless until there is one tab too many, and then the strip
+   silently becomes two rows: the panel jumps down the page, the marker measures
+   a box on a line the customer is not looking at, and on a phone every strip
+   with more than three tabs did it. Scrolling keeps the strip one line at every
+   width, and the tab half in view is what says there are more of them — which a
+   second row cannot say, because it looks like a layout rather than an
+   invitation.
+
+   `scroll-behavior: smooth` is for the programmatic scrolls: arrowing along the
+   strip and `tabs.js` bringing the selected tab into view. Dragging is the
+   browser's own and is unaffected. */
 .tabs--horizontal .tabs__list {
   flex-direction: row;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-behavior: smooth;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+
+.tabs--horizontal .tabs__list::-webkit-scrollbar {
+  display: none;
+}
+
+.tabs--horizontal .tabs__tab {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  white-space: nowrap;
+}
+
+/* The marker is measured from the tab box, so it has to travel with the strip
+   rather than stay pinned to the viewport — and the rail has to be allowed to
+   be narrower than its content for any of that to happen. */
+.tabs--horizontal .tabs__rail {
+  min-inline-size: 0;
 }
 
 .tabs--vertical .tabs__list {
@@ -1376,6 +1423,75 @@ a.menu-promo:hover .menu-promo__cta svg {
    than fighting Swiper for the same property. */
 .tabs__panel .carousel-shell__track {
   --grid-columns-desktop: var(--tab-columns, 3);
+}
+
+/* ---- the standalone block ------------------------------------------------
+   `blocks/tabs.liquid` puts the same strip in a section, where there is no
+   tinted field behind it. The marker keeps its own colour there — a white pill
+   on a white section is an active tab nobody can see — and it takes the card
+   surface, which is the same tint the FAQ rows and every other panel in the
+   theme sit on. */
+/* Fill or fit, written as both `flex` and `inline-size` — see the note in
+   `blocks/tabs.liquid`. The default is fill, so a strip dropped into a section
+   spans it rather than hugging its longest tab name. */
+.tabs--block {
+  flex: var(--tabs-flex, 1 1 0%);
+  inline-size: var(--tabs-width, 100%);
+  max-inline-size: 100%;
+}
+
+/* The selected tab is the primary button's colours, not a pale card. The menu
+   gets away with a near-white marker because it sits in a tinted field; in a
+   section the same pill is invisible on half the colour schemes, and "which tab
+   am I on" is the one question a tab strip exists to answer. */
+.tabs--block .tabs__marker {
+  background-color: var(--color-primary-button-background);
+  box-shadow: none;
+}
+
+.tabs--block .tabs__tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
+  border: var(--tabs-tab-border-width, 1px) var(--tabs-tab-border-style, solid)
+    var(--tabs-tab-border-color, var(--color-border));
+  transition:
+    opacity var(--header-speed) var(--header-ease),
+    color var(--header-speed) var(--header-ease),
+    border-color var(--header-speed) var(--header-ease);
+}
+
+/* The marker slides in behind the selected tab, so the tab's own outline has to
+   get out of the way — two rings, one inside the other, is what a border left
+   on looks like. */
+.tabs--block .tabs__tab[aria-selected='true'] {
+  border-color: transparent;
+  color: var(--color-primary-button-text);
+}
+
+.tabs--block .tabs__tab-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+/* A rule between the rail and the panel, for the vertical arrangement only:
+   read down a column of names and the line is what says where the list ends
+   and the answer begins. Across the top the tabs are already a row of pills
+   above the content and a second horizontal line only crowds them. */
+.tabs--block.tabs--divided .tabs__panels {
+  border-inline-start: 1px solid var(--color-border);
+  padding-inline-start: var(--tabs-gap, var(--space-6));
+}
+
+@media screen and (max-width: 989px) {
+  /* The rail is a horizontal scroller at this width, so a line down the side of
+     the panel would divide nothing. */
+  .tabs--block.tabs--divided .tabs__panels {
+    border-inline-start: 0;
+    padding-inline-start: 0;
+  }
 }
 
 /* The mega menu's rail is inset into a tinted field, which is what makes the
@@ -2172,6 +2288,7 @@ a.menu-promo:hover .menu-promo__panel {
     flex-wrap: nowrap;
     overflow-x: auto;
     overscroll-behavior-x: contain;
+    scroll-behavior: smooth;
     scroll-snap-type: x proximity;
     scrollbar-width: none;
     padding-block-end: var(--space-2);

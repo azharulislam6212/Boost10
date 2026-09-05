@@ -1,0 +1,269 @@
+{% doc %}
+  blocks/_tab.liquid
+
+  One panel in a **Tabs** block, and the button that opens it.
+
+  ## The button is built from a template, not from a string
+
+  The button belongs in the rail and the panel belongs in the panel area, and
+  `{% content_for 'blocks' %}` emits one stream into one container — so the
+  button travels with the panel and `<tab-group>` in `assets/tabs.js` moves it.
+
+  It travels as a `<template>` rather than as text on a `data-` attribute,
+  because the button has an icon in it now. An SVG escaped into an attribute is
+  markup that no longer looks like markup: nothing formats it, nothing checks
+  it, and `snippets/icon.liquid` could not be used to produce it. A template is
+  inert markup that the browser has already parsed, and `tabs.js` clones it.
+
+  `data-tab-label` stays, and stays authoritative: it is what a panel with no
+  template falls back to, and `blocks/menu-tab.liquid` still uses only that.
+
+  ## The panel holds blocks, not a field
+
+  Anything the theme has goes inside: a Section header over an Accordion is what
+  the *FAQ: Tabs* preset builds, but a Text block, an Image, a Group or a set of
+  Buttons are all the same block and none of them are named here. A tab that
+  could only hold prose would be a tab that cannot hold a size table.
+
+  Private — the leading underscore — because a panel outside a tab strip is a
+  `role="tabpanel"` with no tab, which is markup a screen reader has to
+  apologise for. It is addable inside **Tabs** and nowhere else.
+{% enddoc %}
+
+{%- liquid
+  assign s = block.settings
+  assign label = s.label | default: 'Tab'
+
+  comment
+    Icons only, no uploads. The button is a pill a few characters wide sitting
+    in a rail, and an image in it is a second thing to size, crop and describe
+    for a slot where the glyph set already covers what a tab name means.
+  endcomment
+  assign has_icon = false
+  if s.icon_source == 'icon' and s.icon != blank
+    assign has_icon = true
+  endif
+
+  capture icon_px
+    render 'icon-size', size: s.icon_size, custom: s.icon_size_custom
+  endcapture
+  assign icon_size = icon_px | plus: 0
+-%}
+
+{%- capture panel_style -%}
+  {%- render 'spacing', block: s, declarations: true -%}
+{%- endcapture -%}
+
+{%- comment -%}
+  `tabindex="0"` because the panel is a scroll container of its own once the
+  content is long enough, and a scrollable region has to be reachable from the
+  keyboard. `id`, `aria-labelledby` and `hidden` are set by `tabs.js` as it
+  builds the buttons, so they are not written twice here.
+{%- endcomment -%}
+<div
+  class="tabs__panel"
+  role="tabpanel"
+  id="Tab-{{ block.id }}"
+  data-tab-label="{{ label | escape }}"
+  tabindex="0"
+  data-block-spacing
+  style="{{ panel_style | strip_newlines | strip }}"
+  {{ block.shopify_attributes }}
+>
+  <template data-tab-button>
+    {%- if has_icon -%}
+      <span class="tabs__tab-icon">{% render 'icon', icon: s.icon, size: icon_size %}</span>
+    {%- endif -%}
+    <span class="tabs__tab-label">{{ label | escape }}</span>
+  </template>
+
+  {%- comment -%}
+    The animation goes on a layer inside the panel, not on the panel itself.
+    A panel already animates when the tab changes — `tab-panel-rise` in
+    `assets/header.css`, which fires because `hidden` is `display: none` and a
+    box that starts being rendered starts its animations. Two animations on one
+    element is one of them winning per frame, so this one takes the layer under
+    it and staggers the blocks, which is what **Stagger between items** offers.
+  {%- endcomment -%}
+  <motion-effect
+    class="tabs__panel-content"
+    {% render 'motion-attrs', kind: 'text', block: s, children: true %}
+  >
+    {% content_for 'blocks' %}
+  </motion-effect>
+</div>
+
+{% schema %}
+{
+  "name": "t:blocks.tab.name",
+  "tag": null,
+  "blocks": [
+    { "type": "@theme" },
+    { "type": "@app" }
+  ],
+  "settings": [
+    {
+      "type": "text",
+      "id": "label",
+      "label": "t:blocks.tab.settings.label.label",
+      "info": "t:blocks.tab.settings.label.info",
+      "default": "Tab"
+    },
+
+    { "type": "header", "content": "t:blocks.subheading.headers.icon" },
+    {
+      "type": "select",
+      "id": "icon_source",
+      "label": "t:blocks.subheading.settings.icon_source.label",
+      "info": "t:blocks.tab.settings.icon_source.info",
+      "options": [
+        { "value": "none", "label": "t:shared.none.label" },
+        { "value": "icon", "label": "t:blocks.subheading.settings.icon_source.options__2.label" }
+      ],
+      "default": "none"
+    },
+    {
+      "type": "select",
+      "id": "icon",
+      "label": "t:blocks.subheading.settings.icon.label",
+      "options": [
+        { "value": "star", "label": "t:blocks.subheading.settings.icon.options__1.label" },
+        { "value": "check", "label": "t:blocks.subheading.settings.icon.options__2.label" },
+        { "value": "heart", "label": "t:blocks.subheading.settings.icon.options__3.label" },
+        { "value": "tag", "label": "t:blocks.subheading.settings.icon.options__4.label" },
+        { "value": "truck", "label": "t:blocks.subheading.settings.icon.options__5.label" },
+        { "value": "refresh", "label": "t:blocks.subheading.settings.icon.options__6.label" },
+        { "value": "lock", "label": "t:blocks.subheading.settings.icon.options__7.label" },
+        { "value": "clock", "label": "t:blocks.subheading.settings.icon.options__8.label" },
+        { "value": "location", "label": "t:blocks.subheading.settings.icon.options__9.label" },
+        { "value": "mail", "label": "t:blocks.subheading.settings.icon.options__10.label" },
+        { "value": "note", "label": "t:blocks.subheading.settings.icon.options__11.label" },
+        { "value": "info", "label": "t:blocks.subheading.settings.icon.options__12.label" }
+      ],
+      "default": "note",
+      "visible_if": "{{ block.settings.icon_source == 'icon' }}"
+    },
+    {
+      "type": "select",
+      "id": "icon_size",
+      "label": "t:blocks.subheading.settings.icon_size.label",
+      "options": [
+        { "value": "extra_small", "label": "t:shared.icon_size.options__1.label" },
+        { "value": "small", "label": "t:shared.icon_size.options__2.label" },
+        { "value": "medium", "label": "t:shared.icon_size.options__3.label" },
+        { "value": "large", "label": "t:shared.icon_size.options__4.label" },
+        { "value": "extra_large", "label": "t:shared.icon_size.options__5.label" },
+        { "value": "custom", "label": "t:shared.icon_size.options__6.label" }
+      ],
+      "default": "small",
+      "visible_if": "{{ block.settings.icon_source == 'icon' }}"
+    },
+    {
+      "type": "range",
+      "id": "icon_size_custom",
+      "label": "t:shared.icon_size.custom.label",
+      "info": "t:shared.icon_size.custom.info",
+      "min": 10,
+      "max": 32,
+      "step": 1,
+      "unit": "px",
+      "default": 16,
+      "visible_if": "{{ block.settings.icon_source == 'icon' and block.settings.icon_size == 'custom' }}"
+    },
+
+    { "type": "header", "content": "t:shared.animation.header" },
+    {
+      "type": "select",
+      "id": "animation_text",
+      "label": "t:shared.animation.animation_text.label",
+      "options": [
+        { "value": "inherit", "label": "t:shared.animation.animation_text.options__1.label" },
+        { "value": "none", "label": "t:shared.animation.animation_text.options__2.label" },
+        { "value": "fade-in", "label": "t:shared.animation.animation_text.options__3.label" },
+        { "value": "fade-up", "label": "t:shared.animation.animation_text.options__4.label" },
+        { "value": "slide-up", "label": "t:shared.animation.animation_text.options__5.label" }
+      ],
+      "default": "inherit"
+    },
+    {
+      "type": "range",
+      "id": "animation_duration",
+      "label": "t:shared.animation.animation_duration.label",
+      "info": "t:shared.animation.animation_duration.info",
+      "min": 0,
+      "max": 2000,
+      "step": 100,
+      "unit": "ms",
+      "default": 1000,
+      "visible_if": "{{ block.settings.animation_text != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "animation_stagger",
+      "label": "t:shared.animation.animation_stagger.label",
+      "info": "t:shared.animation.animation_stagger.info",
+      "min": 0,
+      "max": 300,
+      "step": 10,
+      "unit": "ms",
+      "default": 0,
+      "visible_if": "{{ block.settings.animation_text != 'none' }}"
+    },
+    { "type": "header", "content": "t:shared.spacing.block_header" },
+    {
+      "type": "select",
+      "id": "padding_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        { "value": "desktop", "label": "t:shared.spacing.devices.options__1.label" },
+        { "value": "mobile", "label": "t:shared.spacing.devices.options__2.label" }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    }
+  ]
+}
+{% endschema %}

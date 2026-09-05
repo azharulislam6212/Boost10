@@ -815,12 +815,25 @@
     padding-block-end: var(--section-padding-block-end, 0px);
   }
 
+  /* `max()` of the emitted value and a component default, rather than a plain
+     `var()` fallback.
+
+     `snippets/spacing.liquid` now writes every side a block has a slider for,
+     `0px` included — it has to, because these properties inherit and a block
+     four levels deep was picking up its parent's padding whenever its own was
+     left at zero. A fallback that only applies when the property is unset can
+     therefore never apply again.
+
+     So a component that wants breathing room by default declares it separately
+     and the larger of the two wins: `.block-text--has-background` still pads
+     itself the moment the background goes on, and every block whose component
+     asks for nothing gets exactly what its sliders say, zero included. */
   .block-spacing,
   [data-block-spacing] {
-    padding-block-start: var(--block-padding-block-start, 0px);
-    padding-inline-end: var(--block-padding-inline-end, 0px);
-    padding-block-end: var(--block-padding-block-end, 0px);
-    padding-inline-start: var(--block-padding-inline-start, 0px);
+    padding-block-start: max(var(--block-padding-block-start, 0px), var(--block-padding-default-block-start, 0px));
+    padding-inline-end: max(var(--block-padding-inline-end, 0px), var(--block-padding-default-inline-end, 0px));
+    padding-block-end: max(var(--block-padding-block-end, 0px), var(--block-padding-default-block-end, 0px));
+    padding-inline-start: max(var(--block-padding-inline-start, 0px), var(--block-padding-default-inline-start, 0px));
   }
 
   .section + .section {
@@ -840,21 +853,33 @@
        side and no question about which of two rules applies. */
     .block-spacing,
     [data-block-spacing] {
-      padding-block-start: var(
-        --block-padding-block-start-mobile,
-        calc(var(--block-padding-block-start, 0px) * var(--block-padding-scale-mobile, 0.75))
+      padding-block-start: max(
+        var(
+          --block-padding-block-start-mobile,
+          calc(var(--block-padding-block-start, 0px) * var(--block-padding-scale-mobile, 0.75))
+        ),
+        var(--block-padding-default-block-start, 0px)
       );
-      padding-inline-end: var(
-        --block-padding-inline-end-mobile,
-        calc(var(--block-padding-inline-end, 0px) * var(--block-padding-scale-mobile, 0.75))
+      padding-inline-end: max(
+        var(
+          --block-padding-inline-end-mobile,
+          calc(var(--block-padding-inline-end, 0px) * var(--block-padding-scale-mobile, 0.75))
+        ),
+        var(--block-padding-default-inline-end, 0px)
       );
-      padding-block-end: var(
-        --block-padding-block-end-mobile,
-        calc(var(--block-padding-block-end, 0px) * var(--block-padding-scale-mobile, 0.75))
+      padding-block-end: max(
+        var(
+          --block-padding-block-end-mobile,
+          calc(var(--block-padding-block-end, 0px) * var(--block-padding-scale-mobile, 0.75))
+        ),
+        var(--block-padding-default-block-end, 0px)
       );
-      padding-inline-start: var(
-        --block-padding-inline-start-mobile,
-        calc(var(--block-padding-inline-start, 0px) * var(--block-padding-scale-mobile, 0.75))
+      padding-inline-start: max(
+        var(
+          --block-padding-inline-start-mobile,
+          calc(var(--block-padding-inline-start, 0px) * var(--block-padding-scale-mobile, 0.75))
+        ),
+        var(--block-padding-default-inline-start, 0px)
       );
     }
   }
@@ -4999,8 +5024,28 @@
 
      `flex-basis: 0` also overrides the `inline-size: 100%` below, which is a
      cross-axis declaration on a row and the whole width on a column. */
-  .faq__content--row > .faq-accordion {
+  .faq__content--row > .faq-accordion,
+  .faq__content--row > .faq-accordion-motion {
     flex: 2 1 0%;
+  }
+
+  /* An empty heading cluster takes no part in the layout.
+
+     The cluster is a *static* block: the section renders it whether or not the
+     arrangement wants one, and the *FAQ: Banner* preset puts a picture beside
+     the questions with no heading above them. Left in, an empty one is still a
+     flex item with a gap on either side of it — which on a row reads as a
+     column of unexplained space before the picture, and is exactly the kind of
+     thing a merchant cannot find the cause of because there is nothing there
+     to click. Declaring the block with no children in a preset is how you say
+     "not this arrangement", and this is what makes that true of the layout too.
+
+     `:has()` rather than `:empty`, because a group always contains its content
+     layer — what is empty is that layer, not the block. And not a group with a
+     background: a picture with nothing on it is a decoration a merchant can
+     legitimately want. */
+  .faq__content > .block-group:not(.has-background-media):not(:has(.block-group__content > *)) {
+    display: none;
   }
 
   @media screen and (max-width: 749px) {
@@ -5025,7 +5070,8 @@
 
     /* Two thirds of nothing. Once stacked, the accordion is back on the block
        axis where a `flex-basis` of 0 means height, not width. */
-    .faq__content--row.faq__content--stack-mobile > .faq-accordion {
+    .faq__content--row.faq__content--stack-mobile > .faq-accordion,
+    .faq__content--row.faq__content--stack-mobile > .faq-accordion-motion {
       flex: 0 1 auto;
     }
   }
@@ -5049,9 +5095,14 @@
      This rule is in @layer components and would otherwise beat the
      `[data-block-spacing]` rule in @layer layout, leaving two of the four
      padding controls inert. */
+  /* Surface, corners and frame are all the block's, and all default to what
+     the row looked like before there were settings for them: the scheme's card
+     tint, the card radius, and no border at all. */
   .faq-row {
-    border-radius: var(--radius-card, 14px);
-    background-color: var(--color-secondary-background);
+    border: var(--faq-row-border-width, 0) var(--faq-row-border-style, solid)
+      var(--faq-row-border-color, transparent);
+    border-radius: var(--faq-row-radius, var(--radius-card, 14px));
+    background-color: var(--faq-row-background, var(--color-secondary-background));
   }
 
   .faq-row__summary {
@@ -5072,12 +5123,17 @@
     border-radius: var(--radius-card, 14px);
   }
 
+  /* The two tiles take the row's own line. One border decision per row: a
+     dashed frame with solid tiles inside it is a row that looks like two
+     designs arguing. */
   .faq-row__icon {
     flex-shrink: 0;
     display: grid;
     place-items: center;
     inline-size: var(--faq-row-icon-box, 28px);
     block-size: var(--faq-row-icon-box, 28px);
+    border: var(--faq-row-border-width, 0) var(--faq-row-border-style, solid)
+      var(--faq-row-border-color, transparent);
     border-radius: 6px;
     background-color: rgb(var(--color-primary-button-background-rgb) / 0.2);
     color: var(--color-heading);
@@ -5097,13 +5153,19 @@
     place-items: center;
     inline-size: 2.4rem;
     block-size: 2.4rem;
+    border: var(--faq-row-border-width, 0) var(--faq-row-border-style, solid)
+      var(--faq-row-border-color, transparent);
     border-radius: 8px;
     background-color: transparent;
     color: var(--color-heading);
-    transition: background-color var(--transition-base);
+    transition:
+      background-color var(--transition-base),
+      border-color var(--transition-base);
   }
 
+  /* Filled, so the line around it would only outline a solid block of colour. */
   .faq-row[open] > .faq-row__summary .faq-row__toggle {
+    border-color: transparent;
     background-color: var(--color-primary-button-background);
     color: var(--color-primary-button-text);
   }
@@ -5120,6 +5182,30 @@
 
   .faq-row__chevron { transition: transform var(--transition-base); }
   .faq-row[open] > .faq-row__summary .faq-row__chevron { transform: rotate(180deg); }
+
+  /* ---- the third toggle: a plus that closes ------------------------------
+     **Plus** travels its upright bar onto the crossbar and settles as a minus.
+     **Close** turns the whole glyph 45° into a cross instead, which is the
+     shape a filled tile in a panel usually carries.
+
+     They are the same two paths, so the bar's own rotation has to be called off
+     here — a bar at 90° inside a glyph at 45° is a plus with a lean, not a
+     cross. */
+  /* No `transform-box` here, unlike the bar above: this turns the whole `<svg>`,
+     which is an ordinary replaced box in the page rather than a shape inside a
+     viewBox, and `center` already means the middle of it. */
+  .faq-row--toggle-cross .faq-row__plus {
+    transform-origin: center;
+    transition: transform var(--transition-base);
+  }
+
+  .faq-row--toggle-cross[open] > .faq-row__summary .faq-row__plus {
+    transform: rotate(45deg);
+  }
+
+  .faq-row--toggle-cross[open] > .faq-row__summary .faq-row__plus .icon__bar--v {
+    transform: none;
+  }
 
   /* The answer is blocks now, so this is a container rather than a body of text:
      a column with a gap, because two blocks in a panel need to be told apart and
@@ -5140,6 +5226,7 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
+    .faq-row__plus,
     .faq-row__plus .icon__bar,
     .faq-row__chevron,
     .faq-row__toggle { transition: none; }
@@ -5657,7 +5744,19 @@
   /* Only painted when the merchant chose a style; `0px` of border still
      computes a border box and shifts layout by a hair. */
   .block-group[style*='--group-border-width'] {
-    border: var(--group-border-width) solid var(--group-border-color, currentColor);
+    border: var(--group-border-width) var(--group-border-style, solid)
+      var(--group-border-color, currentColor);
+  }
+
+  /* Frosted. Keyed off the property rather than a modifier class for the same
+     reason the border above is: the group already carries the value, and a class
+     that has to be kept in step with it is a class that can fall out of step.
+
+     `-webkit-` first and unprefixed second, because Safari shipped this behind
+     the prefix for years and still needs it on older iOS. */
+  .block-group[style*='--group-backdrop-blur'] {
+    -webkit-backdrop-filter: blur(var(--group-backdrop-blur));
+    backdrop-filter: blur(var(--group-backdrop-blur));
   }
 
   .block-group--column {
@@ -5832,6 +5931,80 @@
     flex-wrap: nowrap;
   }
 
+  /* The elements that exist only to animate something. A custom element is
+     `display: inline` until a stylesheet says otherwise, and an inline box cannot
+     be transformed the way these need to be.
+
+     Each wraps a component that has to stay the element it is —
+     `<tab-group>`, `<accordion-element>`, `<details>` — so the animation goes
+     around it rather than onto it. */
+  .faq-accordion-motion,
+  .faq-row-motion,
+  .tabs__panel-content {
+    display: block;
+    inline-size: 100%;
+    min-inline-size: 0;
+  }
+
+  /* The strip carries its own width, so the wrapper has to carry it instead:
+     a full-width box around a content-width strip is a strip that ignored its
+     Width setting. */
+  .tabs-motion {
+    display: block;
+    flex: var(--tabs-flex, 1 1 0%);
+    inline-size: var(--tabs-width, 100%);
+    min-inline-size: 0;
+  }
+
+  /* ==========================================================================
+     Image card
+     ==========================================================================
+     `blocks/image-card.liquid` is a group, so its layout, borders, radius,
+     colours, link and padding are the rules above and none of them are repeated
+     here. What is left is the shape of the card, the picture when it sits above
+     the content rather than behind it, and the label.
+     -------------------------------------------------------------------------- */
+
+  /* With the picture behind it the card has no natural height — the blocks on
+     it decide, so two cards side by side come out different heights for no
+     reason the merchant can see. The ratio gives it one.
+
+     `auto` is the fallback rather than a number, so **Adapt** means "as tall as
+     the content" instead of collapsing to a square. */
+  .image-card--over {
+    aspect-ratio: var(--image-card-ratio, auto);
+  }
+
+  /* The picture as a child, for Content: below the image. It keeps the card's
+     corners, so a radius rounds the photograph instead of leaving it square
+     inside a rounded box. */
+  .image-card__media {
+    inline-size: 100%;
+    overflow: hidden;
+    border-radius: inherit;
+  }
+
+
+  .image-card__label {
+    align-self: start;
+    padding: var(--space-1) var(--space-3);
+    border-radius: 999px;
+    background-color: var(--color-primary-button-background);
+    color: var(--image-card-label-color, var(--color-primary-button-text));
+    font-size: var(--font-size-sm, 1.3rem);
+    line-height: 1.4;
+  }
+
+  /* Pinned to the corner of the picture, which is what **Show in content**
+     turns off. Out of flow, so it takes no row in the content column and the
+     heading underneath it does not move down to make room. */
+  .image-card__label--pinned {
+    position: absolute;
+    inset-block-start: var(--space-4);
+    inset-inline-start: var(--space-4);
+    z-index: 2;
+  }
+
   /* ==========================================================================
      Background media
      ==========================================================================
@@ -5861,6 +6034,17 @@
     overflow: hidden;
     border-radius: inherit;
     pointer-events: none;
+  }
+
+  /* A placeholder in the background layer fills it, rather than keeping the
+     aspect ratio `responsive-image` gives every wrapper it renders. That ratio
+     is right for a picture in the flow, where it reserves the box; here the box
+     is already reserved by the card, and the stand-in has to fill it exactly as
+     the photograph will. */
+  .background-media__placeholder {
+    position: absolute;
+    inset: 0;
+    aspect-ratio: auto;
   }
 
   .background-media__layer {
@@ -9315,10 +9499,10 @@ swiper-carousel {
    defaults — the snippet emits its own the instant a slider leaves zero, and an
    inline declaration beats a class every time. */
 .block-text--has-background {
-  --block-padding-block-start: var(--space-4);
-  --block-padding-block-end: var(--space-4);
-  --block-padding-inline-start: var(--space-5);
-  --block-padding-inline-end: var(--space-5);
+  --block-padding-default-block-start: var(--space-4);
+  --block-padding-default-block-end: var(--space-4);
+  --block-padding-default-inline-start: var(--space-5);
+  --block-padding-default-inline-end: var(--space-5);
 
   background: var(--block-text-background, transparent);
   border-radius: var(--block-text-radius, 0);
@@ -9672,10 +9856,10 @@ swiper-carousel {
    than `padding`, because `[data-block-spacing]` reads those and a `padding`
    shorthand here would win outright and kill all four sliders. */
 .block-subheading--bordered {
-  --block-padding-block-start: var(--space-1);
-  --block-padding-block-end: var(--space-1);
-  --block-padding-inline-start: var(--space-1);
-  --block-padding-inline-end: var(--space-4);
+  --block-padding-default-block-start: var(--space-1);
+  --block-padding-default-block-end: var(--space-1);
+  --block-padding-default-inline-start: var(--space-1);
+  --block-padding-default-inline-end: var(--space-4);
 }
 
 @media screen and (max-width: 749px) {

@@ -50,10 +50,29 @@
   `base.css`, so a button inside a linked group is still a button and the rest
   of the surface is still the link.
 
+  ## Built on, rather than forked
+
+  Three parameters exist only so another block can be a group without copying
+  one: `extra_classes` to name itself, `tag` to be a different element, and
+  `attributes` for whatever that element needs. `blocks/image-card.liquid` uses
+  all three — it is a group whose background is the picture and whose wrapper is
+  a `<motion-effect>`, and it adds no layout code of its own.
+
+  The alternative is a second flex container with its own alignment swap, its
+  own width pair and its own idea of what Fill means. There is one of those in
+  the theme and this is it.
+
   @param {object} settings - Block settings
   @param {string} [children] - Rendered child blocks
   @param {string} [extra_classes] - Extra classes for the wrapper, so a block
     built on top of a group can name itself without forking this snippet
+  @param {string} [tag] - Wrapper element. Default: `div`
+  @param {string} [attributes] - Raw attributes for the wrapper
+  @param {string} [styles] - Declarations appended to the wrapper's own `style`,
+    because a second `style` attribute on the same tag is dropped by the browser
+  @param {boolean} [priority] - Eager-load the background image. Above the fold only
+  @param {string} [placeholder] - Placeholder to draw when the background image is
+    not uploaded yet. Off unless a caller asks for it
   @param {string} [shopify_attributes] - Editor attributes
 
   @example
@@ -168,8 +187,12 @@
   # cannot take an alpha channel from — there is no channel to read until the
   # scheme resolves it in the browser. `color-mix` does the same fade at that
   # point instead, so both paths honour the slider.
+  # Any style the caller offers, not just solid. The Group block lists None and
+  # Solid; `blocks/card-content.liquid` adds Dashed, and the difference between
+  # them is one keyword in the declaration rather than a second border system.
+  assign border_line = settings.border_style | default: 'none'
   assign border_width = 0
-  if settings.border_style == 'solid'
+  if border_line != 'none'
     assign border_width = settings.border_width | default: 1 | plus: 0
 
     assign border_percent = settings.border_opacity | default: 100 | plus: 0
@@ -251,6 +274,27 @@
     assign classes = classes | append: ' ' | append: extra_classes
   endif
 
+  # ---- motion -----------------------------------------------------------
+  #
+  # A group animates itself when it carries the setting, and staggers its own
+  # children when the merchant asks for one. It lives here rather than in each
+  # block because every block built on this snippet is a container, and a
+  # container that animates is the same decision each time.
+  #
+  # `children: true` is what makes **Stagger between items** mean anything: the
+  # blocks inside are the items, and staggering the container against itself
+  # would be one element with a delay on it.
+  #
+  # A caller that brings its own — `blocks/image-card.liquid` animates as an
+  # image, not as text — passes them through `attributes` and has no
+  # `animation_text` setting, so nothing is emitted twice.
+  capture motion_attrs
+    if settings.animation_text
+      render 'motion-attrs', kind: 'text', block: settings, children: true
+    endif
+  endcapture
+  assign motion_attrs = motion_attrs | strip
+
   assign inherit_color_scheme = settings.inherit_color_scheme | default: false
   assign scheme = settings.color_scheme | default: ''
   if inherit_color_scheme == false and scheme != ''
@@ -307,22 +351,48 @@
   --group-radius: {{ radius }}px;
   {%- if border_width > 0 -%}
     --group-border-width: {{ border_width }}px;
+    --group-border-style: {{ border_line }};
     --group-border-color: {{ border_paint }};
+  {%- endif -%}
+  {%- comment -%}
+    A frosted panel. The blur is the group's because a panel that blurs what is
+    behind it is a container decision, not a new kind of container — the card in
+    the FAQ banner is a group on a photograph, and so is every other one.
+  {%- endcomment -%}
+  {%- assign backdrop_blur = settings.backdrop_blur | default: 0 | plus: 0 -%}
+  {%- if backdrop_blur > 0 -%}
+    --group-backdrop-blur: {{ backdrop_blur }}px;
   {%- endif -%}
   {%- assign background_color = settings.background_color | default: '' -%}
   {%- if background_color != '' and has_media == false -%}
     --group-background: {{ background_color }};
   {%- endif -%}
+  {%- comment -%}
+    Last, so a caller building on this snippet can override a property it set
+    rather than having to fork the whole capture to change one value.
+  {%- endcomment -%}
+  {{- styles -}}
 {%- endcapture -%}
 
-<div
+{%- liquid
+  assign group_tag = tag
+  if group_tag == blank
+    assign group_tag = 'div'
+    if motion_attrs != blank
+      assign group_tag = 'motion-effect'
+    endif
+  endif
+-%}
+<{{ group_tag }}
   class="{{ classes }}"
   data-block-spacing
   style="{{ group_style | strip_newlines | strip }}"
+  {{ motion_attrs }}
+  {{ attributes }}
   {{ shopify_attributes }}
 >
   {%- if has_media -%}
-    {% render 'background-media', settings: settings %}
+    {% render 'background-media', settings: settings, priority: priority, placeholder: placeholder %}
   {%- endif -%}
 
   {%- comment -%}
@@ -347,4 +417,4 @@
       aria-label="{{ settings.link_label | default: link_url | escape }}"
     ></a>
   {%- endif -%}
-</div>
+</{{ group_tag }}>

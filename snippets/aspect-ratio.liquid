@@ -1,0 +1,59 @@
+{% doc %}
+  One ratio keyword, resolved to a CSS `aspect-ratio` value.
+
+  ## Why this is not seven strings in each caller
+
+  The seven names are the theme's vocabulary — every image control in every
+  block offers the same list — and until now the numbers behind them lived in
+  two `case` blocks inside `snippets/image.liquid`. That was fine while an
+  `<img>` was the only thing that had a shape. `blocks/image-card.liquid` gives
+  the *card* the ratio, because its picture is a background rather than an
+  element, and a third copy of "portrait means 3 / 4" is the copy that ends up
+  disagreeing with the other two.
+
+      square     1 / 1
+      portrait   3 / 4
+      landscape  4 / 3
+      wide       16 / 9
+      tall       2 / 3
+      long       9 / 16
+      adapt      the image's own ratio
+
+  Anything else is passed through, so a caller with a genuine one-off can hand
+  over `5 / 7` and it lands in the declaration untouched.
+
+  @param {string} [ratio] - One of the names above, or a raw `aspect-ratio` value
+  @param {image} [image] - Read for its own ratio when `ratio` is `adapt`
+  @param {string} [fallback] - Used for `adapt` when the image has no ratio. Default: 1
+
+  @example
+    {%- liquid
+      capture aspect
+        render 'aspect-ratio', ratio: s.ratio, image: s.image
+      endcapture
+    -%}
+{% enddoc %}
+
+{%- liquid
+  assign key = ratio | default: 'adapt'
+
+  case key
+    when 'square'
+      assign value = '1 / 1'
+    when 'portrait'
+      assign value = '3 / 4'
+    when 'landscape'
+      assign value = '4 / 3'
+    when 'wide'
+      assign value = '16 / 9'
+    when 'tall'
+      assign value = '2 / 3'
+    when 'long'
+      assign value = '9 / 16'
+    when 'adapt'
+      assign value = image.aspect_ratio | default: fallback | default: 1
+    else
+      assign value = key
+  endcase
+-%}
+{{- value -}}

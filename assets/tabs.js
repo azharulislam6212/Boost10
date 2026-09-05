@@ -10,7 +10,7 @@
  * @module @theme/tabs
  */
 import { BaseComponent, defineComponent } from '@theme/component';
-import { rafThrottle, prefersReducedMotion } from '@theme/utilities';
+import { rafThrottle, prefersReducedMotion, isDesignMode } from '@theme/utilities';
 
 
 /**
@@ -31,6 +31,24 @@ import { rafThrottle, prefersReducedMotion } from '@theme/utilities';
  * nothing. It is off everywhere else, because hover-to-select on a form is a
  * way to lose what you were reading.
  *
+ * ## The strip scrolls, and something else owns the wheel
+ *
+ * A horizontal strip is a scroll container, and this theme runs Lenis for page
+ * scrolling (`assets/scrollbar.js`). Lenis cancels wheel gestures and animates
+ * the page itself, so a strip that overflowed could not be scrolled with a
+ * wheel or a trackpad at all — it looked like a strip with no way to reach the
+ * tabs past the edge, which is what it was.
+ *
+ * `data-lenis-prevent-wheel` is the theme's own opt-out — the dialog, the
+ * filters drawer and the media zoom all use it — and it goes on and comes off
+ * with the overflow. Left on permanently, a strip that fits would swallow the
+ * smooth page scroll of anyone whose pointer happened to be over it.
+ *
+ * With Lenis out of the way the browser scrolls the strip natively for a
+ * horizontal gesture. A plain mouse has no horizontal gesture, so a vertical
+ * wheel over the strip is mapped across here, and handed back at either end so
+ * the page keeps scrolling once the strip has run out.
+ *
  * Attributes:
  *   data-orientation  horizontal | vertical
  *   data-activation   auto (arrow keys select) | manual (arrow keys only move focus)
@@ -44,6 +62,9 @@ export class TabGroup extends BaseComponent {
 
   /** @type {number} */
   #index = 0;
+
+  /** @type {boolean} Whether the strip currently has more tabs than it can show. */
+  #overflowing = false;
 
   setup() {
     this.#buildTabs();
@@ -67,8 +88,33 @@ export class TabGroup extends BaseComponent {
     // The marker is positioned from measured boxes, so anything that changes a
     // tab's size has to move it: font loading, a container resize, a panel
     // opening. Observing the list covers all three without a resize listener.
-    this.#observer = new ResizeObserver(rafThrottle(() => this.#placeMarker(false)));
+    this.#observer = new ResizeObserver(
+      rafThrottle(() => {
+        this.#placeMarker(false);
+        this.#syncOverflow();
+      })
+    );
     this.#observer.observe(this.refs.list);
+
+    // Not passive: the point of the handler is to take the gesture off the page.
+    this.on(this.refs.list, 'wheel', (event) => this.#onWheel(event), { passive: false });
+
+    this.#syncOverflow();
+
+    // The Theme Editor selects blocks the customer cannot see. A panel that is
+    // not the current tab is `hidden`, so clicking "Tab — Returns" in the
+    // sidebar scrolled to nothing and looked like a broken block. Bring its tab
+    // forward instead, and let the editor's own scroll land on a visible panel.
+    if (isDesignMode()) {
+      this.on(document, 'shopify:block:select', (event) => {
+        const target = /** @type {HTMLElement} */ (event.target);
+        if (!(target instanceof HTMLElement)) return;
+
+        const panels = this.panels;
+        const index = panels.findIndex((panel) => panel === target || panel.contains(target));
+        if (index !== -1) this.select(index);
+      });
+    }
 
     this.select(this.#index, { silent: true, animate: false });
   }
@@ -122,6 +168,10 @@ export class TabGroup extends BaseComponent {
 
     this.#placeMarker(options.animate !== false);
 
+    // Not on the first placement. `setup()` selects the initial tab silently,
+    // and a `scrollIntoView` there would drag the page to the strip on load.
+    if (!options.silent) this.#revealTab(tabs[index], options.animate !== false);
+
 
     if (!options.silent) {
       this.dispatchEvent(
@@ -133,6 +183,82 @@ export class TabGroup extends BaseComponent {
   /* ---------------------------------------------------------- internals -- */
 
   /**
+   * Mark the strip while it has more tabs than it can show.
+   *
+   * The attribute is Lenis's: it hands the wheel back to the browser for any
+   * gesture over this element. It is toggled rather than written once, because
+   * a strip that fits has nothing to scroll and would only be taking the page's
+   * smooth scrolling away from whoever moved a pointer across it.
+   *
+   * @private
+   */
+  #syncOverflow() {
+    const list = this.refs.list;
+    if (!list) return;
+
+    // A sub-pixel difference is a rounding artefact, not a hidden tab.
+    const overflowing = list.scrollWidth - list.clientWidth > 1;
+    if (overflowing === this.#overflowing) return;
+
+    this.#overflowing = overflowing;
+    list.toggleAttribute('data-lenis-prevent-wheel', overflowing);
+  }
+
+  /**
+   * Turn a vertical wheel into a horizontal one, while the strip has somewhere
+   * to go.
+   *
+   * A trackpad swipe already arrives as `deltaX` and the browser handles it, so
+   * this only takes over when the vertical delta is the larger of the two — a
+   * mouse wheel, in other words. At either end the gesture is left alone, and
+   * the page scrolls on as it would have.
+   *
+   * @param {WheelEvent} event
+   * @private
+   */
+  #onWheel(event) {
+    const list = this.refs.list;
+    if (!list || !this.#overflowing) return;
+    if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+
+    const max = list.scrollWidth - list.clientWidth;
+    const next = list.scrollLeft + event.deltaY;
+    if (next < 0 || next > max) return;
+
+    event.preventDefault();
+
+    // `instant`, not the element's own `scroll-behavior: smooth`: a wheel
+    // already arrives in small steps, and animating each one lands the strip a
+    // few frames behind the fingers pushing it.
+    list.scrollBy({ left: event.deltaY, behavior: 'instant' });
+  }
+
+  /**
+   * Bring the selected tab into view.
+   *
+   * A horizontal strip scrolls rather than wraps, so the tab that was just
+   * selected with an arrow key can be off the edge — and a selected tab nobody
+   * can see is the one thing a tab strip must never do. `nearest` so a tab
+   * already on screen is left where it is: scrolling on every click would move
+   * the strip under a pointer that is not asking for it.
+   *
+   * @param {HTMLElement|undefined} tab
+   * @param {boolean} animate
+   * @private
+   */
+  #revealTab(tab, animate) {
+    if (!tab || !this.refs.list) return;
+
+    const smooth = animate && !prefersReducedMotion();
+
+    tab.scrollIntoView({
+      behavior: smooth ? 'smooth' : 'auto',
+      block: 'nearest',
+      inline: 'nearest',
+    });
+  }
+
+  /**
    * Build the strip from the panels when the caller supplied none.
    *
    * A theme block that renders one panel per nested block cannot also render
@@ -140,6 +266,13 @@ export class TabGroup extends BaseComponent {
    * buttons belong in a different container from the panels. So the panel
    * declares its own label with `data-tab-label` and the button is created
    * here, from markup Liquid could not have emitted in two places at once.
+   *
+   * A panel that wants more than a word in its button — an icon beside the
+   * label — ships a `<template data-tab-button>` and that is cloned instead.
+   * The alternative is an SVG escaped into a data attribute, which no formatter
+   * indents and no checker validates. `data-tab-label` stays authoritative
+   * either way: it is the fallback, and the accessible name if the template
+   * turns out to hold nothing but decoration.
    *
    * Without JavaScript every panel simply stays visible, stacked, which is a
    * readable page rather than an empty one.
@@ -166,7 +299,15 @@ export class TabGroup extends BaseComponent {
       tab.setAttribute('aria-controls', id);
       tab.setAttribute('aria-selected', index === 0 ? 'true' : 'false');
       tab.tabIndex = index === 0 ? 0 : -1;
-      tab.textContent = panel.dataset.tabLabel || '';
+
+      // `:scope >` so a tab group nested inside a panel keeps its own buttons.
+      const template = panel.querySelector(':scope > template[data-tab-button]');
+
+      if (template instanceof HTMLTemplateElement) {
+        tab.append(template.content.cloneNode(true));
+      } else {
+        tab.textContent = panel.dataset.tabLabel || '';
+      }
 
       panel.setAttribute('aria-labelledby', tab.id);
       panel.toggleAttribute('hidden', index !== 0);

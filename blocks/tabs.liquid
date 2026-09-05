@@ -1,0 +1,362 @@
+{% doc %}
+  blocks/tabs.liquid
+
+  A strip of tab buttons and the panel one of them shows.
+
+  ## The strip is empty in the markup
+
+  Each nested **Tab** renders a `role="tabpanel"` carrying `data-tab-label`, and
+  `<tab-group>` in `assets/tabs.js` builds the buttons from those labels.
+
+  This is not a shortcut, it is the only shape that works.
+  `{% content_for 'blocks' %}` produces one stream of output, and the buttons
+  and the panels have to end up in two different containers — the rail on one
+  side, the panels on the other. No Liquid emits nested blocks twice. Either the
+  buttons are generated from the panels, or the merchant types every tab name a
+  second time into this block's settings and keeps two lists in sync by hand.
+
+  With JavaScript off every panel stays visible and stacks. All of the content
+  is reachable; only the switching is missing.
+
+  ## Nothing here is FAQ-specific, and none of the shell is this file's
+
+  The same block holds a size guide, a spec table or a set of care instructions.
+  The markup is `snippets/tab-group.liquid` — the rail, the marker, the panel
+  area and the ARIA wiring — which was written generic and, until now, called
+  from nowhere. This is its first caller, so the strip in a section and the
+  strip in the mega menu are one implementation with one set of bugs.
+
+  ## Vertical and horizontal are a grid, not two layouts
+
+  `assets/header.css` reads `.tabs--vertical` and `.tabs--horizontal` and puts
+  the rail beside the panels or above them. Below 990px the vertical rail
+  becomes a horizontal scroller on its own, because a column of tab names on a
+  phone spends the whole screen width on labels and leaves the panel below the
+  fold.
+{% enddoc %}
+
+{%- liquid
+  assign s = block.settings
+
+  assign orientation = s.direction | default: 'vertical'
+  assign rail_width = s.rail_width | default: 260 | plus: 0
+  assign gap = s.gap | default: 24 | plus: 0
+  assign marker_radius = s.marker_radius | default: 50 | plus: 0
+
+  comment
+    Two properties, not one, and for the reason `snippets/group.liquid` sets
+    out at length: `flex` only means anything to a flex *item*, and this block
+    is one only when the section it sits in lays its children out in a flex
+    container — which the FAQ section does and a plain container does not. Each
+    option writes both, they agree, and neither context is a special case.
+
+    Fill is the default because a tab strip that hugs its longest tab name is a
+    panel that changes width as the customer moves between tabs.
+  endcomment
+  if s.width == 'fit'
+    assign width_flex = '0 0 auto'
+    assign width_size = 'fit-content'
+  else
+    assign width_flex = '1 1 0%'
+    assign width_size = '100%'
+  endif
+
+  comment
+    The line around each tab button. `none` is a zero width rather than
+    `border-style: none`, so the buttons keep the same box either way and
+    choosing None does not resize the strip.
+  endcomment
+  assign tab_border_style = s.tab_border_style | default: 'solid'
+  assign tab_border_width = 0
+  if tab_border_style != 'none'
+    assign tab_border_width = s.tab_border_width | default: 1 | plus: 0
+  endif
+
+  assign tabs_id = 'Tabs-' | append: block.id
+
+  comment
+    `tabs` and `tabs--<orientation>` are the snippet's. This is the modifier
+    list on top of them, which is why it does not repeat either.
+  endcomment
+  assign classes = 'tabs--block'
+  if orientation == 'vertical' and s.show_divider
+    assign classes = classes | append: ' tabs--divided'
+  endif
+-%}
+
+{%- capture tabs_style -%}
+  {%- render 'spacing', block: s, declarations: true -%}
+  --tabs-rail-width: {{ rail_width }}px;
+  --tabs-gap: {{ gap }}px;
+  --tabs-marker-radius: {{ marker_radius }}px;
+  --tabs-flex: {{ width_flex }};
+  --tabs-width: {{ width_size }};
+  --tabs-tab-border-width: {{ tab_border_width }}px;
+  {%- if tab_border_width > 0 -%}
+    --tabs-tab-border-style: {{ tab_border_style }};
+    {%- if s.tab_border_color != blank -%}
+      --tabs-tab-border-color: {{ s.tab_border_color }};
+    {%- endif -%}
+  {%- endif -%}
+{%- endcapture -%}
+
+{%- comment -%}
+  Captured, because the shell has to wrap it. `blocks/section-header.liquid`
+  hands its children to `snippets/group.liquid` the same way: a block stream is
+  a string once it is captured, and a snippet can put a string anywhere.
+{%- endcomment -%}
+{%- capture panels -%}
+  {% content_for 'blocks' %}
+{%- endcapture -%}
+
+{%- capture tab_attributes -%}
+  data-block-spacing {{ block.shopify_attributes }}
+{%- endcapture -%}
+
+{%- comment -%}
+  The animation wraps the strip rather than replacing it: `<tab-group>` has to
+  be the custom element `assets/tabs.js` defines, so the one that animates goes
+  around it and takes the width with it — a wrapper that did not would leave the
+  strip sized to its content inside a full-width box.
+
+  Its two targets are the rail and the panels, so **Stagger between items** means
+  the tab names arrive and then what they open. Staggering the wrapper against
+  itself would be one element with a delay on it.
+{%- endcomment -%}
+<motion-effect
+  class="tabs-motion"
+  style="--tabs-flex: {{ width_flex }}; --tabs-width: {{ width_size }};"
+  {% render 'motion-attrs', kind: 'text', block: s, target: '.tabs__rail, .tabs__panels' %}
+>
+  {% render 'tab-group',
+     id: tabs_id,
+     panels: panels,
+     orientation: orientation,
+     classes: classes,
+     label: s.label,
+     styles: tabs_style,
+     attributes: tab_attributes %}
+</motion-effect>
+
+{% schema %}
+{
+  "name": "t:blocks.tabs.name",
+  "tag": null,
+  "blocks": [
+    { "type": "_tab" }
+  ],
+  "settings": [
+    { "type": "header", "content": "t:blocks.group.headers.layout" },
+    {
+      "type": "select",
+      "id": "direction",
+      "label": "t:blocks.tabs.settings.direction.label",
+      "info": "t:blocks.tabs.settings.direction.info",
+      "options": [
+        { "value": "vertical", "label": "t:blocks.tabs.settings.direction.options__1.label" },
+        { "value": "horizontal", "label": "t:blocks.tabs.settings.direction.options__2.label" }
+      ],
+      "default": "vertical"
+    },
+    {
+      "type": "range",
+      "id": "rail_width",
+      "label": "t:blocks.tabs.settings.rail_width.label",
+      "info": "t:blocks.tabs.settings.rail_width.info",
+      "min": 140,
+      "max": 400,
+      "step": 10,
+      "unit": "px",
+      "default": 260,
+      "visible_if": "{{ block.settings.direction == 'vertical' }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_divider",
+      "label": "t:blocks.tabs.settings.show_divider.label",
+      "info": "t:blocks.tabs.settings.show_divider.info",
+      "default": true,
+      "visible_if": "{{ block.settings.direction == 'vertical' }}"
+    },
+    {
+      "type": "range",
+      "id": "gap",
+      "label": "t:blocks.tabs.settings.gap.label",
+      "min": 0,
+      "max": 80,
+      "step": 4,
+      "unit": "px",
+      "default": 24
+    },
+    {
+      "type": "select",
+      "id": "width",
+      "label": "t:blocks.group.settings.width.label",
+      "info": "t:blocks.group.settings.width.info",
+      "options": [
+        { "value": "fill", "label": "t:blocks.group.settings.width.options__2.label" },
+        { "value": "fit", "label": "t:blocks.group.settings.width.options__1.label" }
+      ],
+      "default": "fill"
+    },
+
+    {
+      "type": "text",
+      "id": "label",
+      "label": "t:blocks.tabs.settings.label.label",
+      "info": "t:blocks.tabs.settings.label.info"
+    },
+
+    { "type": "header", "content": "t:shared.appearance.header" },
+    {
+      "type": "select",
+      "id": "tab_border_style",
+      "label": "t:blocks.tabs.settings.tab_border_style.label",
+      "info": "t:blocks.tabs.settings.tab_border_style.info",
+      "options": [
+        { "value": "none", "label": "t:shared.options.none" },
+        { "value": "solid", "label": "t:shared.options.solid" },
+        { "value": "dashed", "label": "t:shared.border.style.options__2.label" }
+      ],
+      "default": "solid"
+    },
+    {
+      "type": "range",
+      "id": "tab_border_width",
+      "label": "t:shared.border.thickness.label",
+      "min": 1,
+      "max": 6,
+      "step": 1,
+      "unit": "px",
+      "default": 1,
+      "visible_if": "{{ block.settings.tab_border_style != 'none' }}"
+    },
+    {
+      "type": "color",
+      "id": "tab_border_color",
+      "label": "t:shared.border.color.label",
+      "visible_if": "{{ block.settings.tab_border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "marker_radius",
+      "label": "t:blocks.tabs.settings.marker_radius.label",
+      "info": "t:blocks.tabs.settings.marker_radius.info",
+      "min": 0,
+      "max": 50,
+      "step": 2,
+      "unit": "px",
+      "default": 50
+    },
+
+    { "type": "header", "content": "t:shared.animation.header" },
+    {
+      "type": "select",
+      "id": "animation_text",
+      "label": "t:shared.animation.animation_text.label",
+      "options": [
+        { "value": "inherit", "label": "t:shared.animation.animation_text.options__1.label" },
+        { "value": "none", "label": "t:shared.animation.animation_text.options__2.label" },
+        { "value": "fade-in", "label": "t:shared.animation.animation_text.options__3.label" },
+        { "value": "fade-up", "label": "t:shared.animation.animation_text.options__4.label" },
+        { "value": "slide-up", "label": "t:shared.animation.animation_text.options__5.label" }
+      ],
+      "default": "inherit"
+    },
+    {
+      "type": "range",
+      "id": "animation_duration",
+      "label": "t:shared.animation.animation_duration.label",
+      "info": "t:shared.animation.animation_duration.info",
+      "min": 0,
+      "max": 2000,
+      "step": 100,
+      "unit": "ms",
+      "default": 1000,
+      "visible_if": "{{ block.settings.animation_text != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "animation_stagger",
+      "label": "t:shared.animation.animation_stagger.label",
+      "info": "t:shared.animation.animation_stagger.info",
+      "min": 0,
+      "max": 300,
+      "step": 10,
+      "unit": "ms",
+      "default": 0,
+      "visible_if": "{{ block.settings.animation_text != 'none' }}"
+    },
+    { "type": "header", "content": "t:shared.spacing.block_header" },
+    {
+      "type": "select",
+      "id": "padding_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        { "value": "desktop", "label": "t:shared.spacing.devices.options__1.label" },
+        { "value": "mobile", "label": "t:shared.spacing.devices.options__2.label" }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    }
+  ],
+  "presets": [
+    {
+      "name": "t:blocks.tabs.name",
+      "blocks": [
+        {
+          "type": "_tab",
+          "settings": { "label": "First tab" }
+        },
+        {
+          "type": "_tab",
+          "settings": { "label": "Second tab" }
+        }
+      ]
+    }
+  ]
+}
+{% endschema %}

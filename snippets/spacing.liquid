@@ -56,13 +56,44 @@
   not enough here, because `section` is a global object and is therefore truthy
   inside every block too. See the note on `section.settings` below.
 
-  ## Zero values are omitted, the attribute is not
+  ## A slider that exists is written, including at zero
 
-  A declaration is only written when the value is non-zero: the fallbacks in
-  `base.css` already resolve to `0px`, so writing `0px` adds bytes to every
-  block on the page to restate the stylesheet. The attribute is emitted either
-  way, because a merchant can drag a slider back to zero and the element still
-  has to be selectable.
+  This used to skip the declaration whenever the value was zero, on the grounds
+  that the fallbacks in `base.css` already resolve to `0px` and writing `0px`
+  restates the stylesheet. Both halves of that were true and the conclusion was
+  still wrong, because a fallback only applies when the property is set nowhere
+  — and there are two places it can be set without this snippet writing it:
+
+      inherited   custom properties inherit, and blocks nest four deep in this
+                  theme. A row inside an accordion inside a tab inside a group
+                  with padding on it inherited that padding, so dragging the
+                  row's own slider to 0 gave it the group's value instead.
+
+      a component `.block-text--has-background` and `.block-subheading--bordered`
+                  set these properties as class-level defaults, so a background
+                  gets breathing room without the merchant going to find the
+                  sliders. At zero the class won and 0 was unreachable.
+
+  So the rule is presence, not value: if the block has the setting at all, its
+  value is written, and `0px` is a value. A block with no padding settings
+  writes nothing and the class defaults still apply — `base.css` keeps them in a
+  `max()` beside the emitted value, which is what makes both true at once.
+
+  Presence is an `if` on the setting rather than a `!= blank` test: nil is falsy
+  in every Liquid engine and **0 is truthy**, which is exactly the distinction
+  needed and exactly the one `blank` cannot make.
+
+  A block's mobile sides follow the same rule, for the same reason: they inherit
+  too, and a heading inside a card with 18px of mobile padding was given 18px of
+  its own the moment its own slider read 0. Nothing is lost by writing them —
+  the "leave at 0 and the desktop value is scaled" path belongs to blocks that
+  offer **Mobile padding** as a percentage instead of per-side fields, and no
+  block in the theme offers both. A block with no mobile fields still writes
+  none, so that path is untouched.
+
+  Sections keep it: their mobile fields say "Leave at 0 to use 60% of the
+  desktop value" on the setting itself, sections do not nest, and nothing
+  inherits `--section-padding-*` from anywhere.
 
   Left and right are spelled `inline-start` and `inline-end` so they follow the
   text direction and flip in right-to-left languages.
@@ -161,10 +192,25 @@
     assign s_top_mobile = section.padding_top_mobile | default: 0 | plus: 0
     assign s_bottom_mobile = section.padding_bottom_mobile | default: 0 | plus: 0
 
-    if s_top > 0
+    comment
+      Presence, not value. 0 is truthy in Liquid and nil is not, so this is true
+      for a slider dragged to zero and false for a section that has no such
+      setting — which is the difference that decides whether 0 is a value or an
+      absence.
+    endcomment
+    assign has_s_top = false
+    if section.padding_top
+      assign has_s_top = true
+    endif
+    assign has_s_bottom = false
+    if section.padding_bottom
+      assign has_s_bottom = true
+    endif
+
+    if has_s_top
       assign out = out | append: '--section-padding-block-start:' | append: s_top | append: 'px;'
     endif
-    if s_bottom > 0
+    if has_s_bottom
       assign out = out | append: '--section-padding-block-end:' | append: s_bottom | append: 'px;'
     endif
 
@@ -197,16 +243,37 @@
     assign b_right = b.padding_right | default: b['padding-inline-end'] | default: 0 | plus: 0
     assign b_scale = b.padding_scale_mobile | default: 0 | plus: 0
 
-    if b_top > 0
+    comment
+      Presence, not value — see the note at the top. Either spelling counts as
+      having the setting, and 0 counts as having a value.
+    endcomment
+    assign has_b_top = false
+    if b.padding_top or b['padding-block-start']
+      assign has_b_top = true
+    endif
+    assign has_b_bottom = false
+    if b.padding_bottom or b['padding-block-end']
+      assign has_b_bottom = true
+    endif
+    assign has_b_left = false
+    if b.padding_left or b['padding-inline-start']
+      assign has_b_left = true
+    endif
+    assign has_b_right = false
+    if b.padding_right or b['padding-inline-end']
+      assign has_b_right = true
+    endif
+
+    if has_b_top
       assign out = out | append: '--block-padding-block-start:' | append: b_top | append: 'px;'
     endif
-    if b_bottom > 0
+    if has_b_bottom
       assign out = out | append: '--block-padding-block-end:' | append: b_bottom | append: 'px;'
     endif
-    if b_left > 0
+    if has_b_left
       assign out = out | append: '--block-padding-inline-start:' | append: b_left | append: 'px;'
     endif
-    if b_right > 0
+    if has_b_right
       assign out = out | append: '--block-padding-inline-end:' | append: b_right | append: 'px;'
     endif
 
@@ -222,16 +289,33 @@
     assign b_left_mobile = b.padding_left_mobile | default: 0 | plus: 0
     assign b_right_mobile = b.padding_right_mobile | default: 0 | plus: 0
 
-    if b_top_mobile > 0
+    assign has_b_top_mobile = false
+    if b.padding_top_mobile
+      assign has_b_top_mobile = true
+    endif
+    assign has_b_bottom_mobile = false
+    if b.padding_bottom_mobile
+      assign has_b_bottom_mobile = true
+    endif
+    assign has_b_left_mobile = false
+    if b.padding_left_mobile
+      assign has_b_left_mobile = true
+    endif
+    assign has_b_right_mobile = false
+    if b.padding_right_mobile
+      assign has_b_right_mobile = true
+    endif
+
+    if has_b_top_mobile
       assign out = out | append: '--block-padding-block-start-mobile:' | append: b_top_mobile | append: 'px;'
     endif
-    if b_bottom_mobile > 0
+    if has_b_bottom_mobile
       assign out = out | append: '--block-padding-block-end-mobile:' | append: b_bottom_mobile | append: 'px;'
     endif
-    if b_left_mobile > 0
+    if has_b_left_mobile
       assign out = out | append: '--block-padding-inline-start-mobile:' | append: b_left_mobile | append: 'px;'
     endif
-    if b_right_mobile > 0
+    if has_b_right_mobile
       assign out = out | append: '--block-padding-inline-end-mobile:' | append: b_right_mobile | append: 'px;'
     endif
 
