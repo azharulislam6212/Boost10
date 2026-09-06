@@ -1,0 +1,141 @@
+{% doc %}
+  One article card with nothing behind it.
+
+  ## Why this is a snippet and not the block tree with a nil article
+
+  `blocks/_article-card.liquid` and everything under it read `closest.article`,
+  and `{% content_for 'blocks' %}` passes no parameters — so there is no way to
+  tell a nested **Article title** "there is no article, draw a placeholder".
+  Every one of those blocks guards on the article and renders nothing without
+  one, which is correct: a title block with no title is not a title.
+
+  So the empty state is drawn here instead, from the same class names the
+  blocks emit. It inherits every rule in the Featured blog part of `base.css`
+  without adding one of its own, which is the whole point — the placeholder
+  looks like the card because it *is* the card's markup, not a second design
+  that has to be kept in step with the first.
+
+  What it does not inherit is the merchant's block settings. That is a
+  deliberate limit rather than a gap: a store with no articles has not arranged
+  the card yet, and the moment one article exists the real blocks take over.
+
+  ## The pictures vary
+
+  Shopify ships `blog-apparel-1` through `-3`. Cycling them means a row of three
+  placeholders is three different photographs rather than the same one repeated,
+  which is what makes it read as "your posts go here" instead of as a bug.
+
+  @param {number} [index] - Position in the row. Picks the placeholder picture and the reveal delay.
+  @param {string} [sizes] - The `sizes` attribute for the picture.
+  @param {object} [section] - `section.settings`, for the animation cascade.
+
+  @example
+    {% render 'article-card-placeholder', index: forloop.index0, sizes: card_sizes %}
+{% enddoc %}
+
+{%- liquid
+  assign position = index | default: 0 | plus: 0
+
+  assign art = position | modulo: 3 | plus: 1
+  assign placeholder_image = 'blog-apparel-' | append: art
+
+  assign card_delay = position | modulo: 3 | times: 80
+-%}
+
+<motion-effect
+  class="article-card-block article-card-block--placeholder"
+  aria-hidden="true"
+  {% render 'motion-attrs',
+     kind: 'image',
+     section: section,
+     target: '.article-image-block, .article-content-block',
+     delay: card_delay %}
+>
+  <div class="article-image-block" style="--article-image-radius: 24px;">
+    <div class="article-image-block__link">
+      {% render 'image',
+         ratio: 'landscape',
+         sizes: sizes,
+         placeholder: placeholder_image,
+         wrapper_class: 'article-image-block__media' %}
+    </div>
+
+    <div class="article-image-block__meta">
+      <span class="article-image-block__pill article-image-block__pill--date">
+        <span class="article-image-block__pill-icon">
+          {% render 'icon', icon: 'clock', size: 14 %}
+        </span>
+        <time datetime="{{ 'now' | date: '%Y-%m-%d' }}">{{ 'now' | date: format: 'date' }}</time>
+      </span>
+      <span class="article-image-block__pill article-image-block__pill--tag">
+        {{- 'blogs.article.placeholder.tag' | t -}}
+      </span>
+    </div>
+  </div>
+
+  {%- comment -%}
+    The panel repeats the defaults `blocks/_article-content.liquid` ships with —
+    dashed rule at half opacity, 16px radius, 24px of padding — so an empty row
+    and a full one are the same shape and the section does not resize the moment
+    the merchant publishes their first post.
+  {%- endcomment -%}
+  <div
+    class="article-content-block"
+    data-block-spacing
+    style="
+      --article-content-radius: 16px;
+      --article-content-gap: 12px;
+      --article-content-align: start;
+      --article-content-border-width: 1px;
+      --article-content-border-style: dashed;
+      --article-content-border-color: color-mix(in srgb, currentColor 50%, transparent);
+      --block-padding-block-start: 24px;
+      --block-padding-block-end: 24px;
+      --block-padding-inline-start: 24px;
+      --block-padding-inline-end: 24px;
+      --block-padding-block-start-mobile: 20px;
+      --block-padding-block-end-mobile: 20px;
+      --block-padding-inline-start-mobile: 20px;
+      --block-padding-inline-end-mobile: 20px;
+    "
+  >
+    <p class="article-read-time block-text--subheading">
+      <span class="article-read-time__icon">{% render 'icon', icon: 'clock', size: 14 %}</span>
+      <span class="article-read-time__label">
+        {{- 'blogs.article.read_time' | t: minutes: 5 -}}
+      </span>
+    </p>
+
+    <h3 class="article-title-block block-text--h5 article-title-block--clamped">
+      {{ 'blogs.article.placeholder.title' | t }}
+    </h3>
+
+    <p class="article-excerpt-block block-text--paragraph article-excerpt-block--clamped">
+      {{- 'blogs.article.placeholder.excerpt' | t -}}
+    </p>
+
+    {%- comment -%}
+      A `<span>` rather than `snippets/button.liquid`: this leads nowhere, and a
+      link or a button that does nothing when activated is worse than no control
+      at all — it is a keyboard stop that announces an action and performs none.
+
+      The classes are the ones the snippet would have emitted for the read-more
+      block's defaults, so the rule under the label and the badge beside it are
+      the real thing. What is left out is the behaviour: no `<button-swap>`
+      wrapper, and `data-fx="none"` so the hover travel does not run on a
+      control that cannot be pressed.
+    {%- endcomment -%}
+    <div class="article-read-more">
+      <span
+        class="button button--link button--medium button--has-icon button--icon-end button--width-auto article-read-more__button"
+        style="--button-underline-size: 1px;"
+        data-fx="none"
+      >
+        <span class="button-text">
+          <span class="button__label">{{ 'blogs.article.read_more' | t }}</span>
+          <span class="button__icon button__icon--end">{% render 'icon', icon: 'arrow-right' %}</span>
+        </span>
+      </span>
+    </div>
+  </div>
+</motion-effect>

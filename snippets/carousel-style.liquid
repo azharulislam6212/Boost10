@@ -9,9 +9,26 @@
   merchant who changes a scheme changes every carousel in the store, which is
   what a scheme is for.
 
-  So this snippet emits nothing at all unless `carousel_custom_colors` is
-  ticked. That is the point: the default path costs zero bytes per section, and
+  So this snippet emits nothing at all unless the section asks for custom
+  colours. That is the point: the default path costs zero bytes per section, and
   only a merchant who wants this one carousel to differ pays for the override.
+
+  ## Two spellings of the same question
+
+  Sections say it one of two ways, and both are read here:
+
+      carousel_color_source   select — `inherit` | `custom`
+      carousel_custom_colors  checkbox — the original spelling
+
+  The select is the better control: "Use custom colors" off does not say what
+  the colours *are*, and a merchant reading the panel has to know the theme's
+  conventions to guess "the section's colour scheme". `Colors: Inherit color
+  scheme` says it outright.
+
+  The select wins wherever a section has one. A section that has only the
+  checkbox — `sections/featured-collection.liquid` and anything else still on
+  the original spelling — reads as blank here and falls through to it, so no
+  section has to be converted for this snippet to keep working.
 
   ## Gradient
 
@@ -28,7 +45,20 @@
     <swiper-carousel style="{% render 'carousel-style', settings: section.settings %}">
 {% enddoc %}
 
-{%- if settings.carousel_custom_colors -%}
+{%- liquid
+  assign color_source = settings.carousel_color_source
+
+  assign use_custom = false
+  if color_source == blank
+    if settings.carousel_custom_colors
+      assign use_custom = true
+    endif
+  elsif color_source == 'custom'
+    assign use_custom = true
+  endif
+-%}
+
+{%- if use_custom -%}
   {%- liquid
     assign nav_style = settings.carousel_nav_style | default: 'solid'
   -%}

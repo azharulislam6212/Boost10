@@ -10095,7 +10095,24 @@ swiper-carousel {
     margin-block-start: var(--space-7);
   }
 
-  .featured-blog__empty { color: var(--color-accent-text); }
+  /* The empty state is a row of placeholder cards, not a line of text — see
+     `snippets/article-card-placeholder.liquid`. It reuses every card rule
+     below, so the only thing it needs of its own is a hint that nothing here is
+     real: the text is the scheme's quieter colour and the photographs sit a
+     little back, which reads as a preview rather than as content that failed to
+     load. */
+  .article-card-block--placeholder .article-title-block,
+  .article-card-block--placeholder .article-read-more {
+    color: var(--color-accent-text);
+  }
+
+  .article-card-block--placeholder .article-image-block__media { opacity: 0.85; }
+
+  /* Nothing in a placeholder is clickable, so nothing in it should react to a
+     pointer either — a cursor change over a card that goes nowhere is a promise
+     the section cannot keep. */
+  .article-card-block--placeholder { cursor: default; }
+  .article-card-block--placeholder .button { pointer-events: none; }
 
   /* ---- the grid --------------------------------------------------------- */
 
@@ -10160,14 +10177,26 @@ swiper-carousel {
 
   /* The pills sit along the bottom edge of the picture, over it rather than
      under it. `pointer-events: none` because the picture behind them is a link,
-     and a tag that is not itself a link should not be a dead spot in it. */
+     and a tag that is not itself a link should not be a dead spot in it.
+
+     One line, always. These are positioned against the bottom edge of the
+     photograph, so a second line does not push the first one down — it grows
+     upward across the picture and lands in the middle of it. On a phone, where
+     the card is full width but the date pill and two tags are not, that is
+     exactly what was happening.
+
+     `nowrap` plus a shrinking last pill is the fix rather than hiding the
+     overflow: the date keeps its full width (it is a fixed, short string and
+     truncating a date makes it unreadable), and a long tag gives way with an
+     ellipsis instead of taking the row with it. */
   .article-image-block__meta {
     position: absolute;
     inset-inline: var(--space-4);
     inset-block-end: var(--space-4);
     z-index: 1;
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    align-items: center;
     gap: var(--space-2);
     pointer-events: none;
   }
@@ -10188,6 +10217,20 @@ swiper-carousel {
     font-size: var(--font-size-xs);
     line-height: 1.9;
     white-space: nowrap;
+  }
+
+  /* The date is the one pill that must never be cut, so it is the one pill that
+     refuses to shrink. Everything else is a tag and gives way in order. */
+  .article-image-block__pill--date { flex: 0 0 auto; }
+
+  .article-image-block__pill--tag {
+    /* `min-inline-size: 0` is what lets a flex item shrink below its content —
+       without it `text-overflow` never fires, because the pill stays as wide as
+       its longest word and pushes the row instead. */
+    min-inline-size: 0;
+    flex: 0 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .article-image-block__pill-icon {

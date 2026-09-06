@@ -41,6 +41,41 @@
   `carousel-shell-attrs` and `carousel-shell-tail` supply the attributes and the
   controls from the same sub-snippets the shell itself uses.
   `sections/featured-collection.liquid` does the same, for the same reason.
+
+  ## Two answers this section gives that the collection one does not
+
+  **The empty row is drawn, not apologised for.** A blog with no posts renders
+  `snippets/article-card-placeholder.liquid` across one row rather than a line
+  of text. A merchant adds this section before they have written anything more
+  often than after, and the theme editor is where the section is judged.
+
+  **View all is a grid-only control.** A carousel already is the way through the
+  rest of the blog, so the button is hidden — in the panel and on the page —
+  whenever the desktop layout is a carousel. See the note by `show_view_all`.
+
+  ## The settings panel is grouped by what a merchant is deciding
+
+  Blog and count, then Layout — the two layout selects, the three column
+  counts, the container and View all together, because those are one decision
+  made once. Everything a carousel needs is under **Carousel**, hidden whole
+  when neither breakpoint is one.
+
+  Its colours are a select, `carousel_color_source`, rather than the
+  **Use custom colors** checkbox `sections/featured-collection.liquid` still
+  carries. `snippets/carousel-style.liquid` reads both, so the two sections
+  share one implementation and neither had to be converted for the other.
+
+  ### The unparenthesised `visible_if` conditions are not a typo
+
+  A carousel setting that also depends on a toggle reads:
+
+      carousel_navigation and layout == 'carousel' or layout_mobile == 'carousel'
+
+  which means *navigation is on **and** either breakpoint is a carousel*.
+  `visible_if` is Liquid, and Liquid has no parentheses: operators are evaluated
+  right to left, so the `or` binds first and the `and` takes the whole of it.
+  Writing the grouping out — `A and (B or C)` — is a `ValidVisibleIf` error,
+  which is how this was found rather than guessed at.
 {% endcomment %}
 
 {%- liquid
@@ -109,7 +144,7 @@
     setting is achievable — Swiper silently disables looping below twice
     `slidesPerView`, which reads as the setting doing nothing.
   endcomment
-  assign cs_layout = s.layout | default: 'grid'
+  assign cs_layout = s.layout | default: 'carousel'
   assign cs_layout_mobile = s.layout_mobile | default: 'carousel'
 
   assign cs_count = featured.articles_count | default: 0 | plus: 0
@@ -120,6 +155,51 @@
   assign cs_is_carousel = false
   if cs_layout == 'carousel' or cs_layout_mobile == 'carousel'
     assign cs_is_carousel = true
+  endif
+
+  comment
+    ---- View all ----
+
+    Hidden while the desktop layout is a carousel, and hidden in the same breath
+    in the schema. A carousel already *is* the way through the rest of the blog:
+    a customer who wants the fourth article drags to it. A button underneath
+    saying "view all" alongside a control that already shows all of them is two
+    answers to one question, and the second one leaves the page.
+
+    The setting is checked as well as the layout so that turning the row back
+    into a grid restores whatever the merchant had chosen, rather than silently
+    coming back on.
+  endcomment
+  assign show_view_all = false
+  if s.show_view_all and cs_layout != 'carousel' and featured.articles_count > limit
+    assign show_view_all = true
+  endif
+
+  comment
+    ---- The empty state ----
+
+    A row with no articles is drawn as placeholder cards rather than as a line
+    of apologetic text. In the theme editor that is the difference between a
+    merchant seeing what the section will look like and a merchant seeing a
+    sentence, and it is where the section is judged: **Featured blog** is added
+    before the first post is written more often than after.
+
+    How many is derived rather than asked for. One full row is the useful
+    preview — it shows the column count, the gaps and the card shape, which is
+    everything the layout settings do — so the count is the desktop column
+    count, held under **Articles to show** for the merchant who has set that
+    lower. Sixteen placeholders for sixteen articles that do not exist is not a
+    preview of anything, and a slider for the number of fake cards is a setting
+    that stops meaning something the moment the store has posts.
+  endcomment
+  assign has_articles = false
+  if featured.articles.size > 0
+    assign has_articles = true
+  endif
+
+  assign placeholder_count = desktop
+  if placeholder_count > limit
+    assign placeholder_count = limit
   endif
 -%}
 
@@ -160,7 +240,7 @@
       {% content_for 'blocks' %}
     </motion-effect>
 
-    {%- if featured.articles.size > 0 -%}
+    {%- if has_articles -%}
       <swiper-carousel
         {% render 'carousel-shell-attrs',
            settings: s,
@@ -197,13 +277,35 @@
            layout_mobile: cs_layout_mobile %}
       </swiper-carousel>
 
-      {%- if s.show_view_all and featured.articles_count > limit -%}
+      {%- if show_view_all -%}
         <div class="featured-blog__footer">
           {% render 'button', label: 'general.actions.view_all', href: featured.url, variant: 'secondary' %}
         </div>
       {%- endif -%}
     {%- else -%}
-      <p class="featured-blog__empty">{{ 'blogs.article.no_articles' | t }}</p>
+      {%- comment -%}
+        The empty row is a plain grid, never a carousel. There is nothing to page
+        through, and arrows over placeholder cards invite a merchant to drag a
+        track that is one screen wide.
+
+        The columns come from the same three settings the real row uses, written
+        here rather than by `carousel-shell-attrs`, because this element is not a
+        carousel and should not carry a carousel's attributes.
+      {%- endcomment -%}
+      <ul
+        class="article-grid featured-blog__placeholders"
+        role="list"
+        style="--columns-desktop: {{ desktop }}; --columns-tablet: {{ s.columns_tablet | default: 2 }}; --columns-mobile: {{ s.columns_mobile | default: 1 }};"
+      >
+        {%- for i in (1..placeholder_count) -%}
+          <li class="article-grid__item">
+            {% render 'article-card-placeholder',
+               index: forloop.index0,
+               sizes: card_sizes,
+               section: s %}
+          </li>
+        {%- endfor -%}
+      </ul>
     {%- endif -%}
   </div>
 </div>
@@ -222,6 +324,105 @@
     }
   ],
   "settings": [
+    {
+      "type": "blog",
+      "id": "blog",
+      "label": "t:sections.featured_blog.settings.blog.label"
+    },
+    {
+      "type": "range",
+      "id": "articles_to_show",
+      "label": "t:sections.featured_blog.settings.articles_to_show.label",
+      "min": 2,
+      "max": 16,
+      "step": 1,
+      "default": 3
+    },
+    {
+      "type": "select",
+      "id": "alignment",
+      "label": "t:blocks.group.settings.alignment.label",
+      "info": "t:sections.featured_blog.settings.alignment.info",
+      "options": [
+        {
+          "value": "start",
+          "label": "t:blocks.group.settings.alignment.options__1.label"
+        },
+        {
+          "value": "center",
+          "label": "t:blocks.group.settings.alignment.options__2.label"
+        },
+        {
+          "value": "end",
+          "label": "t:blocks.group.settings.alignment.options__3.label"
+        }
+      ],
+      "default": "start"
+    },
+
+    {
+      "type": "header",
+      "content": "t:sections.featured_blog.headers.layout"
+    },
+    {
+      "type": "select",
+      "id": "layout",
+      "label": "t:shared.carousel.layout.label",
+      "options": [
+        {
+          "value": "grid",
+          "label": "t:sections.featured_collection.settings.layout.options__1.label"
+        },
+        {
+          "value": "carousel",
+          "label": "t:sections.featured_collection.settings.layout.options__2.label"
+        }
+      ],
+      "default": "carousel"
+    },
+    {
+      "type": "select",
+      "id": "layout_mobile",
+      "label": "t:shared.carousel.layout_mobile.label",
+      "options": [
+        {
+          "value": "grid",
+          "label": "t:shared.carousel.layout.options__1.label"
+        },
+        {
+          "value": "carousel",
+          "label": "t:shared.carousel.layout.options__2.label"
+        }
+      ],
+      "default": "carousel"
+    },
+    {
+      "type": "range",
+      "id": "columns_desktop",
+      "label": "t:shared.columns.desktop.label",
+      "min": 2,
+      "max": 6,
+      "step": 1,
+      "default": 3
+    },
+    {
+      "type": "range",
+      "id": "columns_tablet",
+      "label": "t:shared.carousel.columns_tablet.label",
+      "min": 1,
+      "max": 4,
+      "step": 1,
+      "default": 2
+    },
+    {
+      "type": "range",
+      "id": "columns_mobile",
+      "label": "t:shared.carousel.columns_mobile.label",
+      "min": 1,
+      "max": 3,
+      "step": 1,
+      "default": 1
+    },
     {
       "type": "select",
       "id": "container_width",
@@ -252,71 +453,14 @@
       "default": "standard"
     },
     {
-      "type": "blog",
-      "id": "blog",
-      "label": "t:sections.featured_blog.settings.blog.label"
-    },
-    {
-      "type": "range",
-      "id": "articles_to_show",
-      "label": "t:sections.featured_blog.settings.articles_to_show.label",
-      "min": 2,
-      "max": 16,
-      "step": 1,
-      "default": 3
-    },
-    {
-      "type": "range",
-      "id": "columns_desktop",
-      "label": "t:shared.columns.desktop.label",
-      "min": 2,
-      "max": 6,
-      "step": 1,
-      "default": 4
-    },
-    {
-      "type": "select",
-      "id": "layout",
-      "label": "t:sections.featured_collection.settings.layout.label",
-      "options": [
-        {
-          "value": "grid",
-          "label": "t:sections.featured_collection.settings.layout.options__1.label"
-        },
-        {
-          "value": "carousel",
-          "label": "t:sections.featured_collection.settings.layout.options__2.label"
-        }
-      ],
-      "default": "carousel"
-    },
-    {
       "type": "checkbox",
       "id": "show_view_all",
       "label": "t:sections.featured_collection.settings.show_view_all.label",
+      "info": "t:sections.featured_blog.settings.show_view_all.info",
       "default": true,
-      "info": "t:sections.featured_blog.settings.show_view_all.info"
+      "visible_if": "{{ section.settings.layout != 'carousel' }}"
     },
-    {
-      "type": "select",
-      "id": "alignment",
-      "label": "t:blocks.group.settings.alignment.label",
-      "options": [
-        {
-          "value": "start",
-          "label": "t:blocks.group.settings.alignment.options__1.label"
-        },
-        {
-          "value": "center",
-          "label": "t:blocks.group.settings.alignment.options__2.label"
-        },
-        {
-          "value": "end",
-          "label": "t:blocks.group.settings.alignment.options__3.label"
-        }
-      ],
-      "default": "start"
-    },
+
     {
       "type": "header",
       "content": "t:shared.appearance.header"
@@ -381,6 +525,7 @@
       "default": "cover",
       "visible_if": "{{ section.settings.background_media == 'image' }}"
     },
+
     {
       "type": "header",
       "content": "t:blocks.group.headers.borders"
@@ -439,6 +584,352 @@
       "unit": "px",
       "default": 0
     },
+
+    {
+      "type": "header",
+      "content": "t:sections.featured_blog.headers.carousel",
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.layout_mobile == 'carousel' }}"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:sections.featured_blog.paragraphs.carousel",
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.layout_mobile == 'carousel' }}"
+    },
+    {
+      "type": "range",
+      "id": "carousel_speed",
+      "label": "t:shared.carousel.speed.label",
+      "info": "t:shared.carousel.speed.info",
+      "min": 100,
+      "max": 1500,
+      "step": 50,
+      "unit": "ms",
+      "default": 500,
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.layout_mobile == 'carousel' }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "carousel_loop",
+      "label": "t:shared.carousel.loop.label",
+      "default": false,
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.layout_mobile == 'carousel' }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "carousel_autoplay",
+      "label": "t:shared.carousel.autoplay.label",
+      "info": "t:shared.carousel.autoplay.info",
+      "default": false,
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.layout_mobile == 'carousel' }}"
+    },
+    {
+      "type": "range",
+      "id": "carousel_autoplay_delay",
+      "label": "t:shared.carousel.autoplay_delay.label",
+      "min": 2,
+      "max": 15,
+      "step": 1,
+      "unit": "s",
+      "default": 5,
+      "visible_if": "{{ section.settings.carousel_autoplay and section.settings.layout == 'carousel' or section.settings.layout_mobile == 'carousel' }}"
+    },
+
+    {
+      "type": "header",
+      "content": "t:shared.carousel.headers.peek",
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.layout_mobile == 'carousel' }}"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:shared.carousel.paragraphs.peek",
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.layout_mobile == 'carousel' }}"
+    },
+    {
+      "type": "range",
+      "id": "carousel_peek_mobile",
+      "label": "t:shared.carousel.peek_mobile.label",
+      "info": "t:shared.carousel.peek_mobile.info",
+      "min": 0,
+      "max": 90,
+      "step": 5,
+      "unit": "%",
+      "default": 0,
+      "visible_if": "{{ section.settings.layout_mobile == 'carousel' }}"
+    },
+    {
+      "type": "range",
+      "id": "carousel_peek_desktop",
+      "label": "t:shared.carousel.peek_desktop.label",
+      "info": "t:shared.carousel.peek_desktop.info",
+      "min": 0,
+      "max": 90,
+      "step": 5,
+      "unit": "%",
+      "default": 0,
+      "visible_if": "{{ section.settings.layout == 'carousel' }}"
+    },
+
+    {
+      "type": "header",
+      "content": "t:shared.carousel.headers.navigation",
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.layout_mobile == 'carousel' }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "carousel_navigation",
+      "label": "t:shared.carousel.navigation.label",
+      "default": true,
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.layout_mobile == 'carousel' }}"
+    },
+    {
+      "type": "select",
+      "id": "carousel_nav_position",
+      "label": "t:shared.carousel.nav_position.label",
+      "info": "t:shared.carousel.nav_position.info",
+      "options": [
+        {
+          "value": "outside",
+          "label": "t:shared.carousel.nav_position.options__1.label"
+        },
+        {
+          "value": "inside",
+          "label": "t:shared.carousel.nav_position.options__2.label"
+        },
+        {
+          "value": "bottom",
+          "label": "t:shared.carousel.nav_position.options__3.label"
+        },
+        {
+          "value": "inline",
+          "label": "t:shared.carousel.nav_position.options__4.label"
+        }
+      ],
+      "default": "outside",
+      "visible_if": "{{ section.settings.carousel_navigation and section.settings.layout == 'carousel' or section.settings.layout_mobile == 'carousel' }}"
+    },
+    {
+      "type": "select",
+      "id": "carousel_nav_icon",
+      "label": "t:shared.carousel.nav_icon.label",
+      "options": [
+        {
+          "value": "chevron",
+          "label": "t:shared.carousel.nav_icon.options__1.label"
+        },
+        {
+          "value": "arrow",
+          "label": "t:shared.carousel.nav_icon.options__2.label"
+        },
+        {
+          "value": "play",
+          "label": "t:shared.carousel.nav_icon.options__3.label"
+        },
+        {
+          "value": "external",
+          "label": "t:shared.carousel.nav_icon.options__4.label"
+        }
+      ],
+      "default": "arrow",
+      "visible_if": "{{ section.settings.carousel_navigation and section.settings.layout == 'carousel' or section.settings.layout_mobile == 'carousel' }}"
+    },
+    {
+      "type": "select",
+      "id": "carousel_controls_style",
+      "label": "t:shared.carousel.controls_style.label",
+      "info": "t:shared.carousel.controls_style.info",
+      "options": [
+        {
+          "value": "split",
+          "label": "t:shared.carousel.controls_style.options__1.label"
+        },
+        {
+          "value": "ghost",
+          "label": "t:shared.carousel.controls_style.options__2.label"
+        },
+        {
+          "value": "solid",
+          "label": "t:shared.carousel.controls_style.options__3.label"
+        }
+      ],
+      "default": "split",
+      "visible_if": "{{ section.settings.carousel_navigation and section.settings.layout == 'carousel' or section.settings.layout_mobile == 'carousel' }}"
+    },
+    {
+      "type": "range",
+      "id": "carousel_nav_size",
+      "label": "t:shared.carousel.nav_size.label",
+      "min": 28,
+      "max": 72,
+      "step": 2,
+      "unit": "px",
+      "default": 44,
+      "visible_if": "{{ section.settings.carousel_navigation and section.settings.layout == 'carousel' or section.settings.layout_mobile == 'carousel' }}"
+    },
+
+    {
+      "type": "header",
+      "content": "t:shared.carousel.headers.pagination",
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.layout_mobile == 'carousel' }}"
+    },
+    {
+      "type": "select",
+      "id": "carousel_pagination",
+      "label": "t:shared.carousel.pagination.label",
+      "info": "t:shared.carousel.pagination.info",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.carousel.pagination.options__1.label"
+        },
+        {
+          "value": "dots",
+          "label": "t:shared.carousel.pagination.options__2.label"
+        },
+        {
+          "value": "numbers",
+          "label": "t:shared.carousel.pagination.options__3.label"
+        },
+        {
+          "value": "progress",
+          "label": "t:shared.carousel.pagination.options__4.label"
+        },
+        {
+          "value": "controls",
+          "label": "t:shared.carousel.pagination.options__5.label"
+        }
+      ],
+      "default": "none",
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.layout_mobile == 'carousel' }}"
+    },
+    {
+      "type": "select",
+      "id": "carousel_controls_align",
+      "label": "t:shared.carousel.controls_align.label",
+      "options": [
+        {
+          "value": "start",
+          "label": "t:shared.carousel.controls_align.options__1.label"
+        },
+        {
+          "value": "center",
+          "label": "t:shared.carousel.controls_align.options__2.label"
+        },
+        {
+          "value": "end",
+          "label": "t:shared.carousel.controls_align.options__3.label"
+        }
+      ],
+      "default": "start",
+      "visible_if": "{{ section.settings.carousel_pagination == 'controls' and section.settings.layout == 'carousel' or section.settings.layout_mobile == 'carousel' }}"
+    },
+
+    {
+      "type": "header",
+      "content": "t:shared.carousel.headers.colors",
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.layout_mobile == 'carousel' }}"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:shared.carousel.paragraphs.colors",
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.layout_mobile == 'carousel' }}"
+    },
+    {
+      "type": "select",
+      "id": "carousel_color_source",
+      "label": "t:shared.carousel.color_source.label",
+      "info": "t:shared.carousel.color_source.info",
+      "options": [
+        {
+          "value": "inherit",
+          "label": "t:shared.carousel.color_source.options__1.label"
+        },
+        {
+          "value": "custom",
+          "label": "t:shared.carousel.color_source.options__2.label"
+        }
+      ],
+      "default": "inherit",
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.layout_mobile == 'carousel' }}"
+    },
+    {
+      "type": "select",
+      "id": "carousel_nav_style",
+      "label": "t:shared.carousel.nav_style.label",
+      "options": [
+        {
+          "value": "solid",
+          "label": "t:shared.carousel.nav_style.options__1.label"
+        },
+        {
+          "value": "gradient",
+          "label": "t:shared.carousel.nav_style.options__2.label"
+        }
+      ],
+      "default": "solid",
+      "visible_if": "{{ section.settings.carousel_color_source == 'custom' }}"
+    },
+    {
+      "type": "color",
+      "id": "carousel_nav_bg",
+      "label": "t:shared.carousel.nav_bg.label",
+      "visible_if": "{{ section.settings.carousel_color_source == 'custom' and section.settings.carousel_nav_style == 'solid' }}"
+    },
+    {
+      "type": "color",
+      "id": "carousel_nav_bg_hover",
+      "label": "t:shared.carousel.nav_bg_hover.label",
+      "visible_if": "{{ section.settings.carousel_color_source == 'custom' and section.settings.carousel_nav_style == 'solid' }}"
+    },
+    {
+      "type": "color_background",
+      "id": "carousel_nav_gradient",
+      "label": "t:shared.carousel.nav_gradient.label",
+      "default": "linear-gradient(135deg, #1a1a1a 0%, #4a4a4a 100%)",
+      "visible_if": "{{ section.settings.carousel_color_source == 'custom' and section.settings.carousel_nav_style == 'gradient' }}"
+    },
+    {
+      "type": "color_background",
+      "id": "carousel_nav_gradient_hover",
+      "label": "t:shared.carousel.nav_gradient_hover.label",
+      "visible_if": "{{ section.settings.carousel_color_source == 'custom' and section.settings.carousel_nav_style == 'gradient' }}"
+    },
+    {
+      "type": "color",
+      "id": "carousel_nav_icon_color",
+      "label": "t:shared.carousel.nav_icon_color.label",
+      "visible_if": "{{ section.settings.carousel_color_source == 'custom' }}"
+    },
+    {
+      "type": "color",
+      "id": "carousel_nav_icon_hover",
+      "label": "t:shared.carousel.nav_icon_hover.label",
+      "visible_if": "{{ section.settings.carousel_color_source == 'custom' }}"
+    },
+    {
+      "type": "color",
+      "id": "carousel_nav_border_color",
+      "label": "t:shared.carousel.nav_border_color.label",
+      "visible_if": "{{ section.settings.carousel_color_source == 'custom' }}"
+    },
+    {
+      "type": "color",
+      "id": "carousel_nav_border_hover",
+      "label": "t:shared.carousel.nav_border_hover.label",
+      "visible_if": "{{ section.settings.carousel_color_source == 'custom' }}"
+    },
+    {
+      "type": "color",
+      "id": "carousel_dot_color",
+      "label": "t:shared.carousel.dot_color.label",
+      "visible_if": "{{ section.settings.carousel_color_source == 'custom' and section.settings.carousel_pagination != 'none' }}"
+    },
+    {
+      "type": "color",
+      "id": "carousel_dot_active_color",
+      "label": "t:shared.carousel.dot_active_color.label",
+      "visible_if": "{{ section.settings.carousel_color_source == 'custom' and section.settings.carousel_pagination != 'none' }}"
+    },
+
     {
       "type": "header",
       "content": "t:shared.animation.header"
@@ -493,6 +984,7 @@
       "unit": "ms",
       "default": 0
     },
+
     {
       "type": "header",
       "content": "t:shared.spacing.section_header"
@@ -582,354 +1074,6 @@
       "step": 4,
       "unit": "px",
       "default": 0
-    },
-    {
-      "type": "header",
-      "content": "t:shared.carousel.header"
-    },
-    {
-      "type": "select",
-      "id": "layout_mobile",
-      "label": "t:shared.carousel.layout_mobile.label",
-      "options": [
-        {
-          "value": "grid",
-          "label": "t:shared.carousel.layout.options__1.label"
-        },
-        {
-          "value": "carousel",
-          "label": "t:shared.carousel.layout.options__2.label"
-        }
-      ],
-      "default": "carousel"
-    },
-    {
-      "type": "range",
-      "id": "columns_tablet",
-      "label": "t:shared.carousel.columns_tablet.label",
-      "min": 1,
-      "max": 4,
-      "step": 1,
-      "default": 2
-    },
-    {
-      "type": "range",
-      "id": "columns_mobile",
-      "label": "t:shared.carousel.columns_mobile.label",
-      "min": 1,
-      "max": 3,
-      "step": 1,
-      "default": 1
-    },
-    {
-      "type": "header",
-      "content": "t:shared.carousel.headers.motion"
-    },
-    {
-      "type": "range",
-      "id": "carousel_speed",
-      "label": "t:shared.carousel.speed.label",
-      "info": "t:shared.carousel.speed.info",
-      "min": 100,
-      "max": 1500,
-      "step": 50,
-      "unit": "ms",
-      "default": 500
-    },
-    {
-      "type": "checkbox",
-      "id": "carousel_loop",
-      "label": "t:shared.carousel.loop.label",
-      "default": false
-    },
-    {
-      "type": "checkbox",
-      "id": "carousel_autoplay",
-      "label": "t:shared.carousel.autoplay.label",
-      "info": "t:shared.carousel.autoplay.info",
-      "default": false
-    },
-    {
-      "type": "range",
-      "id": "carousel_autoplay_delay",
-      "label": "t:shared.carousel.autoplay_delay.label",
-      "min": 2,
-      "max": 15,
-      "step": 1,
-      "unit": "s",
-      "default": 5,
-      "visible_if": "{{ section.settings.carousel_autoplay }}"
-    },
-    {
-      "type": "header",
-      "content": "t:shared.carousel.headers.peek"
-    },
-    {
-      "type": "paragraph",
-      "content": "t:shared.carousel.paragraphs.peek"
-    },
-    {
-      "type": "range",
-      "id": "carousel_peek_mobile",
-      "label": "t:shared.carousel.peek_mobile.label",
-      "info": "t:shared.carousel.peek_mobile.info",
-      "min": 0,
-      "max": 90,
-      "step": 5,
-      "unit": "%",
-      "default": 0
-    },
-    {
-      "type": "range",
-      "id": "carousel_peek_desktop",
-      "label": "t:shared.carousel.peek_desktop.label",
-      "info": "t:shared.carousel.peek_desktop.info",
-      "min": 0,
-      "max": 90,
-      "step": 5,
-      "unit": "%",
-      "default": 0
-    },
-    {
-      "type": "header",
-      "content": "t:shared.carousel.headers.navigation"
-    },
-    {
-      "type": "checkbox",
-      "id": "carousel_navigation",
-      "label": "t:shared.carousel.navigation.label",
-      "default": true
-    },
-    {
-      "type": "select",
-      "id": "carousel_nav_position",
-      "label": "t:shared.carousel.nav_position.label",
-      "info": "t:shared.carousel.nav_position.info",
-      "options": [
-        {
-          "value": "outside",
-          "label": "t:shared.carousel.nav_position.options__1.label"
-        },
-        {
-          "value": "inside",
-          "label": "t:shared.carousel.nav_position.options__2.label"
-        },
-        {
-          "value": "bottom",
-          "label": "t:shared.carousel.nav_position.options__3.label"
-        },
-        {
-          "value": "inline",
-          "label": "t:shared.carousel.nav_position.options__4.label"
-        }
-      ],
-      "default": "outside",
-      "visible_if": "{{ section.settings.carousel_navigation }}"
-    },
-    {
-      "type": "select",
-      "id": "carousel_nav_icon",
-      "label": "t:shared.carousel.nav_icon.label",
-      "options": [
-        {
-          "value": "chevron",
-          "label": "t:shared.carousel.nav_icon.options__1.label"
-        },
-        {
-          "value": "arrow",
-          "label": "t:shared.carousel.nav_icon.options__2.label"
-        },
-        {
-          "value": "play",
-          "label": "t:shared.carousel.nav_icon.options__3.label"
-        },
-        {
-          "value": "external",
-          "label": "t:shared.carousel.nav_icon.options__4.label"
-        }
-      ],
-      "default": "arrow",
-      "visible_if": "{{ section.settings.carousel_navigation }}"
-    },
-    {
-      "type": "select",
-      "id": "carousel_controls_style",
-      "label": "t:shared.carousel.controls_style.label",
-      "info": "t:shared.carousel.controls_style.info",
-      "options": [
-        {
-          "value": "split",
-          "label": "t:shared.carousel.controls_style.options__1.label"
-        },
-        {
-          "value": "ghost",
-          "label": "t:shared.carousel.controls_style.options__2.label"
-        },
-        {
-          "value": "solid",
-          "label": "t:shared.carousel.controls_style.options__3.label"
-        }
-      ],
-      "default": "split",
-      "visible_if": "{{ section.settings.carousel_navigation }}"
-    },
-    {
-      "type": "range",
-      "id": "carousel_nav_size",
-      "label": "t:shared.carousel.nav_size.label",
-      "min": 28,
-      "max": 72,
-      "step": 2,
-      "unit": "px",
-      "default": 44,
-      "visible_if": "{{ section.settings.carousel_navigation }}"
-    },
-    {
-      "type": "header",
-      "content": "t:shared.carousel.headers.pagination"
-    },
-    {
-      "type": "select",
-      "id": "carousel_pagination",
-      "label": "t:shared.carousel.pagination.label",
-      "info": "t:shared.carousel.pagination.info",
-      "options": [
-        {
-          "value": "none",
-          "label": "t:shared.carousel.pagination.options__1.label"
-        },
-        {
-          "value": "dots",
-          "label": "t:shared.carousel.pagination.options__2.label"
-        },
-        {
-          "value": "numbers",
-          "label": "t:shared.carousel.pagination.options__3.label"
-        },
-        {
-          "value": "progress",
-          "label": "t:shared.carousel.pagination.options__4.label"
-        },
-        {
-          "value": "controls",
-          "label": "t:shared.carousel.pagination.options__5.label"
-        }
-      ],
-      "default": "none"
-    },
-    {
-      "type": "select",
-      "id": "carousel_controls_align",
-      "label": "t:shared.carousel.controls_align.label",
-      "options": [
-        {
-          "value": "start",
-          "label": "t:shared.carousel.controls_align.options__1.label"
-        },
-        {
-          "value": "center",
-          "label": "t:shared.carousel.controls_align.options__2.label"
-        },
-        {
-          "value": "end",
-          "label": "t:shared.carousel.controls_align.options__3.label"
-        }
-      ],
-      "default": "start",
-      "visible_if": "{{ section.settings.carousel_pagination == 'controls' }}"
-    },
-    {
-      "type": "header",
-      "content": "t:shared.carousel.headers.colors"
-    },
-    {
-      "type": "paragraph",
-      "content": "t:shared.carousel.paragraphs.colors"
-    },
-    {
-      "type": "checkbox",
-      "id": "carousel_custom_colors",
-      "label": "t:shared.carousel.custom_colors.label",
-      "info": "t:shared.carousel.custom_colors.info",
-      "default": false
-    },
-    {
-      "type": "select",
-      "id": "carousel_nav_style",
-      "label": "t:shared.carousel.nav_style.label",
-      "options": [
-        {
-          "value": "solid",
-          "label": "t:shared.carousel.nav_style.options__1.label"
-        },
-        {
-          "value": "gradient",
-          "label": "t:shared.carousel.nav_style.options__2.label"
-        }
-      ],
-      "default": "solid",
-      "visible_if": "{{ section.settings.carousel_custom_colors }}"
-    },
-    {
-      "type": "color",
-      "id": "carousel_nav_bg",
-      "label": "t:shared.carousel.nav_bg.label",
-      "visible_if": "{{ section.settings.carousel_custom_colors and section.settings.carousel_nav_style == 'solid' }}"
-    },
-    {
-      "type": "color",
-      "id": "carousel_nav_bg_hover",
-      "label": "t:shared.carousel.nav_bg_hover.label",
-      "visible_if": "{{ section.settings.carousel_custom_colors and section.settings.carousel_nav_style == 'solid' }}"
-    },
-    {
-      "type": "color_background",
-      "id": "carousel_nav_gradient",
-      "label": "t:shared.carousel.nav_gradient.label",
-      "default": "linear-gradient(135deg, #1a1a1a 0%, #4a4a4a 100%)",
-      "visible_if": "{{ section.settings.carousel_custom_colors and section.settings.carousel_nav_style == 'gradient' }}"
-    },
-    {
-      "type": "color_background",
-      "id": "carousel_nav_gradient_hover",
-      "label": "t:shared.carousel.nav_gradient_hover.label",
-      "visible_if": "{{ section.settings.carousel_custom_colors and section.settings.carousel_nav_style == 'gradient' }}"
-    },
-    {
-      "type": "color",
-      "id": "carousel_nav_icon_color",
-      "label": "t:shared.carousel.nav_icon_color.label",
-      "visible_if": "{{ section.settings.carousel_custom_colors }}"
-    },
-    {
-      "type": "color",
-      "id": "carousel_nav_icon_hover",
-      "label": "t:shared.carousel.nav_icon_hover.label",
-      "visible_if": "{{ section.settings.carousel_custom_colors }}"
-    },
-    {
-      "type": "color",
-      "id": "carousel_nav_border_color",
-      "label": "t:shared.carousel.nav_border_color.label",
-      "visible_if": "{{ section.settings.carousel_custom_colors }}"
-    },
-    {
-      "type": "color",
-      "id": "carousel_nav_border_hover",
-      "label": "t:shared.carousel.nav_border_hover.label",
-      "visible_if": "{{ section.settings.carousel_custom_colors }}"
-    },
-    {
-      "type": "color",
-      "id": "carousel_dot_color",
-      "label": "t:shared.carousel.dot_color.label",
-      "visible_if": "{{ section.settings.carousel_custom_colors and section.settings.carousel_pagination != 'none' }}"
-    },
-    {
-      "type": "color",
-      "id": "carousel_dot_active_color",
-      "label": "t:shared.carousel.dot_active_color.label",
-      "visible_if": "{{ section.settings.carousel_custom_colors and section.settings.carousel_pagination != 'none' }}"
     }
   ],
   "presets": [
@@ -940,14 +1084,14 @@
         "container_width": "standard",
         "articles_to_show": 3,
         "columns_desktop": 3,
-        "layout": "grid",
+        "layout": "carousel",
         "layout_mobile": "carousel",
         "columns_tablet": 2,
         "columns_mobile": 1,
         "show_view_all": true,
         "alignment": "center",
         "carousel_navigation": true,
-        "carousel_custom_colors": false
+        "carousel_color_source": "inherit"
       },
       "blocks": [
         {
