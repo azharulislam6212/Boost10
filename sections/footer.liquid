@@ -109,8 +109,16 @@
     assign background_paint = st.background_color | default: ''
   endif
 
+  comment
+    Any style the merchant offers, not just solid. Style used to be tested for
+    the one value that existed, so the day Dashed was added to the select it
+    would have zeroed the width and drawn nothing — the setting would have
+    looked broken rather than new. `none` is the only value that means no
+    border, so that is what the test asks about.
+  endcomment
+  assign border_line = st.border_style | default: 'none'
   assign border_width = 0
-  if st.border_style == 'solid'
+  if border_line != 'none'
     assign border_width = st.border_width | default: 1 | plus: 0
 
     comment
@@ -149,6 +157,31 @@
     What this file still decides is what it genuinely owns: whether there is a
     policy row at all, which is a section setting rather than a block.
   endcomment
+  comment
+    ---- corners, per breakpoint ----
+
+    Four values assembled into one `border-radius` shorthand here rather than in
+    CSS, because a shorthand cannot be built from four custom properties without
+    four fallbacks that would each have to repeat the default.
+
+    A phone gets its own four. A 40px shoulder that reads as a soft lift on a
+    1400px footer is a third of the width of a 390px screen, and merchants were
+    left choosing one number for two very different shapes.
+
+    `| default:` against the desktop value rather than a constant, so a footer
+    saved before these settings existed keeps one radius at every width instead
+    of squaring off at 749px for a reason the merchant never chose.
+  endcomment
+  assign radius_tl = st.radius_top_left | default: 0 | plus: 0
+  assign radius_tr = st.radius_top_right | default: 0 | plus: 0
+  assign radius_br = st.radius_bottom_right | default: 0 | plus: 0
+  assign radius_bl = st.radius_bottom_left | default: 0 | plus: 0
+
+  assign radius_tl_mobile = st.radius_top_left_mobile | default: radius_tl | plus: 0
+  assign radius_tr_mobile = st.radius_top_right_mobile | default: radius_tr | plus: 0
+  assign radius_br_mobile = st.radius_bottom_right_mobile | default: radius_br | plus: 0
+  assign radius_bl_mobile = st.radius_bottom_left_mobile | default: radius_bl | plus: 0
+
   assign columns_id = 'FooterColumns-' | append: section.id
 
   assign has_policy = false
@@ -170,15 +203,17 @@
 -%}
 
 {%- capture footer_styles -%}
-  --footer-radius:
-    {{ st.radius_top_left | default: 0 }}px
-    {{ st.radius_top_right | default: 0 }}px
-    {{ st.radius_bottom_right | default: 0 }}px
-    {{ st.radius_bottom_left | default: 0 }}px;
+  --footer-radius: {{ radius_tl }}px {{ radius_tr }}px {{ radius_br }}px {{ radius_bl }}px;
+  --footer-radius-mobile:
+    {{ radius_tl_mobile }}px
+    {{ radius_tr_mobile }}px
+    {{ radius_br_mobile }}px
+    {{ radius_bl_mobile }}px;
   --footer-margin-block-start: {{ st.margin_top | default: 0 }}px;
   --footer-margin-block-end: {{ st.margin_bottom | default: 0 }}px;
   {%- if border_width > 0 -%}
     --footer-border-width: {{ border_width }}px;
+    --footer-border-style: {{ border_line }};
     --footer-border-color: {{ border_paint }};
   {%- endif -%}
   {%- if background_paint != '' -%}
@@ -500,6 +535,10 @@
         {
           "value": "solid",
           "label": "t:shared.options.solid"
+        },
+        {
+          "value": "dashed",
+          "label": "t:shared.border.style.options__2.label"
         }
       ],
       "default": "none"
@@ -513,7 +552,7 @@
       "step": 1,
       "unit": "px",
       "default": 1,
-      "visible_if": "{{ section.settings.border_style == 'solid' }}"
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
     },
     {
       "type": "range",
@@ -524,17 +563,27 @@
       "step": 5,
       "unit": "%",
       "default": 100,
-      "visible_if": "{{ section.settings.border_style == 'solid' }}"
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
     },
     {
       "type": "color",
       "id": "border_color",
       "label": "t:blocks.group.settings.border_color.label",
-      "visible_if": "{{ section.settings.border_style == 'solid' }}"
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
     },
     {
       "type": "header",
       "content": "t:sections.footer.headers.corners"
+    },
+    {
+      "type": "select",
+      "id": "radius_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        { "value": "desktop", "label": "t:shared.spacing.devices.options__1.label" },
+        { "value": "mobile", "label": "t:shared.spacing.devices.options__2.label" }
+      ],
+      "default": "desktop"
     },
     {
       "type": "range",
@@ -544,7 +593,8 @@
       "max": 80,
       "step": 2,
       "unit": "px",
-      "default": 40
+      "default": 40,
+      "visible_if": "{{ section.settings.radius_device == 'desktop' }}"
     },
     {
       "type": "range",
@@ -554,7 +604,8 @@
       "max": 80,
       "step": 2,
       "unit": "px",
-      "default": 40
+      "default": 40,
+      "visible_if": "{{ section.settings.radius_device == 'desktop' }}"
     },
     {
       "type": "range",
@@ -564,7 +615,8 @@
       "max": 80,
       "step": 2,
       "unit": "px",
-      "default": 0
+      "default": 0,
+      "visible_if": "{{ section.settings.radius_device == 'desktop' }}"
     },
     {
       "type": "range",
@@ -574,7 +626,52 @@
       "max": 80,
       "step": 2,
       "unit": "px",
-      "default": 0
+      "default": 0,
+      "visible_if": "{{ section.settings.radius_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "radius_top_left_mobile",
+      "label": "t:sections.footer.settings.radius_top_left.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 24,
+      "visible_if": "{{ section.settings.radius_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "radius_top_right_mobile",
+      "label": "t:sections.footer.settings.radius_top_right.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 24,
+      "visible_if": "{{ section.settings.radius_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "radius_bottom_left_mobile",
+      "label": "t:sections.footer.settings.radius_bottom_left.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.radius_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "radius_bottom_right_mobile",
+      "label": "t:sections.footer.settings.radius_bottom_right.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.radius_device == 'mobile' }}"
     },
     {
       "type": "header",

@@ -113,9 +113,15 @@
     cannot take an alpha channel from — there is no channel to read until the
     scheme resolves it in the browser. `color-mix` does the same fade at that
     point instead, so both paths honour the slider.
+
+    Any style the select offers, not the one value it used to have. Testing for
+    `solid` meant the day Dashed was added the width would fall back to zero and
+    nothing would be drawn — a new option that silently did nothing. `none` is
+    the only value that means no border, so that is what is asked about.
   endcomment
+  assign border_line = s.border_style | default: 'none'
   assign border_width = 0
-  if s.border_style == 'solid'
+  if border_line != 'none'
     assign border_width = s.border_width | default: 1 | plus: 0
 
     assign border_percent = s.border_opacity | default: 100 | plus: 0
@@ -127,7 +133,17 @@
     endif
   endif
 
+  comment
+    The corner gets its own value per breakpoint. A radius chosen against a
+    section that runs the width of a desktop is the wrong radius on a 390px
+    screen, where the same number is a much larger share of the box.
+
+    `| default: radius` rather than a constant, so a section saved before the
+    mobile slider existed keeps one corner at every width instead of squaring
+    off at 749px for a reason the merchant never chose.
+  endcomment
   assign radius = s.border_radius | default: 0 | plus: 0
+  assign radius_mobile = s.border_radius_mobile | default: radius | plus: 0
   assign margin_top = s.margin_top | default: 0 | plus: 0
   assign margin_bottom = s.margin_bottom | default: 0 | plus: 0
 
@@ -243,10 +259,12 @@
 {%- capture section_style -%}
   {%- render 'spacing', section: s, declarations: true -%}
   --faq-radius: {{ radius }}px;
+  --faq-radius-mobile: {{ radius_mobile }}px;
   --faq-margin-block-start: {{ margin_top }}px;
   --faq-margin-block-end: {{ margin_bottom }}px;
   {%- if border_width > 0 -%}
     --faq-border-width: {{ border_width }}px;
+    --faq-border-style: {{ border_line }};
     --faq-border-color: {{ border_paint }};
   {%- endif -%}
   {%- if background_paint != '' -%}
@@ -560,6 +578,10 @@
         {
           "value": "solid",
           "label": "t:shared.options.solid"
+        },
+        {
+          "value": "dashed",
+          "label": "t:shared.border.style.options__2.label"
         }
       ],
       "default": "none"
@@ -573,7 +595,7 @@
       "step": 1,
       "unit": "px",
       "default": 1,
-      "visible_if": "{{ section.settings.border_style == 'solid' }}"
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
     },
     {
       "type": "range",
@@ -584,13 +606,27 @@
       "step": 5,
       "unit": "%",
       "default": 100,
-      "visible_if": "{{ section.settings.border_style == 'solid' }}"
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
     },
     {
       "type": "color",
       "id": "border_color",
       "label": "t:blocks.group.settings.border_color.label",
-      "visible_if": "{{ section.settings.border_style == 'solid' }}"
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.corners.header"
+    },
+    {
+      "type": "select",
+      "id": "radius_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        { "value": "desktop", "label": "t:shared.spacing.devices.options__1.label" },
+        { "value": "mobile", "label": "t:shared.spacing.devices.options__2.label" }
+      ],
+      "default": "desktop"
     },
     {
       "type": "range",
@@ -600,7 +636,19 @@
       "max": 60,
       "step": 2,
       "unit": "px",
-      "default": 0
+      "default": 0,
+      "visible_if": "{{ section.settings.radius_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_mobile",
+      "label": "t:blocks.group.settings.border_radius.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.radius_device == 'mobile' }}"
     },
     {
       "type": "header",
