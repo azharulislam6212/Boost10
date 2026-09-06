@@ -7525,7 +7525,12 @@ sticky-header[data-transparent] .header__logo-image--transparent { opacity: 1; }
   inline-size: var(--carousel-nav-size, 44px);
   block-size: var(--carousel-nav-size, 44px);
   padding: 0;
-  border: 1px solid var(--color-slider-arrow-border);
+
+  /* The style is a custom property so "Border style: dashed" is one declaration
+     on the wrapper rather than a modifier class per value, and `none` collapses
+     the border without also having to zero its width. */
+  border: var(--carousel-nav-border-width, 1px) var(--carousel-nav-border-style, solid)
+    var(--color-slider-arrow-border);
   border-radius: var(--carousel-nav-radius, 50%);
   background-color: var(--color-slider-arrow-background);
   background-image: var(--carousel-nav-background, none);
@@ -7545,6 +7550,22 @@ sticky-header[data-transparent] .header__logo-image--transparent { opacity: 1; }
   color: var(--color-slider-arrow-icon-hover);
 }
 
+/* Outlined. This used to be the absence of a class, which meant it rendered as
+   the bare `.carousel-button` above — and that already paints the scheme's arrow
+   background. So Outlined and Split looked the same as each other and nearly the
+   same as Filled, which is what "the arrow style setting does nothing" was.
+
+   It is a real class now, and the fill is transparent, so the three styles are
+   three looks: both outlined, one of each, both filled. */
+.carousel-button--ghost {
+  background-color: transparent;
+  background-image: none;
+}
+
+.carousel-button--ghost:hover {
+  background-color: var(--color-slider-arrow-background-hover);
+}
+
 .carousel-button--solid {
   border-color: var(--color-slider-arrow-icon);
   background-color: var(--color-slider-arrow-icon);
@@ -7555,6 +7576,31 @@ sticky-header[data-transparent] .header__logo-image--transparent { opacity: 1; }
   border-color: var(--color-slider-arrow-icon-hover);
   background-color: var(--color-slider-arrow-icon-hover);
   color: var(--color-slider-arrow-background-hover);
+}
+
+/* ---- icon background ----
+   `circle` and `square` differ only in `--carousel-nav-radius`, written by the
+   snippet, so neither needs a rule of its own. `none` is the one that does: a
+   bare glyph with no disc behind it, which has to win over `--solid` — hence
+   the two-class selector rather than `!important`.
+
+   The button keeps its full size. Shrinking the box to the ink would take a
+   44px target down to an 18px one, and a control that is only reachable with a
+   mouse is not a control on a phone. */
+.carousel-nav--bg-none .carousel-button,
+.carousel-controls--bg-none .carousel-button {
+  border-color: transparent;
+  background-color: transparent;
+  background-image: none;
+  color: var(--color-slider-arrow-icon);
+}
+
+.carousel-nav--bg-none .carousel-button:hover,
+.carousel-controls--bg-none .carousel-button:hover {
+  border-color: transparent;
+  background-color: transparent;
+  background-image: none;
+  color: var(--color-slider-arrow-icon-hover);
 }
 
 /* A single non-directional glyph is mirrored for "previous" rather than
@@ -7716,18 +7762,28 @@ sticky-header[data-transparent] .header__logo-image--transparent { opacity: 1; }
   margin-block-start: 0;
 }
 
+/* The indicator pair, not the heading and accent-text colours these used to
+   take. Everything in this bar is a position readout — the numbers, the track
+   and the fill — and it read as three colours from three unrelated places, so
+   changing "Active indicator" moved the bar and left the numbers behind.
+
+   One pair now covers every way the theme shows a position: the dots, the
+   number count, the progress bar and this bar. That is what makes the two
+   colour settings in a scheme (and their per-section overrides) mean something
+   a merchant can predict. */
 .carousel-controls__count {
   flex: 0 0 auto;
   font-size: var(--carousel-count-size, var(--font-size-lg));
   font-weight: var(--font-weight-bold, 700);
   font-variant-numeric: tabular-nums;
   line-height: 1;
-  color: var(--color-heading);
+  color: var(--color-slider-indicator-active);
 }
 
-/* The total is quieter than the current position — it is context, not state. */
+/* The total is quieter than the current position — it is context, not state, so
+   it takes the inactive half of the same pair. */
 .carousel-controls__count--total {
-  color: var(--color-accent-text);
+  color: var(--color-slider-indicator);
 }
 
 .carousel-controls__progress {
@@ -7786,6 +7842,33 @@ sticky-header[data-transparent] .header__logo-image--transparent { opacity: 1; }
   margin-block-start: var(--space-5);
 }
 
+/* ---- alignment ----
+   Swiper centres every type and offers no setting for it, so the row is aligned
+   here from one modifier class `carousel-pagination.liquid` writes.
+
+   Dots and the fraction are inline content, so `text-align` is the whole of it.
+   The bar is a box: it is capped at a readable width and pushed to one edge with
+   an auto margin, because a full-bleed rule cannot be "left aligned" — it is
+   already touching both sides, and the setting would appear to do nothing. */
+.carousel-pagination--start.carousel-shell__dots,
+.carousel-pagination--start.carousel-shell__counter { text-align: start; }
+
+.carousel-pagination--center.carousel-shell__dots,
+.carousel-pagination--center.carousel-shell__counter { text-align: center; }
+
+.carousel-pagination--end.carousel-shell__dots,
+.carousel-pagination--end.carousel-shell__counter { text-align: end; }
+
+.carousel-shell__progress.carousel-pagination--start,
+.carousel-shell__progress.carousel-pagination--center,
+.carousel-shell__progress.carousel-pagination--end {
+  max-inline-size: var(--carousel-pagination-bar-width, 24rem);
+}
+
+.carousel-shell__progress.carousel-pagination--start { margin-inline: 0 auto; }
+.carousel-shell__progress.carousel-pagination--center { margin-inline: auto; }
+.carousel-shell__progress.carousel-pagination--end { margin-inline: auto 0; }
+
 .carousel-shell.swiper-initialized .carousel-shell__dots,
 .carousel-shell.swiper-initialized .carousel-shell__counter,
 .carousel-shell.swiper-initialized .carousel-shell__progress {
@@ -7821,12 +7904,17 @@ sticky-header[data-transparent] .header__logo-image--transparent { opacity: 1; }
 
 /* ---- fraction ---- */
 
+/* The scheme's indicator colours, not the generic accent text — this is
+   pagination, and the two Pagination colour settings have to reach all three
+   types or "Pagination color" means "the dots, sometimes". The current position
+   takes the active colour below, so the pair reads the same way here as it does
+   in a row of dots. */
 .carousel-shell__counter {
   position: static;
   text-align: center;
   font-size: var(--font-size-sm);
   font-variant-numeric: tabular-nums;
-  color: var(--color-accent-text);
+  color: var(--color-slider-indicator);
 }
 
 .carousel-shell__counter .swiper-pagination-current {
@@ -7835,15 +7923,32 @@ sticky-header[data-transparent] .header__logo-image--transparent { opacity: 1; }
 
 /* ---- progress bar ---- */
 
-.carousel-shell__progress {
+/* The doubled class is load-bearing. Swiper stamps `swiper-pagination-progressbar`
+   onto this element, and swiper.css then matches
+   `.swiper-horizontal > .swiper-pagination-progressbar` — two classes — with
+   `position: absolute; top: 0; left: 0; width: 100%`. At one class this rule lost,
+   so the Progress bar pagination type was not sitting under the track at all: it
+   was pinned across the top of the first slide, which is what made that option
+   look broken. Two classes ties the specificity, and this file, loaded after
+   swiper.css, wins the tie.
+
+   The same applies to the height and the background, which swiper.css also sets. */
+.carousel-shell__progress,
+.carousel-shell__progress.swiper-pagination-progressbar {
   position: relative;
-  block-size: 2px;
+  inset: auto;
+  inline-size: 100%;
+  block-size: var(--carousel-pagination-bar-height, 4px);
+  border-radius: var(--carousel-pagination-bar-radius, 999px);
   background-color: var(--color-slider-indicator);
   overflow: hidden;
 }
 
-.carousel-shell__progress .swiper-pagination-progressbar-fill {
+.carousel-shell__progress .swiper-pagination-progressbar-fill,
+.carousel-shell__progress.swiper-pagination-progressbar .swiper-pagination-progressbar-fill {
+  border-radius: inherit;
   background-color: var(--color-slider-indicator-active);
+  background-image: var(--carousel-bar-background, none);
 }
 
 
@@ -10131,6 +10236,30 @@ swiper-carousel {
   @media screen and (min-width: 990px) {
     .article-grid {
       grid-template-columns: repeat(var(--columns-desktop, 3), minmax(0, 1fr));
+    }
+  }
+
+  /* ---- editorial -------------------------------------------------------- */
+
+  /* One lead story with the rest around it, which is what a blog front page
+     looks like everywhere it is not a shop. Same grid, same cards — the first
+     item is told to span two tracks in each direction and the browser flows the
+     others into what is left, so nothing here knows how many articles there are.
+
+     Desktop only. Two columns of a two-column grid is the whole width, so below
+     990px the span would be a no-op that still cost a rule; the row falls back
+     to the plain grid, which is the layout a phone wants anyway.
+
+     `grid-auto-rows: 1fr` is what keeps the stacked cards beside the lead the
+     same height as each other rather than each sized by its own text. */
+  @media screen and (min-width: 990px) {
+    .article-grid--editorial {
+      grid-auto-rows: 1fr;
+    }
+
+    .article-grid--editorial > .article-grid__item:first-child {
+      grid-column: span 2;
+      grid-row: span 2;
     }
   }
 

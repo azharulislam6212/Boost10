@@ -13,22 +13,35 @@
   colours. That is the point: the default path costs zero bytes per section, and
   only a merchant who wants this one carousel to differ pays for the override.
 
-  ## Two spellings of the same question
+  ## Three spellings of the same question
 
-  Sections say it one of two ways, and both are read here:
+  Sections say it one of three ways, and all of them are read here:
 
-      carousel_color_source   select — `inherit` | `custom`
-      carousel_custom_colors  checkbox — the original spelling
+      carousel_inherit_scheme  checkbox — on inherits, off overrides. The
+                               current spelling, and the same control
+                               `blocks/group.liquid` uses for the same idea.
+      carousel_color_source    select — `inherit` | `custom`
+      carousel_custom_colors   checkbox — the original spelling, inverted
 
-  The select is the better control: "Use custom colors" off does not say what
-  the colours *are*, and a merchant reading the panel has to know the theme's
-  conventions to guess "the section's colour scheme". `Colors: Inherit color
-  scheme` says it outright.
+  The checkbox wins wherever a section has one, then the select, then the old
+  checkbox. Nothing had to be converted for this snippet to keep working, and a
+  section can be moved to the current spelling one at a time.
 
-  The select wins wherever a section has one. A section that has only the
-  checkbox — `sections/featured-collection.liquid` and anything else still on
-  the original spelling — reads as blank here and falls through to it, so no
-  section has to be converted for this snippet to keep working.
+  Note the inversion: `carousel_inherit_scheme` is true when colours are
+  *inherited*, and `carousel_custom_colors` is true when they are *not*. Reading
+  them as one flag is how the two would quietly swap over.
+
+  ## A scheme first, then the pickers
+
+  **Colour scheme** re-declares the eight slider properties from whichever
+  scheme the merchant picked — not by putting `color-scheme-container` on the
+  carousel, which would paint that scheme's background behind the cards as well.
+  Only the controls change.
+
+  The individual pickers below it are layered on top of that, so a merchant can
+  take a scheme and correct one colour in it rather than filling in all eight.
+  Each one is emitted only when it has a value, which is what makes the layering
+  work: an empty picker leaves the scheme's answer standing.
 
   ## Gradient
 
@@ -46,10 +59,15 @@
 {% enddoc %}
 
 {%- liquid
+  assign inherit = settings.carousel_inherit_scheme
   assign color_source = settings.carousel_color_source
 
   assign use_custom = false
-  if color_source == blank
+  if inherit != nil
+    unless inherit
+      assign use_custom = true
+    endunless
+  elsif color_source == blank
     if settings.carousel_custom_colors
       assign use_custom = true
     endif
@@ -61,8 +79,25 @@
 {%- if use_custom -%}
   {%- liquid
     assign nav_style = settings.carousel_nav_style | default: 'solid'
+    assign scheme = settings.carousel_color_scheme
   -%}
   {%- capture custom_colors -%}
+    {%- comment -%}
+      The whole set, or none of it. Half a scheme — arrows from one, dots from
+      the section's — is a combination no merchant asked for and no preview
+      shows them before they publish.
+    {%- endcomment -%}
+    {%- if scheme != blank and scheme.settings != blank -%}
+      --color-slider-arrow-icon: rgb({{ scheme.settings.slider_arrow_icon.rgba }});
+      --color-slider-arrow-background: rgb({{ scheme.settings.slider_arrow_background.rgba }});
+      --color-slider-arrow-border: rgb({{ scheme.settings.slider_arrow_border.rgba }});
+      --color-slider-arrow-icon-hover: rgb({{ scheme.settings.slider_arrow_icon_hover.rgba }});
+      --color-slider-arrow-background-hover: rgb({{ scheme.settings.slider_arrow_background_hover.rgba }});
+      --color-slider-arrow-border-hover: rgb({{ scheme.settings.slider_arrow_border_hover.rgba }});
+      --color-slider-indicator: rgb({{ scheme.settings.slider_indicator_color.rgba }});
+      --color-slider-indicator-active: rgb({{ scheme.settings.slider_indicator_active_color.rgba }});
+    {%- endif -%}
+
     {%- if settings.carousel_nav_icon_color != blank -%}
       --color-slider-arrow-icon: {{ settings.carousel_nav_icon_color }};
     {%- endif -%}

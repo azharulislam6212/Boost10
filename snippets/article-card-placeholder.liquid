@@ -25,12 +25,27 @@
   placeholders is three different photographs rather than the same one repeated,
   which is what makes it read as "your posts go here" instead of as a bug.
 
-  @param {number} [index] - Position in the row. Picks the placeholder picture and the reveal delay.
+  Three is all there is, so a fourth card starts the cycle again. That is fine
+  and it is on purpose: the alternative is a fourth card with no picture at all,
+  and a repeated photograph two rows apart reads as a pattern rather than as a
+  mistake. `sections/featured-blog.liquid` draws one placeholder per **Post
+  count**, so six of these is two rows of the same three photographs.
+
+  ## The stagger follows the row, not the pictures
+
+  The reveal delay used to reuse the picture's `modulo 3`, which was the same
+  number by coincidence — the preview was one row of three. It is not any more,
+  so `columns` is passed in and the two are separate: the pictures cycle every
+  three because there are three of them, and the delay restarts on each new row
+  because that is where the eye restarts.
+
+  @param {number} [index] - Position in the grid. Picks the placeholder picture and the reveal delay.
+  @param {number} [columns] - Cards per row on desktop. Default 3.
   @param {string} [sizes] - The `sizes` attribute for the picture.
   @param {object} [section] - `section.settings`, for the animation cascade.
 
   @example
-    {% render 'article-card-placeholder', index: forloop.index0, sizes: card_sizes %}
+    {% render 'article-card-placeholder', index: forloop.index0, columns: 3, sizes: card_sizes %}
 {% enddoc %}
 
 {%- liquid
@@ -39,7 +54,12 @@
   assign art = position | modulo: 3 | plus: 1
   assign placeholder_image = 'blog-apparel-' | append: art
 
-  assign card_delay = position | modulo: 3 | times: 80
+  assign span = columns | default: 3 | plus: 0
+  if span < 1
+    assign span = 1
+  endif
+
+  assign card_delay = position | modulo: span | times: 80
 -%}
 
 <motion-effect

@@ -45,9 +45,10 @@
   ## Two answers this section gives that the collection one does not
 
   **The empty row is drawn, not apologised for.** A blog with no posts renders
-  `snippets/article-card-placeholder.liquid` across one row rather than a line
-  of text. A merchant adds this section before they have written anything more
-  often than after, and the theme editor is where the section is judged.
+  `snippets/article-card-placeholder.liquid` as the slides of the same shell the
+  real cards use — one per **Post count**, in whichever layout Type is set to. A
+  merchant adds this section before they have written anything more often than
+  after, and the theme editor is where the section is judged.
 
   **View all is a grid-only control.** A carousel already is the way through the
   rest of the blog, so the button is hidden — in the panel and on the page —
@@ -55,21 +56,37 @@
 
   ## The settings panel is grouped by what a merchant is deciding
 
-  Blog and count, then Layout — the two layout selects, the three column
-  counts, the container and View all together, because those are one decision
-  made once. Everything a carousel needs is under **Carousel**, hidden whole
-  when neither breakpoint is one.
+  Blog and alignment, then **Cards layout** — one Type select, the three
+  column counts and the two gaps, because those are one decision made once —
+  then **Section layout** for the container and View all. Everything a carousel
+  needs is under **Carousel**, hidden whole when neither breakpoint is one.
 
-  Its colours are a select, `carousel_color_source`, rather than the
-  **Use custom colors** checkbox `sections/featured-collection.liquid` still
-  carries. `snippets/carousel-style.liquid` reads both, so the two sections
-  share one implementation and neither had to be converted for the other.
+  Type is a single select rather than the Desktop layout / Mobile layout pair it
+  replaces. Two selects made four combinations, two of which nobody wants (a
+  desktop carousel that becomes a mobile grid is a row a phone cannot finish),
+  and the pair could not express Editorial at all — that is a desktop
+  arrangement whose mobile answer is always the plain stack. So the desktop
+  arrangement is the question, and **Carousel on mobile** is the one bit of
+  freedom left underneath it, hidden when Type is already Carousel.
+
+  Its colours are an **Inherit color scheme** checkbox with a colour scheme
+  picker under it, rather than the `carousel_color_source` select this section
+  used to carry or the **Use custom colors** checkbox
+  `sections/featured-collection.liquid` still does.
+  `snippets/carousel-style.liquid` reads all three, so the three sections share
+  one implementation and none had to be converted for another.
+
+  The checkbox is the same control `blocks/group.liquid` uses for the same
+  question, which is the point: a merchant who has turned one off knows what
+  this one does. The scheme picker under it sets all eight slider colours at
+  once and the pickers below correct one of them, so the common case — "these
+  arrows, but on the dark scheme" — is one click rather than eight.
 
   ### The unparenthesised `visible_if` conditions are not a typo
 
   A carousel setting that also depends on a toggle reads:
 
-      carousel_navigation and layout == 'carousel' or layout_mobile == 'carousel'
+      carousel_navigation and layout == 'carousel' or carousel_on_mobile
 
   which means *navigation is on **and** either breakpoint is a carousel*.
   `visible_if` is Liquid, and Liquid has no parentheses: operators are evaluated
@@ -82,8 +99,28 @@
   assign s = section.settings
 
   assign featured = s.blog
-  assign limit = s.articles_to_show | default: 3 | plus: 0
+  assign limit = s.articles_to_show | default: 6 | plus: 0
   assign desktop = s.columns_desktop | default: 3 | plus: 0
+
+  comment
+    Mobile columns is a select of two, and it used to be a range of three. A
+    theme that ships a narrower control does not narrow the values already
+    stored against it: a section saved at three columns keeps the 3, the picker
+    has nowhere to show it, and the phone keeps rendering a layout the merchant
+    can no longer see they chose. So the stored value is clamped here rather
+    than trusted.
+
+    `plus: 0` coerces the select's string to a number first — `"2" > 2` is a
+    comparison between a string and an integer, which is false in every Liquid
+    and would let a 3 through if the setting were ever widened again.
+  endcomment
+  assign cols_mobile = s.columns_mobile | default: 1 | plus: 0
+  if cols_mobile > 2
+    assign cols_mobile = 2
+  endif
+  if cols_mobile < 1
+    assign cols_mobile = 1
+  endif
 
   comment
     `sizes` has to describe the widest a card is ever painted, which is the
@@ -143,9 +180,61 @@
     `count` is what lets `carousel-options` decide whether the merchant's Loop
     setting is achievable — Swiper silently disables looping below twice
     `slidesPerView`, which reads as the setting doing nothing.
+
+    Three types, two answers. `grid` and `editorial` are both a CSS grid as far
+    as the shell is concerned — editorial is the same grid with the first card
+    spanning two tracks — so only `carousel` reaches `data-layout`. Anything
+    else here would make the component try to build a Swiper out of a layout
+    that is not one.
   endcomment
-  assign cs_layout = s.layout | default: 'carousel'
-  assign cs_layout_mobile = s.layout_mobile | default: 'carousel'
+  assign layout_type = s.layout | default: 'carousel'
+
+  assign editorial_class = ''
+  if layout_type == 'editorial'
+    assign editorial_class = ' article-grid--editorial'
+  endif
+
+  assign cs_layout = 'grid'
+  if layout_type == 'carousel'
+    assign cs_layout = 'carousel'
+  endif
+
+  comment
+    `false == blank` is true in Liquid, so a blank check would read "off" as
+    "not set" and turn the mobile carousel back on. `nil` is the only value that
+    means the merchant has not answered yet.
+
+    A desktop carousel is a carousel on a phone too, whatever this holds — the
+    setting is hidden in that case, and a stored `false` from before the type
+    was switched must not leave a phone with a six-card stack the merchant
+    cannot see they have.
+  endcomment
+  assign carousel_on_mobile = s.carousel_on_mobile
+  if carousel_on_mobile == nil
+    assign carousel_on_mobile = true
+  endif
+
+  assign cs_layout_mobile = 'grid'
+  if layout_type == 'carousel' or carousel_on_mobile
+    assign cs_layout_mobile = 'carousel'
+  endif
+
+  comment
+    ---- the gaps ----
+
+    Written as `--grid-gap-x` / `--grid-gap-y` rather than a pair of
+    section-private properties, because those two names are what the whole theme
+    spaces a card grid with — `.article-grid` and the shell's pre-init grid both
+    read them, and `carousel.js` falls back to `--grid-gap-x` for Swiper's
+    `spaceBetween`. So one pair of sliders moves the grid, the pre-init layout
+    and the live carousel together, and a row cannot space itself one way before
+    Swiper mounts and another way after.
+
+    `plus: 0` rather than `default` alone: 0 is a gap a merchant can legitimately
+    want, and `default` would replace it.
+  endcomment
+  assign gap_x = s.gap_horizontal | default: 24 | plus: 0
+  assign gap_y = s.gap_vertical | default: 32 | plus: 0
 
   assign cs_count = featured.articles_count | default: 0 | plus: 0
   if cs_count > limit
@@ -171,7 +260,7 @@
     coming back on.
   endcomment
   assign show_view_all = false
-  if s.show_view_all and cs_layout != 'carousel' and featured.articles_count > limit
+  if s.show_view_all and layout_type != 'carousel' and featured.articles_count > limit
     assign show_view_all = true
   endif
 
@@ -184,27 +273,44 @@
     sentence, and it is where the section is judged: **Featured blog** is added
     before the first post is written more often than after.
 
-    How many is derived rather than asked for. One full row is the useful
-    preview — it shows the column count, the gaps and the card shape, which is
-    everything the layout settings do — so the count is the desktop column
-    count, held under **Articles to show** for the merchant who has set that
-    lower. Sixteen placeholders for sixteen articles that do not exist is not a
-    preview of anything, and a slider for the number of fake cards is a setting
-    that stops meaning something the moment the store has posts.
+    How many is derived rather than asked for: it is **Post count**, exactly.
+    A preview that stops at one row answers the wrong question — the merchant is
+    not asking what one row looks like, they are asking what *this section* will
+    look like when they have written the posts, and at six posts across three
+    columns that is two rows and a different amount of vertical space. Showing
+    three of them made the section shorter empty than full, which is the one
+    thing a placeholder must not do.
+
+    It also has to be Post count for Editorial to preview at all: that layout is
+    a lead card and the cards around it, and a single row of three has no
+    "around it" to show.
+
+    Shopify ships three placeholder photographs, so the fourth card repeats the
+    first. That is `article-card-placeholder`'s own `modulo`, not something this
+    section counts — see the note there on why the pictures vary at all.
   endcomment
   assign has_articles = false
   if featured.articles.size > 0
     assign has_articles = true
   endif
 
-  assign placeholder_count = desktop
-  if placeholder_count > limit
-    assign placeholder_count = limit
-  endif
+  assign placeholder_count = limit
+
+  comment
+    The loop guard counts slides, and when the blog is empty the slides are the
+    placeholders. Leaving `cs_count` at zero told `carousel-options` there was
+    nothing to loop, so a merchant who had turned Loop on saw it silently
+    refused in the one state where they are most likely to be looking at it.
+  endcomment
+  unless has_articles
+    assign cs_count = placeholder_count
+  endunless
 -%}
 
 {%- capture section_style -%}
   {%- render 'spacing', section: s, declarations: true -%}
+  --grid-gap-x: {{ gap_x }}px;
+  --grid-gap-y: {{ gap_y }}px;
   --featured-blog-radius: {{ radius }}px;
   --featured-blog-margin-block-start: {{ margin_top }}px;
   --featured-blog-margin-block-end: {{ margin_bottom }}px;
@@ -240,24 +346,42 @@
       {% content_for 'blocks' %}
     </motion-effect>
 
-    {%- if has_articles -%}
-      <swiper-carousel
-        {% render 'carousel-shell-attrs',
-           settings: s,
-           layout: cs_layout,
-           layout_mobile: cs_layout_mobile,
-           classes: 'featured-blog__carousel',
-           columns_desktop: s.columns_desktop,
-           columns_tablet: s.columns_tablet,
-           columns_mobile: s.columns_mobile,
-           count: cs_count %}
+    {%- comment -%}
+      One shell, whichever kind of slide is going into it.
+
+      The empty state used to be a second element — a plain `<ul>` with the
+      column counts written on it by hand — on the reasoning that there is
+      nothing to page through and arrows over placeholders invite a drag that
+      goes nowhere. That reasoning was wrong in the way that matters: a merchant
+      who has set Type to Carousel and has not written a post yet was shown a
+      two-row grid, and reported the carousel as broken. Correctly — the preview
+      is the whole job of the empty state, and it was previewing a layout they
+      had not chosen.
+
+      So the placeholders are slides now. The arrows work, the dots work, and
+      what the merchant sees before they publish is what they get after. It also
+      removes the hand-written `--columns-*` on that second element, which was a
+      copy of what `carousel-shell-attrs` already writes and was one edit away
+      from disagreeing with it.
+    {%- endcomment -%}
+    <swiper-carousel
+      {% render 'carousel-shell-attrs',
+         settings: s,
+         layout: cs_layout,
+         layout_mobile: cs_layout_mobile,
+         classes: 'featured-blog__carousel',
+         columns_desktop: s.columns_desktop,
+         columns_tablet: s.columns_tablet,
+         columns_mobile: cols_mobile,
+         count: cs_count %}
+    >
+      <ul
+        class="carousel-shell__track article-grid{{ editorial_class }}{% unless has_articles %} featured-blog__placeholders{% endunless %}"
+        data-ref="track"
+        role="list"
+        {% if has_articles and cs_is_carousel %}aria-label="{{ featured.title | escape }}"{% endif %}
       >
-        <ul
-          class="carousel-shell__track article-grid"
-          data-ref="track"
-          role="list"
-          {% if cs_is_carousel %}aria-label="{{ featured.title | escape }}"{% endif %}
-        >
+        {%- if has_articles -%}
           {%- for article in featured.articles limit: limit -%}
             <li class="article-grid__item carousel-shell__item" data-article-id="{{ article.id }}">
               {% content_for 'block',
@@ -269,43 +393,29 @@
                  sizes: card_sizes %}
             </li>
           {%- endfor -%}
-        </ul>
-
-        {% render 'carousel-shell-tail',
-           settings: s,
-           layout: cs_layout,
-           layout_mobile: cs_layout_mobile %}
-      </swiper-carousel>
-
-      {%- if show_view_all -%}
-        <div class="featured-blog__footer">
-          {% render 'button', label: 'general.actions.view_all', href: featured.url, variant: 'secondary' %}
-        </div>
-      {%- endif -%}
-    {%- else -%}
-      {%- comment -%}
-        The empty row is a plain grid, never a carousel. There is nothing to page
-        through, and arrows over placeholder cards invite a merchant to drag a
-        track that is one screen wide.
-
-        The columns come from the same three settings the real row uses, written
-        here rather than by `carousel-shell-attrs`, because this element is not a
-        carousel and should not carry a carousel's attributes.
-      {%- endcomment -%}
-      <ul
-        class="article-grid featured-blog__placeholders"
-        role="list"
-        style="--columns-desktop: {{ desktop }}; --columns-tablet: {{ s.columns_tablet | default: 2 }}; --columns-mobile: {{ s.columns_mobile | default: 1 }};"
-      >
-        {%- for i in (1..placeholder_count) -%}
-          <li class="article-grid__item">
-            {% render 'article-card-placeholder',
-               index: forloop.index0,
-               sizes: card_sizes,
-               section: s %}
-          </li>
-        {%- endfor -%}
+        {%- else -%}
+          {%- for i in (1..placeholder_count) -%}
+            <li class="article-grid__item carousel-shell__item">
+              {% render 'article-card-placeholder',
+                 index: forloop.index0,
+                 columns: desktop,
+                 sizes: card_sizes,
+                 section: s %}
+            </li>
+          {%- endfor -%}
+        {%- endif -%}
       </ul>
+
+      {% render 'carousel-shell-tail',
+         settings: s,
+         layout: cs_layout,
+         layout_mobile: cs_layout_mobile %}
+    </swiper-carousel>
+
+    {%- if show_view_all -%}
+      <div class="featured-blog__footer">
+        {% render 'button', label: 'general.actions.view_all', href: featured.url, variant: 'secondary' %}
+      </div>
     {%- endif -%}
   </div>
 </div>
@@ -328,15 +438,6 @@
       "type": "blog",
       "id": "blog",
       "label": "t:sections.featured_blog.settings.blog.label"
-    },
-    {
-      "type": "range",
-      "id": "articles_to_show",
-      "label": "t:sections.featured_blog.settings.articles_to_show.label",
-      "min": 2,
-      "max": 16,
-      "step": 1,
-      "default": 3
     },
     {
       "type": "select",
@@ -362,39 +463,45 @@
 
     {
       "type": "header",
-      "content": "t:sections.featured_blog.headers.layout"
+      "content": "t:sections.featured_blog.headers.cards"
     },
     {
       "type": "select",
       "id": "layout",
-      "label": "t:shared.carousel.layout.label",
+      "label": "t:shared.carousel.layout_type.label",
+      "info": "t:shared.carousel.layout_type.info",
       "options": [
         {
           "value": "grid",
-          "label": "t:sections.featured_collection.settings.layout.options__1.label"
+          "label": "t:shared.carousel.layout_type.options__1.label"
         },
         {
           "value": "carousel",
-          "label": "t:sections.featured_collection.settings.layout.options__2.label"
+          "label": "t:shared.carousel.layout_type.options__2.label"
+        },
+        {
+          "value": "editorial",
+          "label": "t:shared.carousel.layout_type.options__3.label"
         }
       ],
       "default": "carousel"
     },
     {
-      "type": "select",
-      "id": "layout_mobile",
-      "label": "t:shared.carousel.layout_mobile.label",
-      "options": [
-        {
-          "value": "grid",
-          "label": "t:shared.carousel.layout.options__1.label"
-        },
-        {
-          "value": "carousel",
-          "label": "t:shared.carousel.layout.options__2.label"
-        }
-      ],
-      "default": "carousel"
+      "type": "checkbox",
+      "id": "carousel_on_mobile",
+      "label": "t:shared.carousel.carousel_on_mobile.label",
+      "info": "t:shared.carousel.carousel_on_mobile.info",
+      "default": true,
+      "visible_if": "{{ section.settings.layout != 'carousel' }}"
+    },
+    {
+      "type": "range",
+      "id": "articles_to_show",
+      "label": "t:sections.featured_blog.settings.articles_to_show.label",
+      "min": 2,
+      "max": 16,
+      "step": 1,
+      "default": 6
     },
     {
       "type": "range",
@@ -415,13 +522,45 @@
       "default": 2
     },
     {
-      "type": "range",
+      "type": "select",
       "id": "columns_mobile",
       "label": "t:shared.carousel.columns_mobile.label",
-      "min": 1,
-      "max": 3,
-      "step": 1,
-      "default": 1
+      "options": [
+        {
+          "value": "1",
+          "label": "t:shared.carousel.columns_mobile.options__1.label"
+        },
+        {
+          "value": "2",
+          "label": "t:shared.carousel.columns_mobile.options__2.label"
+        }
+      ],
+      "default": "1"
+    },
+    {
+      "type": "range",
+      "id": "gap_horizontal",
+      "label": "t:blocks.group.settings.gap_horizontal.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 24
+    },
+    {
+      "type": "range",
+      "id": "gap_vertical",
+      "label": "t:blocks.group.settings.gap_vertical.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 32
+    },
+
+    {
+      "type": "header",
+      "content": "t:sections.featured_blog.headers.section"
     },
     {
       "type": "select",
@@ -588,12 +727,12 @@
     {
       "type": "header",
       "content": "t:sections.featured_blog.headers.carousel",
-      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.layout_mobile == 'carousel' }}"
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
     },
     {
       "type": "paragraph",
       "content": "t:sections.featured_blog.paragraphs.carousel",
-      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.layout_mobile == 'carousel' }}"
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
     },
     {
       "type": "range",
@@ -605,14 +744,14 @@
       "step": 50,
       "unit": "ms",
       "default": 500,
-      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.layout_mobile == 'carousel' }}"
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
     },
     {
       "type": "checkbox",
       "id": "carousel_loop",
       "label": "t:shared.carousel.loop.label",
       "default": false,
-      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.layout_mobile == 'carousel' }}"
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
     },
     {
       "type": "checkbox",
@@ -620,7 +759,7 @@
       "label": "t:shared.carousel.autoplay.label",
       "info": "t:shared.carousel.autoplay.info",
       "default": false,
-      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.layout_mobile == 'carousel' }}"
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
     },
     {
       "type": "range",
@@ -631,18 +770,18 @@
       "step": 1,
       "unit": "s",
       "default": 5,
-      "visible_if": "{{ section.settings.carousel_autoplay and section.settings.layout == 'carousel' or section.settings.layout_mobile == 'carousel' }}"
+      "visible_if": "{{ section.settings.carousel_autoplay and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
     },
 
     {
       "type": "header",
       "content": "t:shared.carousel.headers.peek",
-      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.layout_mobile == 'carousel' }}"
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
     },
     {
       "type": "paragraph",
       "content": "t:shared.carousel.paragraphs.peek",
-      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.layout_mobile == 'carousel' }}"
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
     },
     {
       "type": "range",
@@ -654,7 +793,7 @@
       "step": 5,
       "unit": "%",
       "default": 0,
-      "visible_if": "{{ section.settings.layout_mobile == 'carousel' }}"
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
     },
     {
       "type": "range",
@@ -672,14 +811,14 @@
     {
       "type": "header",
       "content": "t:shared.carousel.headers.navigation",
-      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.layout_mobile == 'carousel' }}"
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
     },
     {
       "type": "checkbox",
       "id": "carousel_navigation",
       "label": "t:shared.carousel.navigation.label",
       "default": true,
-      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.layout_mobile == 'carousel' }}"
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
     },
     {
       "type": "select",
@@ -705,32 +844,90 @@
         }
       ],
       "default": "outside",
-      "visible_if": "{{ section.settings.carousel_navigation and section.settings.layout == 'carousel' or section.settings.layout_mobile == 'carousel' }}"
+      "visible_if": "{{ section.settings.carousel_navigation and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
     },
     {
       "type": "select",
       "id": "carousel_nav_icon",
-      "label": "t:shared.carousel.nav_icon.label",
+      "label": "t:shared.carousel.nav_glyph.label",
       "options": [
         {
-          "value": "chevron",
-          "label": "t:shared.carousel.nav_icon.options__1.label"
-        },
-        {
           "value": "arrow",
-          "label": "t:shared.carousel.nav_icon.options__2.label"
+          "label": "t:shared.carousel.nav_glyph.options__1.label"
         },
         {
-          "value": "play",
-          "label": "t:shared.carousel.nav_icon.options__3.label"
+          "value": "chevron",
+          "label": "t:shared.carousel.nav_glyph.options__2.label"
         },
         {
-          "value": "external",
-          "label": "t:shared.carousel.nav_icon.options__4.label"
+          "value": "arrow-large",
+          "label": "t:shared.carousel.nav_glyph.options__3.label"
+        },
+        {
+          "value": "chevron-large",
+          "label": "t:shared.carousel.nav_glyph.options__4.label"
+        },
+        {
+          "value": "none",
+          "label": "t:shared.carousel.nav_glyph.options__5.label"
         }
       ],
       "default": "arrow",
-      "visible_if": "{{ section.settings.carousel_navigation and section.settings.layout == 'carousel' or section.settings.layout_mobile == 'carousel' }}"
+      "visible_if": "{{ section.settings.carousel_navigation and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "select",
+      "id": "carousel_nav_shape",
+      "label": "t:shared.carousel.nav_shape.label",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.carousel.nav_shape.options__1.label"
+        },
+        {
+          "value": "circle",
+          "label": "t:shared.carousel.nav_shape.options__2.label"
+        },
+        {
+          "value": "square",
+          "label": "t:shared.carousel.nav_shape.options__3.label"
+        }
+      ],
+      "default": "circle",
+      "visible_if": "{{ section.settings.carousel_navigation and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "select",
+      "id": "carousel_nav_border_style",
+      "label": "t:shared.carousel.nav_border_style.label",
+      "options": [
+        {
+          "value": "solid",
+          "label": "t:shared.options.solid"
+        },
+        {
+          "value": "dashed",
+          "label": "t:shared.options.dashed"
+        },
+        {
+          "value": "none",
+          "label": "t:shared.options.none"
+        }
+      ],
+      "default": "solid",
+      "visible_if": "{{ section.settings.carousel_nav_shape != 'none' and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "range",
+      "id": "carousel_nav_border_radius",
+      "label": "t:shared.carousel.nav_border_radius.label",
+      "info": "t:shared.carousel.nav_border_radius.info",
+      "min": 0,
+      "max": 30,
+      "step": 1,
+      "unit": "px",
+      "default": 8,
+      "visible_if": "{{ section.settings.carousel_nav_shape == 'square' and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
     },
     {
       "type": "select",
@@ -752,7 +949,7 @@
         }
       ],
       "default": "split",
-      "visible_if": "{{ section.settings.carousel_navigation and section.settings.layout == 'carousel' or section.settings.layout_mobile == 'carousel' }}"
+      "visible_if": "{{ section.settings.carousel_navigation and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
     },
     {
       "type": "range",
@@ -763,13 +960,13 @@
       "step": 2,
       "unit": "px",
       "default": 44,
-      "visible_if": "{{ section.settings.carousel_navigation and section.settings.layout == 'carousel' or section.settings.layout_mobile == 'carousel' }}"
+      "visible_if": "{{ section.settings.carousel_navigation and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
     },
 
     {
       "type": "header",
       "content": "t:shared.carousel.headers.pagination",
-      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.layout_mobile == 'carousel' }}"
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
     },
     {
       "type": "select",
@@ -799,12 +996,13 @@
         }
       ],
       "default": "none",
-      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.layout_mobile == 'carousel' }}"
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
     },
     {
       "type": "select",
-      "id": "carousel_controls_align",
-      "label": "t:shared.carousel.controls_align.label",
+      "id": "carousel_pagination_align",
+      "label": "t:shared.carousel.pagination_align.label",
+      "info": "t:shared.carousel.pagination_align.info",
       "options": [
         {
           "value": "start",
@@ -819,37 +1017,41 @@
           "label": "t:shared.carousel.controls_align.options__3.label"
         }
       ],
-      "default": "start",
-      "visible_if": "{{ section.settings.carousel_pagination == 'controls' and section.settings.layout == 'carousel' or section.settings.layout_mobile == 'carousel' }}"
+      "default": "center",
+      "visible_if": "{{ section.settings.carousel_pagination != 'none' and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
     },
 
     {
       "type": "header",
-      "content": "t:shared.carousel.headers.colors",
-      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.layout_mobile == 'carousel' }}"
+      "content": "t:shared.carousel.headers.controls",
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
     },
     {
       "type": "paragraph",
       "content": "t:shared.carousel.paragraphs.colors",
-      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.layout_mobile == 'carousel' }}"
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
     },
     {
-      "type": "select",
-      "id": "carousel_color_source",
-      "label": "t:shared.carousel.color_source.label",
-      "info": "t:shared.carousel.color_source.info",
-      "options": [
-        {
-          "value": "inherit",
-          "label": "t:shared.carousel.color_source.options__1.label"
-        },
-        {
-          "value": "custom",
-          "label": "t:shared.carousel.color_source.options__2.label"
-        }
-      ],
-      "default": "inherit",
-      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.layout_mobile == 'carousel' }}"
+      "type": "checkbox",
+      "id": "carousel_inherit_scheme",
+      "label": "t:shared.carousel.inherit_scheme.label",
+      "info": "t:shared.carousel.inherit_scheme.info",
+      "default": true,
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "color_scheme",
+      "id": "carousel_color_scheme",
+      "label": "t:shared.color_scheme.label",
+      "info": "t:shared.carousel.color_scheme.info",
+      "default": "scheme-1",
+      "visible_if": "{{ section.settings.carousel_inherit_scheme == false }}"
+    },
+
+    {
+      "type": "header",
+      "content": "t:shared.carousel.headers.nav_colors",
+      "visible_if": "{{ section.settings.carousel_inherit_scheme == false }}"
     },
     {
       "type": "select",
@@ -866,68 +1068,69 @@
         }
       ],
       "default": "solid",
-      "visible_if": "{{ section.settings.carousel_color_source == 'custom' }}"
+      "visible_if": "{{ section.settings.carousel_inherit_scheme == false }}"
     },
     {
       "type": "color",
       "id": "carousel_nav_bg",
       "label": "t:shared.carousel.nav_bg.label",
-      "visible_if": "{{ section.settings.carousel_color_source == 'custom' and section.settings.carousel_nav_style == 'solid' }}"
+      "visible_if": "{{ section.settings.carousel_inherit_scheme == false and section.settings.carousel_nav_style == 'solid' }}"
     },
     {
       "type": "color",
       "id": "carousel_nav_bg_hover",
       "label": "t:shared.carousel.nav_bg_hover.label",
-      "visible_if": "{{ section.settings.carousel_color_source == 'custom' and section.settings.carousel_nav_style == 'solid' }}"
+      "visible_if": "{{ section.settings.carousel_inherit_scheme == false and section.settings.carousel_nav_style == 'solid' }}"
     },
     {
       "type": "color_background",
       "id": "carousel_nav_gradient",
       "label": "t:shared.carousel.nav_gradient.label",
       "default": "linear-gradient(135deg, #1a1a1a 0%, #4a4a4a 100%)",
-      "visible_if": "{{ section.settings.carousel_color_source == 'custom' and section.settings.carousel_nav_style == 'gradient' }}"
+      "visible_if": "{{ section.settings.carousel_inherit_scheme == false and section.settings.carousel_nav_style == 'gradient' }}"
     },
     {
       "type": "color_background",
       "id": "carousel_nav_gradient_hover",
       "label": "t:shared.carousel.nav_gradient_hover.label",
-      "visible_if": "{{ section.settings.carousel_color_source == 'custom' and section.settings.carousel_nav_style == 'gradient' }}"
+      "visible_if": "{{ section.settings.carousel_inherit_scheme == false and section.settings.carousel_nav_style == 'gradient' }}"
     },
     {
       "type": "color",
       "id": "carousel_nav_icon_color",
       "label": "t:shared.carousel.nav_icon_color.label",
-      "visible_if": "{{ section.settings.carousel_color_source == 'custom' }}"
+      "visible_if": "{{ section.settings.carousel_inherit_scheme == false }}"
     },
     {
       "type": "color",
       "id": "carousel_nav_icon_hover",
       "label": "t:shared.carousel.nav_icon_hover.label",
-      "visible_if": "{{ section.settings.carousel_color_source == 'custom' }}"
+      "visible_if": "{{ section.settings.carousel_inherit_scheme == false }}"
     },
     {
       "type": "color",
       "id": "carousel_nav_border_color",
       "label": "t:shared.carousel.nav_border_color.label",
-      "visible_if": "{{ section.settings.carousel_color_source == 'custom' }}"
+      "visible_if": "{{ section.settings.carousel_inherit_scheme == false }}"
     },
     {
       "type": "color",
       "id": "carousel_nav_border_hover",
       "label": "t:shared.carousel.nav_border_hover.label",
-      "visible_if": "{{ section.settings.carousel_color_source == 'custom' }}"
+      "visible_if": "{{ section.settings.carousel_inherit_scheme == false }}"
     },
     {
       "type": "color",
       "id": "carousel_dot_color",
       "label": "t:shared.carousel.dot_color.label",
-      "visible_if": "{{ section.settings.carousel_color_source == 'custom' and section.settings.carousel_pagination != 'none' }}"
+      "info": "t:shared.carousel.dot_color.info",
+      "visible_if": "{{ section.settings.carousel_inherit_scheme == false }}"
     },
     {
       "type": "color",
       "id": "carousel_dot_active_color",
       "label": "t:shared.carousel.dot_active_color.label",
-      "visible_if": "{{ section.settings.carousel_color_source == 'custom' and section.settings.carousel_pagination != 'none' }}"
+      "visible_if": "{{ section.settings.carousel_inherit_scheme == false }}"
     },
 
     {
@@ -1082,16 +1285,23 @@
       "category": "t:categories.text",
       "settings": {
         "container_width": "standard",
-        "articles_to_show": 3,
-        "columns_desktop": 3,
+        "articles_to_show": 6,
         "layout": "carousel",
-        "layout_mobile": "carousel",
+        "carousel_on_mobile": true,
+        "columns_desktop": 3,
         "columns_tablet": 2,
-        "columns_mobile": 1,
+        "columns_mobile": "1",
+        "gap_horizontal": 24,
+        "gap_vertical": 32,
         "show_view_all": true,
         "alignment": "center",
         "carousel_navigation": true,
-        "carousel_color_source": "inherit"
+        "carousel_nav_icon": "arrow",
+        "carousel_nav_shape": "circle",
+        "carousel_nav_border_style": "solid",
+        "carousel_pagination": "dots",
+        "carousel_pagination_align": "center",
+        "carousel_inherit_scheme": true
       },
       "blocks": [
         {
@@ -1244,3 +1454,4 @@
   ]
 }
 {% endschema %}
+

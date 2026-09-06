@@ -35,6 +35,9 @@
   @param {string} [icon] - Icon name. Default from settings.
   @param {number} [size] - Button diameter in px. Default from settings.
   @param {string} [align] - start | center | end | inline
+  @param {string} [shape] - none | circle | square. Overrides the setting.
+  @param {string} [border_style] - solid | dashed | none. Overrides the setting.
+  @param {number} [radius] - Corner radius in px, squares only.
   @param {string} [classes] - Extra classes
 
   @example
@@ -44,10 +47,41 @@
 
 {%- liquid
   assign icon_name = icon | default: settings.carousel_nav_icon | default: 'arrow'
+
+  # `-large` is a size, not a glyph — the same SVG drawn at a bigger fraction of
+  # the button. `carousel-nav.liquid` resolves it identically, so the two
+  # controls can never disagree about what "Large arrows" means.
+  assign icon_ratio = 0.4
+  if icon_name contains '-large'
+    assign icon_name = icon_name | remove: '-large'
+    assign icon_ratio = 0.62
+  endif
+
+  # `none` is the off switch for the bare arrow pair, and it cannot mean the same
+  # thing here: this bar *is* the navigation, and a controls bar with two empty
+  # circles in it is not a quieter carousel, it is a broken one. So the glyph
+  # falls back rather than disappearing.
+  if icon_name == 'none'
+    assign icon_name = 'arrow'
+  endif
+
   assign btn_style = style | default: settings.carousel_controls_style | default: 'split'
   assign btn_size = size | default: settings.carousel_nav_size | default: 44
-  assign icon_size = btn_size | times: 0.4 | round
-  assign placement = align | default: settings.carousel_controls_align | default: 'start'
+  assign icon_size = btn_size | times: icon_ratio | round
+  assign placement = align | default: settings.carousel_pagination_align | default: settings.carousel_controls_align | default: 'start'
+
+  assign nav_shape = shape | default: settings.carousel_nav_shape | default: 'circle'
+  assign nav_border = border_style | default: settings.carousel_nav_border_style | default: 'solid'
+
+  assign nav_radius = radius | default: settings.carousel_nav_border_radius | default: 8 | plus: 0
+  case nav_shape
+    when 'square'
+      assign radius_value = nav_radius | append: 'px'
+    when 'none'
+      assign radius_value = '0'
+    else
+      assign radius_value = '50%'
+  endcase
 
   # `chevron` and `arrow` are directional pairs. Anything else is one glyph used
   # for both buttons, mirrored on the previous one by CSS.
@@ -64,15 +98,18 @@
     assign icon_next = icon_name
   endif
 
+  # Every role carries a class. `ghost` used to be the empty string, so it
+  # rendered as the bare `.carousel-button` — which already paints the scheme's
+  # arrow background, and made three arrow styles look like one.
   case btn_style
     when 'solid'
       assign class_previous = 'carousel-button--solid'
       assign class_next = 'carousel-button--solid'
     when 'ghost'
-      assign class_previous = ''
-      assign class_next = ''
+      assign class_previous = 'carousel-button--ghost'
+      assign class_next = 'carousel-button--ghost'
     else
-      assign class_previous = ''
+      assign class_previous = 'carousel-button--ghost'
       assign class_next = 'carousel-button--solid'
   endcase
 
@@ -82,9 +119,9 @@
 -%}
 
 <div
-  class="carousel-controls carousel-controls--{{ placement }} {{ classes }}"
+  class="carousel-controls carousel-controls--{{ placement }} carousel-controls--bg-{{ nav_shape }} {{ classes }}"
   data-carousel-nav
-  style="--carousel-nav-size: {{ btn_size }}px;"
+  style="--carousel-nav-size: {{ btn_size }}px; --carousel-nav-radius: {{ radius_value }}; --carousel-nav-border-style: {{ nav_border }};"
 >
   <button
     type="button"
