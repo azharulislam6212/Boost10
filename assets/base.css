@@ -10322,42 +10322,57 @@ swiper-carousel {
 
   /* ---- editorial -------------------------------------------------------- */
 
-  /* A magazine run rather than one lead story: a full-width feature, then a
-     pair beside each other, then another feature, for as many articles as the
-     section shows. `3n + 1` is the whole rule — every third item starting at
-     the first is the wide one, and the two after it fall into the two tracks
-     left over. Nothing here counts articles, so 4 and 16 both come out right.
+  /* A magazine run rather than one lead story. The cycle is four articles: one
+     list card across the full width, then three in a row of three, then the
+     next list card the other way round, then three more.
 
-     The old version spanned the first item two-by-two and let the browser flow
-     the rest around it. That is a different picture: it makes one hero and a
-     sidebar, and the pattern stops after the first row. This repeats.
+     `4n + 1` is the whole pattern — every fourth item starting at the first is
+     the list card, and the three after it fall into the three tracks left over.
+     `8n + 5` is the second half of it: every other list card, which is the one
+     that runs mirrored. Nothing here counts articles, so 8 and 16 come out as
+     two and four complete cycles and an odd number simply stops wherever it
+     stops.
 
-     The feature runs horizontally whatever the card's own **Direction** says.
+     The list card runs horizontally whatever the card's own **Direction** says.
      Direction is one value for every card in the section — that is the point of
      `_article-card` being rendered with one id — so a layout that needs its
      wide row to read differently from its narrow ones has to say so here. The
-     card's own styling is untouched: this sets the axis and the split, and the
-     picture, the pills, the panel and the type are the same objects they are in
-     a column card.
+     card's own styling is untouched: this sets the axis, the split and the
+     order, and the picture, the pills, the panel and the type are the same
+     objects they are in a column card.
 
-     Desktop only, below 990px the row falls back to the plain grid — a feature
-     that is the full width of a phone is just a card. */
+     `row-reverse` rather than an `order` on the two halves: it reverses the
+     painting order only, so the picture and the panel keep their place in the
+     document and a keyboard still reaches the title before the read-more.
+
+     Desktop only, below 990px the row falls back to the plain grid — a list
+     card that is the full width of a phone is just a card. */
   @media screen and (min-width: 990px) {
     .article-grid--editorial {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
-    .article-grid--editorial > .article-grid__item:nth-child(3n + 1) {
+    .article-grid--editorial > .article-grid__item:nth-child(4n + 1) {
       grid-column: 1 / -1;
     }
 
-    .article-grid--editorial > .article-grid__item:nth-child(3n + 1) > .article-card-block {
+    /* `stretch`, not `center`: the panel is a box with its own background and
+       border, and a list card whose picture is 400px tall and whose panel is
+       160px reads as a card with something missing beside it. See the
+       `block-size: 100%` on the panel below — the two say the same thing from
+       either end, and the pair of them is what a three-column card must not
+       get, because there the panel's height is the row's business. */
+    .article-grid--editorial > .article-grid__item:nth-child(4n + 1) > .article-card-block {
       flex-direction: row;
-      align-items: center;
+      align-items: stretch;
+    }
+
+    .article-grid--editorial > .article-grid__item:nth-child(8n + 5) > .article-card-block {
+      flex-direction: row-reverse;
     }
 
     .article-grid--editorial
-      > .article-grid__item:nth-child(3n + 1)
+      > .article-grid__item:nth-child(4n + 1)
       > .article-card-block
       > .article-image-block {
       flex: 0 0 var(--article-card-media, 55%);
@@ -10365,11 +10380,12 @@ swiper-carousel {
     }
 
     .article-grid--editorial
-      > .article-grid__item:nth-child(3n + 1)
+      > .article-grid__item:nth-child(4n + 1)
       > .article-card-block
       > .article-content-block {
       flex: 1 1 auto;
       min-inline-size: 0;
+      block-size: 100%;
     }
 
     /* ---- the rules ----
@@ -10380,10 +10396,11 @@ swiper-carousel {
        separates stops reading as a separation. Half the gap up, and it lands in
        the middle of the space that is already there.
 
-       A border also cannot cross the column gap. The pair's rule has to run
-       unbroken across the full width — two rules with a hole between them is
-       the thing a reader notices — so each half of the pair reaches into the
-       gap from its own side and the two meet in the middle. */
+       A border also cannot cross the column gap. A row's rule has to run
+       unbroken across the full width — three rules with two holes in them is
+       the thing a reader notices — so each card in a row of three reaches into
+       the gaps it touches and the ends meet in the middle. The list card spans
+       every track already, so it reaches nowhere and keeps the plain inset. */
     .article-grid--editorial > .article-grid__item {
       position: relative;
     }
@@ -10397,17 +10414,23 @@ swiper-carousel {
       background-color: var(--color-border);
     }
 
-    .article-grid--editorial > .article-grid__item:nth-child(3n + 2)::before {
+    .article-grid--editorial > .article-grid__item:nth-child(4n + 2)::before {
       inset-inline-end: calc(var(--grid-gap-x, 0px) / -2);
     }
 
-    .article-grid--editorial > .article-grid__item:nth-child(3n + 3)::before {
+    .article-grid--editorial > .article-grid__item:nth-child(4n + 3)::before {
+      inset-inline: calc(var(--grid-gap-x, 0px) / -2);
+    }
+
+    .article-grid--editorial > .article-grid__item:nth-child(4n + 4)::before {
       inset-inline-start: calc(var(--grid-gap-x, 0px) / -2);
     }
 
-    /* And the one between the pair. Only the right-hand card draws it, so a
-       trailing article with no partner leaves no rule hanging beside it. */
-    .article-grid--editorial > .article-grid__item:nth-child(3n + 3)::after {
+    /* And the two between the three. Each card draws the rule on its own
+       leading edge, so the first column draws none and a row that stops short
+       of three leaves nothing hanging past its last card. */
+    .article-grid--editorial > .article-grid__item:nth-child(4n + 3)::after,
+    .article-grid--editorial > .article-grid__item:nth-child(4n + 4)::after {
       content: '';
       position: absolute;
       inset-block: 0;
@@ -10451,7 +10474,7 @@ swiper-carousel {
      of setting the panel's width from its longest word. */
   .article-card-block--row {
     flex-direction: row;
-    align-items: center;
+    align-items: stretch;
   }
 
   .article-card-block--row > .article-image-block {
@@ -10459,9 +10482,15 @@ swiper-carousel {
     min-inline-size: 0;
   }
 
+  /* Full height beside the picture. The panel carries its own background,
+     border and radius, so a short one floating against a tall photograph reads
+     as a card that failed to fill rather than as a deliberate shape. A column
+     card keeps `flex: 1 1 auto` on its own — there the panel's height is what
+     levels a row of cards, and pinning it to 100% would take that away. */
   .article-card-block--row > .article-content-block {
     flex: 1 1 auto;
     min-inline-size: 0;
+    block-size: 100%;
   }
 
   /* A phone has no room for the row: two 160px columns turn the title into one

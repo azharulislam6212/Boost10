@@ -100,6 +100,22 @@
 
   assign featured = s.blog
   assign limit = s.articles_to_show | default: 6 | plus: 0
+
+  comment
+    Editorial counts in fours — one list card and a row of three — so it brings
+    its own count rather than sharing the grid's. Six articles in this layout is
+    a cycle and a half: a list card, three across, and a second list card with
+    nothing under it. Eight is two whole cycles, which is why it is the default
+    and why the setting is its own.
+
+    A merchant who has already set six for a grid does not have that number
+    moved out from under them when they try the layout, which one shared setting
+    with a switched default would do.
+  endcomment
+  if s.layout == 'editorial'
+    assign limit = s.articles_to_show_editorial | default: 8 | plus: 0
+  endif
+
   assign desktop = s.columns_desktop | default: 3 | plus: 0
 
   comment
@@ -183,10 +199,10 @@
 
     Three types, two answers. `grid` and `editorial` are both a CSS grid as far
     as the shell is concerned — editorial is the same grid running a repeating
-    magazine pattern, one full-width feature then a pair, which `base.css` draws
-    off `nth-child(3n + 1)` — so only `carousel` reaches `data-layout`. Anything
-    else here would make the component try to build a Swiper out of a layout
-    that is not one.
+    magazine pattern, a full-width list card then three across, which `base.css`
+    draws off `nth-child(4n + 1)` and mirrors on `8n + 5` — so only `carousel`
+    reaches `data-layout`. Anything else here would make the component try to
+    build a Swiper out of a layout that is not one.
   endcomment
   assign layout_type = s.layout | default: 'carousel'
 
@@ -502,7 +518,19 @@
       "min": 2,
       "max": 16,
       "step": 1,
-      "default": 6
+      "default": 6,
+      "visible_if": "{{ section.settings.layout != 'editorial' }}"
+    },
+    {
+      "type": "range",
+      "id": "articles_to_show_editorial",
+      "label": "t:sections.featured_blog.settings.articles_to_show.label",
+      "info": "t:sections.featured_blog.settings.articles_to_show_editorial.info",
+      "min": 4,
+      "max": 16,
+      "step": 4,
+      "default": 8,
+      "visible_if": "{{ section.settings.layout == 'editorial' }}"
     },
     {
       "type": "range",
