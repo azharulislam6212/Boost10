@@ -1,7 +1,15 @@
 {% doc %}
-  blocks/faq-row.liquid
+  blocks/accordion-row.liquid
 
-  One question and whatever answers it, inside a `<faq-accordion>`.
+  One row of an **Accordion** — a question, or any other short label, and
+  whatever answers it.
+
+  Nothing here is about FAQs. The block was called `faq-row` and lived beside a
+  `faq-accordion`, which read as a section-specific pair and kept merchants from
+  reaching for it anywhere else. It is a general disclosure row: shipping terms
+  under a product, a spec table on a landing page, a "what's included" list in a
+  footer column. `question` is still the setting id, because renaming a stored id
+  would empty the field on every row already published.
 
   ## The answer is blocks, not a rich text field
 
@@ -19,11 +27,10 @@
   ## Still a `<details>`
 
 
-  Same reasoning as `blocks/collapsible.liquid`: the disclosure is native, so the
-  answer is on the page with JavaScript off, `<summary>` is already a button with
-  an expanded state to a screen reader, and the browser's own in-page search
-  finds the text. Nothing here re-implements that with a `<button>` and an
-  `aria-expanded` of its own.
+  The disclosure is native, so the answer is on the page with JavaScript off,
+  `<summary>` is already a button with an expanded state to a screen reader, and
+  the browser's own in-page search finds the text. Nothing here re-implements
+  that with a `<button>` and an `aria-expanded` of its own.
 
   The open and close motion belongs to `<accordion-element>` in
   `assets/modules.js` — a measured WAAPI height animation that every other
@@ -125,7 +132,7 @@
                           settings › Typography
       Custom and colour   `snippets/block-typography.liquid`, which emits only
                           what a class cannot know
-      the consumption     `.faq-row__question` in `assets/base.css` reads those
+      the consumption     `.accordion-row__question` in `assets/base.css` reads those
                           properties, with its own values as the fallback
 
     Not `.block-text` itself. That class also sets `flex` and `inline-size`, and
@@ -133,15 +140,15 @@
     the icon and the toggle. The typography half is the part worth sharing; the
     layout half belongs to the row.
 
-    Same arrangement, same setting ids, as `blocks/collapsible.liquid` and
-    `blocks/_tab.liquid` — a merchant who has styled one has styled all three.
+    Same arrangement and the same setting ids as `blocks/_tab.liquid` — a
+    merchant who has styled a tab name has styled a question.
 
     `default` is the default, so a row saved before this existed emits no class
     that resolves and no declarations, and looks exactly as it did.
   endcomment
   assign preset = s.preset | default: 'default'
 
-  assign question_classes = 'faq-row__question block-text--' | append: preset
+  assign question_classes = 'accordion-row__question block-text--' | append: preset
   if s.color == 'gradient'
     assign question_classes = question_classes | append: ' block-text--gradient'
   endif
@@ -155,17 +162,17 @@
   {%- capture row_style -%}
     {%- render 'spacing', block: s, declarations: true -%}
     {%- if has_icon -%}
-      --faq-row-icon-size: {{ icon_size }}px;
-      --faq-row-icon-box: {{ icon_box }}px;
+      --accordion-row-icon-size: {{ icon_size }}px;
+      --accordion-row-icon-box: {{ icon_box }}px;
     {%- endif -%}
-    --faq-row-radius: {{ radius }}px;
+    --accordion-row-radius: {{ radius }}px;
     {%- if s.background_color != blank -%}
-      --faq-row-background: {{ s.background_color }};
+      --accordion-row-background: {{ s.background_color }};
     {%- endif -%}
     {%- if border_width > 0 -%}
-      --faq-row-border-width: {{ border_width }}px;
-      --faq-row-border-style: {{ border_style }};
-      --faq-row-border-color: {{ border_paint }};
+      --accordion-row-border-width: {{ border_width }}px;
+      --accordion-row-border-style: {{ border_style }};
+      --accordion-row-border-color: {{ border_paint }};
     {%- endif -%}
   {%- endcapture -%}
 
@@ -176,17 +183,17 @@
     nothing. The list cascades from the Accordion above it instead.
   {%- endcomment -%}
   <motion-effect
-    class="faq-row-motion"
+    class="accordion-row-motion"
     {% render 'motion-attrs', kind: 'text', block: s %}
   >
   <details
-    class="faq-row faq-row--toggle-{{ toggle }}{% if has_icon %} faq-row--has-icon{% endif %}"
+    class="accordion-row accordion-row--toggle-{{ toggle }}{% if has_icon %} accordion-row--has-icon{% endif %}"
     {% if s.open_by_default %}open data-default-open{% endif %}
     data-block-spacing
     style="{{ row_style | strip_newlines | strip }}"
     {{ block.shopify_attributes }}
   >
-    <summary class="faq-row__summary">
+    <summary class="accordion-row__summary">
       {%- if has_icon -%}
         {%- comment -%}
           No `aria-hidden` on the tile. `snippets/icon.liquid` already hides the
@@ -195,13 +202,13 @@
           into it. Each source keeps its own semantics, as in the Subheading
           block.
         {%- endcomment -%}
-        <span class="faq-row__icon">
+        <span class="accordion-row__icon">
           {%- if icon_source == 'image' -%}
             {% render 'image',
                image: s.icon_image,
                alt: s.icon_image_alt,
                sizes: '48px',
-               wrapper_class: 'faq-row__icon-image' %}
+               wrapper_class: 'accordion-row__icon-image' %}
           {%- else -%}
             {% render 'icon', icon: s.icon, size: icon_size %}
           {%- endif -%}
@@ -216,11 +223,11 @@
         Decorative. `<summary>` conveys the expanded state already, so labelling
         this would announce the same thing twice.
       {%- endcomment -%}
-      <span class="faq-row__toggle" aria-hidden="true">
+      <span class="accordion-row__toggle" aria-hidden="true">
         {%- if toggle == 'arrow' -%}
-          {% render 'icon', icon: 'chevron-down', size: 14, class: 'faq-row__chevron' %}
+          {% render 'icon', icon: 'chevron-down', size: 14, class: 'accordion-row__chevron' %}
         {%- else -%}
-          {% render 'icon', icon: 'plus', size: 14, class: 'faq-row__plus' %}
+          {% render 'icon', icon: 'plus', size: 14, class: 'accordion-row__plus' %}
         {%- endif -%}
       </span>
     </summary>
@@ -231,8 +238,8 @@
       `grid-template-rows` trick here would animate against that measurement and
       land with a visible jump.
     {%- endcomment -%}
-    <div class="faq-row__panel">
-      <div class="faq-row__answer">
+    <div class="accordion-row__panel">
+      <div class="accordion-row__answer">
         {% content_for 'blocks' %}
       </div>
     </div>
@@ -242,7 +249,7 @@
 
 {% schema %}
 {
-  "name": "t:blocks.faq_row.name",
+  "name": "t:blocks.accordion_row.name",
   "tag": null,
   "blocks": [
     { "type": "@theme" },
@@ -252,19 +259,19 @@
     {
       "type": "text",
       "id": "question",
-      "label": "t:blocks.faq_row.settings.question.label",
+      "label": "t:blocks.accordion_row.settings.question.label",
       "default": "How long does delivery take?"
     },
     {
       "type": "checkbox",
       "id": "open_by_default",
-      "label": "t:blocks.faq_row.settings.open_by_default.label",
-      "info": "t:blocks.faq_row.settings.open_by_default.info",
+      "label": "t:blocks.accordion_row.settings.open_by_default.label",
+      "info": "t:blocks.accordion_row.settings.open_by_default.info",
       "default": false
     },
 
     { "type": "header", "content": "t:blocks.subheading.headers.icon" },
-    { "type": "paragraph", "content": "t:blocks.faq_row.paragraphs.icon" },
+    { "type": "paragraph", "content": "t:blocks.accordion_row.paragraphs.icon" },
     {
       "type": "select",
       "id": "icon_source",
@@ -315,7 +322,7 @@
       "type": "select",
       "id": "icon_size",
       "label": "t:blocks.subheading.settings.icon_size.label",
-      "info": "t:blocks.faq_row.settings.icon_size.info",
+      "info": "t:blocks.accordion_row.settings.icon_size.info",
       "options": [
         { "value": "extra_small", "label": "t:shared.icon_size.options__1.label" },
         { "value": "small", "label": "t:shared.icon_size.options__2.label" },
@@ -461,13 +468,13 @@
       "type": "color",
       "id": "background_color",
       "label": "t:shared.background.color.label",
-      "info": "t:blocks.faq_row.settings.background_color.info"
+      "info": "t:blocks.accordion_row.settings.background_color.info"
     },
     {
       "type": "select",
       "id": "border_style",
       "label": "t:blocks.group.settings.border_style.label",
-      "info": "t:blocks.faq_row.settings.border_style.info",
+      "info": "t:blocks.accordion_row.settings.border_style.info",
       "options": [
         { "value": "none", "label": "t:shared.options.none" },
         { "value": "solid", "label": "t:shared.options.solid" },
@@ -504,16 +511,16 @@
       "default": 14
     },
 
-    { "type": "header", "content": "t:blocks.collapsible.headers.toggle" },
+    { "type": "header", "content": "t:blocks.accordion_row.headers.toggle" },
     {
       "type": "select",
       "id": "toggle_style",
-      "label": "t:blocks.collapsible.settings.toggle_style.label",
-      "info": "t:blocks.faq_row.settings.toggle_style.info",
+      "label": "t:blocks.accordion_row.settings.toggle_style.label",
+      "info": "t:blocks.accordion_row.settings.toggle_style.info",
       "options": [
-        { "value": "plus", "label": "t:blocks.collapsible.settings.toggle_style.options__1.label" },
-        { "value": "cross", "label": "t:blocks.collapsible.settings.toggle_style.options__3.label" },
-        { "value": "arrow", "label": "t:blocks.collapsible.settings.toggle_style.options__2.label" }
+        { "value": "plus", "label": "t:blocks.accordion_row.settings.toggle_style.options__1.label" },
+        { "value": "cross", "label": "t:blocks.accordion_row.settings.toggle_style.options__3.label" },
+        { "value": "arrow", "label": "t:blocks.accordion_row.settings.toggle_style.options__2.label" }
       ],
       "default": "plus"
     },
@@ -646,7 +653,7 @@
   ],
   "presets": [
     {
-      "name": "t:blocks.faq_row.name",
+      "name": "t:blocks.accordion_row.name",
       "blocks": [
         {
           "type": "text",

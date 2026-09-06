@@ -80,7 +80,19 @@ function nearestAccordion(element) {
  * which the stylesheet uses to remove the pointer cursor and the marker.
  */
 export class AccordionElement extends BaseComponent {
-  /** @type {WeakMap<HTMLDetailsElement, Animation>} */
+  /**
+   * What is running on an item, and which way it is going.
+   *
+   * The direction is the half that was missing. Without it `open()` and
+   * `close()` could only ask the DOM, and the DOM's answer during a close is
+   * "open" — `open` stays set until the animation lands. So a second click
+   * while a row was closing started a *second* close from the top, and a click
+   * on another row in single-open mode re-closed a row that was already on its
+   * way shut. Knowing the direction is what makes both a no-op and makes
+   * reversing mid-flight possible.
+   *
+   * @type {WeakMap<HTMLDetailsElement, {animation: Animation, fade: Animation|null, direction: 'open'|'close'}>}
+   */
   #animations = new WeakMap();
 
   /** @type {MediaQueryList|null} */
@@ -107,7 +119,12 @@ export class AccordionElement extends BaseComponent {
    * @param {HTMLDetailsElement} item
    */
   open(item) {
-    if (item.open) return;
+    const running = this.#animations.get(item);
+
+    if (running?.direction === 'open') return;
+    // `item.open` is still true through a close, so "already open" is only a
+    // reason to stop when nothing is closing it.
+    if (item.open && running?.direction !== 'close') return;
 
     if (this.dataset.single !== undefined && this.dataset.single !== 'false') {
       for (const other of this.#items()) {
@@ -123,6 +140,7 @@ export class AccordionElement extends BaseComponent {
    * @param {HTMLDetailsElement} item
    */
   close(item) {
+    if (this.#animations.get(item)?.direction === 'close') return;
     if (!item.open) return;
     this.#animateClose(item);
   }
@@ -261,10 +279,16 @@ export class AccordionElement extends BaseComponent {
     const panel = this.#panelOf(item);
     if (!panel || prefersReducedMotion()) return;
 
-    this.#animations.get(item)?.cancel();
+    // Where the row is *right now*, read before the running animation is
+    // cancelled — cancelling drops the fill and snaps the box back to its
+    // natural height, so a reversal measured after it would start from a
+    // height the customer never saw.
+    const running = this.#animations.get(item);
+    const from = running ? item.getBoundingClientRect().height : null;
+    running?.animation.cancel();
+    running?.fade?.cancel();
 
-    const summary = item.querySelector('summary');
-    const start = summary ? summary.offsetHeight : 0;
+    const start = from ?? this.#closedHeight(item);
     const end = item.offsetHeight;
 
     // The height is animated on the `<details>` itself, so for the whole of the
@@ -277,23 +301,96 @@ export class AccordionElement extends BaseComponent {
     // keyframes; it is set here and cleared when the animation settles.
     this.#clip(item, true);
 
-    const animation = item.animate(
-      [
-        { height: `${start}px`, opacity: 0.6 },
-        { height: `${end}px`, opacity: 1 },
-      ],
-      { duration: 280, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' }
+    this.#run(item, 'open', start, end, panel, 300, 'cubic-bezier(0.16, 1, 0.3, 1)');
+  }
+
+  /**
+   * The closed height of a row, measured exactly rather than guessed at.
+   *
+   * It used to be `summary.offsetHeight`, which is the summary's own box and
+   * not the row's: it misses the border and any padding the `<details>` carries
+   * of its own. The close animation therefore ended a few pixels short of where
+   * the row actually settles, and the last thing the customer saw was the row
+   * snapping back up to meet it — the jump.
+   *
+   * Hiding the panel gives the real number. `open` is deliberately left alone:
+   * toggling it would fire two `toggle` events per click and reset the panel's
+   * scroll position, and a closed `<details>` draws exactly the same box as an
+   * open one whose panel is `display: none`.
+   *
+   * @param {HTMLDetailsElement} item
+   * @returns {number}
+   * @private
+   */
+  #closedHeight(item) {
+    const panel = this.#panelOf(item);
+    if (!panel) return item.offsetHeight;
+
+    const previous = panel.style.display;
+    panel.style.display = 'none';
+    const height = item.offsetHeight;
+
+    if (previous) panel.style.display = previous;
+    else panel.style.removeProperty('display');
+
+    return height;
+  }
+
+  /**
+   * Run one height animation and own the cleanup after it.
+   *
+   * `fill: 'both'` is the whole reason this is shared. Without a fill the
+   * animated height is dropped the instant the animation finishes, and the
+   * `finished` promise resolves a microtask later — so a closing row painted
+   * one frame back at its full open height before `open = false` reached it.
+   * That frame is the jump. With the fill, the row holds the height it landed
+   * on until this method has changed the DOM under it and released the fill in
+   * that order.
+   *
+   * @param {HTMLDetailsElement} item
+   * @param {'open'|'close'} direction
+   * @param {number} start
+   * @param {number} end
+   * @param {HTMLElement} panel
+   * @param {number} duration
+   * @param {string} easing
+   * @private
+   */
+  #run(item, direction, start, end, panel, duration, easing) {
+    const animation = item.animate([{ height: `${start}px` }, { height: `${end}px` }], {
+      duration,
+      easing,
+      fill: 'both',
+    });
+
+    // The fade is on the panel, not on the `<details>`. Fading the whole row
+    // took the question with it, so every toggle dimmed the one line that
+    // should stay put. It also runs short of the height so the answer has
+    // arrived before the box stops moving.
+    const fade = panel.animate(
+      direction === 'open' ? [{ opacity: 0 }, { opacity: 1 }] : [{ opacity: 1 }, { opacity: 0 }],
+      { duration: Math.round(duration * 0.7), easing: 'ease-out', fill: 'both' }
     );
 
-    this.#animations.set(item, animation);
+    this.#animations.set(item, { animation, fade, direction });
+
     animation.finished
       .then(() => {
+        // Another click already took the row over; that animation owns the
+        // element and its cleanup now.
+        if (this.#animations.get(item)?.animation !== animation) return;
+        this.#animations.delete(item);
+
+        if (direction === 'close') item.open = false;
+
+        animation.cancel();
+        fade.cancel();
         item.style.removeProperty('height');
         this.#clip(item, false);
       })
       .catch(() => {
-        // Cancelled: the next animation is already clipping the element and
-        // owns the cleanup.
+        // Cancelled by a reversal. The animation that replaced this one is
+        // already clipping the element and owns the cleanup.
       });
   }
 
@@ -336,40 +433,26 @@ export class AccordionElement extends BaseComponent {
    */
   #animateClose(item) {
     const panel = this.#panelOf(item);
-    const summary = item.querySelector('summary');
 
     if (!panel || prefersReducedMotion()) {
       item.open = false;
       return;
     }
 
-    this.#animations.get(item)?.cancel();
+    const running = this.#animations.get(item);
+    const from = running ? item.getBoundingClientRect().height : null;
+    running?.animation.cancel();
+    running?.fade?.cancel();
 
-    const start = item.offsetHeight;
-    const end = summary ? summary.offsetHeight : 0;
+    const start = from ?? item.offsetHeight;
+    const end = this.#closedHeight(item);
 
     this.#clip(item, true);
 
-    const animation = item.animate(
-      [
-        { height: `${start}px`, opacity: 1 },
-        { height: `${end}px`, opacity: 0.6 },
-      ],
-      { duration: 220, easing: 'cubic-bezier(0.76, 0, 0.24, 1)' }
-    );
-
-    this.#animations.set(item, animation);
-
-    animation.finished
-      .then(() => {
-        item.open = false;
-        item.style.removeProperty('height');
-        this.#clip(item, false);
-      })
-      .catch(() => {
-        // Cancelled because the customer clicked again mid-animation. The next
-        // animation owns the element now, so leave its state alone.
-      });
+    // Decelerating into the closed state rather than accelerating out of it.
+    // The old ease-in-out spent its last frames moving fastest, which is what
+    // made a close read as a snap even when the arithmetic was right.
+    this.#run(item, 'close', start, end, panel, 260, 'cubic-bezier(0.33, 0, 0.2, 1)');
   }
 }
 
