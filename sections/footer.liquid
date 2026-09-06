@@ -117,9 +117,29 @@
     border, so that is what the test asks about.
   endcomment
   assign border_line = st.border_style | default: 'none'
-  assign border_width = 0
+
+  comment
+    One width per side rather than one for the box. The frame a merchant
+    actually wants here is usually a single rule — a hairline across the top
+    of the section, nothing down the sides — and a single slider could only
+    ever draw all four or none.
+
+    They are summed into `border_any` so the properties are emitted only when
+    at least one side is drawn. A zero-width border with a colour on it is
+    three declarations that paint nothing.
+  endcomment
+  assign bw_top = 0
+  assign bw_right = 0
+  assign bw_bottom = 0
+  assign bw_left = 0
+  assign border_any = 0
+
   if border_line != 'none'
-    assign border_width = st.border_width | default: 1 | plus: 0
+    assign bw_top = st.border_width_top | default: 0 | plus: 0
+    assign bw_right = st.border_width_right | default: 0 | plus: 0
+    assign bw_bottom = st.border_width_bottom | default: 0 | plus: 0
+    assign bw_left = st.border_width_left | default: 0 | plus: 0
+    assign border_any = bw_top | plus: bw_right | plus: bw_bottom | plus: bw_left
 
     comment
       Opacity goes into the colour, not onto the element: `opacity` on the
@@ -158,29 +178,19 @@
     policy row at all, which is a section setting rather than a block.
   endcomment
   comment
-    ---- corners, per breakpoint ----
+    ---- corners ----
 
-    Four values assembled into one `border-radius` shorthand here rather than in
-    CSS, because a shorthand cannot be built from four custom properties without
-    four fallbacks that would each have to repeat the default.
+    One radius, twice: the desktop shape and the phone's. Four per-corner
+    sliders were the shape before this, and eight controls for a decision that
+    is nearly always "round the box by this much" is seven too many.
 
-    A phone gets its own four. A 40px shoulder that reads as a soft lift on a
-    1400px footer is a third of the width of a 390px screen, and merchants were
-    left choosing one number for two very different shapes.
-
-    `| default:` against the desktop value rather than a constant, so a footer
-    saved before these settings existed keeps one radius at every width instead
-    of squaring off at 749px for a reason the merchant never chose.
+    A phone gets its own number because the same one does not read the same at
+    both widths — 40px is a soft lift across 1400px and a heavy scoop out of a
+    390px screen. `| default: radius` rather than a constant, so a section
+    saved before the mobile slider existed keeps one shape at every width.
   endcomment
-  assign radius_tl = st.radius_top_left | default: 0 | plus: 0
-  assign radius_tr = st.radius_top_right | default: 0 | plus: 0
-  assign radius_br = st.radius_bottom_right | default: 0 | plus: 0
-  assign radius_bl = st.radius_bottom_left | default: 0 | plus: 0
-
-  assign radius_tl_mobile = st.radius_top_left_mobile | default: radius_tl | plus: 0
-  assign radius_tr_mobile = st.radius_top_right_mobile | default: radius_tr | plus: 0
-  assign radius_br_mobile = st.radius_bottom_right_mobile | default: radius_br | plus: 0
-  assign radius_bl_mobile = st.radius_bottom_left_mobile | default: radius_bl | plus: 0
+  assign radius = st.border_radius | default: 40 | plus: 0
+  assign radius_mobile = st.border_radius_mobile | default: radius | plus: 0
 
   assign columns_id = 'FooterColumns-' | append: section.id
 
@@ -203,16 +213,12 @@
 -%}
 
 {%- capture footer_styles -%}
-  --footer-radius: {{ radius_tl }}px {{ radius_tr }}px {{ radius_br }}px {{ radius_bl }}px;
-  --footer-radius-mobile:
-    {{ radius_tl_mobile }}px
-    {{ radius_tr_mobile }}px
-    {{ radius_br_mobile }}px
-    {{ radius_bl_mobile }}px;
+  --footer-radius: {{ radius }}px;
+  --footer-radius-mobile: {{ radius_mobile }}px;
   --footer-margin-block-start: {{ st.margin_top | default: 0 }}px;
   --footer-margin-block-end: {{ st.margin_bottom | default: 0 }}px;
-  {%- if border_width > 0 -%}
-    --footer-border-width: {{ border_width }}px;
+  {%- if border_any > 0 -%}
+    --footer-border-width: {{ bw_top }}px {{ bw_right }}px {{ bw_bottom }}px {{ bw_left }}px;
     --footer-border-style: {{ border_line }};
     --footer-border-color: {{ border_paint }};
   {%- endif -%}
@@ -541,17 +547,51 @@
           "label": "t:shared.border.style.options__2.label"
         }
       ],
-      "default": "none"
+      "default": "dashed"
     },
     {
       "type": "range",
-      "id": "border_width",
-      "label": "t:blocks.group.settings.border_width.label",
+      "id": "border_width_top",
+      "label": "t:shared.border.sides.top.label",
+      "info": "t:shared.border.sides.info",
       "min": 0,
       "max": 12,
       "step": 1,
       "unit": "px",
       "default": 1,
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_width_right",
+      "label": "t:shared.border.sides.right.label",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_width_bottom",
+      "label": "t:shared.border.sides.bottom.label",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_width_left",
+      "label": "t:shared.border.sides.left.label",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 0,
       "visible_if": "{{ section.settings.border_style != 'none' }}"
     },
     {
@@ -573,105 +613,27 @@
     },
     {
       "type": "header",
-      "content": "t:sections.footer.headers.corners"
-    },
-    {
-      "type": "select",
-      "id": "radius_device",
-      "label": "t:shared.spacing.devices.label",
-      "options": [
-        { "value": "desktop", "label": "t:shared.spacing.devices.options__1.label" },
-        { "value": "mobile", "label": "t:shared.spacing.devices.options__2.label" }
-      ],
-      "default": "desktop"
+      "content": "t:shared.corners.header"
     },
     {
       "type": "range",
-      "id": "radius_top_left",
-      "label": "t:sections.footer.settings.radius_top_left.label",
+      "id": "border_radius",
+      "label": "t:shared.corners.radius.label",
       "min": 0,
       "max": 80,
       "step": 2,
       "unit": "px",
-      "default": 40,
-      "visible_if": "{{ section.settings.radius_device == 'desktop' }}"
+      "default": 40
     },
     {
       "type": "range",
-      "id": "radius_top_right",
-      "label": "t:sections.footer.settings.radius_top_right.label",
+      "id": "border_radius_mobile",
+      "label": "t:shared.corners.radius_mobile.label",
       "min": 0,
       "max": 80,
       "step": 2,
       "unit": "px",
-      "default": 40,
-      "visible_if": "{{ section.settings.radius_device == 'desktop' }}"
-    },
-    {
-      "type": "range",
-      "id": "radius_bottom_left",
-      "label": "t:sections.footer.settings.radius_bottom_left.label",
-      "min": 0,
-      "max": 80,
-      "step": 2,
-      "unit": "px",
-      "default": 0,
-      "visible_if": "{{ section.settings.radius_device == 'desktop' }}"
-    },
-    {
-      "type": "range",
-      "id": "radius_bottom_right",
-      "label": "t:sections.footer.settings.radius_bottom_right.label",
-      "min": 0,
-      "max": 80,
-      "step": 2,
-      "unit": "px",
-      "default": 0,
-      "visible_if": "{{ section.settings.radius_device == 'desktop' }}"
-    },
-    {
-      "type": "range",
-      "id": "radius_top_left_mobile",
-      "label": "t:sections.footer.settings.radius_top_left.label",
-      "min": 0,
-      "max": 80,
-      "step": 2,
-      "unit": "px",
-      "default": 24,
-      "visible_if": "{{ section.settings.radius_device == 'mobile' }}"
-    },
-    {
-      "type": "range",
-      "id": "radius_top_right_mobile",
-      "label": "t:sections.footer.settings.radius_top_right.label",
-      "min": 0,
-      "max": 80,
-      "step": 2,
-      "unit": "px",
-      "default": 24,
-      "visible_if": "{{ section.settings.radius_device == 'mobile' }}"
-    },
-    {
-      "type": "range",
-      "id": "radius_bottom_left_mobile",
-      "label": "t:sections.footer.settings.radius_bottom_left.label",
-      "min": 0,
-      "max": 80,
-      "step": 2,
-      "unit": "px",
-      "default": 0,
-      "visible_if": "{{ section.settings.radius_device == 'mobile' }}"
-    },
-    {
-      "type": "range",
-      "id": "radius_bottom_right_mobile",
-      "label": "t:sections.footer.settings.radius_bottom_right.label",
-      "min": 0,
-      "max": 80,
-      "step": 2,
-      "unit": "px",
-      "default": 0,
-      "visible_if": "{{ section.settings.radius_device == 'mobile' }}"
+      "default": 24
     },
     {
       "type": "header",

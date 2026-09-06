@@ -120,9 +120,29 @@
     the only value that means no border, so that is what is asked about.
   endcomment
   assign border_line = s.border_style | default: 'none'
-  assign border_width = 0
+
+  comment
+    One width per side rather than one for the box. The frame a merchant
+    actually wants here is usually a single rule — a hairline across the top
+    of the section, nothing down the sides — and a single slider could only
+    ever draw all four or none.
+
+    They are summed into `border_any` so the properties are emitted only when
+    at least one side is drawn. A zero-width border with a colour on it is
+    three declarations that paint nothing.
+  endcomment
+  assign bw_top = 0
+  assign bw_right = 0
+  assign bw_bottom = 0
+  assign bw_left = 0
+  assign border_any = 0
+
   if border_line != 'none'
-    assign border_width = s.border_width | default: 1 | plus: 0
+    assign bw_top = s.border_width_top | default: 0 | plus: 0
+    assign bw_right = s.border_width_right | default: 0 | plus: 0
+    assign bw_bottom = s.border_width_bottom | default: 0 | plus: 0
+    assign bw_left = s.border_width_left | default: 0 | plus: 0
+    assign border_any = bw_top | plus: bw_right | plus: bw_bottom | plus: bw_left
 
     assign border_percent = s.border_opacity | default: 100 | plus: 0
     if s.border_color == blank
@@ -134,15 +154,18 @@
   endif
 
   comment
-    The corner gets its own value per breakpoint. A radius chosen against a
-    section that runs the width of a desktop is the wrong radius on a 390px
-    screen, where the same number is a much larger share of the box.
+    ---- corners ----
 
-    `| default: radius` rather than a constant, so a section saved before the
-    mobile slider existed keeps one corner at every width instead of squaring
-    off at 749px for a reason the merchant never chose.
+    One radius, twice: the desktop shape and the phone's. Four per-corner
+    sliders were the shape before this, and eight controls for a decision that
+    is nearly always "round the box by this much" is seven too many.
+
+    A phone gets its own number because the same one does not read the same at
+    both widths — 40px is a soft lift across 1400px and a heavy scoop out of a
+    390px screen. `| default: radius` rather than a constant, so a section
+    saved before the mobile slider existed keeps one shape at every width.
   endcomment
-  assign radius = s.border_radius | default: 0 | plus: 0
+  assign radius = s.border_radius | default: 40 | plus: 0
   assign radius_mobile = s.border_radius_mobile | default: radius | plus: 0
   assign margin_top = s.margin_top | default: 0 | plus: 0
   assign margin_bottom = s.margin_bottom | default: 0 | plus: 0
@@ -262,8 +285,8 @@
   --faq-radius-mobile: {{ radius_mobile }}px;
   --faq-margin-block-start: {{ margin_top }}px;
   --faq-margin-block-end: {{ margin_bottom }}px;
-  {%- if border_width > 0 -%}
-    --faq-border-width: {{ border_width }}px;
+  {%- if border_any > 0 -%}
+    --faq-border-width: {{ bw_top }}px {{ bw_right }}px {{ bw_bottom }}px {{ bw_left }}px;
     --faq-border-style: {{ border_line }};
     --faq-border-color: {{ border_paint }};
   {%- endif -%}
@@ -584,17 +607,51 @@
           "label": "t:shared.border.style.options__2.label"
         }
       ],
-      "default": "none"
+      "default": "dashed"
     },
     {
       "type": "range",
-      "id": "border_width",
-      "label": "t:blocks.group.settings.border_width.label",
+      "id": "border_width_top",
+      "label": "t:shared.border.sides.top.label",
+      "info": "t:shared.border.sides.info",
       "min": 0,
       "max": 12,
       "step": 1,
       "unit": "px",
       "default": 1,
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_width_right",
+      "label": "t:shared.border.sides.right.label",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_width_bottom",
+      "label": "t:shared.border.sides.bottom.label",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_width_left",
+      "label": "t:shared.border.sides.left.label",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 0,
       "visible_if": "{{ section.settings.border_style != 'none' }}"
     },
     {
@@ -619,36 +676,24 @@
       "content": "t:shared.corners.header"
     },
     {
-      "type": "select",
-      "id": "radius_device",
-      "label": "t:shared.spacing.devices.label",
-      "options": [
-        { "value": "desktop", "label": "t:shared.spacing.devices.options__1.label" },
-        { "value": "mobile", "label": "t:shared.spacing.devices.options__2.label" }
-      ],
-      "default": "desktop"
-    },
-    {
       "type": "range",
       "id": "border_radius",
-      "label": "t:blocks.group.settings.border_radius.label",
+      "label": "t:shared.corners.radius.label",
       "min": 0,
-      "max": 60,
+      "max": 80,
       "step": 2,
       "unit": "px",
-      "default": 0,
-      "visible_if": "{{ section.settings.radius_device == 'desktop' }}"
+      "default": 40
     },
     {
       "type": "range",
       "id": "border_radius_mobile",
-      "label": "t:blocks.group.settings.border_radius.label",
+      "label": "t:shared.corners.radius_mobile.label",
       "min": 0,
-      "max": 60,
+      "max": 80,
       "step": 2,
       "unit": "px",
-      "default": 0,
-      "visible_if": "{{ section.settings.radius_device == 'mobile' }}"
+      "default": 24
     },
     {
       "type": "header",
