@@ -72,7 +72,38 @@
   endcomment
   assign gap_block = s.gap_vertical | default: 24 | plus: 0
   assign gap_block_mobile = s.gap_vertical_mobile | default: gap_block | plus: 0
+
+  comment
+    ## The tab name's typography rides in the template
+
+    The same three-part arrangement every text block in this theme uses — the
+    named presets are `.block-text--*` classes in `assets/base.css` pointing at
+    the tokens Theme settings › Typography writes, `block-typography` emits only
+    the Custom preset and the colour, and `.tabs__tab-label` in
+    `assets/header.css` reads the properties both of them set.
+
+    It works here for the same reason the icon does: `tabs.js` clones the
+    `<template>` into the button, and a clone carries its classes and its style
+    attribute with it. Nothing has to be handed across on a `data-` attribute.
+
+    Not `.block-text` itself — that class also sets `flex` and `inline-size`,
+    and this span is a run of words inside a button, not a box. The typography
+    is the part worth sharing.
+
+    `default` is the default, so a tab saved before this existed emits no class
+    that resolves and no declarations, and keeps the rail's own type.
+  endcomment
+  assign preset = s.preset | default: 'default'
+
+  assign label_classes = 'tabs__tab-label block-text--' | append: preset
+  if s.color == 'gradient'
+    assign label_classes = label_classes | append: ' block-text--gradient'
+  endif
 -%}
+
+{%- capture label_style -%}
+  {%- render 'block-typography', block: s -%}
+{%- endcapture -%}
 
 {%- capture panel_style -%}
   {%- render 'spacing', block: s, declarations: true -%}
@@ -100,7 +131,9 @@
     {%- if has_icon -%}
       <span class="tabs__tab-icon">{% render 'icon', icon: s.icon, size: icon_size %}</span>
     {%- endif -%}
-    <span class="tabs__tab-label">{{ label | escape }}</span>
+    <span class="{{ label_classes }}" style="{{ label_style | strip_newlines | strip }}">
+      {{- label | escape -}}
+    </span>
   </template>
 
   {%- comment -%}
@@ -218,6 +251,120 @@
       "unit": "px",
       "default": 16,
       "visible_if": "{{ block.settings.icon_source == 'icon' and block.settings.icon_size == 'custom' }}"
+    },
+
+    { "type": "header", "content": "t:shared.typography.header" },
+    { "type": "paragraph", "content": "t:shared.typography.paragraph" },
+    {
+      "type": "select", "id": "preset", "label": "t:shared.typography.preset.label", "info": "t:shared.typography.preset.info",
+      "options": [
+        { "value": "default", "label": "t:shared.typography.preset.options__1.label" },
+        { "value": "paragraph", "label": "t:shared.typography.preset.options__2.label" },
+        { "value": "subheading", "label": "t:shared.typography.preset.options__3.label" },
+        { "value": "h1", "label": "t:shared.typography.preset.options__4.label" },
+        { "value": "h2", "label": "t:shared.typography.preset.options__5.label" },
+        { "value": "h3", "label": "t:shared.typography.preset.options__6.label" },
+        { "value": "h4", "label": "t:shared.typography.preset.options__7.label" },
+        { "value": "h5", "label": "t:shared.typography.preset.options__8.label" },
+        { "value": "h6", "label": "t:shared.typography.preset.options__9.label" },
+        { "value": "custom", "label": "t:shared.typography.preset.options__10.label" }
+      ],
+      "default": "default"
+    },
+    {
+      "type": "select", "id": "font_family", "label": "t:shared.typography.font_family.label",
+      "options": [
+        { "value": "body", "label": "t:shared.typography.font_family.options__2.label" },
+        { "value": "heading", "label": "t:shared.typography.font_family.options__1.label" },
+        { "value": "accent", "label": "t:shared.typography.font_family.options__3.label" }
+      ],
+      "default": "heading",
+      "visible_if": "{{ block.settings.preset == 'custom' }}"
+    },
+    {
+      "type": "select", "id": "font_weight", "label": "t:shared.typography.font_weight.label",
+      "options": [
+        { "value": "inherit", "label": "t:shared.typography.font_weight.options__1.label" },
+        { "value": "300", "label": "300" }, { "value": "400", "label": "400" },
+        { "value": "500", "label": "500" }, { "value": "600", "label": "600" },
+        { "value": "700", "label": "700" }, { "value": "800", "label": "800" },
+        { "value": "900", "label": "900" }
+      ],
+      "default": "inherit",
+      "visible_if": "{{ block.settings.preset == 'custom' }}"
+    },
+    {
+      "type": "select", "id": "font_size", "label": "t:shared.typography.font_size.label",
+      "options": [
+        { "value": "12", "label": "12px" }, { "value": "14", "label": "14px" },
+        { "value": "16", "label": "16px" }, { "value": "18", "label": "18px" },
+        { "value": "20", "label": "20px" }, { "value": "24", "label": "24px" },
+        { "value": "28", "label": "28px" }, { "value": "32", "label": "32px" },
+        { "value": "40", "label": "40px" }, { "value": "48", "label": "48px" }
+      ],
+      "default": "16",
+      "visible_if": "{{ block.settings.preset == 'custom' }}"
+    },
+    {
+      "type": "select", "id": "font_size_mobile", "label": "t:shared.typography.font_size_mobile.label", "info": "t:shared.typography.font_size_mobile.info",
+      "options": [
+        { "value": "12", "label": "12px" }, { "value": "13", "label": "13px" },
+        { "value": "14", "label": "14px" }, { "value": "15", "label": "15px" },
+        { "value": "16", "label": "16px" }, { "value": "18", "label": "18px" },
+        { "value": "20", "label": "20px" }, { "value": "24", "label": "24px" }
+      ],
+      "default": "15",
+      "visible_if": "{{ block.settings.preset == 'custom' }}"
+    },
+    {
+      "type": "select", "id": "line_height", "label": "t:shared.typography.line_height.label",
+      "options": [
+        { "value": "tight", "label": "t:shared.typography.line_height.options__1.label" },
+        { "value": "normal", "label": "t:shared.typography.line_height.options__2.label" },
+        { "value": "loose", "label": "t:shared.typography.line_height.options__3.label" }
+      ],
+      "default": "normal",
+      "visible_if": "{{ block.settings.preset == 'custom' }}"
+    },
+    {
+      "type": "select", "id": "letter_spacing", "label": "t:shared.typography.letter_spacing.label",
+      "options": [
+        { "value": "tight", "label": "t:shared.typography.letter_spacing.options__1.label" },
+        { "value": "normal", "label": "t:shared.typography.letter_spacing.options__2.label" },
+        { "value": "wide", "label": "t:shared.typography.letter_spacing.options__3.label" }
+      ],
+      "default": "normal",
+      "visible_if": "{{ block.settings.preset == 'custom' }}"
+    },
+    {
+      "type": "select", "id": "text_transform", "label": "t:shared.typography.text_transform.label",
+      "options": [
+        { "value": "inherit", "label": "t:shared.typography.text_transform.options__1.label" },
+        { "value": "none", "label": "t:shared.typography.text_transform.options__2.label" },
+        { "value": "capitalize", "label": "t:shared.typography.text_transform.options__3.label" },
+        { "value": "uppercase", "label": "t:shared.typography.text_transform.options__4.label" },
+        { "value": "lowercase", "label": "t:shared.typography.text_transform.options__5.label" }
+      ],
+      "default": "inherit",
+      "visible_if": "{{ block.settings.preset == 'custom' }}"
+    },
+    {
+      "type": "select", "id": "color", "label": "t:shared.typography.color.label", "info": "t:shared.typography.color.info",
+      "options": [
+        { "value": "inherit", "label": "t:shared.typography.color.options__1.label" },
+        { "value": "muted", "label": "t:shared.typography.color.options__2.label" },
+        { "value": "custom", "label": "t:shared.typography.color.options__3.label" },
+        { "value": "gradient", "label": "t:shared.typography.color.options__4.label" }
+      ],
+      "default": "inherit"
+    },
+    {
+      "type": "color", "id": "text_color_custom", "label": "t:shared.typography.text_color.label", "info": "t:shared.typography.text_color.info",
+      "visible_if": "{{ block.settings.color == 'custom' }}"
+    },
+    {
+      "type": "color_background", "id": "text_gradient", "label": "t:shared.typography.text_gradient.label", "info": "t:shared.typography.text_gradient.info",
+      "visible_if": "{{ block.settings.color == 'gradient' }}"
     },
 
     { "type": "header", "content": "t:shared.animation.header" },

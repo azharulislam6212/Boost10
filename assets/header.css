@@ -1392,6 +1392,55 @@ a.menu-promo:hover .menu-promo__cta svg {
   outline-offset: -2px;
 }
 
+/* The tab name reads the same `--block-font-*` properties every text block in
+   the theme reads — the named presets are `.block-text--*` classes in
+   `base.css` pointing at the Theme settings › Typography tokens, and only the
+   Custom preset and the colour come through Liquid. `blocks/_tab.liquid` puts
+   the class and the style attribute on this span inside its `<template>`, and
+   `tabs.js` clones both into the button.
+
+   Every fallback is `inherit`, which is the button's own font above — so a tab
+   left on the Default preset renders exactly as it did before any of this, and
+   the icon beside it keeps its own size either way.
+
+   `.block-text` itself is not on the span: it sets `flex` and `inline-size`,
+   and this is a run of words inside a button, not a box. */
+.tabs__tab-label {
+  font-family: var(--block-font-family, inherit);
+  font-size: var(--block-font-size, inherit);
+  font-weight: var(--block-font-weight, inherit);
+  line-height: var(--block-line-height, inherit);
+  letter-spacing: var(--block-letter-spacing, inherit);
+  text-transform: var(--block-text-transform, inherit);
+  color: var(--block-text-color, inherit);
+}
+
+/* A rule and not a second inline declaration: an inline `font-size` beats every
+   stylesheet, and a style attribute cannot carry a breakpoint. */
+@media screen and (max-width: 749px) {
+  .tabs__tab-label {
+    font-size: var(--block-font-size-mobile, var(--block-font-size, inherit));
+  }
+}
+
+/* Gradient text is `background-image` plus a transparent colour, and the pair
+   has to land on the element holding the words. The Text block's rule aims at
+   the tags inside its rich text; a tab name is one bare span, so it clips the
+   gradient itself. */
+.tabs__tab-label.block-text--gradient {
+  background-image: var(--block-text-gradient, var(--gradient-primary));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@media (forced-colors: active) {
+  .tabs__tab-label.block-text--gradient {
+    background-image: none;
+    color: CanvasText;
+  }
+}
+
 /* The ring is inset, like the tab buttons' own two lines above.
  *
  * It used to sit 4px outside the panel, and the panel fills its container

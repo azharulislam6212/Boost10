@@ -41,7 +41,41 @@
   endif
 
   assign toggle = block.settings.toggle_style | default: 'plus'
+
+  comment
+    ## The question's typography is the theme's, by reference
+
+    Same three-part arrangement every text block in this theme uses, and no
+    fourth copy of the type map:
+
+      the named presets   `.block-text--h4` and its eight siblings in
+                          `assets/base.css`, which point `--block-font-*` at the
+                          tokens `css-variables.liquid` writes from Theme
+                          settings › Typography
+      Custom and colour   `snippets/block-typography.liquid`, which emits only
+                          what a class cannot know
+      the consumption     `.collapsible__heading` in `assets/base.css` reads
+                          those properties, with its own values as the fallback
+
+    What it does *not* do is carry `.block-text` itself. That class also sets
+    `flex` and `inline-size`, and this span is already a flex item of the
+    summary row with a size the row decided. The typography half is the part
+    worth sharing; the layout half belongs to the row.
+
+    `default` is the default, so a row saved before any of this existed emits
+    no class that resolves and no declarations, and looks exactly as it did.
+  endcomment
+  assign preset = block.settings.preset | default: 'default'
+
+  assign heading_classes = 'collapsible__heading block-text--' | append: preset
+  if block.settings.color == 'gradient'
+    assign heading_classes = heading_classes | append: ' block-text--gradient'
+  endif
 -%}
+
+{%- capture heading_style -%}
+  {%- render 'block-typography', block: block.settings -%}
+{%- endcapture -%}
 
 {%- if heading != blank -%}
   <details
@@ -59,7 +93,9 @@
         {% render 'icon', icon: block.settings.icon, size: 18, class: 'collapsible__icon' %}
       {%- endif -%}
 
-      <span class="collapsible__heading">{{ heading }}</span>
+      <span class="{{ heading_classes }}" style="{{ heading_style | strip_newlines | strip }}">
+        {{- heading -}}
+      </span>
 
       {%- comment -%}
         The toggle is decorative. `<summary>` already conveys expanded state to
@@ -125,6 +161,122 @@
       ],
       "default": "start",
       "visible_if": "{{ block.settings.icon != 'none' }}"
+    },
+
+    { "type": "header", "content": "t:shared.typography.header" },
+    { "type": "paragraph", "content": "t:shared.typography.paragraph" },
+    {
+      "type": "select", "id": "preset", "label": "t:shared.typography.preset.label", "info": "t:shared.typography.preset.info",
+      "options": [
+        { "value": "default", "label": "t:shared.typography.preset.options__1.label" },
+        { "value": "paragraph", "label": "t:shared.typography.preset.options__2.label" },
+        { "value": "subheading", "label": "t:shared.typography.preset.options__3.label" },
+        { "value": "h1", "label": "t:shared.typography.preset.options__4.label" },
+        { "value": "h2", "label": "t:shared.typography.preset.options__5.label" },
+        { "value": "h3", "label": "t:shared.typography.preset.options__6.label" },
+        { "value": "h4", "label": "t:shared.typography.preset.options__7.label" },
+        { "value": "h5", "label": "t:shared.typography.preset.options__8.label" },
+        { "value": "h6", "label": "t:shared.typography.preset.options__9.label" },
+        { "value": "custom", "label": "t:shared.typography.preset.options__10.label" }
+      ],
+      "default": "default"
+    },
+    {
+      "type": "select", "id": "font_family", "label": "t:shared.typography.font_family.label",
+      "options": [
+        { "value": "body", "label": "t:shared.typography.font_family.options__2.label" },
+        { "value": "heading", "label": "t:shared.typography.font_family.options__1.label" },
+        { "value": "accent", "label": "t:shared.typography.font_family.options__3.label" }
+      ],
+      "default": "body",
+      "visible_if": "{{ block.settings.preset == 'custom' }}"
+    },
+    {
+      "type": "select", "id": "font_weight", "label": "t:shared.typography.font_weight.label",
+      "options": [
+        { "value": "inherit", "label": "t:shared.typography.font_weight.options__1.label" },
+        { "value": "300", "label": "300" }, { "value": "400", "label": "400" },
+        { "value": "500", "label": "500" }, { "value": "600", "label": "600" },
+        { "value": "700", "label": "700" }, { "value": "800", "label": "800" },
+        { "value": "900", "label": "900" }
+      ],
+      "default": "inherit",
+      "visible_if": "{{ block.settings.preset == 'custom' }}"
+    },
+    {
+      "type": "select", "id": "font_size", "label": "t:shared.typography.font_size.label",
+      "options": [
+        { "value": "12", "label": "12px" }, { "value": "14", "label": "14px" },
+        { "value": "16", "label": "16px" }, { "value": "18", "label": "18px" },
+        { "value": "20", "label": "20px" }, { "value": "24", "label": "24px" },
+        { "value": "28", "label": "28px" }, { "value": "32", "label": "32px" },
+        { "value": "40", "label": "40px" }, { "value": "48", "label": "48px" },
+        { "value": "56", "label": "56px" }, { "value": "64", "label": "64px" }
+      ],
+      "default": "18",
+      "visible_if": "{{ block.settings.preset == 'custom' }}"
+    },
+    {
+      "type": "select", "id": "font_size_mobile", "label": "t:shared.typography.font_size_mobile.label", "info": "t:shared.typography.font_size_mobile.info",
+      "options": [
+        { "value": "12", "label": "12px" }, { "value": "13", "label": "13px" },
+        { "value": "14", "label": "14px" }, { "value": "15", "label": "15px" },
+        { "value": "16", "label": "16px" }, { "value": "18", "label": "18px" },
+        { "value": "20", "label": "20px" }, { "value": "24", "label": "24px" },
+        { "value": "28", "label": "28px" }, { "value": "32", "label": "32px" }
+      ],
+      "default": "16",
+      "visible_if": "{{ block.settings.preset == 'custom' }}"
+    },
+    {
+      "type": "select", "id": "line_height", "label": "t:shared.typography.line_height.label",
+      "options": [
+        { "value": "tight", "label": "t:shared.typography.line_height.options__1.label" },
+        { "value": "normal", "label": "t:shared.typography.line_height.options__2.label" },
+        { "value": "loose", "label": "t:shared.typography.line_height.options__3.label" }
+      ],
+      "default": "normal",
+      "visible_if": "{{ block.settings.preset == 'custom' }}"
+    },
+    {
+      "type": "select", "id": "letter_spacing", "label": "t:shared.typography.letter_spacing.label",
+      "options": [
+        { "value": "tight", "label": "t:shared.typography.letter_spacing.options__1.label" },
+        { "value": "normal", "label": "t:shared.typography.letter_spacing.options__2.label" },
+        { "value": "wide", "label": "t:shared.typography.letter_spacing.options__3.label" }
+      ],
+      "default": "normal",
+      "visible_if": "{{ block.settings.preset == 'custom' }}"
+    },
+    {
+      "type": "select", "id": "text_transform", "label": "t:shared.typography.text_transform.label",
+      "options": [
+        { "value": "inherit", "label": "t:shared.typography.text_transform.options__1.label" },
+        { "value": "none", "label": "t:shared.typography.text_transform.options__2.label" },
+        { "value": "capitalize", "label": "t:shared.typography.text_transform.options__3.label" },
+        { "value": "uppercase", "label": "t:shared.typography.text_transform.options__4.label" },
+        { "value": "lowercase", "label": "t:shared.typography.text_transform.options__5.label" }
+      ],
+      "default": "inherit",
+      "visible_if": "{{ block.settings.preset == 'custom' }}"
+    },
+    {
+      "type": "select", "id": "color", "label": "t:shared.typography.color.label", "info": "t:shared.typography.color.info",
+      "options": [
+        { "value": "inherit", "label": "t:shared.typography.color.options__1.label" },
+        { "value": "muted", "label": "t:shared.typography.color.options__2.label" },
+        { "value": "custom", "label": "t:shared.typography.color.options__3.label" },
+        { "value": "gradient", "label": "t:shared.typography.color.options__4.label" }
+      ],
+      "default": "inherit"
+    },
+    {
+      "type": "color", "id": "text_color_custom", "label": "t:shared.typography.text_color.label", "info": "t:shared.typography.text_color.info",
+      "visible_if": "{{ block.settings.color == 'custom' }}"
+    },
+    {
+      "type": "color_background", "id": "text_gradient", "label": "t:shared.typography.text_gradient.label", "info": "t:shared.typography.text_gradient.info",
+      "visible_if": "{{ block.settings.color == 'gradient' }}"
     },
 
     { "type": "header", "content": "t:blocks.collapsible.headers.behaviour" },
