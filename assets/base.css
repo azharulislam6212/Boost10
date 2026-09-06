@@ -7630,6 +7630,55 @@ sticky-header[data-transparent] .header__logo-image--transparent { opacity: 1; }
   pointer-events: none;
 }
 
+/* ---- disabled, without losing the ring ----
+
+   `opacity: 0.35` above fades the whole button, border included, and a 1px
+   frame at a third of its alpha stops being a frame: the arrow at the end of a
+   track read as a loose glyph floating where a button used to be, which is
+   worse than either a solid button or no button at all.
+
+   So the pair inside a nav or a controls bar dims its ink instead of its box.
+   The border is restored to full strength and the glyph is the thing that
+   fades, which is the same signal — this one is spent — drawn on the part that
+   carries meaning rather than on the part that carries the shape.
+
+   `opacity: 1` first, because the shared rule above still matches and it is the
+   whole-element fade that has to be undone before any of this is visible. */
+.carousel-nav .carousel-button--disabled,
+.carousel-controls .carousel-button--disabled {
+  opacity: 1;
+  border-color: var(--color-slider-arrow-border);
+  color: color-mix(in srgb, var(--color-slider-arrow-icon) 40%, transparent);
+}
+
+/* Filled. The disc *is* this style's emphasis, so it is what gives way — down
+   to a tint of itself rather than to nothing, so the button keeps its weight in
+   the row. The border holds the outline the fill is no longer drawing, and the
+   glyph stays the background colour it has always been, because it is still
+   sitting on a fill and inverting it here would flip it to invisible. */
+.carousel-nav .carousel-button--solid.carousel-button--disabled,
+.carousel-controls .carousel-button--solid.carousel-button--disabled {
+  border-color: var(--color-slider-arrow-icon);
+  background-color: color-mix(in srgb, var(--color-slider-arrow-icon) 30%, transparent);
+  color: var(--color-slider-arrow-background);
+}
+
+/* No disc means no ring to protect. There is nothing here but the glyph, so the
+   plain fade is the right one and the rules above are handed back.
+
+   The doubled class is carrying the same weight as the `--solid` rule above it,
+   the way `.carousel-nav--bg-none .carousel-button` already outweighs
+   `.carousel-button--solid`: Icon background "None" wins over the arrow style
+   in every other state, and it has to keep winning in this one. Last of equals,
+   so it does. */
+.carousel-nav--bg-none .carousel-button--disabled.carousel-button,
+.carousel-controls--bg-none .carousel-button--disabled.carousel-button {
+  opacity: 0.35;
+  border-color: transparent;
+  background-color: transparent;
+  color: var(--color-slider-arrow-icon);
+}
+
 .carousel-button--locked {
   display: none;
 }
@@ -7749,6 +7798,11 @@ sticky-header[data-transparent] .header__logo-image--transparent { opacity: 1; }
    region.
    -------------------------------------------------------------------------- */
 
+/* The bar keeps the full row and the track inside it is what is bounded — see
+   `--carousel-progress-width` below. Capping the bar itself would have made the
+   alignment setting a second job (auto margins to place the box, plus
+   `justify-content` to place its parts); bounding only the part that wanted to
+   stretch leaves alignment doing the one thing it already did. */
 .carousel-controls {
   display: none;
   align-items: center;
@@ -7793,17 +7847,31 @@ sticky-header[data-transparent] .header__logo-image--transparent { opacity: 1; }
   color: var(--color-slider-indicator-active);
 }
 
-/* The total is quieter than the current position — it is context, not state, so
-   it takes the inactive half of the same pair. */
+/* Both numbers read as one string — "03 / 12" is a position, not a value and a
+   label — so the total takes the active colour too. The inactive half of the
+   pair dropped it far enough behind the current number that the pair stopped
+   looking like a pair.
+
+   Written out rather than deleted, even though it now matches the rule above:
+   this is the declaration to change when the two numbers should differ again,
+   and finding it here is the point of it. */
 .carousel-controls__count--total {
-  color: var(--color-slider-indicator);
+  color: var(--color-slider-indicator-active);
 }
 
+/* The track is the only part of the bar that stretches, so it is the only part
+   that has to be told when to stop. 40rem let it run the width of a wide
+   container and the fill read as a section divider rather than as a position;
+   24rem is a track you take in at a glance.
+
+   `flex: 1 1 auto` between a floor and a ceiling is what makes the bar size
+   itself: it grows to 24rem where there is room, gives way down to 6rem where
+   there is not, and the arrows and numbers around it never move. */
 .carousel-controls__progress {
   position: relative;
   flex: 1 1 auto;
   min-inline-size: 6rem;
-  max-inline-size: var(--carousel-progress-width, 40rem);
+  max-inline-size: var(--carousel-progress-width, 24rem);
   block-size: var(--carousel-progress-height, 6px);
   border-radius: var(--carousel-progress-radius, 0);
   background-color: var(--color-slider-indicator);
@@ -10254,25 +10322,98 @@ swiper-carousel {
 
   /* ---- editorial -------------------------------------------------------- */
 
-  /* One lead story with the rest around it, which is what a blog front page
-     looks like everywhere it is not a shop. Same grid, same cards — the first
-     item is told to span two tracks in each direction and the browser flows the
-     others into what is left, so nothing here knows how many articles there are.
+  /* A magazine run rather than one lead story: a full-width feature, then a
+     pair beside each other, then another feature, for as many articles as the
+     section shows. `3n + 1` is the whole rule — every third item starting at
+     the first is the wide one, and the two after it fall into the two tracks
+     left over. Nothing here counts articles, so 4 and 16 both come out right.
 
-     Desktop only. Two columns of a two-column grid is the whole width, so below
-     990px the span would be a no-op that still cost a rule; the row falls back
-     to the plain grid, which is the layout a phone wants anyway.
+     The old version spanned the first item two-by-two and let the browser flow
+     the rest around it. That is a different picture: it makes one hero and a
+     sidebar, and the pattern stops after the first row. This repeats.
 
-     `grid-auto-rows: 1fr` is what keeps the stacked cards beside the lead the
-     same height as each other rather than each sized by its own text. */
+     The feature runs horizontally whatever the card's own **Direction** says.
+     Direction is one value for every card in the section — that is the point of
+     `_article-card` being rendered with one id — so a layout that needs its
+     wide row to read differently from its narrow ones has to say so here. The
+     card's own styling is untouched: this sets the axis and the split, and the
+     picture, the pills, the panel and the type are the same objects they are in
+     a column card.
+
+     Desktop only, below 990px the row falls back to the plain grid — a feature
+     that is the full width of a phone is just a card. */
   @media screen and (min-width: 990px) {
     .article-grid--editorial {
-      grid-auto-rows: 1fr;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .article-grid--editorial > .article-grid__item:first-child {
-      grid-column: span 2;
-      grid-row: span 2;
+    .article-grid--editorial > .article-grid__item:nth-child(3n + 1) {
+      grid-column: 1 / -1;
+    }
+
+    .article-grid--editorial > .article-grid__item:nth-child(3n + 1) > .article-card-block {
+      flex-direction: row;
+      align-items: center;
+    }
+
+    .article-grid--editorial
+      > .article-grid__item:nth-child(3n + 1)
+      > .article-card-block
+      > .article-image-block {
+      flex: 0 0 var(--article-card-media, 55%);
+      min-inline-size: 0;
+    }
+
+    .article-grid--editorial
+      > .article-grid__item:nth-child(3n + 1)
+      > .article-card-block
+      > .article-content-block {
+      flex: 1 1 auto;
+      min-inline-size: 0;
+    }
+
+    /* ---- the rules ----
+
+       The hairlines are drawn in the gaps rather than on the cards, which is
+       why they are pseudo-elements and not borders: a border sits on the card's
+       own edge, hard against the photograph, and a rule that touches what it
+       separates stops reading as a separation. Half the gap up, and it lands in
+       the middle of the space that is already there.
+
+       A border also cannot cross the column gap. The pair's rule has to run
+       unbroken across the full width — two rules with a hole between them is
+       the thing a reader notices — so each half of the pair reaches into the
+       gap from its own side and the two meet in the middle. */
+    .article-grid--editorial > .article-grid__item {
+      position: relative;
+    }
+
+    .article-grid--editorial > .article-grid__item:not(:first-child)::before {
+      content: '';
+      position: absolute;
+      inset-block-start: calc(var(--grid-gap-y, 0px) / -2);
+      inset-inline: 0;
+      block-size: 1px;
+      background-color: var(--color-border);
+    }
+
+    .article-grid--editorial > .article-grid__item:nth-child(3n + 2)::before {
+      inset-inline-end: calc(var(--grid-gap-x, 0px) / -2);
+    }
+
+    .article-grid--editorial > .article-grid__item:nth-child(3n + 3)::before {
+      inset-inline-start: calc(var(--grid-gap-x, 0px) / -2);
+    }
+
+    /* And the one between the pair. Only the right-hand card draws it, so a
+       trailing article with no partner leaves no rule hanging beside it. */
+    .article-grid--editorial > .article-grid__item:nth-child(3n + 3)::after {
+      content: '';
+      position: absolute;
+      inset-block: 0;
+      inset-inline-start: calc(var(--grid-gap-x, 0px) / -2);
+      inline-size: 1px;
+      background-color: var(--color-border);
     }
   }
 
@@ -10293,6 +10434,48 @@ swiper-carousel {
     gap: var(--article-card-gap, var(--space-3));
     inline-size: 100%;
     min-inline-size: 0;
+  }
+
+  /* ---- direction -------------------------------------------------------
+     Picture above panel, or picture beside it. One gap serves both, because it
+     is a flex gap and the axis it runs along is the one thing the direction has
+     already decided.
+
+     The share is a variable rather than a setting: a row card wants roughly
+     three fifths picture, and a merchant moving that slider is choosing between
+     two layouts that both look right. `--article-card-media` is what lets a
+     context that wants a different split — the editorial feature above reads
+     the same variable — say so without forking these rules.
+
+     `min-inline-size: 0` on both halves is what lets a long title wrap instead
+     of setting the panel's width from its longest word. */
+  .article-card-block--row {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .article-card-block--row > .article-image-block {
+    flex: 0 0 var(--article-card-media, 55%);
+    min-inline-size: 0;
+  }
+
+  .article-card-block--row > .article-content-block {
+    flex: 1 1 auto;
+    min-inline-size: 0;
+  }
+
+  /* A phone has no room for the row: two 160px columns turn the title into one
+     word a line. The setting stays what the merchant chose for every width that
+     can carry it, and stacks below that. */
+  @media screen and (max-width: 749px) {
+    .article-card-block--row {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .article-card-block--row > .article-image-block {
+      flex: 0 0 auto;
+    }
   }
 
   /* ---- the picture ------------------------------------------------------ */
@@ -10321,16 +10504,15 @@ swiper-carousel {
      under it. `pointer-events: none` because the picture behind them is a link,
      and a tag that is not itself a link should not be a dead spot in it.
 
-     One line, always. These are positioned against the bottom edge of the
-     photograph, so a second line does not push the first one down — it grows
-     upward across the picture and lands in the middle of it. On a phone, where
-     the card is full width but the date pill and two tags are not, that is
-     exactly what was happening.
+     One line on a desktop card. These are positioned against the bottom edge of
+     the photograph, so a wrapped line does not push the first one down — it
+     grows upward across the picture and lands in the middle of it.
 
-     `nowrap` plus a shrinking last pill is the fix rather than hiding the
-     overflow: the date keeps its full width (it is a fixed, short string and
+     `nowrap` plus a shrinking last pill is what keeps that from happening
+     accidentally: the date keeps its full width (it is a fixed, short string and
      truncating a date makes it unreadable), and a long tag gives way with an
-     ellipsis instead of taking the row with it. */
+     ellipsis instead of taking the row with it. The phone stacks on purpose —
+     see the `max-width: 749px` rule below. */
   .article-image-block__meta {
     position: absolute;
     inset-inline: var(--space-4);
@@ -10342,6 +10524,11 @@ swiper-carousel {
     gap: var(--space-2);
     pointer-events: none;
   }
+
+  /* The wrapper exists for the phone. Above it the tags are flex items of the
+     meta row exactly as they were before it was added, which is what keeps the
+     shrink-and-ellipsis behaviour above working on them. */
+  .article-image-block__meta-tags { display: contents; }
 
   /* A frosted pill, so a date stays readable over any photograph. White at low
      alpha rather than the scheme's colours, because what is behind them is a
@@ -10382,6 +10569,33 @@ swiper-carousel {
     block-size: 22px;
     border: 1px dashed rgb(255 255 255 / 0.3);
     border-radius: 50%;
+  }
+
+  /* On a phone the card is full width and the picture is tall enough to carry
+     two lines, so the meta stops competing for one: the date is the first line
+     and the tags are the second, both left-aligned against the same edge.
+
+     `align-items: start` is what keeps each line as wide as its own pills — a
+     stretched column would give the date pill the width of the picture. The
+     stack still grows upward from the bottom edge, which is why it is two lines
+     and not three: `limit: 2` in the block is the other half of this rule. */
+  @media screen and (max-width: 749px) {
+    .article-image-block__meta {
+      flex-direction: column;
+      align-items: start;
+    }
+
+    .article-image-block__meta-tags {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+
+      /* The row of tags is now the thing that can overflow the picture, so it
+         is the thing that has to be told its bounds — the ellipsis on a long
+         tag fires against this, not against the meta column. */
+      max-inline-size: 100%;
+      min-inline-size: 0;
+    }
   }
 
   /* ---- the panel -------------------------------------------------------- */
