@@ -26,6 +26,11 @@
   in the middle of "Free delivery" is worse than silence. A merchant who has
   something to *say* with a picture wants an Image block, not this.
 
+  There is always a layer: with no picture chosen it is Shopify's placeholder,
+  through the same `snippets/image.liquid` call, so the hover works the moment
+  the block is added and looks the way it will once a photograph replaces it.
+  See the note by `has_placeholder`.
+
   It is also `pointer-events: none` in `base.css`, so the layer can never
   swallow a click meant for something inside the card.
 
@@ -39,15 +44,55 @@
   — is in the icon's own part of the stylesheet, not the card's. A block still
   styles only its own box; it is allowed to know which state the card is in.
 
-  ## Touch has no hover, so the picture is not hidden behind one
+  ## Touch has no hover, so the hover state is simply on
 
-  Every hover rule sits inside `@media (hover: hover)`. On a phone the card
-  keeps its resting colours and the picture never appears, rather than latching
-  on after a tap and staying until the customer taps something else — which is
-  what an unguarded `:hover` does on touch, and which reads as a bug.
+  Every hover rule sits inside `@media (hover: hover)`, and `base.css` carries
+  the exact inverse — an `@media (hover: none)` block that makes the same state
+  the resting one. On a phone the picture is up, the tint is on and the words
+  are already in their second colour.
+
+  That is the opposite of the usual advice, and it is the right answer here
+  because of what is behind the hover. This is not a control that reveals an
+  action; it is a photograph, a tint and a colour — content. Content a phone can
+  never reach is content that does not exist on a phone, and half the card would
+  simply be missing there. The alternative is worse than the sticky `:hover` it
+  avoids: an unguarded rule latches after a tap and stays until the customer
+  taps elsewhere, which reads as a bug, while a permanent state reads as design.
+
+  The one exception is the icon's rotation, which stays keyed to a tap. See the
+  note in `blocks/_feature-icon.liquid`.
+
+  The condition is `max-width: 749px` **or** `(hover: none)`, not either alone.
+  `(hover: none)` is the honest test for a phone, but the theme editor's mobile
+  preview is a narrow viewport in a desktop browser with a mouse attached — it
+  reports `hover: hover`, and on that test alone a merchant laying out the
+  mobile view was shown a card no phone would render.
 
   `:focus-within` is paired with `:hover` throughout, so a keyboard reaching a
   link inside the card gets the same state a pointer does.
+
+  ## Every default is written twice, and both are load-bearing
+
+  The schema default, and the Liquid fallback beside the setting that reads it:
+
+      "id": "min_height", "default": 400
+      assign min_height = s.min_height | default: 400 | plus: 0
+
+  They have to agree. Where they disagreed, the Liquid one won for any card
+  whose settings had not been stored — a card with no `min_height` in its JSON
+  read the `| default: 0` here, not the 400 in the schema, and sized itself to
+  its content while the panel showed 400 in the editor.
+
+  The section preset is the third copy and the one that made this visible. A
+  preset block with no `settings` object at all — the only such block in this
+  file's preset, and the only one whose settings did not apply — is created with
+  nothing stored, so every card fell through to the Liquid fallbacks at once:
+  no padding, square corners, no overlay, no minimum height.
+
+  `sections/featured-blog.liquid` writes the settings on every block in its
+  preset for this reason. So does this one now. **Adding a setting here means
+  adding it in three places**, and the audit that catches a miss is comparing
+  the schema defaults against the `| default:` filters in this file.
 {% enddoc %}
 
 {%- liquid
@@ -55,12 +100,18 @@
 
   assign align = s.alignment | default: 'center'
   assign gap = s.gap | default: 16 | plus: 0
-  assign min_height = s.min_height | default: 0 | plus: 0
+  assign min_height = s.min_height | default: 400 | plus: 0
 
   comment
-    Same three-part border resolution the section and the panel use, so a
-    merchant setting a border on any of the three boxes is answering the same
-    three questions in the same order.
+    Same border resolution the section frame uses, down to the four widths.
+
+    One width per side rather than one for the box: the frame a merchant wants
+    on a card is often a single rule — a rail down the left of each feature, or
+    a line between the row and what follows it — and a single slider could only
+    ever draw all four or none. They are summed into `border_any` so the three
+    properties are emitted only when at least one side is actually drawn; a
+    zero-width border with a colour on it is three declarations that paint
+    nothing and one that overrides the component's own CSS.
 
     A blank colour resolves to `currentColor` faded with `color-mix` rather than
     through `color_modify`: the colour filters need a value to read an alpha
@@ -68,11 +119,19 @@
     browser.
   endcomment
   assign border_line = s.border_style | default: 'none'
-  assign border_width = 0
+  assign bw_top = 0
+  assign bw_right = 0
+  assign bw_bottom = 0
+  assign bw_left = 0
+  assign border_any = 0
   assign border_paint = ''
 
   if border_line != 'none'
-    assign border_width = s.border_width | default: 1 | plus: 0
+    assign bw_top = s.border_width_top | default: 0 | plus: 0
+    assign bw_right = s.border_width_right | default: 0 | plus: 0
+    assign bw_bottom = s.border_width_bottom | default: 0 | plus: 0
+    assign bw_left = s.border_width_left | default: 0 | plus: 0
+    assign border_any = bw_top | plus: bw_right | plus: bw_bottom | plus: bw_left
 
     assign border_percent = s.border_opacity | default: 100 | plus: 0
     if s.border_color == blank
@@ -83,7 +142,15 @@
     endif
   endif
 
-  assign radius = s.border_radius | default: 0 | plus: 0
+  comment
+    A phone gets its own corner because the same number does not read the same
+    at both widths — 24px is a soft round on a 312px card and a heavy scoop out
+    of one that is nearly the full width of a 390px screen. `| default: radius`
+    rather than a constant, so a card saved before the mobile slider existed
+    keeps one shape at every width. Same pair, same reasoning, as the section's.
+  endcomment
+  assign radius = s.border_radius | default: 24 | plus: 0
+  assign radius_mobile = s.border_radius_mobile | default: radius | plus: 0
 
   assign background_paint = ''
   if s.background_color != blank
@@ -100,16 +167,84 @@
     *and* anything a merchant later puts in the same layer. One `background`
     with an alpha channel fades exactly the tint.
   endcomment
-  assign has_media = false
-  if s.hover_image != blank
-    assign has_media = true
+  comment
+    There is always a hover layer. With no picture uploaded it is Shopify's
+    placeholder, rendered through `snippets/image.liquid` like any other
+    image — same `<responsive-image>` wrapper, same fade-in, same load
+    behaviour — so the hover works out of the box and the merchant can see what
+    they are configuring before they have chosen a photograph.
+
+    That matters most in the theme editor, which is where this section is
+    judged: a card whose hover does nothing until a picture is uploaded reads as
+    a broken setting rather than as an empty one. It is the same call
+    `sections/featured-blog.liquid` makes when it draws placeholder cards for a
+    blog with no posts.
+
+    `has_placeholder` is kept separate from `has_media` because the two answer
+    different questions — one decides what to render, the other whether the card
+    is showing the merchant's own content. `base.css` gives the placeholder a
+    ground of its own so the overlay has something to tint; it does not lighten
+    the overlay, because the question the merchant is asking of the preview is
+    whether white words will sit on a dark picture.
+  endcomment
+  assign has_media = true
+  assign has_placeholder = false
+  if s.hover_image == blank
+    assign has_placeholder = true
+  endif
+
+  comment
+    ---- what the picture does while it is up ----
+
+    Zoom is a hover effect and Drift is a scroll effect, which is why they are
+    one select rather than a pair of toggles: they animate the same `transform`
+    on the same layer, and two controls able to ask for both would resolve to
+    whichever declaration came last in the stylesheet.
+
+    Drift is `<parallax-media>`, the element the hero already uses, rather than
+    `motion-effect data-effect="parallax"`, which `snippets/background-image.liquid`
+    uses. The two are different mechanisms: motion-effect translates the element
+    itself and needs 120px of overscan around it — a number coupled by hand to a
+    clamp in `assets/motion-engine.js` — while `<parallax-media>` writes
+    `--parallax-offset` and lets CSS combine it with a `scale()`, which covers
+    the travel with no second number to keep in step. A layer that already fills
+    its box wants the second one.
+
+    The speed is converted here, not passed through. The engine wants a
+    multiplier and the schema stores a percentage a merchant can reason about;
+    handing 30 to a function that clamps at 0.5 pins every card to maximum
+    strength and the effect stops responding to the slider.
+    `snippets/background-image.liquid` documents this as the bug it had.
+
+    (`sections/hero-banner.liquid` still passes its percentage straight through
+    and is pinned at the clamp. Not touched from here — it is its own file and
+    its own fix.)
+  endcomment
+  assign image_effect = s.hover_image_effect | default: 'zoom_in'
+
+  assign image_scale = s.hover_image_scale | default: 110 | plus: 0
+  assign image_scale = image_scale | divided_by: 100.0
+
+  assign drift_speed = s.hover_image_parallax_speed | default: 30 | plus: 0
+  if drift_speed < 10
+    assign drift_speed = 10
+  endif
+  if drift_speed > 50
+    assign drift_speed = 50
+  endif
+  assign drift_speed = drift_speed | divided_by: 100.0
+
+  assign layer_tag = 'div'
+  if image_effect == 'drift'
+    assign layer_tag = 'parallax-media'
   endif
 
   assign overlay_paint = ''
-  if has_media and s.overlay_color != blank
+  assign overlay_tint = s.overlay_color | default: '#000000'
+  if overlay_tint != blank
     assign overlay_alpha = s.overlay_opacity | default: 60 | plus: 0
     assign overlay_alpha = overlay_alpha | divided_by: 100.0
-    assign overlay_paint = s.overlay_color | color_modify: 'alpha', overlay_alpha
+    assign overlay_paint = overlay_tint | color_modify: 'alpha', overlay_alpha
   endif
 
   comment
@@ -119,11 +254,14 @@
     "leave it alone", it is "override whatever the title block set on itself".
     So the rule only exists when the merchant has asked for it.
   endcomment
-  assign hover_text = s.hover_text_color | default: ''
+  assign hover_text = s.hover_text_color | default: '#FFFFFF'
 
   assign card_classes = 'feature-card feature-card--align-' | append: align
   if has_media
     assign card_classes = card_classes | append: ' feature-card--has-media'
+  endif
+  if has_placeholder
+    assign card_classes = card_classes | append: ' feature-card--placeholder-media'
   endif
   if hover_text != ''
     assign card_classes = card_classes | append: ' feature-card--hover-text'
@@ -143,13 +281,14 @@
   --feature-card-gap: {{ gap }}px;
   --feature-card-align: {{ align }};
   --feature-card-radius: {{ radius }}px;
+  --feature-card-radius-mobile: {{ radius_mobile }}px;
   --feature-card-transition: {{ s.hover_duration | default: 500 | plus: 0 }}ms;
   --feature-card-lift: {{ s.hover_lift | default: 0 | plus: 0 }}px;
   {%- if min_height > 0 -%}
     --feature-card-min-height: {{ min_height }}px;
   {%- endif -%}
-  {%- if border_width > 0 -%}
-    --feature-card-border-width: {{ border_width }}px;
+  {%- if border_any > 0 -%}
+    --feature-card-border-width: {{ bw_top }}px {{ bw_right }}px {{ bw_bottom }}px {{ bw_left }}px;
     --feature-card-border-style: {{ border_line }};
     --feature-card-border-color: {{ border_paint }};
   {%- endif -%}
@@ -162,6 +301,9 @@
   {%- if hover_text != '' -%}
     --feature-card-hover-text: {{ hover_text }};
   {%- endif -%}
+  {%- if image_effect == 'zoom_in' or image_effect == 'zoom_out' -%}
+    --feature-card-image-scale: {{ image_scale }};
+  {%- endif -%}
 {%- endcapture -%}
 
 <div
@@ -170,21 +312,41 @@
   style="{{ card_style | strip_newlines | strip }}"
   {{ block.shopify_attributes }}
 >
-  {%- if has_media -%}
+  {%- comment -%}
+    Decoration, and marked as such — see the note above. `alt: ''` as well as
+    `aria-hidden` on the layer, because the two are read by different things and
+    a filename announced mid-sentence is worse than nothing.
+
+    One render call for both states. `snippets/image.liquid` draws the
+    placeholder itself when `image` is blank, so there is no second branch here
+    that could hold a different wrapper, a different `sizes` hint or a different
+    fade — which is how a placeholder ends up animating unlike the picture that
+    replaces it.
+
+    `hero-apparel-1` rather than the flat grey mark: the apparel family is the
+    set this theme uses everywhere an empty slot appears, so a section being
+    configured looks like the same store as the one next to it.
+  {%- endcomment -%}
+  <div class="feature-card__media" aria-hidden="true">
     {%- comment -%}
-      Decoration, and marked as such — see the note above. `alt: ''` as well as
-      `aria-hidden` on the layer, because the two are read by different things
-      and a filename announced mid-sentence is worse than nothing.
+      One inner layer, whichever effect is on it — a `<div>` for none and the
+      two zooms, `<parallax-media>` for Drift. The class is the same either way,
+      so the sizing rules in `base.css` do not have to know which element they
+      got, and the modifier is the only thing that varies.
     {%- endcomment -%}
-    <div class="feature-card__media" aria-hidden="true">
+    <{{ layer_tag }}
+      class="feature-card__layer feature-card__layer--{{ image_effect | replace: '_', '-' }}"
+      {% if image_effect == 'drift' %}data-speed="{{ drift_speed }}"{% endif %}
+    >
       {% render 'image',
          image: s.hover_image,
          mobile_image: s.hover_image_mobile,
          alt: '',
          class: 'feature-card__image',
+         placeholder: 'hero-apparel-1',
          sizes: card_sizes %}
-    </div>
-  {%- endif -%}
+    </{{ layer_tag }}>
+  </div>
 
   <div class="feature-card__inner">
     {% content_for 'blocks' %}
@@ -256,8 +418,7 @@
       "type": "color",
       "id": "overlay_color",
       "label": "t:shared.background.overlay_color.label",
-      "default": "#000000",
-      "visible_if": "{{ block.settings.hover_image != blank }}"
+      "default": "#000000"
     },
     {
       "type": "range",
@@ -267,8 +428,44 @@
       "max": 100,
       "step": 5,
       "unit": "%",
-      "default": 60,
-      "visible_if": "{{ block.settings.hover_image != blank }}"
+      "default": 60
+    },
+    {
+      "type": "select",
+      "id": "hover_image_effect",
+      "label": "t:blocks.feature_card.settings.hover_image_effect.label",
+      "info": "t:blocks.feature_card.settings.hover_image_effect.info",
+      "options": [
+        { "value": "none", "label": "t:shared.options.none" },
+        { "value": "zoom_in", "label": "t:blocks.feature_card.settings.hover_image_effect.options__2.label" },
+        { "value": "zoom_out", "label": "t:blocks.feature_card.settings.hover_image_effect.options__3.label" },
+        { "value": "drift", "label": "t:blocks.feature_card.settings.hover_image_effect.options__4.label" }
+      ],
+      "default": "zoom_in"
+    },
+    {
+      "type": "range",
+      "id": "hover_image_scale",
+      "label": "t:blocks.feature_card.settings.hover_image_scale.label",
+      "info": "t:blocks.feature_card.settings.hover_image_scale.info",
+      "min": 100,
+      "max": 140,
+      "step": 2,
+      "unit": "%",
+      "default": 110,
+      "visible_if": "{{ block.settings.hover_image_effect == 'zoom_in' or block.settings.hover_image_effect == 'zoom_out' }}"
+    },
+    {
+      "type": "range",
+      "id": "hover_image_parallax_speed",
+      "label": "t:blocks.feature_card.settings.hover_image_parallax_speed.label",
+      "info": "t:blocks.feature_card.settings.hover_image_parallax_speed.info",
+      "min": 10,
+      "max": 50,
+      "step": 5,
+      "unit": "%",
+      "default": 30,
+      "visible_if": "{{ block.settings.hover_image_effect == 'drift' }}"
     },
     {
       "type": "color",
@@ -334,13 +531,47 @@
     },
     {
       "type": "range",
-      "id": "border_width",
-      "label": "t:shared.border.thickness.label",
+      "id": "border_width_top",
+      "label": "t:shared.border.sides.top.label",
+      "info": "t:shared.border.sides.info",
       "min": 0,
       "max": 12,
       "step": 1,
       "unit": "px",
-      "default": 1,
+      "default": 0,
+      "visible_if": "{{ block.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_width_right",
+      "label": "t:shared.border.sides.right.label",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_width_bottom",
+      "label": "t:shared.border.sides.bottom.label",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_width_left",
+      "label": "t:shared.border.sides.left.label",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 0,
       "visible_if": "{{ block.settings.border_style != 'none' }}"
     },
     {
@@ -370,7 +601,17 @@
       "max": 60,
       "step": 2,
       "unit": "px",
-      "default": 0
+      "default": 24
+    },
+    {
+      "type": "range",
+      "id": "border_radius_mobile",
+      "label": "t:shared.corners.radius_mobile.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 16
     },
 
     { "type": "header", "content": "t:shared.spacing.block_header" },
@@ -433,24 +674,22 @@
       "type": "range",
       "id": "padding_top_mobile",
       "label": "t:shared.spacing.padding_top.label",
-      "info": "t:shared.spacing.padding_top_mobile.info",
       "min": 0,
       "max": 100,
       "step": 2,
       "unit": "px",
-      "default": 0,
+      "default": 40,
       "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
     },
     {
       "type": "range",
       "id": "padding_bottom_mobile",
       "label": "t:shared.spacing.padding_bottom.label",
-      "info": "t:shared.spacing.padding_bottom_mobile.info",
       "min": 0,
       "max": 100,
       "step": 2,
       "unit": "px",
-      "default": 0,
+      "default": 40,
       "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
     },
     {
@@ -461,7 +700,7 @@
       "max": 100,
       "step": 2,
       "unit": "px",
-      "default": 0,
+      "default": 24,
       "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
     },
     {
@@ -472,7 +711,7 @@
       "max": 100,
       "step": 2,
       "unit": "px",
-      "default": 0,
+      "default": 24,
       "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
     }
   ],

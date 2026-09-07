@@ -10733,6 +10733,19 @@ swiper-carousel {
   .feature-cards__header--center { align-items: center; text-align: center; }
   .feature-cards__header--end { align-items: flex-end; text-align: end; }
 
+  /* The line under the row. Its own alignment setting rather than the header's,
+     because the two are read at different moments: the heading introduces the
+     row and usually sits where the row starts, while this closes it and is
+     nearly always centred under the whole panel whatever the heading did. */
+  .feature-cards__footer {
+    display: flex;
+    flex-direction: column;
+    margin-block-start: var(--space-7);
+  }
+
+  .feature-cards__footer--center { align-items: center; text-align: center; }
+  .feature-cards__footer--end { align-items: flex-end; text-align: end; }
+
   /* ---- the panel -------------------------------------------------------- */
 
   .feature-cards__panel {
@@ -10792,6 +10805,15 @@ swiper-carousel {
       transform var(--feature-card-transition, 500ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
   }
 
+  /* The phone's own corner. Liquid resolves an unset mobile value to the desktop
+     one, so this only ever differs when the merchant said it should. The media
+     layer follows through `border-radius: inherit` and needs no rule of its own. */
+  @media screen and (max-width: 749px) {
+    .feature-card {
+      border-radius: var(--feature-card-radius-mobile, var(--feature-card-radius, 0));
+    }
+  }
+
   /* The picture is decoration and is never a target: `pointer-events: none` so
      it cannot swallow a click meant for a link inside the card, and it rounds
      itself with `border-radius: inherit` rather than making the card clip —
@@ -10838,6 +10860,65 @@ swiper-carousel {
     object-fit: cover;
   }
 
+  /* The layer the effect is applied to. It is `<parallax-media>` for Drift and a
+     plain `<div>` otherwise, so nothing here names an element — the modifier is
+     the only thing that varies, and the box is the same either way. */
+  .feature-card__layer {
+    position: absolute;
+    inset: 0;
+    inline-size: 100%;
+    block-size: 100%;
+    transform-origin: center;
+    transition: transform var(--feature-card-transition, 500ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+  }
+
+  /* Two directions, one resting state each. Zoom in starts true to size and
+     grows; zoom out starts large and settles — which is only visible because
+     the layer fades in at the same time, so the picture arrives already moving
+     rather than appearing and then jumping. */
+  .feature-card__layer--zoom-in { transform: scale(1); }
+  .feature-card__layer--zoom-out { transform: scale(var(--feature-card-image-scale, 1.1)); }
+
+  /* Drift is scroll, not hover. `<parallax-media>` writes `--parallax-offset`
+     and the scale covers the travel, so there is no overscan to keep in step
+     with the clamp in `assets/motion-engine.js` — the same arrangement
+     `.hero__parallax` uses.
+
+     The engine sits out on touch and under reduced motion, and it sits out by
+     never writing the property. The fallback of `0` is therefore the whole of
+     the "off" state: a still layer, cropped 12%, with no rule to remove. */
+  .feature-card__layer--drift {
+    will-change: transform;
+    transform: translate3d(0, var(--parallax-offset, 0), 0) scale(1.12);
+    transition: none;
+  }
+
+  @media (hover: hover) {
+    .feature-card--has-media:hover .feature-card__layer--zoom-in,
+    .feature-card--has-media:focus-within .feature-card__layer--zoom-in {
+      transform: scale(var(--feature-card-image-scale, 1.1));
+    }
+
+    .feature-card--has-media:hover .feature-card__layer--zoom-out,
+    .feature-card--has-media:focus-within .feature-card__layer--zoom-out {
+      transform: scale(1);
+    }
+  }
+
+  /* The placeholder needs a ground of its own. The rule above clears
+     `responsive-image`'s background because a photograph covers its box and the
+     colour would only ever show for a frame while it loads — but a placeholder
+     is a line drawing on nothing, and without a ground the panel shows through
+     and the overlay tints the panel instead of an image.
+
+     The overlay is deliberately *not* held back here. A merchant configuring
+     the card is judging whether white words will sit on a dark picture, and
+     lightening the preview to make the drawing prettier would answer a
+     different question than the one they are asking. */
+  .feature-card--placeholder-media .feature-card__media responsive-image {
+    background-color: var(--color-secondary-background);
+  }
+
   .feature-card__inner {
     position: relative;
     z-index: 1;
@@ -10862,6 +10943,39 @@ swiper-carousel {
     .feature-card--has-media:hover .feature-card__media,
     .feature-card--has-media:focus-within .feature-card__media {
       opacity: 1;
+    }
+  }
+
+  /* ---- one padding at every width --------------------------------------- */
+
+  /* The three blocks inside a card offer four sides and no Desktop/Mobile
+     switch, so `snippets/spacing.liquid` writes their four desktop properties
+     and no `-mobile` ones at all.
+
+     That is a hole, because these are custom properties and custom properties
+     inherit. The card above *does* have the switch, so it writes
+     `--block-padding-block-start-mobile: 40px` — and below 750px the
+     `[data-block-spacing]` rule reads `var(--block-padding-block-start-mobile,
+     …)` on the title, finds the card's inherited value, and gives a title whose
+     own four sliders read 0 the card's 40px. The block's own setting is not
+     overridden; it is never consulted.
+
+     So each of the three points the mobile properties back at its own desktop
+     values. That is the truth about these blocks — one padding, stated once,
+     applying at every width — and it stops the inheritance at the element that
+     owns the setting. `snippets/spacing.liquid` documents this same trap for
+     the case where the block does have mobile fields; this is the case where it
+     has none.
+
+     A fourth block of this shape belongs in this list. */
+  @media screen and (max-width: 749px) {
+    .feature-title-block,
+    .feature-text-block,
+    .feature-icon-block {
+      --block-padding-block-start-mobile: var(--block-padding-block-start, 0px);
+      --block-padding-block-end-mobile: var(--block-padding-block-end, 0px);
+      --block-padding-inline-start-mobile: var(--block-padding-inline-start, 0px);
+      --block-padding-inline-end-mobile: var(--block-padding-inline-end, 0px);
     }
   }
 
@@ -10952,22 +11066,80 @@ swiper-carousel {
 
   /* ---- the icon --------------------------------------------------------- */
 
+  /* One indirection, and everything below follows the breakpoint for free: the
+     shape box, the disc box, the ring, and the centre the connectors turn
+     about all read the resolved property and never test a width themselves.
+
+     The two source names exist because `--x: var(--x-mobile, var(--x))` is a
+     self-reference — it resolves to the guaranteed-invalid value rather than to
+     the desktop number. See the note in `blocks/_feature-icon.liquid`. */
   .feature-icon-block {
+    --feature-icon-shape-size: var(--feature-icon-shape-size-desktop, 86px);
+    --feature-icon-ring-size: var(--feature-icon-ring-size-desktop, 108px);
+
     display: flex;
     flex-direction: column;
     align-items: center;
     inline-size: 100%;
   }
 
+  @media screen and (max-width: 749px) {
+    .feature-icon-block {
+      --feature-icon-shape-size: var(
+        --feature-icon-shape-size-mobile,
+        var(--feature-icon-shape-size-desktop, 86px)
+      );
+      --feature-icon-ring-size: var(
+        --feature-icon-ring-size-mobile,
+        var(--feature-icon-ring-size-desktop, 108px)
+      );
+    }
+  }
+
   /* The two hairlines that tie the title, the icon and the text into one
      column. `flex: none` or the connector is the first thing a short card
-     squeezes, and the spine breaks before anything else gives. */
+     squeezes, and the spine breaks before anything else gives.
+
+     `z-index` is stated on both the lines and the shape because of the swap
+     below. A `transform` makes an element paint like a positioned one at
+     `z-index: auto`, in tree order — so the moment the lower line starts moving
+     it would travel *over* the disc, which is the one place it must pass
+     behind. Two integers settle it once, in both directions. */
   .feature-icon-block__connector {
     display: block;
     flex: none;
+    position: relative;
+    z-index: 0;
+
     inline-size: var(--feature-icon-connector-width, 1px);
     block-size: var(--feature-icon-connector-length, 48px);
     background-color: var(--feature-icon-connector-color, currentColor);
+
+    transform: rotate(0deg);
+    transition: transform var(--feature-card-transition, 500ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+  }
+
+  /* Each line turns about the middle of the icon rather than about itself, which
+     is what makes the swap an arc around the disc instead of a slide through it.
+
+     The column is `[line][shape][line]` with nothing between the parts, so the
+     centre is one `calc()` from properties the block already writes: half the
+     ring below the top line's own length, and half the ring above the bottom
+     line's own start. A 180° turn about that point lands each line exactly
+     where the other was — and lands it upside down, which is what keeps a faded
+     line still fading away from the icon once it arrives.
+
+     Because both terms are custom properties, the mobile ring size moves the
+     centre with it and a longer line moves it again. There is no pixel distance
+     stored anywhere to fall out of step. */
+  .feature-icon-block__connector--top {
+    transform-origin: 50% calc(
+      var(--feature-icon-connector-length, 48px) + var(--feature-icon-ring-size, 108px) / 2
+    );
+  }
+
+  .feature-icon-block__connector--bottom {
+    transform-origin: 50% calc(var(--feature-icon-ring-size, 108px) / -2);
   }
 
   /* Fading away from the ring in both directions, so the line arrives at the
@@ -10995,6 +11167,7 @@ swiper-carousel {
 
   .feature-icon-block__shape {
     position: relative;
+    z-index: 1;
     display: grid;
     place-items: center;
     flex: none;
@@ -11020,7 +11193,11 @@ swiper-carousel {
     block-size: 100%;
     pointer-events: none;
     color: var(--feature-icon-ring-color, currentColor);
-    transition: color var(--feature-card-transition, 500ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+
+    transform: rotate(0deg);
+    transition:
+      color var(--feature-card-transition, 500ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+      transform var(--feature-card-transition, 500ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
   }
 
   .feature-icon-block__disc {
@@ -11067,9 +11244,127 @@ swiper-carousel {
       color: var(--feature-icon-color-hover, var(--feature-icon-color, inherit));
     }
 
+    /* The ring turns and recolours in one step. `--ring-spin` is emitted only
+       when the merchant has asked for a rotation, so the fallback of `0deg`
+       leaves a ring that only changes colour — and the declaration still has to
+       be here, or the transform would not return on the way out. */
     .feature-card:hover .feature-icon-block__ring,
     .feature-card:focus-within .feature-icon-block__ring {
       color: var(--feature-icon-ring-color-hover, var(--feature-icon-ring-color, currentColor));
+      transform: rotate(var(--feature-icon-ring-spin, 0deg));
+    }
+
+    /* The lines swing round the disc and trade places. One declaration for both,
+       because the origins above are what make the same 180° land each of them
+       on the other — and both turning the same way is what reads as one wheel
+       rather than as two lines passing.
+
+       180° exactly, and not a settable angle: any other value leaves a line
+       stopped somewhere off the column with nothing under it. Rotation on hover
+       is the ring's setting, where a partial turn still looks deliberate. */
+    .feature-card:hover .feature-icon-block--connector-swap .feature-icon-block__connector,
+    .feature-card:focus-within .feature-icon-block--connector-swap .feature-icon-block__connector {
+      transform: rotate(180deg);
+    }
+  }
+
+  /* ---- touch: the hover state IS the resting state ---------------------- */
+
+  /* A device with no hover never reaches a single rule above, so a card on a
+     phone showed the bare panel and nothing else — the picture, the tint and the
+     icon's second colour were content with no way to reach it.
+
+     Two conditions, not one, and the comma is an `or`.
+
+     `(hover: none)` is the honest test for a real phone. On its own it is not
+     enough, because the place this layout is *judged* is the theme editor's
+     mobile preview — and that is a narrow viewport in a desktop browser with a
+     mouse attached, so it reports `hover: hover` and got the desktop treatment.
+     A merchant setting up the mobile view was shown a card that no phone would
+     ever render.
+
+     `max-width: 749px` is therefore here as well, matching the breakpoint every
+     other mobile rule in this section uses. The cost is that a genuinely narrow
+     desktop window now gets the phone's card, which is the right trade: what a
+     merchant sees while laying the section out has to be what a customer gets.
+
+     What is deliberately *not* made permanent is the turn — see the block at the
+     end of this rule. */
+  @media screen and (max-width: 749px), (hover: none) {
+    .feature-card--has-media .feature-card__media { opacity: 1; }
+
+    /* True to size at rest. Both zooms are a journey between two scales, and
+       with no hover to travel on, the far end of one of them is just a permanent
+       10% crop nobody asked for. Drift is untouched — the engine already sits
+       out on touch, and its `scale(1.12)` is the crop that covers the travel. */
+    .feature-card__layer--zoom-in,
+    .feature-card__layer--zoom-out {
+      transform: none;
+    }
+
+    .feature-card--hover-text :is(.feature-title-block, .feature-text-block),
+    .feature-card--hover-text
+      :is(.feature-title-block, .feature-text-block)
+      :is(p, h1, h2, h3, h4, h5, h6, li, strong, em) {
+      color: var(--feature-card-hover-text);
+    }
+
+    .feature-card--hover-text
+      .block-text--gradient
+      :is(p, h1, h2, h3, h4, h5, h6, li, strong, em) {
+      background-image: none;
+      color: var(--feature-card-hover-text);
+      -webkit-text-fill-color: var(--feature-card-hover-text);
+    }
+
+    .feature-icon-block__disc {
+      color: var(--feature-icon-color-hover, var(--feature-icon-color, inherit));
+    }
+
+    /* Matched to the shape modifier, not written as a bare `__disc` rule. The
+       resting fill is set by `.feature-icon-block--shape-circle .…__disc`, and a
+       single-class override would lose to it on specificity and leave the disc
+       its first colour on every phone. `:is()` takes the specificity of its
+       heaviest argument, so this is the same weight and later in the file. */
+    :is(.feature-icon-block--shape-circle, .feature-icon-block--shape-square)
+      .feature-icon-block__disc {
+      background-color: var(--feature-icon-fill-hover, var(--feature-icon-fill, currentColor));
+    }
+
+    .feature-icon-block__ring {
+      color: var(--feature-icon-ring-color-hover, var(--feature-icon-ring-color, currentColor));
+    }
+
+    /* The turn, and only the turn, stays interactive — and on a slider the
+       gesture that drives it is the swipe, not a tap.
+
+       `.swiper-slide-active` is Swiper's own class on the card currently in
+       view, so bringing a card in turns its ring and swings its connectors, and
+       moving on turns them back. That is the one thing on a phone that reports
+       "this card, now" without asking the customer to press anything, and it
+       makes the effect part of paging through the row rather than a reward for
+       finding a tap target.
+
+       `:active` still fires under a finger and `:hover` is kept because a tap
+       leaves it set on most mobile browsers until the next tap elsewhere —
+       the sticky hover the blocks above are written to avoid is exactly what
+       holds the rotation long enough to be watched here. `:focus-within` covers
+       a keyboard on a device reporting no pointer.
+
+       All four in one rule: they are one state — "this is the card you are
+       looking at" — arrived at four ways. */
+    .feature-card.swiper-slide-active .feature-icon-block__ring,
+    .feature-card:hover .feature-icon-block__ring,
+    .feature-card:focus-within .feature-icon-block__ring,
+    .feature-card:active .feature-icon-block__ring {
+      transform: rotate(var(--feature-icon-ring-spin, 0deg));
+    }
+
+    .feature-card.swiper-slide-active .feature-icon-block--connector-swap .feature-icon-block__connector,
+    .feature-card:hover .feature-icon-block--connector-swap .feature-icon-block__connector,
+    .feature-card:focus-within .feature-icon-block--connector-swap .feature-icon-block__connector,
+    .feature-card:active .feature-icon-block--connector-swap .feature-icon-block__connector {
+      transform: rotate(180deg);
     }
   }
 
@@ -11080,18 +11375,71 @@ swiper-carousel {
   @media (prefers-reduced-motion: reduce) {
     .feature-card,
     .feature-card__media,
+    .feature-card__layer,
     .feature-title-block,
     .feature-text-block,
     .feature-title-block > *,
     .feature-text-block > *,
     .feature-icon-block__ring,
+    .feature-icon-block__connector,
     .feature-icon-block__disc {
       transition-duration: 0.01ms;
     }
 
+    /* The picture still appears — that is the hover. What stops is it moving
+       while it does. Drift keeps its `scale(1.12)` because the engine simply
+       never writes an offset here, so the layer is already still. */
+    .feature-card__layer--zoom-in,
+    .feature-card__layer--zoom-out,
+    .feature-card--has-media:hover .feature-card__layer--zoom-in,
+    .feature-card--has-media:hover .feature-card__layer--zoom-out,
+    .feature-card--has-media:focus-within .feature-card__layer--zoom-in,
+    .feature-card--has-media:focus-within .feature-card__layer--zoom-out {
+      transform: none;
+    }
+
+    /* The colours still swap — that is the information. What stops is the
+       travel: the lift, the ring turning, and the two lines trading places are
+       decorative movement tied to a pointer, which is exactly what the
+       preference is asking to switch off. */
     .feature-card:hover,
     .feature-card:focus-within {
       transform: none;
     }
+
+    .feature-card.swiper-slide-active .feature-icon-block__ring,
+    .feature-card:hover .feature-icon-block__ring,
+    .feature-card:focus-within .feature-icon-block__ring,
+    .feature-card:active .feature-icon-block__ring,
+    .feature-card.swiper-slide-active .feature-icon-block--connector-swap .feature-icon-block__connector,
+    .feature-card:hover .feature-icon-block--connector-swap .feature-icon-block__connector,
+    .feature-card:focus-within .feature-icon-block--connector-swap .feature-icon-block__connector,
+    .feature-card:active .feature-icon-block--connector-swap .feature-icon-block__connector {
+      transform: none;
+    }
   }
+}
+
+
+/* --------------------------------------------------------------------------
+   Feature cards — carousel controls, outside the layer
+   --------------------------------------------------------------------------
+   These three rules cannot live in `@layer components` with the rest of the
+   section. The carousel's own spacing — `.carousel-shell > .carousel-controls
+   { margin-block-start: var(--space-6) }` — is written unlayered further up
+   this file, and an unlayered declaration beats a layered one whatever the
+   specificity. A layered override would lose silently and the gap setting would
+   appear to do nothing.
+
+   Symmetric margin, not just a top one. The dots sit inside the cards panel, so
+   they need clearing from the row above them *and* from the panel's own bottom
+   edge — otherwise a full-width mobile slider ends with the pagination pressed
+   against the frame.
+   -------------------------------------------------------------------------- */
+
+.feature-cards__carousel > .carousel-controls,
+.feature-cards__carousel > .carousel-shell__dots,
+.feature-cards__carousel > .carousel-shell__counter,
+.feature-cards__carousel > .carousel-shell__progress {
+  margin-block: var(--feature-cards-controls-gap, 24px);
 }

@@ -39,12 +39,41 @@
   resizes its icons moves this one with them, and **Custom** is there for the
   design's 32px without adding a sixth vocabulary.
 
-  ## Hover
+  ## Hover: the whole assembly turns
 
-  Every hover rule for this block lives in `base.css` under
-  `@media (hover: hover)`, keyed off `.feature-card:hover`. The block reads the
-  card's state; it never paints outside its own box. See the note in
-  `blocks/_feature-card.liquid` on why touch is excluded.
+  Three things move on the same timing, so they read as one rotation about the
+  disc rather than as three effects that happen to fire together:
+
+    * the ring turns by **Rotation on hover**, which walks the dash around the
+      circle — the reason the dash is a stated `2 8` and not the browser's guess
+      is what makes that legible
+    * both lines turn 180° **about the middle of the icon**, so the one above
+      swings round to the bottom and the one below swings round to the top
+
+  The lines rotate rather than travel, and that is the difference between an
+  effect you can see and one you cannot. Sliding each line into the other's slot
+  ends in the same place, but the path is a straight line through the disc and
+  nothing on screen reads as turning. An arc around the outside of the ring is
+  legible as motion at any speed.
+
+  The 180° also lands each line upside down, which is what keeps a faded line
+  fading *away* from the icon once it arrives, exactly as it did before it moved.
+
+  All of it is one `transform` per element and one `transition`, on the card's
+  own **Transition** duration. Nothing here animates a layout property, so the
+  turn runs on the compositor.
+
+  ## The turn is the one thing a phone still gets on demand
+
+  Every other hover rule is made permanent on a touch device — see the
+  `@media (hover: none)` block in `base.css`. The picture, the tint and the
+  second set of colours are content, and content with no way to reach it is
+  content that does not exist on a phone.
+
+  The rotation is the exception: it stays keyed to `:active` / `:hover` /
+  `:focus-within` so a tap still turns the assembly. It is the one part of the
+  effect a finger can trigger, and making it permanent would spend it for
+  nothing.
 {% enddoc %}
 
 {%- liquid
@@ -53,20 +82,70 @@
   assign icon_source = s.icon_source | default: 'icon'
 
   comment
+    The glyph and its size, resolved to the schema's own defaults first.
+
+    `icon-size` falls back to Medium when handed nothing, which is the right
+    answer for a control that was never offered a Custom step and the wrong one
+    here: this block ships on Custom at 32px, and a card with nothing stored
+    would draw a 20px glyph in an 86px disc.
+  endcomment
+  assign icon_name = s.icon | default: 'star'
+  assign icon_size_key = s.icon_size | default: 'custom'
+  assign icon_size_px_custom = s.icon_size_custom | default: 32 | plus: 0
+
+  comment
+    Every colour is resolved to the schema's own default before it is used,
+    rather than left to the `currentColor` fallbacks in `base.css`.
+
+    A card whose settings were never stored — the case a preset with no
+    `settings` object creates, see the note in `blocks/_feature-card.liquid` —
+    reaches those fallbacks and paints a disc in the text colour. Which reads as
+    the block being broken rather than as a colour nobody chose, because a disc
+    is a brand mark and the theme's neutral answer is not one.
+
+    The CSS fallbacks stay where they are. They are the answer for a stylesheet
+    loaded without this block, not for this block rendering without its
+    settings.
+  endcomment
+  assign fill_color = s.fill_color | default: '#03D26F'
+  assign fill_hover_color = s.fill_hover_color | default: '#F9F871'
+  assign icon_color = s.icon_color | default: '#0F2E2F'
+  assign icon_hover_color = s.icon_hover_color | default: '#0F2E2F'
+  assign ring_color = s.ring_color | default: '#03D26F'
+  assign ring_hover_color = s.ring_hover_color | default: '#F9F871'
+  assign connector_color = s.connector_color | default: '#03D26F'
+
+  comment
+    `| default:` cannot resolve a checkbox: `false | default: true` is `true` in
+    every Liquid, so an unticked box would come back on. `nil` is the only value
+    that means "never stored", which is the distinction these need — the same
+    guard `carousel_on_mobile` uses in the section.
+  endcomment
+  assign connector_fade = s.connector_fade
+  if connector_fade == nil
+    assign connector_fade = true
+  endif
+
+  assign want_swap = s.connector_swap
+  if want_swap == nil
+    assign want_swap = true
+  endif
+
+  comment
     The source decides, and the field belonging to it has to actually hold
     something — a merchant who picked Image and has not uploaded one yet gets an
     empty disc rather than a broken picture. Same rule as
     `blocks/subheading.liquid`, which is where merchants learn it.
   endcomment
   assign has_icon = false
-  if icon_source == 'icon' and s.icon != blank and s.icon != 'none'
+  if icon_source == 'icon' and icon_name != blank and icon_name != 'none'
     assign has_icon = true
   elsif icon_source == 'image' and s.icon_image != blank
     assign has_icon = true
   endif
 
   capture icon_px
-    render 'icon-size', size: s.icon_size, custom: s.icon_size_custom
+    render 'icon-size', size: icon_size_key, custom: icon_size_px_custom
   endcapture
   assign icon_size = icon_px | plus: 0
 
@@ -81,6 +160,17 @@
   assign shape = s.shape | default: 'circle'
   assign shape_size = s.shape_size | default: 86 | plus: 0
   assign shape_radius = s.shape_radius | default: 16 | plus: 0
+
+  comment
+    A phone gets its own size. 86px is a fifth of a 400px card on a desktop and
+    a quarter of the width of a 390px screen, and at that scale the disc stops
+    being a mark beside the words and starts being the card.
+
+    `| default: shape_size` rather than a constant, so a block saved before the
+    mobile slider existed keeps one size at every width — the same pair, and the
+    same fallback, as the two corner radii on the card.
+  endcomment
+  assign shape_size_mobile = s.shape_size_mobile | default: shape_size | plus: 0
 
   if shape == 'circle'
     assign shape_radius = shape_size
@@ -105,6 +195,7 @@
   assign ring_width = s.ring_width | default: 2 | plus: 0
   assign ring_offset = s.ring_offset | default: 11 | plus: 0
   assign ring_size = shape_size | plus: ring_offset | plus: ring_offset
+  assign ring_size_mobile = shape_size_mobile | plus: ring_offset | plus: ring_offset
   assign ring_half = ring_size | divided_by: 2.0
   assign ring_radius = ring_size | minus: ring_width | divided_by: 2.0
 
@@ -119,7 +210,20 @@
   endcomment
   unless has_ring
     assign ring_size = shape_size
+    assign ring_size_mobile = shape_size_mobile
   endunless
+
+  comment
+    With no shape either, the box around the glyph is the glyph. This matters
+    beyond the sizing rule in `base.css`, which is keyed off the shape modifier
+    and would not fire anyway: the connector rotation below turns about the
+    middle of this box, and a centre that thinks the column's middle is 86px
+    tall when it is 32 sends both lines round an arc 27px off centre.
+  endcomment
+  if shape == 'none'
+    assign ring_size = icon_size
+    assign ring_size_mobile = icon_size
+  endif
 
   comment
     Solid is the same circle with no dash pattern, rather than a second element
@@ -152,23 +256,77 @@
     assign connector_bottom = false
   endif
 
+  comment
+    ---- the swap ----
+
+    On hover the two lines turn 180° about the middle of the icon: the one above
+    swings round to the bottom, the one below swings round to the top, and the
+    ring turns with them. It is one rotation of the whole assembly rather than
+    two lines sliding past a disc that happens to be spinning.
+
+    It is a rotation and not a translation, and the difference is the whole
+    point. Moving each line to the other's slot lands in the same place, but the
+    path is a straight line through the icon and there is nothing on screen
+    that reads as turning — which is what "only the border rotates" was
+    describing. An arc around the disc is legible as motion at any speed.
+
+    Nothing here computes the geometry. `base.css` sets each line's
+    `transform-origin` to the centre of the icon with a `calc()` over the
+    length and ring properties this block already writes, so lengthening a line
+    or resizing the disc — including at the mobile size — moves the centre with
+    it and the pair still land exactly on each other. A travel distance in
+    pixels could not: it would need a second value per breakpoint and a third
+    the first time somebody added a gap between the parts.
+
+    It needs both lines. With only one there is nothing to trade places with,
+    and the line would swing to an empty slot and sit there — so the class is
+    withheld rather than the setting hidden, and **Swap on hover** simply has
+    nothing to do until Position is Above and below.
+  endcomment
+  assign connector_swap = false
+  if connector_top and connector_bottom and want_swap
+    assign connector_swap = true
+  endif
+
+  assign ring_spin = s.ring_spin | default: 180 | plus: 0
+
   assign block_classes = 'feature-icon-block'
   if shape != 'none'
     assign block_classes = block_classes | append: ' feature-icon-block--shape-' | append: shape
   endif
-  if s.connector_fade
+  if connector_fade
     assign block_classes = block_classes | append: ' feature-icon-block--connector-fade'
+  endif
+  if connector_swap
+    assign block_classes = block_classes | append: ' feature-icon-block--connector-swap'
   endif
 -%}
 
 {%- capture icon_style -%}
   {%- render 'spacing', block: s, declarations: true -%}
+  {%- comment -%}
+    Two sizes each, under `-desktop` and `-mobile` names, and `base.css` picks
+    one into `--feature-icon-shape-size` / `--feature-icon-ring-size` at the
+    breakpoint.
+
+    The indirection is what lets everything downstream — the shape box, the disc
+    box, the ring, and the `transform-origin` the connector rotation turns
+    about — read one property and follow the breakpoint for free. Writing the
+    mobile value into the same name instead is not an option:
+    `--x: var(--x-mobile, var(--x))` is a self-reference, which resolves to the
+    guaranteed-invalid value and takes the declaration down with it.
+  {%- endcomment -%}
   --feature-icon-glyph-size: {{ icon_size }}px;
-  --feature-icon-shape-size: {{ shape_size }}px;
+  --feature-icon-shape-size-desktop: {{ shape_size }}px;
+  --feature-icon-shape-size-mobile: {{ shape_size_mobile }}px;
   --feature-icon-shape-radius: {{ shape_radius }}px;
-  --feature-icon-ring-size: {{ ring_size }}px;
+  --feature-icon-ring-size-desktop: {{ ring_size }}px;
+  --feature-icon-ring-size-mobile: {{ ring_size_mobile }}px;
   --feature-icon-connector-length: {{ connector_length }}px;
   --feature-icon-connector-width: {{ s.connector_width | default: 1 | plus: 0 }}px;
+  {%- if has_ring and ring_spin != 0 -%}
+    --feature-icon-ring-spin: {{ ring_spin }}deg;
+  {%- endif -%}
   {%- comment -%}
     The fill and the ring colours are gated on there being something to paint,
     not just on the setting holding a value. A merchant who switches Shape to
@@ -178,16 +336,16 @@
     doing something they did not ask for.
   {%- endcomment -%}
   {%- if shape != 'none' -%}
-    {%- if s.fill_color != blank -%}--feature-icon-fill: {{ s.fill_color }};{%- endif -%}
-    {%- if s.fill_hover_color != blank -%}--feature-icon-fill-hover: {{ s.fill_hover_color }};{%- endif -%}
+    {%- if fill_color != blank -%}--feature-icon-fill: {{ fill_color }};{%- endif -%}
+    {%- if fill_hover_color != blank -%}--feature-icon-fill-hover: {{ fill_hover_color }};{%- endif -%}
   {%- endif -%}
-  {%- if s.icon_color != blank -%}--feature-icon-color: {{ s.icon_color }};{%- endif -%}
-  {%- if s.icon_hover_color != blank -%}--feature-icon-color-hover: {{ s.icon_hover_color }};{%- endif -%}
+  {%- if icon_color != blank -%}--feature-icon-color: {{ icon_color }};{%- endif -%}
+  {%- if icon_hover_color != blank -%}--feature-icon-color-hover: {{ icon_hover_color }};{%- endif -%}
   {%- if has_ring -%}
-    {%- if s.ring_color != blank -%}--feature-icon-ring-color: {{ s.ring_color }};{%- endif -%}
-    {%- if s.ring_hover_color != blank -%}--feature-icon-ring-color-hover: {{ s.ring_hover_color }};{%- endif -%}
+    {%- if ring_color != blank -%}--feature-icon-ring-color: {{ ring_color }};{%- endif -%}
+    {%- if ring_hover_color != blank -%}--feature-icon-ring-color-hover: {{ ring_hover_color }};{%- endif -%}
   {%- endif -%}
-  {%- if s.connector_color != blank -%}--feature-icon-connector-color: {{ s.connector_color }};{%- endif -%}
+  {%- if connector_color != blank -%}--feature-icon-connector-color: {{ connector_color }};{%- endif -%}
 {%- endcapture -%}
 
 <div
@@ -203,9 +361,13 @@
   <span class="feature-icon-block__shape">
     {%- if has_ring -%}
       {%- comment -%}
-        Drawn at its real pixel size with a matching viewBox, so the dash is the
-        length the merchant asked for rather than that length multiplied by
-        whatever scale a percentage-sized SVG happened to land on.
+        Drawn at the desktop size with a matching viewBox, so at that width the
+        dash is exactly the length the merchant asked for.
+
+        The stylesheet stretches it to whatever box it is in, so at the mobile
+        size the dash scales with the ring — a 66px disc gets a proportionally
+        finer stitch rather than the desktop dash wrapped around a smaller
+        circle, which is the right answer and worth knowing is what happens.
       {%- endcomment -%}
       <svg
         class="feature-icon-block__ring"
@@ -257,7 +419,7 @@
           loading="lazy"
         >
       {%- elsif has_icon -%}
-        {% render 'icon', icon: s.icon, size: icon_size, class: 'feature-icon-block__glyph' %}
+        {% render 'icon', icon: icon_name, size: icon_size, class: 'feature-icon-block__glyph' %}
       {%- endif -%}
     </span>
   </span>
@@ -387,6 +549,18 @@
     },
     {
       "type": "range",
+      "id": "shape_size_mobile",
+      "label": "t:blocks.feature_icon.settings.shape_size_mobile.label",
+      "info": "t:blocks.feature_icon.settings.shape_size_mobile.info",
+      "min": 32,
+      "max": 160,
+      "step": 2,
+      "unit": "px",
+      "default": 66,
+      "visible_if": "{{ block.settings.shape != 'none' }}"
+    },
+    {
+      "type": "range",
       "id": "shape_radius",
       "label": "t:shared.corners.radius.label",
       "min": 0,
@@ -486,6 +660,18 @@
       "default": "#F9F871",
       "visible_if": "{{ block.settings.ring_style != 'none' and block.settings.shape != 'none' }}"
     },
+    {
+      "type": "range",
+      "id": "ring_spin",
+      "label": "t:blocks.feature_icon.settings.ring_spin.label",
+      "info": "t:blocks.feature_icon.settings.ring_spin.info",
+      "min": 0,
+      "max": 360,
+      "step": 15,
+      "unit": "°",
+      "default": 180,
+      "visible_if": "{{ block.settings.ring_style != 'none' and block.settings.shape != 'none' }}"
+    },
 
     { "type": "header", "content": "t:blocks.feature_icon.headers.connectors" },
     { "type": "paragraph", "content": "t:blocks.feature_icon.paragraphs.connectors" },
@@ -538,6 +724,14 @@
       "default": true,
       "visible_if": "{{ block.settings.connector_position != 'none' }}"
     },
+    {
+      "type": "checkbox",
+      "id": "connector_swap",
+      "label": "t:blocks.feature_icon.settings.connector_swap.label",
+      "info": "t:blocks.feature_icon.settings.connector_swap.info",
+      "default": true,
+      "visible_if": "{{ block.settings.connector_position == 'both' }}"
+    },
 
     { "type": "header", "content": "t:shared.spacing.block_header" },
     {
@@ -554,6 +748,27 @@
       "type": "range",
       "id": "padding_bottom",
       "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "padding_left",
+      "label": "t:shared.spacing.padding_left.label",
+      "info": "t:shared.spacing.block_paragraph",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "padding_right",
+      "label": "t:shared.spacing.padding_right.label",
       "min": 0,
       "max": 60,
       "step": 2,

@@ -26,14 +26,18 @@
   The design has a border in two places and the theme has merchants who want it
   in a third, so the controls are grouped by which box they draw:
 
-      Borders          the section frame — off by default
-      Cards panel      the dashed rounded box the cards sit inside — this is
-                       the one the design draws
+      Borders          the section frame — a dashed hairline across the top
+      Cards panel      the dashed rounded box the cards sit inside
       (per card)       `blocks/_feature-card.liquid`, its own panel again
 
   They are three separate boxes, so they are three separate groups rather than
   one set of settings with a "what does this apply to" select. A select there
   would mean a merchant who wants both has to choose.
+
+  All three ship drawn, and all three nest: a 40px section frame around a 40px
+  panel around 24px cards. The widths are what separate them — the section is a
+  single rule across the top, the panel is the full outline, the card is corners
+  only — so the three do not read as one box drawn three times.
 
   ## Why the panel clips
 
@@ -118,7 +122,7 @@
     scheme resolves in the browser. `color-mix` does the same fade at that point
     instead, so both paths honour the slider.
   endcomment
-  assign border_line = s.border_style | default: 'none'
+  assign border_line = s.border_style | default: 'dashed'
 
   assign bw_top = 0
   assign bw_right = 0
@@ -127,7 +131,7 @@
   assign border_any = 0
 
   if border_line != 'none'
-    assign bw_top = s.border_width_top | default: 0 | plus: 0
+    assign bw_top = s.border_width_top | default: 1 | plus: 0
     assign bw_right = s.border_width_right | default: 0 | plus: 0
     assign bw_bottom = s.border_width_bottom | default: 0 | plus: 0
     assign bw_left = s.border_width_left | default: 0 | plus: 0
@@ -142,7 +146,7 @@
     endif
   endif
 
-  assign radius = s.border_radius | default: 0 | plus: 0
+  assign radius = s.border_radius | default: 40 | plus: 0
   assign radius_mobile = s.border_radius_mobile | default: radius | plus: 0
   assign margin_top = s.margin_top | default: 0 | plus: 0
   assign margin_bottom = s.margin_bottom | default: 0 | plus: 0
@@ -155,7 +159,7 @@
     all the way round, and a merchant who wants a single rule under a row of
     features has the section's four-sided control one group up.
   endcomment
-  assign panel_line = s.panel_border_style | default: 'none'
+  assign panel_line = s.panel_border_style | default: 'dashed'
   assign panel_width = 0
   assign panel_paint = ''
 
@@ -171,29 +175,32 @@
     endif
   endif
 
-  assign panel_radius = s.panel_border_radius | default: 0 | plus: 0
+  assign panel_radius = s.panel_border_radius | default: 40 | plus: 0
   assign panel_radius_mobile = s.panel_border_radius_mobile | default: panel_radius | plus: 0
 
   comment
-    The phone's padding falls back to the desktop value rather than to zero.
+    The two paddings are independent, and 0 on the phone means 0.
 
-    `default` cannot do it: 0 is not blank in Liquid, and 0 is exactly what an
-    untouched slider holds — so a merchant who set 32px on desktop and never
-    opened the mobile control would get 32 and 0, which reads as the panel
-    losing its inset on a phone rather than as a setting they have not answered
-    yet. Same convention as the section's own padding sliders.
+    This used to fall back to the desktop value whenever the mobile slider read
+    0, because 0 was also the default and there was no way to tell "no inset"
+    from "not answered yet". The phone's default is 6px now — the frame runs
+    much closer to the edge of the screen there, and a card pressed against it
+    reads as a mistake — so the default carries that meaning on its own and the
+    fallback has nothing left to do except take 0 away from a merchant who
+    deliberately dragged the slider to it.
+
+    The section's own padding sliders keep the fallback: theirs still default to
+    0, and the setting says so on its own label.
   endcomment
   assign panel_padding = s.panel_padding | default: 0 | plus: 0
-  assign panel_padding_mobile = s.panel_padding_mobile | default: 0 | plus: 0
-  if panel_padding_mobile == 0
-    assign panel_padding_mobile = panel_padding
-  endif
+  assign panel_padding_mobile = s.panel_padding_mobile | default: 6 | plus: 0
 
   assign panel_background = ''
-  if s.panel_background != blank
+  assign panel_tint = s.panel_background | default: '#FFFFFF'
+  if panel_tint != blank
     assign panel_bg_alpha = s.panel_background_opacity | default: 100 | plus: 0
     assign panel_bg_alpha = panel_bg_alpha | divided_by: 100.0
-    assign panel_background = s.panel_background | color_modify: 'alpha', panel_bg_alpha
+    assign panel_background = panel_tint | color_modify: 'alpha', panel_bg_alpha
   endif
 
   comment
@@ -276,7 +283,7 @@
   assign gap_x = s.gap_horizontal | default: 24 | plus: 0
   assign gap_y = s.gap_vertical | default: 24 | plus: 0
 
-  assign card_stagger = s.animation_stagger | default: 0 | plus: 0
+  assign card_stagger = s.animation_stagger | default: 120 | plus: 0
 -%}
 
 {%- capture section_style -%}
@@ -302,6 +309,7 @@
   --feature-cards-panel-radius-mobile: {{ panel_radius_mobile }}px;
   --feature-cards-panel-padding: {{ panel_padding }}px;
   --feature-cards-panel-padding-mobile: {{ panel_padding_mobile }}px;
+  --feature-cards-controls-gap: {{ s.carousel_controls_gap | default: 24 | plus: 0 }}px;
   {%- if panel_width > 0 -%}
     --feature-cards-panel-border-width: {{ panel_width }}px;
     --feature-cards-panel-border-style: {{ panel_line }};
@@ -313,7 +321,7 @@
 {%- endcapture -%}
 
 <div
-  class="feature-cards color-scheme-container color-{{ s.color_scheme }}{% if has_background_media %} has-background-media{% endif %}"
+  class="feature-cards color-scheme-container color-{{ s.color_scheme | default: 'scheme-1' }}{% if has_background_media %} has-background-media{% endif %}"
   data-section-spacing
   data-section-id="{{ section.id }}"
   style="{{ section_style | strip_newlines | strip }}"
@@ -392,6 +400,47 @@
            layout_mobile: cs_layout_mobile %}
       </swiper-carousel>
     </motion-effect>
+
+    {%- comment -%}
+      `nil`, not `blank`. `false == blank` is true in Liquid, so a blank test
+      reads "the merchant turned it off" as "never answered" and puts the footer
+      back. `nil` is the only value that means the setting was never stored —
+      the same guard `carousel_on_mobile` uses above.
+    {%- endcomment -%}
+    {%- liquid
+      assign show_footer = s.show_footer
+      if show_footer == nil
+        assign show_footer = true
+      endif
+    -%}
+    {%- if show_footer -%}
+      {%- comment -%}
+        The line under the row, as a second static `section-header` block.
+
+        The same mechanism as the header above and for the same reason — it
+        cannot be dragged into the row of cards and cannot be deleted by
+        accident — but a separate `id`, so the two clusters hold their own
+        settings and a merchant editing one does not move the other.
+
+        It is a cluster rather than a single Text block because the thing that
+        follows a feature row is not always a sentence: a store often wants the
+        sentence *and* the button that acts on it. The design has only the
+        sentence, so that is what the preset ships; the room for the button
+        costs nothing until it is used.
+
+        Gated on a checkbox rather than on the block having content. A static
+        block always renders, so with nothing in it the row would still carry
+        the footer's top margin — an empty gap under the panel with no visible
+        cause and no control to remove it. Turning the checkbox off keeps the
+        block's settings, so switching it back on restores what was written.
+      {%- endcomment -%}
+      <motion-effect
+        class="feature-cards__footer feature-cards__footer--{{ s.footer_alignment | default: 'center' }}"
+        {% render 'motion-attrs', kind: 'text', section: s, children: true %}
+      >
+        {% content_for 'block', type: 'section-header', id: 'feature-cards-footer' %}
+      </motion-effect>
+    {%- endif -%}
   </div>
 </div>
 
@@ -629,7 +678,44 @@
       "max": 80,
       "step": 2,
       "unit": "px",
-      "default": 0
+      "default": 6
+    },
+
+    {
+      "type": "header",
+      "content": "t:sections.feature_cards.headers.footer"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:sections.feature_cards.paragraphs.footer"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_footer",
+      "label": "t:sections.feature_cards.settings.show_footer.label",
+      "info": "t:sections.feature_cards.settings.show_footer.info",
+      "default": true
+    },
+    {
+      "type": "select",
+      "id": "footer_alignment",
+      "label": "t:blocks.group.settings.alignment.label",
+      "options": [
+        {
+          "value": "start",
+          "label": "t:blocks.group.settings.alignment.options__1.label"
+        },
+        {
+          "value": "center",
+          "label": "t:blocks.group.settings.alignment.options__2.label"
+        },
+        {
+          "value": "end",
+          "label": "t:blocks.group.settings.alignment.options__3.label"
+        }
+      ],
+      "default": "center",
+      "visible_if": "{{ section.settings.show_footer }}"
     },
 
     {
@@ -757,7 +843,7 @@
           "label": "t:shared.options.dashed"
         }
       ],
-      "default": "none"
+      "default": "dashed"
     },
     {
       "type": "range",
@@ -768,7 +854,7 @@
       "max": 12,
       "step": 1,
       "unit": "px",
-      "default": 0,
+      "default": 1,
       "visible_if": "{{ section.settings.border_style != 'none' }}"
     },
     {
@@ -834,7 +920,7 @@
       "max": 80,
       "step": 2,
       "unit": "px",
-      "default": 0
+      "default": 40
     },
     {
       "type": "range",
@@ -844,7 +930,7 @@
       "max": 80,
       "step": 2,
       "unit": "px",
-      "default": 0
+      "default": 24
     },
 
     {
@@ -915,7 +1001,7 @@
       "max": 90,
       "step": 5,
       "unit": "%",
-      "default": 15,
+      "default": 0,
       "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
     },
     {
@@ -1142,6 +1228,18 @@
       ],
       "default": "center",
       "visible_if": "{{ section.settings.carousel_pagination != 'none' and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "range",
+      "id": "carousel_controls_gap",
+      "label": "t:sections.feature_cards.settings.carousel_controls_gap.label",
+      "info": "t:sections.feature_cards.settings.carousel_controls_gap.info",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 24,
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
     },
 
     {
@@ -1380,11 +1478,17 @@
         "panel_border_radius": 40,
         "panel_border_radius_mobile": 24,
         "panel_padding": 0,
+        "panel_padding_mobile": 6,
         "container_width": "standard",
-        "border_style": "none",
-        "border_radius": 0,
-        "carousel_peek_mobile": 15,
+        "border_style": "dashed",
+        "border_width_top": 1,
+        "border_radius": 40,
+        "border_radius_mobile": 24,
+        "carousel_peek_mobile": 0,
         "carousel_pagination": "dots",
+        "carousel_controls_gap": 24,
+        "show_footer": true,
+        "footer_alignment": "center",
         "carousel_navigation": false,
         "animation_image": "fade-up",
         "animation_duration": 800,
@@ -1458,7 +1562,58 @@
           ]
         },
         {
+          "type": "section-header",
+          "static": true,
+          "id": "feature-cards-footer",
+          "settings": {
+            "direction": "column",
+            "alignment": "center",
+            "position": "start",
+            "gap": 12,
+            "gap_vertical": 12,
+            "gap_vertical_mobile": 10,
+            "width": "fill"
+          },
+          "blocks": [
+            {
+              "type": "text",
+              "name": "t:blocks.text.presets.text.name",
+              "settings": {
+                "text": "<p>Fast shipping, global coverage, and round-the-clock support designed completely around your convenience.</p>",
+                "preset": "paragraph",
+                "max_width": "normal",
+                "alignment": "center",
+                "alignment_mobile": "center"
+              }
+            }
+          ]
+        },
+        {
           "type": "_feature-card",
+          "settings": {
+            "alignment": "center",
+            "gap": 16,
+            "min_height": 400,
+            "hover_image_effect": "zoom_in",
+            "hover_image_scale": 110,
+            "overlay_color": "#000000",
+            "overlay_opacity": 60,
+            "hover_text_color": "#FFFFFF",
+            "hover_duration": 500,
+            "hover_lift": 0,
+            "border_style": "none",
+            "border_radius": 24,
+            "border_radius_mobile": 16,
+            "padding_device": "desktop",
+            "padding_top": 40,
+            "padding_bottom": 40,
+            "padding_left": 24,
+            "padding_right": 24,
+            "padding_top_mobile": 40,
+            "padding_bottom_mobile": 40,
+            "padding_left_mobile": 24,
+            "padding_right_mobile": 24
+          },
           "blocks": [
             { "type": "_feature-title", "settings": { "text": "Free delivery" } },
             { "type": "_feature-icon", "settings": { "icon": "truck" } },
@@ -1472,6 +1627,30 @@
         },
         {
           "type": "_feature-card",
+          "settings": {
+            "alignment": "center",
+            "gap": 16,
+            "min_height": 400,
+            "hover_image_effect": "zoom_in",
+            "hover_image_scale": 110,
+            "overlay_color": "#000000",
+            "overlay_opacity": 60,
+            "hover_text_color": "#FFFFFF",
+            "hover_duration": 500,
+            "hover_lift": 0,
+            "border_style": "none",
+            "border_radius": 24,
+            "border_radius_mobile": 16,
+            "padding_device": "desktop",
+            "padding_top": 40,
+            "padding_bottom": 40,
+            "padding_left": 24,
+            "padding_right": 24,
+            "padding_top_mobile": 40,
+            "padding_bottom_mobile": 40,
+            "padding_left_mobile": 24,
+            "padding_right_mobile": 24
+          },
           "blocks": [
             { "type": "_feature-title", "settings": { "text": "30 day returns" } },
             { "type": "_feature-icon", "settings": { "icon": "refresh" } },
@@ -1485,6 +1664,30 @@
         },
         {
           "type": "_feature-card",
+          "settings": {
+            "alignment": "center",
+            "gap": 16,
+            "min_height": 400,
+            "hover_image_effect": "zoom_in",
+            "hover_image_scale": 110,
+            "overlay_color": "#000000",
+            "overlay_opacity": 60,
+            "hover_text_color": "#FFFFFF",
+            "hover_duration": 500,
+            "hover_lift": 0,
+            "border_style": "none",
+            "border_radius": 24,
+            "border_radius_mobile": 16,
+            "padding_device": "desktop",
+            "padding_top": 40,
+            "padding_bottom": 40,
+            "padding_left": 24,
+            "padding_right": 24,
+            "padding_top_mobile": 40,
+            "padding_bottom_mobile": 40,
+            "padding_left_mobile": 24,
+            "padding_right_mobile": 24
+          },
           "blocks": [
             { "type": "_feature-title", "settings": { "text": "Secure checkout" } },
             { "type": "_feature-icon", "settings": { "icon": "lock" } },
@@ -1498,6 +1701,30 @@
         },
         {
           "type": "_feature-card",
+          "settings": {
+            "alignment": "center",
+            "gap": 16,
+            "min_height": 400,
+            "hover_image_effect": "zoom_in",
+            "hover_image_scale": 110,
+            "overlay_color": "#000000",
+            "overlay_opacity": 60,
+            "hover_text_color": "#FFFFFF",
+            "hover_duration": 500,
+            "hover_lift": 0,
+            "border_style": "none",
+            "border_radius": 24,
+            "border_radius_mobile": 16,
+            "padding_device": "desktop",
+            "padding_top": 40,
+            "padding_bottom": 40,
+            "padding_left": 24,
+            "padding_right": 24,
+            "padding_top_mobile": 40,
+            "padding_bottom_mobile": 40,
+            "padding_left_mobile": 24,
+            "padding_right_mobile": 24
+          },
           "blocks": [
             { "type": "_feature-title", "settings": { "text": "Here to help" } },
             { "type": "_feature-icon", "settings": { "icon": "chat" } },
