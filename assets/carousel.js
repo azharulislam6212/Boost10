@@ -118,6 +118,33 @@ export class SwiperCarousel extends BaseComponent {
   #authoredTrackStyle = null;
 
   /**
+   * The same, per slide.
+   *
+   * `cleanStyles` strips three things, not two: the host, the wrapper, and
+   * every slide — `slideEl.removeAttribute('style')`, the whole attribute. The
+   * host and the track were put back below; slides were not, because until
+   * recently no section in the theme rendered a slide with a `style` on it.
+   * `sections/featured-blog.liquid` wraps each card in an `<li>`, so the `<li>`
+   * is the slide and the card's properties sit on an element Swiper never
+   * touches.
+   *
+   * `sections/feature-cards.liquid` renders its block roots straight into the
+   * track, so the card *is* the slide and its style attribute carries the
+   * padding, the corner radius, the overlay colour, the minimum height and the
+   * hover colours. Resizing past the breakpoint destroyed the carousel and took
+   * all of them with it — the section rendered correctly and then lost its
+   * settings on the first resize, with nothing in the markup to show why.
+   *
+   * A `WeakMap` rather than an array: slides are replaced wholesale by a
+   * section re-render in the theme editor, and keying by element means the old
+   * entries go with them instead of being restored onto elements that have
+   * since been recycled.
+   *
+   * @type {WeakMap<Element, string|null>}
+   */
+  #authoredSlideStyles = new WeakMap();
+
+  /**
    * True while Swiper is rearranging the track itself.
    *
    * `loopCreate` clones slides on init and `loopFix` moves them on every wrap,
@@ -551,11 +578,13 @@ export class SwiperCarousel extends BaseComponent {
     this.#tagSlides(true);
 
     try {
-      // Captured before Swiper can touch either element. Swiper writes only
-      // classes to the host and transforms to the wrapper, so what is here now
-      // is what Liquid rendered.
+      // Captured before Swiper can touch any of the three. `#tagSlides` above
+      // writes classes only, and Swiper's own widths and transforms all land
+      // inside the constructor below — so what is here now is what Liquid
+      // rendered.
       this.#authoredStyle = this.getAttribute('style');
       this.#authoredTrackStyle = this.refs.track?.getAttribute('style') ?? null;
+      this.#captureAuthoredSlideStyles();
 
       // `loopCreate` clones slides during construction. Without this the
       // observer fires before `#swiper` is even assigned and calls `#init()`
@@ -672,6 +701,28 @@ export class SwiperCarousel extends BaseComponent {
   }
 
   /**
+   * Records what Liquid put on each slide, before Swiper writes a width to it.
+   *
+   * Guarded on `has`, so a second init cannot overwrite the authored value with
+   * whatever is on the element at the time. That matters on the path where a
+   * destroy did not run — a failed init, say — where the attribute would still
+   * hold Swiper's own `width` and capturing it would make that width permanent.
+   *
+   * Loop clones are never in the map. They are created by `loopCreate` after
+   * this runs and removed by `loopDestroy` before the restore, so they neither
+   * need an entry nor get one.
+   */
+  #captureAuthoredSlideStyles() {
+    const track = this.refs.track;
+    if (!track) return;
+
+    for (const slide of track.children) {
+      if (this.#authoredSlideStyles.has(slide)) continue;
+      this.#authoredSlideStyles.set(slide, slide.getAttribute('style'));
+    }
+  }
+
+  /**
    * Puts back the `style` attributes Swiper's `cleanStyles` removed.
    *
    * Removing the attribute rather than restoring an empty one matters: an empty
@@ -687,6 +738,18 @@ export class SwiperCarousel extends BaseComponent {
 
     if (this.#authoredTrackStyle === null) track.removeAttribute('style');
     else track.setAttribute('style', this.#authoredTrackStyle);
+
+    // Slides last, and only the ones this component recorded. A slide with no
+    // entry is one that arrived after the capture — a clone Swiper has already
+    // unwound, or markup added since — and guessing at its authored style would
+    // be inventing one.
+    for (const slide of track.children) {
+      if (!this.#authoredSlideStyles.has(slide)) continue;
+
+      const authored = this.#authoredSlideStyles.get(slide);
+      if (authored == null) slide.removeAttribute('style');
+      else slide.setAttribute('style', authored);
+    }
   }
 
   /**
@@ -713,9 +776,13 @@ export class SwiperCarousel extends BaseComponent {
   #destroy() {
     if (!this.#swiper) return;
 
-    // `deleteInstance, cleanStyles` — the second argument returns the wrapper
-    // and slides to their authored styles so the CSS grid layout can take over
-    // at the other breakpoint.
+    // `deleteInstance, cleanStyles` — the second argument strips the inline
+    // widths and transforms off the host, the wrapper and every slide, so the
+    // CSS grid layout can take over at the other breakpoint.
+    //
+    // "Strips", not "returns to their authored styles": it removes the whole
+    // attribute, authored properties included. `#restoreAuthoredStyles` below
+    // is what actually puts them back, for all three.
     // `destroy` unwinds the loop clones, which is another burst of childList
     // mutations on a track the observer is still watching.
     if (!this.#swiper.destroyed) this.#withSwiperMutation(() => this.#swiper?.destroy(true, true));
