@@ -12,6 +12,7 @@
   @param {string} [layout] - grid | carousel, desktop. Default grid.
   @param {string} [layout_mobile] - grid | carousel. Default carousel.
   @param {boolean} [nav] - Render the arrows. Defaults to the theme setting.
+  @param {boolean} [detached] - The caller is rendering the arrows and pagination itself, somewhere else. Keeps the pause button and the live region, which have to stay inside the element.
 
   @example
     {% render 'carousel-shell-tail', settings: section.settings %}
@@ -33,6 +34,16 @@
   endunless
 
   assign pagination = settings.carousel_pagination | default: 'none'
+
+  # Both off in one place rather than at each of the three render tags below,
+  # so a caller cannot switch one out and leave the other doubled. The pause
+  # button and the live region are deliberately not covered: they are found by
+  # ref and announced from inside, so they stay where the component can reach
+  # them however the visible controls are arranged.
+  if detached
+    assign show_nav = false
+    assign pagination = 'none'
+  endif
 
   # One alignment for every pagination type, including the controls bar. The
   # older `carousel_controls_align` only ever reached the bar, which is why dots

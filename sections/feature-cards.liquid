@@ -47,9 +47,28 @@
 
   So the panel clips — but only when it is actually rounded, because clipping
   unconditionally would cut the focus ring off the outermost card for no reason.
-  `feature-cards__panel--clipped` is added when the radius is above zero, and
-  **Arrow position** carries a note that arrows placed outside the track are
-  inside that clip. Bottom is the default for the same reason.
+  `feature-cards__panel--clipped` is added when the radius is above zero.
+
+  ## The controls are outside the panel, and that is why the id exists
+
+  A clipping, bordered, rounded box is the wrong place for the arrows and the
+  dots. Inside it they are within the frame the row is drawn in — pagination
+  pressed against a dashed border, and arrows set to Outside cut away entirely
+  by the corner radius. So the row is rendered under the panel and reaches the
+  carousel by `data-carousel-for`, which is what `id:` on `carousel-shell-attrs`
+  is for.
+
+  `carousel-nav` and `carousel-controls` could already detach. `carousel-pagination`
+  could not — `carousel.js` read `this.refs.pagination`, and `component.js`
+  collects refs from inside the element only. It now resolves the pagination
+  element the same way it already resolved the arrows: nested wins, and an
+  external one is looked for only when the element has an id. Every other
+  carousel in the theme renders its pagination nested and never reaches that
+  lookup, so nothing else changes behaviour.
+
+  There is no **Arrow position** setting. Detached, the row is under the panel
+  and nowhere else, and a select offering Inside or Outside would be describing
+  a track it no longer sits in.
 
   ## Default layout is a grid, and a phone is a slider
 
@@ -268,6 +287,59 @@
   assign cs_label = 'accessibility.carousel' | t
 
   comment
+    ---- the controls, outside the panel ----
+
+    The arrows and the pagination are rendered under the panel rather than
+    inside it, and they reach the carousel by id.
+
+    They have to be outside. The panel is a bordered, rounded, clipping box that
+    the track sits inside, and controls within it are inside the frame the row
+    is drawn in — dots pressed against a dashed border, and arrows set to
+    Outside clipped away entirely by the corner radius.
+
+    `carousel-nav` and `carousel-controls` could already do this: pass
+    `carousel:` and they stamp `data-carousel-for`, which `findExternalControls`
+    resolves from the document. `carousel-pagination` could not — the component
+    read `this.refs.pagination`, and `component.js` collects refs from inside
+    the element only, so a detached dot row was never found. Both now take the
+    same parameter and `carousel.js` resolves the element the same way it
+    already resolved the arrows: nested wins, external is looked for only when
+    the element has an id. Every other carousel in the theme renders its
+    pagination nested and never reaches that lookup.
+
+    The id is the section's, so two of these sections on one page cannot claim
+    each other's controls.
+  endcomment
+  assign carousel_id = 'feature-cards-' | append: section.id
+
+  assign cs_pagination = s.carousel_pagination | default: 'dots'
+  assign cs_pagination_align = s.carousel_pagination_align | default: 'center'
+
+  assign cs_nav = s.carousel_navigation
+  if cs_nav == nil
+    assign cs_nav = false
+  endif
+
+  comment
+    Whether the row is drawn at all is a Liquid question, not a runtime one.
+    The layout is known here for both breakpoints, so the visibility is a class
+    and a media query rather than a `:has()` test or a class the component has
+    to remember to toggle — and a row of dots can never be left on a page where
+    the cards are a static grid.
+  endcomment
+  assign controls_class = 'feature-cards__controls'
+  if cs_layout == 'carousel'
+    assign controls_class = controls_class | append: ' feature-cards__controls--always'
+  elsif cs_layout_mobile == 'carousel'
+    assign controls_class = controls_class | append: ' feature-cards__controls--mobile'
+  endif
+
+  assign has_controls = false
+  if cs_is_carousel and cs_nav or cs_is_carousel and cs_pagination != 'none'
+    assign has_controls = true
+  endif
+
+  comment
     ---- the gaps ----
 
     `--grid-gap-x` / `--grid-gap-y` rather than section-private names, because
@@ -378,6 +450,7 @@
       <swiper-carousel
         {% render 'carousel-shell-attrs',
            settings: s,
+           id: carousel_id,
            layout: cs_layout,
            layout_mobile: cs_layout_mobile,
            classes: 'feature-cards__carousel',
@@ -394,12 +467,49 @@
           {% content_for 'blocks' %}
         </div>
 
+        {%- comment -%}
+          `detached` keeps the pause button and the live region — both are found
+          by ref and announced from inside the element — and stands the arrows
+          and the pagination down so they can be rendered below the panel
+          instead. Without it the section would draw each of them twice.
+        {%- endcomment -%}
         {% render 'carousel-shell-tail',
            settings: s,
            layout: cs_layout,
-           layout_mobile: cs_layout_mobile %}
+           layout_mobile: cs_layout_mobile,
+           detached: true %}
       </swiper-carousel>
     </motion-effect>
+
+    {%- if has_controls -%}
+      <div class="{{ controls_class }}">
+        {%- comment -%}
+          `controls` is one bar carrying its own arrows, so the bare pair would
+          be a duplicate of what it already draws — the same test
+          `carousel-shell-tail` makes when the controls are nested.
+        {%- endcomment -%}
+        {%- if cs_pagination == 'controls' -%}
+          {% render 'carousel-controls',
+             settings: s,
+             carousel: carousel_id,
+             align: cs_pagination_align %}
+        {%- else -%}
+          {%- if cs_nav -%}
+            {% render 'carousel-nav',
+               settings: s,
+               carousel: carousel_id,
+               position: 'bottom' %}
+          {%- endif -%}
+
+          {%- if cs_pagination != 'none' -%}
+            {% render 'carousel-pagination',
+               style: cs_pagination,
+               align: cs_pagination_align,
+               carousel: carousel_id %}
+          {%- endif -%}
+        {%- endif -%}
+      </div>
+    {%- endif -%}
 
     {%- comment -%}
       `nil`, not `blank`. `false == blank` is true in Liquid, so a blank test
@@ -1028,32 +1138,6 @@
       "label": "t:shared.carousel.navigation.label",
       "default": false,
       "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
-    },
-    {
-      "type": "select",
-      "id": "carousel_nav_position",
-      "label": "t:shared.carousel.nav_position.label",
-      "info": "t:sections.feature_cards.settings.carousel_nav_position.info",
-      "options": [
-        {
-          "value": "outside",
-          "label": "t:shared.carousel.nav_position.options__1.label"
-        },
-        {
-          "value": "inside",
-          "label": "t:shared.carousel.nav_position.options__2.label"
-        },
-        {
-          "value": "bottom",
-          "label": "t:shared.carousel.nav_position.options__3.label"
-        },
-        {
-          "value": "inline",
-          "label": "t:shared.carousel.nav_position.options__4.label"
-        }
-      ],
-      "default": "bottom",
-      "visible_if": "{{ section.settings.carousel_navigation and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
     },
     {
       "type": "select",

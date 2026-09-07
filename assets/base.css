@@ -11422,24 +11422,60 @@ swiper-carousel {
 
 
 /* --------------------------------------------------------------------------
-   Feature cards — carousel controls, outside the layer
+   Feature cards — the detached controls row, outside the layer
    --------------------------------------------------------------------------
-   These three rules cannot live in `@layer components` with the rest of the
-   section. The carousel's own spacing — `.carousel-shell > .carousel-controls
-   { margin-block-start: var(--space-6) }` — is written unlayered further up
-   this file, and an unlayered declaration beats a layered one whatever the
-   specificity. A layered override would lose silently and the gap setting would
-   appear to do nothing.
+   The arrows and the pagination are rendered under the cards panel rather than
+   inside it, and they find the carousel by id — see the note in
+   `sections/feature-cards.liquid`. Everything here dresses that row.
 
-   Symmetric margin, not just a top one. The dots sit inside the cards panel, so
-   they need clearing from the row above them *and* from the panel's own bottom
-   edge — otherwise a full-width mobile slider ends with the pagination pressed
-   against the frame.
+   Unlayered, like the rules above it. The carousel's own spacing and the
+   `display: none` that hides a pagination element outside an initialised
+   `.carousel-shell` are both written unlayered further up this file, and an
+   unlayered declaration beats a layered one whatever the specificity. In
+   `@layer components` these would lose silently and the row would never appear.
    -------------------------------------------------------------------------- */
 
-.feature-cards__carousel > .carousel-controls,
-.feature-cards__carousel > .carousel-shell__dots,
-.feature-cards__carousel > .carousel-shell__counter,
-.feature-cards__carousel > .carousel-shell__progress {
-  margin-block: var(--feature-cards-controls-gap, 24px);
+/* Drawn only where the cards are actually a carousel, and that is a Liquid
+   question: the layout is known for both breakpoints when the section renders,
+   so the answer is a class rather than a `:has()` test or a class the component
+   has to remember to toggle. A row of dots can never be left under a static
+   grid. */
+.feature-cards__controls {
+  display: none;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-4);
+  margin-block-start: var(--feature-cards-controls-gap, 24px);
+}
+
+.feature-cards__controls--always { display: flex; }
+
+@media screen and (max-width: 749px) {
+  .feature-cards__controls--mobile { display: flex; }
+}
+
+/* `.carousel-shell__dots` and its siblings are `display: none` until they are
+   inside an initialised `.carousel-shell`. Detached, they never will be, so
+   this row shows them itself — and drops the `margin-block-start` that spaced
+   them from a track they no longer sit under, because the row above already
+   carries the gap. */
+.feature-cards__controls .carousel-shell__dots,
+.feature-cards__controls .carousel-shell__counter,
+.feature-cards__controls .carousel-shell__progress {
+  display: block;
+  margin-block-start: 0;
+}
+
+/* The bar and the progress type set their own width; the arrows do not need
+   one. `inline-size: 100%` on the bar is what lets its alignment setting mean
+   anything, the same as when it is nested. */
+.feature-cards__controls .carousel-controls,
+.feature-cards__controls .carousel-shell__progress {
+  inline-size: 100%;
+}
+
+/* Nested, this margin separates the bar from the track above it. Out here the
+   row's own margin does that job, and keeping both doubles the gap. */
+.feature-cards__controls .carousel-controls {
+  margin-block-start: 0;
 }

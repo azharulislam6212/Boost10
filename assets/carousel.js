@@ -253,6 +253,35 @@ export class SwiperCarousel extends BaseComponent {
     };
   }
 
+  /**
+   * The element Swiper's Pagination module renders into.
+   *
+   * Same rule as the controls above, and for the same reason: nested wins, and
+   * an external one is only ever looked for when this element has an id to be
+   * addressed by. `findExternalControls` returns nulls for an empty id, so a
+   * carousel without one — every carousel in the theme until now — resolves to
+   * `this.refs.pagination` exactly as it did before, and a section that renders
+   * its dots nested never reaches the document query at all.
+   *
+   * The arrows could always be detached; the dots could not, because this read
+   * `this.refs.pagination` directly and `component.js` collects refs from
+   * inside the component only. `sections/feature-cards.liquid` puts its
+   * pagination below a bordered panel that the track sits inside, which is
+   * outside the element in the DOM as well as on the screen.
+   *
+   * @returns {HTMLElement|null}
+   */
+  get #pagination() {
+    if (this.refs.pagination) return this.refs.pagination;
+
+    const id = this.getAttribute('id');
+    if (!id) return null;
+
+    return /** @type {HTMLElement|null} */ (
+      document.querySelector(`[data-carousel-for="${CSS.escape(id)}"][data-ref="pagination"]`)
+    );
+  }
+
   /* --------------------------------------------------------------- state */
 
   /**
@@ -343,7 +372,9 @@ export class SwiperCarousel extends BaseComponent {
     }
 
     // ---- pagination -----------------------------------------------------
-    if (this.refs.pagination) {
+    const paginationEl = this.#pagination;
+
+    if (paginationEl) {
       const authoredPagination = typeof authored.pagination === 'object' ? authored.pagination : {};
 
       config.pagination = {
@@ -353,7 +384,7 @@ export class SwiperCarousel extends BaseComponent {
         bulletActiveClass: 'carousel-shell__dot--active',
         lockClass: 'carousel-shell__pagination--locked',
         ...authoredPagination,
-        el: this.refs.pagination,
+        el: paginationEl,
       };
 
       // Fraction and progressbar render their own internals, so the custom
