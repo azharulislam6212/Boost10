@@ -10664,3 +10664,434 @@ swiper-carousel {
     margin-block-start: auto;
   }
 }
+
+
+/* ==========================================================================
+   Feature cards
+   ==========================================================================
+   `sections/feature-cards.liquid` — a row of features inside one bordered
+   panel, each card filling with a picture under the pointer.
+
+   Four boxes, and each one is drawn by the file that owns it:
+
+     .feature-cards          the section frame, property for property the same
+                             as `.featured-blog` above
+     .feature-cards__panel   the panel the cards sit inside
+     .feature-card           one card, and its hover picture
+     .feature-icon-block     the disc, the ring and the two hairlines
+
+   The grid itself is not here. `swiper-carousel[data-layout='grid']` in the
+   carousel section of this file already lays the track out from the same
+   `--columns-*` properties `carousel-shell-attrs` writes, so a second set of
+   `grid-template-columns` for this section would be a copy free to drift from
+   the one the shell and Swiper agree on.
+
+   Everything that reacts to a pointer is inside `@media (hover: hover)`. A
+   touch device has no hover to leave, so an unguarded `:hover` latches on after
+   a tap and stays until the customer taps elsewhere — the picture stuck on one
+   card and the icon stuck on its hover colour. `:focus-within` is paired with
+   it everywhere, so a keyboard sees what a mouse sees.
+   -------------------------------------------------------------------------- */
+
+@layer components {
+  .feature-cards {
+    border-radius: var(--feature-cards-radius, 0);
+
+    /* Longhands, not the `border` shorthand: the width is four values — one per
+       side — and `border` accepts only a single width. Same split as
+       `.featured-blog` and `.footer`. */
+    border-width: var(--feature-cards-border-width, 0px);
+    border-style: var(--feature-cards-border-style, solid);
+    border-color: var(--feature-cards-border-color, transparent);
+
+    margin-block-start: var(--feature-cards-margin-block-start, 0px);
+    margin-block-end: var(--feature-cards-margin-block-end, 0px);
+  }
+
+  @media screen and (max-width: 749px) {
+    .feature-cards {
+      border-radius: var(--feature-cards-radius-mobile, var(--feature-cards-radius, 0));
+    }
+  }
+
+  /* Clipping only where a background picture has to stay inside the corners. An
+     unconditional `overflow: hidden` here would cut the focus ring off the
+     outermost card. */
+  .feature-cards.has-background-media { overflow: hidden; }
+
+  .feature-cards.has-background-media > :not(.background-media) {
+    position: relative;
+    z-index: 1;
+  }
+
+  .feature-cards__header {
+    display: flex;
+    flex-direction: column;
+    margin-block-end: var(--space-7);
+  }
+
+  .feature-cards__header--center { align-items: center; text-align: center; }
+  .feature-cards__header--end { align-items: flex-end; text-align: end; }
+
+  /* ---- the panel -------------------------------------------------------- */
+
+  .feature-cards__panel {
+    background: var(--feature-cards-panel-background, transparent);
+
+    border-width: var(--feature-cards-panel-border-width, 0px);
+    border-style: var(--feature-cards-panel-border-style, solid);
+    border-color: var(--feature-cards-panel-border-color, transparent);
+    border-radius: var(--feature-cards-panel-radius, 0);
+
+    padding: var(--feature-cards-panel-padding, 0px);
+  }
+
+  @media screen and (max-width: 749px) {
+    .feature-cards__panel {
+      border-radius: var(--feature-cards-panel-radius-mobile, var(--feature-cards-panel-radius, 0));
+      padding: var(--feature-cards-panel-padding-mobile, var(--feature-cards-panel-padding, 0px));
+    }
+  }
+
+  /* A card's hover picture fills the card edge to edge, and with no padding the
+     outermost cards sit in the panel's rounded corners — so a square photograph
+     corner would show outside a rounded frame.
+
+     Added by Liquid only when the radius is above zero. Clipping a square panel
+     buys nothing and costs the focus ring on the outermost card, and arrows
+     positioned outside the track are inside this clip — which is why Bottom is
+     the default arrow position and why the setting says so. */
+  .feature-cards__panel--clipped { overflow: hidden; }
+
+  /* Swiper's own overflow lives on `swiper-carousel`; this is the pre-init and
+     grid case, where the element is a plain block and the peek setting has
+     nothing keeping it inside the panel. */
+  .feature-cards__carousel { max-inline-size: 100%; }
+
+  /* ---- the card --------------------------------------------------------- */
+
+  .feature-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+
+    min-block-size: var(--feature-card-min-height, auto);
+
+    border-width: var(--feature-card-border-width, 0px);
+    border-style: var(--feature-card-border-style, solid);
+    border-color: var(--feature-card-border-color, transparent);
+    border-radius: var(--feature-card-radius, 0);
+
+    background: var(--feature-card-background, transparent);
+
+    /* `background-color` and `transform` only. Transitioning `all` here would
+       animate the border colour a scheme swap set, and would put the hover
+       picture — which fades on its own layer — through a second timeline. */
+    transition:
+      background-color var(--feature-card-transition, 500ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+      transform var(--feature-card-transition, 500ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+  }
+
+  /* The picture is decoration and is never a target: `pointer-events: none` so
+     it cannot swallow a click meant for a link inside the card, and it rounds
+     itself with `border-radius: inherit` rather than making the card clip —
+     which would take the focus ring of everything inside it with it. */
+  .feature-card__media {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+
+    border-radius: inherit;
+    overflow: hidden;
+    pointer-events: none;
+
+    opacity: 0;
+    transition: opacity var(--feature-card-transition, 500ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+  }
+
+  /* The tint, as a pseudo-element over the picture rather than as `opacity` on
+     the layer — fading the layer would fade the picture and the tint together,
+     which is the one thing the overlay slider must not do. */
+  .feature-card__media::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--feature-card-overlay, transparent);
+  }
+
+  /* `responsive-image` is built to hold an aspect ratio open. Here it is a fill
+     layer, so the ratio, the radius and the placeholder background all come
+     off — the same three corrections `.background-media responsive-image`
+     makes, for the same reason. */
+  .feature-card__media responsive-image {
+    display: block;
+    inline-size: 100%;
+    block-size: 100%;
+    aspect-ratio: auto;
+    border-radius: 0;
+    background: none;
+  }
+
+  .feature-card__media img {
+    inline-size: 100%;
+    block-size: 100%;
+    object-fit: cover;
+  }
+
+  .feature-card__inner {
+    position: relative;
+    z-index: 1;
+    flex: 1;
+
+    display: flex;
+    flex-direction: column;
+    align-items: var(--feature-card-align, center);
+    justify-content: center;
+    text-align: var(--feature-card-align, center);
+    gap: var(--feature-card-gap, 16px);
+
+    inline-size: 100%;
+  }
+
+  @media (hover: hover) {
+    .feature-card:hover,
+    .feature-card:focus-within {
+      transform: translateY(calc(var(--feature-card-lift, 0px) * -1));
+    }
+
+    .feature-card--has-media:hover .feature-card__media,
+    .feature-card--has-media:focus-within .feature-card__media {
+      opacity: 1;
+    }
+  }
+
+  /* ---- the words -------------------------------------------------------- */
+
+  /* `.block-text` is written for a row, where growing to fill is right. In this
+     column it would stretch a two-word title down the card, so the block's own
+     property is corrected rather than its `flex` declaration — the mobile rule
+     further up still reads `--block-text-flex-mobile` off the same cascade. */
+  .feature-title-block,
+  .feature-text-block,
+  .feature-title-block > *,
+  .feature-text-block > * {
+    transition: color var(--feature-card-transition, 500ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+  }
+
+  .feature-title-block,
+  .feature-text-block {
+    --block-text-flex: 0 0 auto;
+
+    margin: 0;
+  }
+
+  /* Both blocks are a `.block-text.rte` wrapper with the real tags inside — see
+     the note in `blocks/_feature-title.liquid` on why the class cannot go on
+     the heading itself. The wrapper is the block's box, so it is flush at both
+     ends and the paragraph rhythm inside it is left alone. */
+  .feature-title-block > :first-child,
+  .feature-text-block > :first-child {
+    margin-block-start: 0;
+  }
+
+  .feature-title-block > :last-child,
+  .feature-text-block > :last-child {
+    margin-block-end: 0;
+  }
+
+  /* The title clamps its heading and the text clamps its wrapper, because that
+     is where the lines are in each case: a title is one tag, and body copy is
+     however many paragraphs the merchant wrote. Clamping the title's wrapper
+     instead would count one line per paragraph. */
+  .feature-title-block--clamped > *,
+  .feature-text-block--clamped {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .feature-title-block--clamped > * { -webkit-line-clamp: var(--feature-title-lines, 2); }
+  .feature-text-block--clamped { -webkit-line-clamp: var(--feature-text-lines, 3); }
+
+  /* The class, not the property's fallback. `color: var(--x, inherit)` would
+     override whatever the block set on itself every time the merchant left the
+     hover colour empty — "unset" is not "inherit". Liquid adds the class and
+     the property together, only when there is a colour to apply.
+
+     The tags inside are named as well as the wrapper. A heading takes
+     `--color-heading` from the theme rather than inheriting, so a colour on the
+     wrapper alone reaches the text block and stops at the title — which reads
+     as the setting half working. */
+  @media (hover: hover) {
+    .feature-card--hover-text:hover :is(.feature-title-block, .feature-text-block),
+    .feature-card--hover-text:focus-within :is(.feature-title-block, .feature-text-block),
+    .feature-card--hover-text:hover
+      :is(.feature-title-block, .feature-text-block)
+      :is(p, h1, h2, h3, h4, h5, h6, li, strong, em),
+    .feature-card--hover-text:focus-within
+      :is(.feature-title-block, .feature-text-block)
+      :is(p, h1, h2, h3, h4, h5, h6, li, strong, em) {
+      color: var(--feature-card-hover-text);
+    }
+
+    /* Gradient text is painted by clipping a background to the glyphs, and a
+       `color` never reaches it. So the gradient comes off and the hover colour
+       goes on in its place — `-webkit-text-fill-color` as well as `color`,
+       because the clip sets the fill and the fill is what wins. */
+    .feature-card--hover-text:hover
+      .block-text--gradient
+      :is(p, h1, h2, h3, h4, h5, h6, li, strong, em),
+    .feature-card--hover-text:focus-within
+      .block-text--gradient
+      :is(p, h1, h2, h3, h4, h5, h6, li, strong, em) {
+      background-image: none;
+      color: var(--feature-card-hover-text);
+      -webkit-text-fill-color: var(--feature-card-hover-text);
+    }
+  }
+
+  /* ---- the icon --------------------------------------------------------- */
+
+  .feature-icon-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    inline-size: 100%;
+  }
+
+  /* The two hairlines that tie the title, the icon and the text into one
+     column. `flex: none` or the connector is the first thing a short card
+     squeezes, and the spine breaks before anything else gives. */
+  .feature-icon-block__connector {
+    display: block;
+    flex: none;
+    inline-size: var(--feature-icon-connector-width, 1px);
+    block-size: var(--feature-icon-connector-length, 48px);
+    background-color: var(--feature-icon-connector-color, currentColor);
+  }
+
+  /* Fading away from the ring in both directions, so the line arrives at the
+     icon at full strength and dissolves into the card. `background-color` is
+     cleared or it shows through the transparent end of the gradient. */
+  .feature-icon-block--connector-fade .feature-icon-block__connector {
+    background-color: transparent;
+  }
+
+  .feature-icon-block--connector-fade .feature-icon-block__connector--top {
+    background-image: linear-gradient(
+      to bottom,
+      transparent,
+      var(--feature-icon-connector-color, currentColor)
+    );
+  }
+
+  .feature-icon-block--connector-fade .feature-icon-block__connector--bottom {
+    background-image: linear-gradient(
+      to bottom,
+      var(--feature-icon-connector-color, currentColor),
+      transparent
+    );
+  }
+
+  .feature-icon-block__shape {
+    position: relative;
+    display: grid;
+    place-items: center;
+    flex: none;
+  }
+
+  /* Sized by the modifier rather than by the property alone, so Shape: None
+     leaves a bare glyph at its own size instead of a 108px box around it.
+     Liquid collapses the ring size to the disc's size when the ring is off, so
+     one property covers both. */
+  .feature-icon-block--shape-circle .feature-icon-block__shape,
+  .feature-icon-block--shape-square .feature-icon-block__shape {
+    inline-size: var(--feature-icon-ring-size, 108px);
+    block-size: var(--feature-icon-ring-size, 108px);
+  }
+
+  /* The ring is an inline SVG — see the note in the block on why a `border`
+     cannot draw this dash. `color` here is what `stroke="currentColor"` reads,
+     which is what makes the hover swap a single declaration. */
+  .feature-icon-block__ring {
+    position: absolute;
+    inset: 0;
+    inline-size: 100%;
+    block-size: 100%;
+    pointer-events: none;
+    color: var(--feature-icon-ring-color, currentColor);
+    transition: color var(--feature-card-transition, 500ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+  }
+
+  .feature-icon-block__disc {
+    display: grid;
+    place-items: center;
+    color: var(--feature-icon-color, inherit);
+    transition:
+      background-color var(--feature-card-transition, 500ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+      color var(--feature-card-transition, 500ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+  }
+
+  .feature-icon-block--shape-circle .feature-icon-block__disc,
+  .feature-icon-block--shape-square .feature-icon-block__disc {
+    inline-size: var(--feature-icon-shape-size, 86px);
+    block-size: var(--feature-icon-shape-size, 86px);
+    background-color: var(--feature-icon-fill, currentColor);
+    border-radius: var(--feature-icon-shape-radius, 0);
+  }
+
+  /* Beats the inline `--icon-size` the icon snippet writes on every svg, so the
+     block's own Icon size is the one that decides. Same override the button
+     makes, for the same reason. */
+  .feature-icon-block__glyph {
+    display: block;
+    inline-size: var(--feature-icon-glyph-size, 32px);
+    block-size: var(--feature-icon-glyph-size, 32px);
+  }
+
+  .feature-icon-block__image {
+    display: block;
+    inline-size: var(--feature-icon-glyph-size, 32px);
+    block-size: var(--feature-icon-glyph-size, 32px);
+    object-fit: contain;
+  }
+
+  /* The icon reads the card's state without painting outside its own box — see
+     the note in `blocks/_feature-card.liquid`. Each hover colour falls back to
+     its resting one, so a merchant who cleared a hover swatch gets no change
+     rather than `currentColor`. */
+  @media (hover: hover) {
+    .feature-card:hover .feature-icon-block__disc,
+    .feature-card:focus-within .feature-icon-block__disc {
+      background-color: var(--feature-icon-fill-hover, var(--feature-icon-fill, currentColor));
+      color: var(--feature-icon-color-hover, var(--feature-icon-color, inherit));
+    }
+
+    .feature-card:hover .feature-icon-block__ring,
+    .feature-card:focus-within .feature-icon-block__ring {
+      color: var(--feature-icon-ring-color-hover, var(--feature-icon-ring-color, currentColor));
+    }
+  }
+
+  /* A hover state is information, so the colours still change — what stops is
+     the travel and the timing. The picture appears and the icon recolours at
+     once rather than not at all, which is what the preference asks for and not
+     what switching the whole interaction off would give. */
+  @media (prefers-reduced-motion: reduce) {
+    .feature-card,
+    .feature-card__media,
+    .feature-title-block,
+    .feature-text-block,
+    .feature-title-block > *,
+    .feature-text-block > *,
+    .feature-icon-block__ring,
+    .feature-icon-block__disc {
+      transition-duration: 0.01ms;
+    }
+
+    .feature-card:hover,
+    .feature-card:focus-within {
+      transform: none;
+    }
+  }
+}

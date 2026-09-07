@@ -1,0 +1,570 @@
+{% doc %}
+  blocks/_feature-icon.liquid — private to `blocks/_feature-card.liquid`.
+
+  The disc in the middle of a feature card: a glyph, a filled shape behind it, a
+  dashed ring around that, and a hairline running up and down to the text.
+
+  ## The ring is an SVG, not a `border`
+
+  `border-style: dashed` gives no control over the dash. Every browser picks its
+  own length and its own gap from the width, and the design's ring is a 2px dash
+  with an 8px gap — a specific rhythm that reads as stitching rather than as a
+  dashed box. A `<circle>` with `stroke-dasharray` is the only way to state it,
+  so **Dash** and **Dash gap** are settings rather than something a merchant has
+  to accept from their browser.
+
+  The SVG is sized in px and given a matching `viewBox`, so it draws 1:1 and the
+  dash means the same thing at every ring size. `currentColor` on the stroke and
+  the colour on the element is what makes the hover swap one declaration.
+
+  ## The connectors are the card's spine
+
+  Two hairlines, one above the ring and one below, fading out as they travel
+  away from it. They are what tie the title, the icon and the text into a single
+  column rather than three things that happen to be stacked.
+
+  They are `::before` / `::after`-shaped work done with real elements instead,
+  because a fading line needs a `background-image` and pseudo-elements on this
+  block are already spoken for by the shape. Both are `aria-hidden`.
+
+  **Position** is one select with four values rather than two checkboxes: a
+  merchant putting the icon at the top of the card wants the line below it only,
+  and two independent toggles make four states out of a question with four
+  answers, two of which have to be discovered by trying.
+
+  ## Size comes from the theme, not from this block
+
+  `snippets/icon-size.liquid` resolves the same five keywords every icon control
+  in the theme offers, from Theme settings › Colors › Icon sizes. A store that
+  resizes its icons moves this one with them, and **Custom** is there for the
+  design's 32px without adding a sixth vocabulary.
+
+  ## Hover
+
+  Every hover rule for this block lives in `base.css` under
+  `@media (hover: hover)`, keyed off `.feature-card:hover`. The block reads the
+  card's state; it never paints outside its own box. See the note in
+  `blocks/_feature-card.liquid` on why touch is excluded.
+{% enddoc %}
+
+{%- liquid
+  assign s = block.settings
+
+  assign icon_source = s.icon_source | default: 'icon'
+
+  comment
+    The source decides, and the field belonging to it has to actually hold
+    something — a merchant who picked Image and has not uploaded one yet gets an
+    empty disc rather than a broken picture. Same rule as
+    `blocks/subheading.liquid`, which is where merchants learn it.
+  endcomment
+  assign has_icon = false
+  if icon_source == 'icon' and s.icon != blank and s.icon != 'none'
+    assign has_icon = true
+  elsif icon_source == 'image' and s.icon_image != blank
+    assign has_icon = true
+  endif
+
+  capture icon_px
+    render 'icon-size', size: s.icon_size, custom: s.icon_size_custom
+  endcapture
+  assign icon_size = icon_px | plus: 0
+
+  comment
+    ---- the shape behind the glyph ----
+
+    `none` means the glyph sits on its own. Fill colour, size and radius are
+    hidden in that case because there is no shape for them to describe, which
+    is the same reasoning `icon_style` on the Subheading block is written with:
+    no combination of settings that quietly does nothing.
+  endcomment
+  assign shape = s.shape | default: 'circle'
+  assign shape_size = s.shape_size | default: 86 | plus: 0
+  assign shape_radius = s.shape_radius | default: 16 | plus: 0
+
+  if shape == 'circle'
+    assign shape_radius = shape_size
+  endif
+
+  comment
+    ---- the ring ----
+
+    Offset is the clear space between the shape and the ring, so the ring's own
+    size is derived rather than asked for twice. A merchant enlarging the disc
+    keeps the gap they set instead of having to correct a second number.
+
+    The stroke is centred on the path, so the radius is inset by half the width
+    or the ring is clipped by its own viewBox on both sides.
+  endcomment
+  assign ring_style = s.ring_style | default: 'dashed'
+  assign has_ring = false
+  if ring_style != 'none' and shape != 'none'
+    assign has_ring = true
+  endif
+
+  assign ring_width = s.ring_width | default: 2 | plus: 0
+  assign ring_offset = s.ring_offset | default: 11 | plus: 0
+  assign ring_size = shape_size | plus: ring_offset | plus: ring_offset
+  assign ring_half = ring_size | divided_by: 2.0
+  assign ring_radius = ring_size | minus: ring_width | divided_by: 2.0
+
+  assign ring_inset = ring_width | divided_by: 2.0
+  assign ring_box = ring_size | minus: ring_width
+
+  comment
+    With no ring there is no clear space to hold open, so the shape's box is the
+    shape. Leaving the offset in would reserve 22px of nothing around a disc
+    whose ring the merchant has just turned off, and they would go looking for a
+    padding setting to correct it.
+  endcomment
+  unless has_ring
+    assign ring_size = shape_size
+  endunless
+
+  comment
+    Solid is the same circle with no dash pattern, rather than a second element
+    or a `border`. One code path, and switching between the two styles cannot
+    change anything but the dash.
+  endcomment
+  assign ring_dash = ''
+  if ring_style == 'dashed'
+    assign dash_on = s.ring_dash | default: 2 | plus: 0
+    assign dash_off = s.ring_dash_gap | default: 8 | plus: 0
+    assign ring_dash = dash_on | append: ' ' | append: dash_off
+  endif
+
+  comment
+    ---- the connectors ----
+  endcomment
+  assign connectors = s.connector_position | default: 'both'
+  assign connector_top = false
+  assign connector_bottom = false
+  if connectors == 'top' or connectors == 'both'
+    assign connector_top = true
+  endif
+  if connectors == 'bottom' or connectors == 'both'
+    assign connector_bottom = true
+  endif
+
+  assign connector_length = s.connector_length | default: 48 | plus: 0
+  if connector_length <= 0
+    assign connector_top = false
+    assign connector_bottom = false
+  endif
+
+  assign block_classes = 'feature-icon-block'
+  if shape != 'none'
+    assign block_classes = block_classes | append: ' feature-icon-block--shape-' | append: shape
+  endif
+  if s.connector_fade
+    assign block_classes = block_classes | append: ' feature-icon-block--connector-fade'
+  endif
+-%}
+
+{%- capture icon_style -%}
+  {%- render 'spacing', block: s, declarations: true -%}
+  --feature-icon-glyph-size: {{ icon_size }}px;
+  --feature-icon-shape-size: {{ shape_size }}px;
+  --feature-icon-shape-radius: {{ shape_radius }}px;
+  --feature-icon-ring-size: {{ ring_size }}px;
+  --feature-icon-connector-length: {{ connector_length }}px;
+  --feature-icon-connector-width: {{ s.connector_width | default: 1 | plus: 0 }}px;
+  {%- comment -%}
+    The fill and the ring colours are gated on there being something to paint,
+    not just on the setting holding a value. A merchant who switches Shape to
+    None has hidden those pickers but their stored colours remain, and an
+    ungated `--feature-icon-fill-hover` would put a coloured square behind a
+    bare glyph the moment a pointer arrived — a setting they can no longer see
+    doing something they did not ask for.
+  {%- endcomment -%}
+  {%- if shape != 'none' -%}
+    {%- if s.fill_color != blank -%}--feature-icon-fill: {{ s.fill_color }};{%- endif -%}
+    {%- if s.fill_hover_color != blank -%}--feature-icon-fill-hover: {{ s.fill_hover_color }};{%- endif -%}
+  {%- endif -%}
+  {%- if s.icon_color != blank -%}--feature-icon-color: {{ s.icon_color }};{%- endif -%}
+  {%- if s.icon_hover_color != blank -%}--feature-icon-color-hover: {{ s.icon_hover_color }};{%- endif -%}
+  {%- if has_ring -%}
+    {%- if s.ring_color != blank -%}--feature-icon-ring-color: {{ s.ring_color }};{%- endif -%}
+    {%- if s.ring_hover_color != blank -%}--feature-icon-ring-color-hover: {{ s.ring_hover_color }};{%- endif -%}
+  {%- endif -%}
+  {%- if s.connector_color != blank -%}--feature-icon-connector-color: {{ s.connector_color }};{%- endif -%}
+{%- endcapture -%}
+
+<div
+  class="{{ block_classes }}"
+  data-block-spacing
+  style="{{ icon_style | strip_newlines | strip }}"
+  {{ block.shopify_attributes }}
+>
+  {%- if connector_top -%}
+    <span class="feature-icon-block__connector feature-icon-block__connector--top" aria-hidden="true"></span>
+  {%- endif -%}
+
+  <span class="feature-icon-block__shape">
+    {%- if has_ring -%}
+      {%- comment -%}
+        Drawn at its real pixel size with a matching viewBox, so the dash is the
+        length the merchant asked for rather than that length multiplied by
+        whatever scale a percentage-sized SVG happened to land on.
+      {%- endcomment -%}
+      <svg
+        class="feature-icon-block__ring"
+        width="{{ ring_size }}"
+        height="{{ ring_size }}"
+        viewBox="0 0 {{ ring_size }} {{ ring_size }}"
+        fill="none"
+        aria-hidden="true"
+        focusable="false"
+      >
+        {%- if shape == 'square' -%}
+          <rect
+            x="{{ ring_inset }}"
+            y="{{ ring_inset }}"
+            width="{{ ring_box }}"
+            height="{{ ring_box }}"
+            rx="{{ shape_radius | plus: ring_offset }}"
+            stroke="currentColor"
+            stroke-width="{{ ring_width }}"
+            {% if ring_dash != blank %}stroke-dasharray="{{ ring_dash }}"{% endif %}
+          />
+        {%- else -%}
+          <circle
+            cx="{{ ring_half }}"
+            cy="{{ ring_half }}"
+            r="{{ ring_radius }}"
+            stroke="currentColor"
+            stroke-width="{{ ring_width }}"
+            {% if ring_dash != blank %}stroke-dasharray="{{ ring_dash }}"{% endif %}
+          />
+        {%- endif -%}
+      </svg>
+    {%- endif -%}
+
+    <span class="feature-icon-block__disc">
+      {%- if icon_source == 'image' and s.icon_image != blank -%}
+        {%- comment -%}
+          An uploaded mark is content the merchant chose, so it takes their alt
+          text — but it defaults to empty rather than to a filename. A feature
+          card's title already names the feature; an icon repeating it is a
+          second announcement of the same thing.
+        {%- endcomment -%}
+        <img
+          class="feature-icon-block__image"
+          src="{{ s.icon_image | image_url: width: 160 }}"
+          alt="{{ s.icon_image_alt | default: '' | escape }}"
+          width="{{ icon_size }}"
+          height="{{ icon_size }}"
+          loading="lazy"
+        >
+      {%- elsif has_icon -%}
+        {% render 'icon', icon: s.icon, size: icon_size, class: 'feature-icon-block__glyph' %}
+      {%- endif -%}
+    </span>
+  </span>
+
+  {%- if connector_bottom -%}
+    <span class="feature-icon-block__connector feature-icon-block__connector--bottom" aria-hidden="true"></span>
+  {%- endif -%}
+</div>
+
+{% schema %}
+{
+  "name": "t:blocks.feature_icon.name",
+  "tag": null,
+  "settings": [
+    {
+      "type": "select",
+      "id": "icon_source",
+      "label": "t:blocks.subheading.settings.icon_source.label",
+      "options": [
+        { "value": "icon", "label": "t:blocks.subheading.settings.icon_source.options__2.label" },
+        { "value": "image", "label": "t:blocks.subheading.settings.icon_source.options__3.label" }
+      ],
+      "default": "icon"
+    },
+    {
+      "type": "select",
+      "id": "icon",
+      "label": "t:blocks.subheading.settings.icon.label",
+      "options": [
+        { "value": "star", "label": "t:blocks.subheading.settings.icon.options__1.label" },
+        { "value": "check", "label": "t:blocks.subheading.settings.icon.options__2.label" },
+        { "value": "heart", "label": "t:blocks.subheading.settings.icon.options__3.label" },
+        { "value": "tag", "label": "t:blocks.subheading.settings.icon.options__4.label" },
+        { "value": "truck", "label": "t:blocks.subheading.settings.icon.options__5.label" },
+        { "value": "refresh", "label": "t:blocks.subheading.settings.icon.options__6.label" },
+        { "value": "lock", "label": "t:blocks.subheading.settings.icon.options__7.label" },
+        { "value": "clock", "label": "t:blocks.subheading.settings.icon.options__8.label" },
+        { "value": "location", "label": "t:blocks.subheading.settings.icon.options__9.label" },
+        { "value": "mail", "label": "t:blocks.subheading.settings.icon.options__10.label" },
+        { "value": "note", "label": "t:blocks.subheading.settings.icon.options__11.label" },
+        { "value": "info", "label": "t:blocks.subheading.settings.icon.options__12.label" },
+        { "value": "chat", "label": "t:blocks.feature_icon.settings.icon.options__13.label" },
+        { "value": "phone", "label": "t:blocks.feature_icon.settings.icon.options__14.label" },
+        { "value": "share", "label": "t:blocks.feature_icon.settings.icon.options__15.label" },
+        { "value": "grid", "label": "t:blocks.feature_icon.settings.icon.options__16.label" }
+      ],
+      "default": "star",
+      "visible_if": "{{ block.settings.icon_source == 'icon' }}"
+    },
+    {
+      "type": "image_picker",
+      "id": "icon_image",
+      "label": "t:blocks.subheading.settings.icon_image.label",
+      "info": "t:blocks.subheading.settings.icon_image.info",
+      "visible_if": "{{ block.settings.icon_source == 'image' }}"
+    },
+    {
+      "type": "text",
+      "id": "icon_image_alt",
+      "label": "t:blocks.subheading.settings.icon_image_alt.label",
+      "info": "t:blocks.subheading.settings.icon_image_alt.info",
+      "visible_if": "{{ block.settings.icon_source == 'image' }}"
+    },
+    {
+      "type": "select",
+      "id": "icon_size",
+      "label": "t:shared.icon_size.label",
+      "options": [
+        { "value": "extra_small", "label": "t:shared.icon_size.options__1.label" },
+        { "value": "small", "label": "t:shared.icon_size.options__2.label" },
+        { "value": "medium", "label": "t:shared.icon_size.options__3.label" },
+        { "value": "large", "label": "t:shared.icon_size.options__4.label" },
+        { "value": "extra_large", "label": "t:shared.icon_size.options__5.label" },
+        { "value": "custom", "label": "t:shared.icon_size.options__6.label" }
+      ],
+      "default": "custom"
+    },
+    {
+      "type": "range",
+      "id": "icon_size_custom",
+      "label": "t:shared.icon_size.custom.label",
+      "info": "t:shared.icon_size.custom.info",
+      "min": 12,
+      "max": 72,
+      "step": 2,
+      "unit": "px",
+      "default": 32,
+      "visible_if": "{{ block.settings.icon_size == 'custom' }}"
+    },
+    {
+      "type": "color",
+      "id": "icon_color",
+      "label": "t:blocks.feature_icon.settings.icon_color.label",
+      "default": "#0F2E2F"
+    },
+    {
+      "type": "color",
+      "id": "icon_hover_color",
+      "label": "t:blocks.feature_icon.settings.icon_hover_color.label",
+      "info": "t:blocks.feature_icon.settings.icon_hover_color.info",
+      "default": "#0F2E2F"
+    },
+
+    { "type": "header", "content": "t:blocks.feature_icon.headers.shape" },
+    {
+      "type": "select",
+      "id": "shape",
+      "label": "t:blocks.feature_icon.settings.shape.label",
+      "info": "t:blocks.feature_icon.settings.shape.info",
+      "options": [
+        { "value": "none", "label": "t:shared.options.none" },
+        { "value": "circle", "label": "t:shared.carousel.nav_shape.options__2.label" },
+        { "value": "square", "label": "t:shared.carousel.nav_shape.options__3.label" }
+      ],
+      "default": "circle"
+    },
+    {
+      "type": "range",
+      "id": "shape_size",
+      "label": "t:blocks.feature_icon.settings.shape_size.label",
+      "min": 32,
+      "max": 160,
+      "step": 2,
+      "unit": "px",
+      "default": 86,
+      "visible_if": "{{ block.settings.shape != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "shape_radius",
+      "label": "t:shared.corners.radius.label",
+      "min": 0,
+      "max": 48,
+      "step": 2,
+      "unit": "px",
+      "default": 16,
+      "visible_if": "{{ block.settings.shape == 'square' }}"
+    },
+    {
+      "type": "color",
+      "id": "fill_color",
+      "label": "t:blocks.feature_icon.settings.fill_color.label",
+      "default": "#03D26F",
+      "visible_if": "{{ block.settings.shape != 'none' }}"
+    },
+    {
+      "type": "color",
+      "id": "fill_hover_color",
+      "label": "t:blocks.feature_icon.settings.fill_hover_color.label",
+      "info": "t:blocks.feature_icon.settings.fill_hover_color.info",
+      "default": "#F9F871",
+      "visible_if": "{{ block.settings.shape != 'none' }}"
+    },
+
+    { "type": "header", "content": "t:blocks.feature_icon.headers.ring" },
+    { "type": "paragraph", "content": "t:blocks.feature_icon.paragraphs.ring" },
+    {
+      "type": "select",
+      "id": "ring_style",
+      "label": "t:shared.border.style.label",
+      "options": [
+        { "value": "none", "label": "t:shared.options.none" },
+        { "value": "solid", "label": "t:shared.options.solid" },
+        { "value": "dashed", "label": "t:shared.options.dashed" }
+      ],
+      "default": "dashed",
+      "visible_if": "{{ block.settings.shape != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "ring_offset",
+      "label": "t:blocks.feature_icon.settings.ring_offset.label",
+      "info": "t:blocks.feature_icon.settings.ring_offset.info",
+      "min": 0,
+      "max": 40,
+      "step": 1,
+      "unit": "px",
+      "default": 11,
+      "visible_if": "{{ block.settings.ring_style != 'none' and block.settings.shape != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "ring_width",
+      "label": "t:shared.border.thickness.label",
+      "min": 1,
+      "max": 8,
+      "step": 1,
+      "unit": "px",
+      "default": 2,
+      "visible_if": "{{ block.settings.ring_style != 'none' and block.settings.shape != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "ring_dash",
+      "label": "t:blocks.feature_icon.settings.ring_dash.label",
+      "info": "t:blocks.feature_icon.settings.ring_dash.info",
+      "min": 1,
+      "max": 20,
+      "step": 1,
+      "unit": "px",
+      "default": 2,
+      "visible_if": "{{ block.settings.ring_style == 'dashed' and block.settings.shape != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "ring_dash_gap",
+      "label": "t:blocks.feature_icon.settings.ring_dash_gap.label",
+      "min": 1,
+      "max": 24,
+      "step": 1,
+      "unit": "px",
+      "default": 8,
+      "visible_if": "{{ block.settings.ring_style == 'dashed' and block.settings.shape != 'none' }}"
+    },
+    {
+      "type": "color",
+      "id": "ring_color",
+      "label": "t:shared.border.color.label",
+      "default": "#03D26F",
+      "visible_if": "{{ block.settings.ring_style != 'none' and block.settings.shape != 'none' }}"
+    },
+    {
+      "type": "color",
+      "id": "ring_hover_color",
+      "label": "t:blocks.feature_icon.settings.ring_hover_color.label",
+      "default": "#F9F871",
+      "visible_if": "{{ block.settings.ring_style != 'none' and block.settings.shape != 'none' }}"
+    },
+
+    { "type": "header", "content": "t:blocks.feature_icon.headers.connectors" },
+    { "type": "paragraph", "content": "t:blocks.feature_icon.paragraphs.connectors" },
+    {
+      "type": "select",
+      "id": "connector_position",
+      "label": "t:shared.position.label",
+      "options": [
+        { "value": "none", "label": "t:shared.options.none" },
+        { "value": "top", "label": "t:blocks.feature_icon.settings.connector_position.options__2.label" },
+        { "value": "bottom", "label": "t:blocks.feature_icon.settings.connector_position.options__3.label" },
+        { "value": "both", "label": "t:blocks.feature_icon.settings.connector_position.options__4.label" }
+      ],
+      "default": "both"
+    },
+    {
+      "type": "range",
+      "id": "connector_length",
+      "label": "t:blocks.feature_icon.settings.connector_length.label",
+      "min": 0,
+      "max": 120,
+      "step": 2,
+      "unit": "px",
+      "default": 48,
+      "visible_if": "{{ block.settings.connector_position != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "connector_width",
+      "label": "t:shared.border.thickness.label",
+      "min": 1,
+      "max": 6,
+      "step": 1,
+      "unit": "px",
+      "default": 1,
+      "visible_if": "{{ block.settings.connector_position != 'none' }}"
+    },
+    {
+      "type": "color",
+      "id": "connector_color",
+      "label": "t:blocks.feature_icon.settings.connector_color.label",
+      "default": "#03D26F",
+      "visible_if": "{{ block.settings.connector_position != 'none' }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "connector_fade",
+      "label": "t:blocks.feature_icon.settings.connector_fade.label",
+      "info": "t:blocks.feature_icon.settings.connector_fade.info",
+      "default": true,
+      "visible_if": "{{ block.settings.connector_position != 'none' }}"
+    },
+
+    { "type": "header", "content": "t:shared.spacing.block_header" },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 0
+    }
+  ],
+  "presets": [
+    {
+      "name": "t:blocks.feature_icon.name"
+    }
+  ]
+}
+{% endschema %}

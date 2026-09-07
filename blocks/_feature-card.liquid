@@ -1,0 +1,490 @@
+{% doc %}
+  blocks/_feature-card.liquid — private to `sections/feature-cards.liquid`.
+
+  One feature: a title, a ringed icon and a line of text, with a picture that
+  comes up under all three when a pointer is over the card.
+
+  ## The card is a container, not a set of content settings
+
+  It holds no words of its own. The title, the icon and the text are three
+  nested blocks — `_feature-title`, `_feature-icon`, `_feature-text` — so the
+  merchant decides the order, drops any one of them, or adds two lines of text
+  under the icon, without this file knowing anything about it.
+
+  That is the same split `blocks/_article-card.liquid` makes, for the same
+  reason: a card whose parts are settings can only ever be the arrangement
+  somebody chose while writing it.
+
+  Unlike that one, this card is added by the merchant rather than rendered by
+  the section, because a feature row's length is content — four things a store
+  wants to say — not a count derived from a collection.
+
+  ## The hover picture is decoration, and is marked as such
+
+  It carries no alt text and sits in an `aria-hidden` layer. It is a mood behind
+  words that are already on the page, and a screen reader announcing a filename
+  in the middle of "Free delivery" is worse than silence. A merchant who has
+  something to *say* with a picture wants an Image block, not this.
+
+  It is also `pointer-events: none` in `base.css`, so the layer can never
+  swallow a click meant for something inside the card.
+
+  ## Why the hover colours live here and the icon's live in the icon
+
+  The card owns what the card paints — its picture, its overlay, the colour the
+  words turn when the picture is behind them. The disc, the ring and the glyph
+  are the icon block's box, so their hover colours are its settings.
+
+  The line that reads across — `.feature-card:hover .feature-icon-block__disc`
+  — is in the icon's own part of the stylesheet, not the card's. A block still
+  styles only its own box; it is allowed to know which state the card is in.
+
+  ## Touch has no hover, so the picture is not hidden behind one
+
+  Every hover rule sits inside `@media (hover: hover)`. On a phone the card
+  keeps its resting colours and the picture never appears, rather than latching
+  on after a tap and staying until the customer taps something else — which is
+  what an unguarded `:hover` does on touch, and which reads as a bug.
+
+  `:focus-within` is paired with `:hover` throughout, so a keyboard reaching a
+  link inside the card gets the same state a pointer does.
+{% enddoc %}
+
+{%- liquid
+  assign s = block.settings
+
+  assign align = s.alignment | default: 'center'
+  assign gap = s.gap | default: 16 | plus: 0
+  assign min_height = s.min_height | default: 0 | plus: 0
+
+  comment
+    Same three-part border resolution the section and the panel use, so a
+    merchant setting a border on any of the three boxes is answering the same
+    three questions in the same order.
+
+    A blank colour resolves to `currentColor` faded with `color-mix` rather than
+    through `color_modify`: the colour filters need a value to read an alpha
+    channel off, and there is nothing to read until the scheme resolves in the
+    browser.
+  endcomment
+  assign border_line = s.border_style | default: 'none'
+  assign border_width = 0
+  assign border_paint = ''
+
+  if border_line != 'none'
+    assign border_width = s.border_width | default: 1 | plus: 0
+
+    assign border_percent = s.border_opacity | default: 100 | plus: 0
+    if s.border_color == blank
+      assign border_paint = 'color-mix(in srgb, currentColor ' | append: border_percent | append: '%, transparent)'
+    else
+      assign border_alpha = border_percent | divided_by: 100.0
+      assign border_paint = s.border_color | color_modify: 'alpha', border_alpha
+    endif
+  endif
+
+  assign radius = s.border_radius | default: 0 | plus: 0
+
+  assign background_paint = ''
+  if s.background_color != blank
+    assign background_alpha = s.background_opacity | default: 100 | plus: 0
+    assign background_alpha = background_alpha | divided_by: 100.0
+    assign background_paint = s.background_color | color_modify: 'alpha', background_alpha
+  endif
+
+  comment
+    ---- the hover layer ----
+
+    The overlay is a colour with the slider folded into its alpha rather than an
+    element at `opacity`, because an element's opacity would fade the picture
+    *and* anything a merchant later puts in the same layer. One `background`
+    with an alpha channel fades exactly the tint.
+  endcomment
+  assign has_media = false
+  if s.hover_image != blank
+    assign has_media = true
+  endif
+
+  assign overlay_paint = ''
+  if has_media and s.overlay_color != blank
+    assign overlay_alpha = s.overlay_opacity | default: 60 | plus: 0
+    assign overlay_alpha = overlay_alpha | divided_by: 100.0
+    assign overlay_paint = s.overlay_color | color_modify: 'alpha', overlay_alpha
+  endif
+
+  comment
+    The hover text colour is a class as well as a property. Emitting the
+    property alone and writing `color: var(--feature-card-hover-text, inherit)`
+    would mean an unset colour resolving to `inherit` on hover — which is not
+    "leave it alone", it is "override whatever the title block set on itself".
+    So the rule only exists when the merchant has asked for it.
+  endcomment
+  assign hover_text = s.hover_text_color | default: ''
+
+  assign card_classes = 'feature-card feature-card--align-' | append: align
+  if has_media
+    assign card_classes = card_classes | append: ' feature-card--has-media'
+  endif
+  if hover_text != ''
+    assign card_classes = card_classes | append: ' feature-card--hover-text'
+  endif
+
+  comment
+    `sizes` describes the widest this picture is ever painted. A feature card is
+    a quarter of the row on a desktop and close to the full width of a phone, so
+    a wrong hint here is the usual cause of a hover picture arriving three sizes
+    too large for the box it fills.
+  endcomment
+  assign card_sizes = '(min-width: 990px) 25vw, (min-width: 750px) 50vw, 90vw'
+-%}
+
+{%- capture card_style -%}
+  {%- render 'spacing', block: s, declarations: true -%}
+  --feature-card-gap: {{ gap }}px;
+  --feature-card-align: {{ align }};
+  --feature-card-radius: {{ radius }}px;
+  --feature-card-transition: {{ s.hover_duration | default: 500 | plus: 0 }}ms;
+  --feature-card-lift: {{ s.hover_lift | default: 0 | plus: 0 }}px;
+  {%- if min_height > 0 -%}
+    --feature-card-min-height: {{ min_height }}px;
+  {%- endif -%}
+  {%- if border_width > 0 -%}
+    --feature-card-border-width: {{ border_width }}px;
+    --feature-card-border-style: {{ border_line }};
+    --feature-card-border-color: {{ border_paint }};
+  {%- endif -%}
+  {%- if background_paint != '' -%}
+    --feature-card-background: {{ background_paint }};
+  {%- endif -%}
+  {%- if overlay_paint != '' -%}
+    --feature-card-overlay: {{ overlay_paint }};
+  {%- endif -%}
+  {%- if hover_text != '' -%}
+    --feature-card-hover-text: {{ hover_text }};
+  {%- endif -%}
+{%- endcapture -%}
+
+<div
+  class="{{ card_classes }}"
+  data-block-spacing
+  style="{{ card_style | strip_newlines | strip }}"
+  {{ block.shopify_attributes }}
+>
+  {%- if has_media -%}
+    {%- comment -%}
+      Decoration, and marked as such — see the note above. `alt: ''` as well as
+      `aria-hidden` on the layer, because the two are read by different things
+      and a filename announced mid-sentence is worse than nothing.
+    {%- endcomment -%}
+    <div class="feature-card__media" aria-hidden="true">
+      {% render 'image',
+         image: s.hover_image,
+         mobile_image: s.hover_image_mobile,
+         alt: '',
+         class: 'feature-card__image',
+         sizes: card_sizes %}
+    </div>
+  {%- endif -%}
+
+  <div class="feature-card__inner">
+    {% content_for 'blocks' %}
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "t:blocks.feature_card.name",
+  "tag": null,
+  "blocks": [
+    { "type": "_feature-title" },
+    { "type": "_feature-icon" },
+    { "type": "_feature-text" },
+    { "type": "@app" }
+  ],
+  "settings": [
+    { "type": "paragraph", "content": "t:blocks.feature_card.paragraph" },
+    {
+      "type": "select",
+      "id": "alignment",
+      "label": "t:blocks.group.settings.alignment.label",
+      "options": [
+        { "value": "start", "label": "t:blocks.group.settings.alignment.options__1.label" },
+        { "value": "center", "label": "t:blocks.group.settings.alignment.options__2.label" },
+        { "value": "end", "label": "t:blocks.group.settings.alignment.options__3.label" }
+      ],
+      "default": "center"
+    },
+    {
+      "type": "range",
+      "id": "gap",
+      "label": "t:blocks.article_card.settings.gap.label",
+      "info": "t:blocks.feature_card.settings.gap.info",
+      "min": 0,
+      "max": 48,
+      "step": 2,
+      "unit": "px",
+      "default": 16
+    },
+    {
+      "type": "range",
+      "id": "min_height",
+      "label": "t:blocks.feature_card.settings.min_height.label",
+      "info": "t:blocks.feature_card.settings.min_height.info",
+      "min": 0,
+      "max": 640,
+      "step": 10,
+      "unit": "px",
+      "default": 400
+    },
+
+    { "type": "header", "content": "t:blocks.feature_card.headers.hover" },
+    { "type": "paragraph", "content": "t:blocks.feature_card.paragraphs.hover" },
+    {
+      "type": "image_picker",
+      "id": "hover_image",
+      "label": "t:blocks.feature_card.settings.hover_image.label",
+      "info": "t:blocks.feature_card.settings.hover_image.info"
+    },
+    {
+      "type": "image_picker",
+      "id": "hover_image_mobile",
+      "label": "t:shared.background.image_mobile.label",
+      "info": "t:shared.background.image_mobile.info",
+      "visible_if": "{{ block.settings.hover_image != blank }}"
+    },
+    {
+      "type": "color",
+      "id": "overlay_color",
+      "label": "t:shared.background.overlay_color.label",
+      "default": "#000000",
+      "visible_if": "{{ block.settings.hover_image != blank }}"
+    },
+    {
+      "type": "range",
+      "id": "overlay_opacity",
+      "label": "t:shared.background.overlay_opacity.label",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 60,
+      "visible_if": "{{ block.settings.hover_image != blank }}"
+    },
+    {
+      "type": "color",
+      "id": "hover_text_color",
+      "label": "t:blocks.feature_card.settings.hover_text_color.label",
+      "info": "t:blocks.feature_card.settings.hover_text_color.info",
+      "default": "#FFFFFF"
+    },
+    {
+      "type": "range",
+      "id": "hover_duration",
+      "label": "t:blocks.feature_card.settings.hover_duration.label",
+      "info": "t:blocks.feature_card.settings.hover_duration.info",
+      "min": 0,
+      "max": 1200,
+      "step": 50,
+      "unit": "ms",
+      "default": 500
+    },
+    {
+      "type": "range",
+      "id": "hover_lift",
+      "label": "t:blocks.feature_card.settings.hover_lift.label",
+      "info": "t:blocks.feature_card.settings.hover_lift.info",
+      "min": 0,
+      "max": 24,
+      "step": 1,
+      "unit": "px",
+      "default": 0
+    },
+
+    { "type": "header", "content": "t:shared.appearance.header" },
+    {
+      "type": "color",
+      "id": "background_color",
+      "label": "t:shared.appearance.background_color.label",
+      "info": "t:blocks.feature_card.settings.background_color.info"
+    },
+    {
+      "type": "range",
+      "id": "background_opacity",
+      "label": "t:sections.feature_cards.settings.panel_background_opacity.label",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 100,
+      "visible_if": "{{ block.settings.background_color != blank }}"
+    },
+
+    { "type": "header", "content": "t:blocks.group.headers.borders" },
+    { "type": "paragraph", "content": "t:blocks.feature_card.paragraphs.borders" },
+    {
+      "type": "select",
+      "id": "border_style",
+      "label": "t:shared.border.style.label",
+      "options": [
+        { "value": "none", "label": "t:shared.options.none" },
+        { "value": "solid", "label": "t:shared.options.solid" },
+        { "value": "dashed", "label": "t:shared.options.dashed" }
+      ],
+      "default": "none"
+    },
+    {
+      "type": "range",
+      "id": "border_width",
+      "label": "t:shared.border.thickness.label",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 1,
+      "visible_if": "{{ block.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_opacity",
+      "label": "t:shared.border.opacity.label",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 100,
+      "visible_if": "{{ block.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "color",
+      "id": "border_color",
+      "label": "t:shared.border.color.label",
+      "info": "t:shared.border.color.info",
+      "visible_if": "{{ block.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius",
+      "label": "t:shared.corners.radius.label",
+      "info": "t:blocks.feature_card.settings.border_radius.info",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 0
+    },
+
+    { "type": "header", "content": "t:shared.spacing.block_header" },
+    { "type": "paragraph", "content": "t:shared.spacing.block_paragraph" },
+    {
+      "type": "select",
+      "id": "padding_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        { "value": "desktop", "label": "t:shared.spacing.devices.options__1.label" },
+        { "value": "mobile", "label": "t:shared.spacing.devices.options__2.label" }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 40,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 40,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 24,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 24,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "label": "t:shared.spacing.padding_top.label",
+      "info": "t:shared.spacing.padding_top_mobile.info",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "info": "t:shared.spacing.padding_bottom_mobile.info",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left_mobile",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right_mobile",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    }
+  ],
+  "presets": [
+    {
+      "name": "t:blocks.feature_card.name",
+      "blocks": [
+        { "type": "_feature-title" },
+        { "type": "_feature-icon" },
+        { "type": "_feature-text" }
+      ]
+    }
+  ]
+}
+{% endschema %}

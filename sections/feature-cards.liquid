@@ -1,0 +1,1516 @@
+{% comment %}
+  sections/feature-cards.liquid
+
+  A row of feature cards inside one bordered panel. Each card is a title, a
+  ringed icon and a line of text; hovering one fills it with a picture and
+  swaps the icon's colour.
+
+  ## Nothing here is a third copy of anything
+
+  The surface is `sections/featured-blog.liquid`'s, setting id for setting id —
+  colour scheme, background media, the four border widths, the opacity slider,
+  the two radii, the margins, the container. A merchant who has set up a
+  Featured blog has set up this one, and the two share `snippets/spacing.liquid`,
+  `snippets/background-media.liquid` and `snippets/container.liquid` rather than
+  reimplementing them.
+
+  The carousel is `sections/multicolumn.liquid`'s: the element is written out
+  here because `{% content_for 'blocks' %}` cannot have its output captured, and
+  `carousel-shell-attrs` / `carousel-shell-tail` supply the attributes and the
+  controls from the same sub-snippets `carousel-shell.liquid` itself uses. Every
+  `carousel_*` id is the one the other two sections already carry, so the
+  arrows, the peek and the pagination are one implementation.
+
+  ## Three frames, three sets of border settings
+
+  The design has a border in two places and the theme has merchants who want it
+  in a third, so the controls are grouped by which box they draw:
+
+      Borders          the section frame — off by default
+      Cards panel      the dashed rounded box the cards sit inside — this is
+                       the one the design draws
+      (per card)       `blocks/_feature-card.liquid`, its own panel again
+
+  They are three separate boxes, so they are three separate groups rather than
+  one set of settings with a "what does this apply to" select. A select there
+  would mean a merchant who wants both has to choose.
+
+  ## Why the panel clips
+
+  A card's hover picture fills the card edge to edge, and the outermost cards
+  touch the panel's rounded corners. Without `overflow: hidden` on the panel a
+  square photograph corner sits outside a rounded frame.
+
+  So the panel clips — but only when it is actually rounded, because clipping
+  unconditionally would cut the focus ring off the outermost card for no reason.
+  `feature-cards__panel--clipped` is added when the radius is above zero, and
+  **Arrow position** carries a note that arrows placed outside the track are
+  inside that clip. Bottom is the default for the same reason.
+
+  ## Default layout is a grid, and a phone is a slider
+
+  Four features across is a row a desktop reads at a glance and a phone cannot
+  finish. So `layout` defaults to `grid` and `carousel_on_mobile` to true, which
+  is the one combination the pair of settings exists for. The same Type select
+  as Featured blog, minus Editorial — that layout is a lead story and the cards
+  around it, and a feature row has no lead feature.
+
+  ## The cards arrive one at a time
+
+  `<motion-effect>` wraps the panel with `data-target=".feature-card"` and a
+  stagger, rather than each card carrying its own effect. A card is a merchant
+  block here — `{% content_for 'blocks' %}` renders them all in one call and
+  passes no index — so there is no `forloop.index0` to turn into a per-card
+  delay the way `blocks/_article-card.liquid` does. One element that finds the
+  cards by selector and staggers them is the same cascade with nothing to keep
+  in step, and it survives a merchant reordering the row.
+
+  Targeting rather than `data-children` is deliberate: the panel's children are
+  the carousel element, not the cards, and once Swiper mounts it moves the
+  cards into a wrapper of its own. A selector still finds them; a child list
+  would not.
+{% endcomment %}
+
+{%- liquid
+  assign s = section.settings
+
+  assign desktop = s.columns_desktop | default: 4 | plus: 0
+
+  comment
+    Mobile columns is a select of two, clamped rather than trusted — a section
+    saved at three before the control narrowed keeps the 3 in the settings data
+    and the picker has nowhere to show it. Same guard, same reason, as
+    `sections/featured-blog.liquid`.
+
+    `plus: 0` coerces the select's string first: `"2" > 2` compares a string to
+    an integer, which is false in every Liquid.
+  endcomment
+  assign cols_mobile = s.columns_mobile | default: 1 | plus: 0
+  if cols_mobile > 2
+    assign cols_mobile = 2
+  endif
+  if cols_mobile < 1
+    assign cols_mobile = 1
+  endif
+
+  assign cols_tablet = s.columns_tablet | default: 2 | plus: 0
+
+  comment
+    ---- the surface, from `sections/featured-blog.liquid` ----
+  endcomment
+  assign background_media = s.background_media | default: 'none'
+  assign has_background_media = false
+  if background_media != 'none'
+    assign has_background_media = true
+  endif
+
+  assign background_paint = ''
+  if has_background_media == false
+    assign background_paint = s.background_color | default: ''
+  endif
+
+  comment
+    Opacity goes into the colour rather than onto the element: `opacity` on the
+    section would fade the cards along with the frame.
+
+    With no colour picked the border is `currentColor`, which the colour filters
+    cannot take an alpha channel from — there is nothing to read until the
+    scheme resolves in the browser. `color-mix` does the same fade at that point
+    instead, so both paths honour the slider.
+  endcomment
+  assign border_line = s.border_style | default: 'none'
+
+  assign bw_top = 0
+  assign bw_right = 0
+  assign bw_bottom = 0
+  assign bw_left = 0
+  assign border_any = 0
+
+  if border_line != 'none'
+    assign bw_top = s.border_width_top | default: 0 | plus: 0
+    assign bw_right = s.border_width_right | default: 0 | plus: 0
+    assign bw_bottom = s.border_width_bottom | default: 0 | plus: 0
+    assign bw_left = s.border_width_left | default: 0 | plus: 0
+    assign border_any = bw_top | plus: bw_right | plus: bw_bottom | plus: bw_left
+
+    assign border_percent = s.border_opacity | default: 100 | plus: 0
+    if s.border_color == blank
+      assign border_paint = 'color-mix(in srgb, currentColor ' | append: border_percent | append: '%, transparent)'
+    else
+      assign border_alpha = border_percent | divided_by: 100.0
+      assign border_paint = s.border_color | color_modify: 'alpha', border_alpha
+    endif
+  endif
+
+  assign radius = s.border_radius | default: 0 | plus: 0
+  assign radius_mobile = s.border_radius_mobile | default: radius | plus: 0
+  assign margin_top = s.margin_top | default: 0 | plus: 0
+  assign margin_bottom = s.margin_bottom | default: 0 | plus: 0
+
+  comment
+    ---- the cards panel ----
+
+    The same three-part border resolution as the section frame, on its own
+    prefix. One width rather than four: this box is the frame the design draws
+    all the way round, and a merchant who wants a single rule under a row of
+    features has the section's four-sided control one group up.
+  endcomment
+  assign panel_line = s.panel_border_style | default: 'none'
+  assign panel_width = 0
+  assign panel_paint = ''
+
+  if panel_line != 'none'
+    assign panel_width = s.panel_border_width | default: 1 | plus: 0
+
+    assign panel_percent = s.panel_border_opacity | default: 100 | plus: 0
+    if s.panel_border_color == blank
+      assign panel_paint = 'color-mix(in srgb, currentColor ' | append: panel_percent | append: '%, transparent)'
+    else
+      assign panel_alpha = panel_percent | divided_by: 100.0
+      assign panel_paint = s.panel_border_color | color_modify: 'alpha', panel_alpha
+    endif
+  endif
+
+  assign panel_radius = s.panel_border_radius | default: 0 | plus: 0
+  assign panel_radius_mobile = s.panel_border_radius_mobile | default: panel_radius | plus: 0
+
+  comment
+    The phone's padding falls back to the desktop value rather than to zero.
+
+    `default` cannot do it: 0 is not blank in Liquid, and 0 is exactly what an
+    untouched slider holds — so a merchant who set 32px on desktop and never
+    opened the mobile control would get 32 and 0, which reads as the panel
+    losing its inset on a phone rather than as a setting they have not answered
+    yet. Same convention as the section's own padding sliders.
+  endcomment
+  assign panel_padding = s.panel_padding | default: 0 | plus: 0
+  assign panel_padding_mobile = s.panel_padding_mobile | default: 0 | plus: 0
+  if panel_padding_mobile == 0
+    assign panel_padding_mobile = panel_padding
+  endif
+
+  assign panel_background = ''
+  if s.panel_background != blank
+    assign panel_bg_alpha = s.panel_background_opacity | default: 100 | plus: 0
+    assign panel_bg_alpha = panel_bg_alpha | divided_by: 100.0
+    assign panel_background = s.panel_background | color_modify: 'alpha', panel_bg_alpha
+  endif
+
+  comment
+    A card's hover picture reaches the panel's corners, so the panel has to clip
+    it — but only where there is a corner to clip to. An unconditional
+    `overflow: hidden` would cut the focus ring off the outermost card, which is
+    the same reasoning `.featured-blog.has-background-media` is written with.
+  endcomment
+  assign panel_clipped = false
+  if panel_radius > 0 or panel_radius_mobile > 0
+    assign panel_clipped = true
+  endif
+
+  comment
+    ---- the carousel ----
+
+    Two types, two answers. `grid` is a CSS grid; only `carousel` reaches
+    `data-layout`, or the component would try to build a Swiper out of a layout
+    that is not one.
+  endcomment
+  assign layout_type = s.layout | default: 'grid'
+
+  assign cs_layout = 'grid'
+  if layout_type == 'carousel'
+    assign cs_layout = 'carousel'
+  endif
+
+  comment
+    `false == blank` is true in Liquid, so a blank check would read "off" as
+    "not set" and turn the mobile carousel back on. `nil` is the only value that
+    means the merchant has not answered yet.
+  endcomment
+  assign carousel_on_mobile = s.carousel_on_mobile
+  if carousel_on_mobile == nil
+    assign carousel_on_mobile = true
+  endif
+
+  assign cs_layout_mobile = 'grid'
+  if layout_type == 'carousel' or carousel_on_mobile
+    assign cs_layout_mobile = 'carousel'
+  endif
+
+  assign cs_is_carousel = false
+  if cs_layout == 'carousel' or cs_layout_mobile == 'carousel'
+    assign cs_is_carousel = true
+  endif
+
+  comment
+    The slide count, and only the slides.
+
+    `carousel-options` uses it to decide whether the merchant's Loop setting is
+    achievable — Swiper silently disables looping below twice `slidesPerView`,
+    which reads as the setting doing nothing. So it has to be the number of
+    cards, not `section.blocks.size`: an app block sitting in the row, or the
+    static heading if the platform ever counts it, would inflate the number and
+    let a loop through that Swiper then refuses.
+  endcomment
+  assign cs_count = 0
+  for feature_block in section.blocks
+    if feature_block.type == '_feature-card'
+      assign cs_count = cs_count | plus: 1
+    endif
+  endfor
+
+  assign cs_label = 'accessibility.carousel' | t
+
+  comment
+    ---- the gaps ----
+
+    `--grid-gap-x` / `--grid-gap-y` rather than section-private names, because
+    those two are what the whole theme spaces a card grid with: the pre-init
+    grid reads them and `carousel.js` falls back to `--grid-gap-x` for Swiper's
+    `spaceBetween`. One pair of sliders moves the grid, the pre-init layout and
+    the live carousel together.
+
+    `plus: 0` rather than `default` alone: 0 is a gap a merchant can legitimately
+    want here — the design's panel has its cards flush against a shared frame —
+    and `default` would replace it.
+  endcomment
+  assign gap_x = s.gap_horizontal | default: 24 | plus: 0
+  assign gap_y = s.gap_vertical | default: 24 | plus: 0
+
+  assign card_stagger = s.animation_stagger | default: 0 | plus: 0
+-%}
+
+{%- capture section_style -%}
+  {%- render 'spacing', section: s, declarations: true -%}
+  --grid-gap-x: {{ gap_x }}px;
+  --grid-gap-y: {{ gap_y }}px;
+  --feature-cards-radius: {{ radius }}px;
+  --feature-cards-radius-mobile: {{ radius_mobile }}px;
+  --feature-cards-margin-block-start: {{ margin_top }}px;
+  --feature-cards-margin-block-end: {{ margin_bottom }}px;
+  {%- if border_any > 0 -%}
+    --feature-cards-border-width: {{ bw_top }}px {{ bw_right }}px {{ bw_bottom }}px {{ bw_left }}px;
+    --feature-cards-border-style: {{ border_line }};
+    --feature-cards-border-color: {{ border_paint }};
+  {%- endif -%}
+  {%- if background_paint != '' -%}
+    background: {{ background_paint }};
+  {%- endif -%}
+{%- endcapture -%}
+
+{%- capture panel_style -%}
+  --feature-cards-panel-radius: {{ panel_radius }}px;
+  --feature-cards-panel-radius-mobile: {{ panel_radius_mobile }}px;
+  --feature-cards-panel-padding: {{ panel_padding }}px;
+  --feature-cards-panel-padding-mobile: {{ panel_padding_mobile }}px;
+  {%- if panel_width > 0 -%}
+    --feature-cards-panel-border-width: {{ panel_width }}px;
+    --feature-cards-panel-border-style: {{ panel_line }};
+    --feature-cards-panel-border-color: {{ panel_paint }};
+  {%- endif -%}
+  {%- if panel_background != '' -%}
+    --feature-cards-panel-background: {{ panel_background }};
+  {%- endif -%}
+{%- endcapture -%}
+
+<div
+  class="feature-cards color-scheme-container color-{{ s.color_scheme }}{% if has_background_media %} has-background-media{% endif %}"
+  data-section-spacing
+  data-section-id="{{ section.id }}"
+  style="{{ section_style | strip_newlines | strip }}"
+>
+  {%- if has_background_media -%}
+    {% render 'background-media', settings: s %}
+  {%- endif -%}
+
+  <div class="{% render 'container', width: s.container_width %}">
+    {%- comment -%}
+      The merchant's heading cluster, as a static block so it cannot be dragged
+      into the row of cards and cannot be deleted by accident. Same mechanism,
+      same reason, as `sections/main-faq.liquid`'s `faq-header`.
+
+      `children: true` staggers the cluster's own parts — the pill, the heading,
+      the paragraph — so the section opens as one cascade rather than as a wall
+      of text arriving at once.
+    {%- endcomment -%}
+    <motion-effect
+      class="feature-cards__header feature-cards__header--{{ s.alignment | default: 'center' }}"
+      {% render 'motion-attrs', kind: 'text', section: s, children: true %}
+    >
+      {% content_for 'block', type: 'section-header', id: 'feature-cards-header' %}
+    </motion-effect>
+
+    {%- comment -%}
+      One `<motion-effect>` for the whole row — see the note at the top on why
+      the cards are found by selector rather than carrying an effect each.
+
+      `kind: 'image'` rather than `'text'`: a card is a picture and a panel, and
+      the text family's presets split their target into words and letters.
+    {%- endcomment -%}
+    <motion-effect
+      class="feature-cards__panel{% if panel_clipped %} feature-cards__panel--clipped{% endif %}"
+      style="{{ panel_style | strip_newlines | strip }}"
+      {% render 'motion-attrs',
+         kind: 'image',
+         section: s,
+         target: '.feature-card',
+         stagger: card_stagger %}
+    >
+      {%- comment -%}
+        The carousel element, written out here rather than through
+        `snippets/carousel-shell.liquid`.
+
+        Its slides are theme blocks, and `{% content_for %}` output cannot be
+        captured — Shopify renders blocks with their editor bindings attached,
+        and buffering that into a variable is not something the platform
+        supports. So the element and its track live here while
+        `carousel-shell-attrs` and `carousel-shell-tail` supply the attributes
+        and the controls from the same sub-snippets the shell itself uses.
+        `sections/multicolumn.liquid` does the same, for the same reason.
+      {%- endcomment -%}
+      <swiper-carousel
+        {% render 'carousel-shell-attrs',
+           settings: s,
+           layout: cs_layout,
+           layout_mobile: cs_layout_mobile,
+           classes: 'feature-cards__carousel',
+           columns_desktop: desktop,
+           columns_tablet: cols_tablet,
+           columns_mobile: cols_mobile,
+           count: cs_count %}
+      >
+        <div
+          class="carousel-shell__track feature-cards__grid"
+          data-ref="track"
+          {% if cs_is_carousel %}aria-label="{{ cs_label | escape }}"{% endif %}
+        >
+          {% content_for 'blocks' %}
+        </div>
+
+        {% render 'carousel-shell-tail',
+           settings: s,
+           layout: cs_layout,
+           layout_mobile: cs_layout_mobile %}
+      </swiper-carousel>
+    </motion-effect>
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "t:sections.feature_cards.name",
+  "tag": "section",
+  "class": "section",
+  "blocks": [
+    {
+      "type": "_feature-card"
+    },
+    {
+      "type": "@app"
+    }
+  ],
+  "settings": [
+    {
+      "type": "select",
+      "id": "alignment",
+      "label": "t:blocks.group.settings.alignment.label",
+      "info": "t:sections.feature_cards.settings.alignment.info",
+      "options": [
+        {
+          "value": "start",
+          "label": "t:blocks.group.settings.alignment.options__1.label"
+        },
+        {
+          "value": "center",
+          "label": "t:blocks.group.settings.alignment.options__2.label"
+        },
+        {
+          "value": "end",
+          "label": "t:blocks.group.settings.alignment.options__3.label"
+        }
+      ],
+      "default": "center"
+    },
+
+    {
+      "type": "header",
+      "content": "t:sections.featured_blog.headers.cards"
+    },
+    {
+      "type": "select",
+      "id": "layout",
+      "label": "t:shared.carousel.layout_type.label",
+      "info": "t:shared.carousel.layout_type.info",
+      "options": [
+        {
+          "value": "grid",
+          "label": "t:shared.carousel.layout_type.options__1.label"
+        },
+        {
+          "value": "carousel",
+          "label": "t:shared.carousel.layout_type.options__2.label"
+        }
+      ],
+      "default": "grid"
+    },
+    {
+      "type": "checkbox",
+      "id": "carousel_on_mobile",
+      "label": "t:shared.carousel.carousel_on_mobile.label",
+      "info": "t:shared.carousel.carousel_on_mobile.info",
+      "default": true,
+      "visible_if": "{{ section.settings.layout != 'carousel' }}"
+    },
+    {
+      "type": "range",
+      "id": "columns_desktop",
+      "label": "t:shared.columns.desktop.label",
+      "min": 2,
+      "max": 6,
+      "step": 1,
+      "default": 4
+    },
+    {
+      "type": "range",
+      "id": "columns_tablet",
+      "label": "t:shared.carousel.columns_tablet.label",
+      "min": 1,
+      "max": 4,
+      "step": 1,
+      "default": 2
+    },
+    {
+      "type": "select",
+      "id": "columns_mobile",
+      "label": "t:shared.carousel.columns_mobile.label",
+      "options": [
+        {
+          "value": "1",
+          "label": "t:shared.carousel.columns_mobile.options__1.label"
+        },
+        {
+          "value": "2",
+          "label": "t:shared.carousel.columns_mobile.options__2.label"
+        }
+      ],
+      "default": "1"
+    },
+    {
+      "type": "range",
+      "id": "gap_horizontal",
+      "label": "t:blocks.group.settings.gap_horizontal.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 24
+    },
+    {
+      "type": "range",
+      "id": "gap_vertical",
+      "label": "t:blocks.group.settings.gap_vertical.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 24
+    },
+
+    {
+      "type": "header",
+      "content": "t:sections.feature_cards.headers.panel"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:sections.feature_cards.paragraphs.panel"
+    },
+    {
+      "type": "color",
+      "id": "panel_background",
+      "label": "t:shared.appearance.background_color.label",
+      "default": "#FFFFFF"
+    },
+    {
+      "type": "range",
+      "id": "panel_background_opacity",
+      "label": "t:sections.feature_cards.settings.panel_background_opacity.label",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 100
+    },
+    {
+      "type": "select",
+      "id": "panel_border_style",
+      "label": "t:shared.border.style.label",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.options.none"
+        },
+        {
+          "value": "solid",
+          "label": "t:shared.options.solid"
+        },
+        {
+          "value": "dashed",
+          "label": "t:shared.options.dashed"
+        }
+      ],
+      "default": "dashed"
+    },
+    {
+      "type": "range",
+      "id": "panel_border_width",
+      "label": "t:shared.border.thickness.label",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 1,
+      "visible_if": "{{ section.settings.panel_border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "panel_border_opacity",
+      "label": "t:shared.border.opacity.label",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 100,
+      "visible_if": "{{ section.settings.panel_border_style != 'none' }}"
+    },
+    {
+      "type": "color",
+      "id": "panel_border_color",
+      "label": "t:shared.border.color.label",
+      "info": "t:shared.border.color.info",
+      "default": "#0F2E2F",
+      "visible_if": "{{ section.settings.panel_border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "panel_border_radius",
+      "label": "t:shared.corners.radius.label",
+      "info": "t:sections.feature_cards.settings.panel_border_radius.info",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 40
+    },
+    {
+      "type": "range",
+      "id": "panel_border_radius_mobile",
+      "label": "t:shared.corners.radius_mobile.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 24
+    },
+    {
+      "type": "range",
+      "id": "panel_padding",
+      "label": "t:sections.feature_cards.settings.panel_padding.label",
+      "info": "t:sections.feature_cards.settings.panel_padding.info",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "panel_padding_mobile",
+      "label": "t:sections.feature_cards.settings.panel_padding_mobile.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 0
+    },
+
+    {
+      "type": "header",
+      "content": "t:sections.featured_blog.headers.section"
+    },
+    {
+      "type": "select",
+      "id": "container_width",
+      "label": "t:shared.container.width.label",
+      "info": "t:shared.container.width.info",
+      "options": [
+        {
+          "value": "edge",
+          "label": "t:shared.container.width.options__1.label"
+        },
+        {
+          "value": "wide",
+          "label": "t:shared.container.width.options__2.label"
+        },
+        {
+          "value": "standard",
+          "label": "t:shared.container.width.options__3.label"
+        },
+        {
+          "value": "compact",
+          "label": "t:shared.container.width.options__4.label"
+        },
+        {
+          "value": "custom",
+          "label": "t:shared.container.width.options__5.label"
+        }
+      ],
+      "default": "standard"
+    },
+
+    {
+      "type": "header",
+      "content": "t:shared.appearance.header"
+    },
+    {
+      "type": "color_scheme",
+      "id": "color_scheme",
+      "label": "t:shared.color_scheme.label",
+      "default": "scheme-1"
+    },
+    {
+      "type": "select",
+      "id": "background_media",
+      "label": "t:shared.background.media.label",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.background.media.options__1.label"
+        },
+        {
+          "value": "image",
+          "label": "t:shared.background.media.options__2.label"
+        }
+      ],
+      "default": "none"
+    },
+    {
+      "type": "color_background",
+      "id": "background_color",
+      "label": "t:shared.background.color.label",
+      "info": "t:shared.background.color.info",
+      "visible_if": "{{ section.settings.background_media == 'none' }}"
+    },
+    {
+      "type": "image_picker",
+      "id": "image",
+      "label": "t:shared.background.image.label",
+      "visible_if": "{{ section.settings.background_media == 'image' }}"
+    },
+    {
+      "type": "image_picker",
+      "id": "image_mobile",
+      "label": "t:shared.background.image_mobile.label",
+      "info": "t:shared.background.image_mobile.info",
+      "visible_if": "{{ section.settings.background_media == 'image' }}"
+    },
+    {
+      "type": "select",
+      "id": "image_position",
+      "label": "t:shared.background.image_position.label",
+      "info": "t:shared.background.image_position.info",
+      "options": [
+        {
+          "value": "cover",
+          "label": "t:shared.background.image_position.options__1.label"
+        },
+        {
+          "value": "fit",
+          "label": "t:shared.background.image_position.options__2.label"
+        }
+      ],
+      "default": "cover",
+      "visible_if": "{{ section.settings.background_media == 'image' }}"
+    },
+
+    {
+      "type": "header",
+      "content": "t:blocks.group.headers.borders"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:sections.feature_cards.paragraphs.borders"
+    },
+    {
+      "type": "select",
+      "id": "border_style",
+      "label": "t:blocks.group.settings.border_style.label",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.options.none"
+        },
+        {
+          "value": "solid",
+          "label": "t:shared.options.solid"
+        },
+        {
+          "value": "dashed",
+          "label": "t:shared.options.dashed"
+        }
+      ],
+      "default": "none"
+    },
+    {
+      "type": "range",
+      "id": "border_width_top",
+      "label": "t:shared.border.sides.top.label",
+      "info": "t:shared.border.sides.info",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_width_right",
+      "label": "t:shared.border.sides.right.label",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_width_bottom",
+      "label": "t:shared.border.sides.bottom.label",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_width_left",
+      "label": "t:shared.border.sides.left.label",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_opacity",
+      "label": "t:shared.border.opacity.label",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 100,
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "color",
+      "id": "border_color",
+      "label": "t:blocks.group.settings.border_color.label",
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+
+    {
+      "type": "header",
+      "content": "t:shared.corners.header"
+    },
+    {
+      "type": "range",
+      "id": "border_radius",
+      "label": "t:shared.corners.radius.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "border_radius_mobile",
+      "label": "t:shared.corners.radius_mobile.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 0
+    },
+
+    {
+      "type": "header",
+      "content": "t:sections.featured_blog.headers.carousel",
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:sections.featured_blog.paragraphs.carousel",
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "range",
+      "id": "carousel_speed",
+      "label": "t:shared.carousel.speed.label",
+      "info": "t:shared.carousel.speed.info",
+      "min": 100,
+      "max": 1500,
+      "step": 50,
+      "unit": "ms",
+      "default": 500,
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "carousel_loop",
+      "label": "t:shared.carousel.loop.label",
+      "default": false,
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "carousel_autoplay",
+      "label": "t:shared.carousel.autoplay.label",
+      "info": "t:shared.carousel.autoplay.info",
+      "default": false,
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "range",
+      "id": "carousel_autoplay_delay",
+      "label": "t:shared.carousel.autoplay_delay.label",
+      "min": 2,
+      "max": 15,
+      "step": 1,
+      "unit": "s",
+      "default": 5,
+      "visible_if": "{{ section.settings.carousel_autoplay and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+
+    {
+      "type": "header",
+      "content": "t:shared.carousel.headers.peek",
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:shared.carousel.paragraphs.peek",
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "range",
+      "id": "carousel_peek_mobile",
+      "label": "t:shared.carousel.peek_mobile.label",
+      "info": "t:shared.carousel.peek_mobile.info",
+      "min": 0,
+      "max": 90,
+      "step": 5,
+      "unit": "%",
+      "default": 15,
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "range",
+      "id": "carousel_peek_desktop",
+      "label": "t:shared.carousel.peek_desktop.label",
+      "info": "t:shared.carousel.peek_desktop.info",
+      "min": 0,
+      "max": 90,
+      "step": 5,
+      "unit": "%",
+      "default": 0,
+      "visible_if": "{{ section.settings.layout == 'carousel' }}"
+    },
+
+    {
+      "type": "header",
+      "content": "t:shared.carousel.headers.navigation",
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "carousel_navigation",
+      "label": "t:shared.carousel.navigation.label",
+      "default": false,
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "select",
+      "id": "carousel_nav_position",
+      "label": "t:shared.carousel.nav_position.label",
+      "info": "t:sections.feature_cards.settings.carousel_nav_position.info",
+      "options": [
+        {
+          "value": "outside",
+          "label": "t:shared.carousel.nav_position.options__1.label"
+        },
+        {
+          "value": "inside",
+          "label": "t:shared.carousel.nav_position.options__2.label"
+        },
+        {
+          "value": "bottom",
+          "label": "t:shared.carousel.nav_position.options__3.label"
+        },
+        {
+          "value": "inline",
+          "label": "t:shared.carousel.nav_position.options__4.label"
+        }
+      ],
+      "default": "bottom",
+      "visible_if": "{{ section.settings.carousel_navigation and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "select",
+      "id": "carousel_nav_icon",
+      "label": "t:shared.carousel.nav_glyph.label",
+      "options": [
+        {
+          "value": "arrow",
+          "label": "t:shared.carousel.nav_glyph.options__1.label"
+        },
+        {
+          "value": "chevron",
+          "label": "t:shared.carousel.nav_glyph.options__2.label"
+        },
+        {
+          "value": "arrow-large",
+          "label": "t:shared.carousel.nav_glyph.options__3.label"
+        },
+        {
+          "value": "chevron-large",
+          "label": "t:shared.carousel.nav_glyph.options__4.label"
+        },
+        {
+          "value": "none",
+          "label": "t:shared.carousel.nav_glyph.options__5.label"
+        }
+      ],
+      "default": "arrow",
+      "visible_if": "{{ section.settings.carousel_navigation and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "select",
+      "id": "carousel_nav_shape",
+      "label": "t:shared.carousel.nav_shape.label",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.carousel.nav_shape.options__1.label"
+        },
+        {
+          "value": "circle",
+          "label": "t:shared.carousel.nav_shape.options__2.label"
+        },
+        {
+          "value": "square",
+          "label": "t:shared.carousel.nav_shape.options__3.label"
+        }
+      ],
+      "default": "circle",
+      "visible_if": "{{ section.settings.carousel_navigation and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "select",
+      "id": "carousel_nav_border_style",
+      "label": "t:shared.carousel.nav_border_style.label",
+      "options": [
+        {
+          "value": "solid",
+          "label": "t:shared.options.solid"
+        },
+        {
+          "value": "dashed",
+          "label": "t:shared.options.dashed"
+        },
+        {
+          "value": "none",
+          "label": "t:shared.options.none"
+        }
+      ],
+      "default": "dashed",
+      "visible_if": "{{ section.settings.carousel_nav_shape != 'none' and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "range",
+      "id": "carousel_nav_border_radius",
+      "label": "t:shared.carousel.nav_border_radius.label",
+      "info": "t:shared.carousel.nav_border_radius.info",
+      "min": 0,
+      "max": 30,
+      "step": 1,
+      "unit": "px",
+      "default": 8,
+      "visible_if": "{{ section.settings.carousel_nav_shape == 'square' and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "select",
+      "id": "carousel_controls_style",
+      "label": "t:shared.carousel.controls_style.label",
+      "info": "t:shared.carousel.controls_style.info",
+      "options": [
+        {
+          "value": "split",
+          "label": "t:shared.carousel.controls_style.options__1.label"
+        },
+        {
+          "value": "ghost",
+          "label": "t:shared.carousel.controls_style.options__2.label"
+        },
+        {
+          "value": "solid",
+          "label": "t:shared.carousel.controls_style.options__3.label"
+        }
+      ],
+      "default": "ghost",
+      "visible_if": "{{ section.settings.carousel_navigation and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "range",
+      "id": "carousel_nav_size",
+      "label": "t:shared.carousel.nav_size.label",
+      "min": 28,
+      "max": 72,
+      "step": 2,
+      "unit": "px",
+      "default": 44,
+      "visible_if": "{{ section.settings.carousel_navigation and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+
+    {
+      "type": "header",
+      "content": "t:shared.carousel.headers.pagination",
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "select",
+      "id": "carousel_pagination",
+      "label": "t:shared.carousel.pagination.label",
+      "info": "t:shared.carousel.pagination.info",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.carousel.pagination.options__1.label"
+        },
+        {
+          "value": "dots",
+          "label": "t:shared.carousel.pagination.options__2.label"
+        },
+        {
+          "value": "numbers",
+          "label": "t:shared.carousel.pagination.options__3.label"
+        },
+        {
+          "value": "progress",
+          "label": "t:shared.carousel.pagination.options__4.label"
+        },
+        {
+          "value": "controls",
+          "label": "t:shared.carousel.pagination.options__5.label"
+        }
+      ],
+      "default": "dots",
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "select",
+      "id": "carousel_pagination_align",
+      "label": "t:shared.carousel.pagination_align.label",
+      "info": "t:shared.carousel.pagination_align.info",
+      "options": [
+        {
+          "value": "start",
+          "label": "t:shared.carousel.controls_align.options__1.label"
+        },
+        {
+          "value": "center",
+          "label": "t:shared.carousel.controls_align.options__2.label"
+        },
+        {
+          "value": "end",
+          "label": "t:shared.carousel.controls_align.options__3.label"
+        }
+      ],
+      "default": "center",
+      "visible_if": "{{ section.settings.carousel_pagination != 'none' and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+
+    {
+      "type": "header",
+      "content": "t:shared.carousel.headers.controls",
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:shared.carousel.paragraphs.colors",
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "carousel_inherit_scheme",
+      "label": "t:shared.carousel.inherit_scheme.label",
+      "info": "t:shared.carousel.inherit_scheme.info",
+      "default": true,
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "color_scheme",
+      "id": "carousel_color_scheme",
+      "label": "t:shared.color_scheme.label",
+      "info": "t:shared.carousel.color_scheme.info",
+      "default": "scheme-1",
+      "visible_if": "{{ section.settings.carousel_inherit_scheme == false }}"
+    },
+
+    {
+      "type": "header",
+      "content": "t:shared.animation.header"
+    },
+    {
+      "type": "select",
+      "id": "animation_text",
+      "label": "t:shared.animation.animation_text.label",
+      "info": "t:sections.feature_cards.settings.animation_text.info",
+      "options": [
+        {
+          "value": "inherit",
+          "label": "t:shared.animation.animation_text.options__1.label"
+        },
+        {
+          "value": "none",
+          "label": "t:shared.animation.animation_text.options__2.label"
+        },
+        {
+          "value": "fade-in",
+          "label": "t:shared.animation.animation_text.options__3.label"
+        },
+        {
+          "value": "fade-up",
+          "label": "t:shared.animation.animation_text.options__4.label"
+        },
+        {
+          "value": "slide-up",
+          "label": "t:shared.animation.animation_text.options__5.label"
+        }
+      ],
+      "default": "inherit"
+    },
+    {
+      "type": "select",
+      "id": "animation_image",
+      "label": "t:sections.feature_cards.settings.animation_image.label",
+      "info": "t:sections.feature_cards.settings.animation_image.info",
+      "options": [
+        {
+          "value": "inherit",
+          "label": "t:shared.animation.animation_text.options__1.label"
+        },
+        {
+          "value": "none",
+          "label": "t:shared.animation.animation_text.options__2.label"
+        },
+        {
+          "value": "fade-in",
+          "label": "t:shared.animation.animation_text.options__3.label"
+        },
+        {
+          "value": "fade-up",
+          "label": "t:shared.animation.animation_text.options__4.label"
+        },
+        {
+          "value": "slide-up",
+          "label": "t:shared.animation.animation_text.options__5.label"
+        }
+      ],
+      "default": "fade-up"
+    },
+    {
+      "type": "range",
+      "id": "animation_duration",
+      "label": "t:shared.animation.animation_duration.label",
+      "info": "t:shared.animation.animation_duration.info",
+      "min": 0,
+      "max": 2000,
+      "step": 100,
+      "unit": "ms",
+      "default": 800
+    },
+    {
+      "type": "range",
+      "id": "animation_delay",
+      "label": "t:shared.animation.animation_delay.label",
+      "info": "t:shared.animation.animation_delay.info",
+      "min": 0,
+      "max": 1000,
+      "step": 50,
+      "unit": "ms",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "animation_stagger",
+      "label": "t:shared.animation.animation_stagger.label",
+      "info": "t:sections.feature_cards.settings.animation_stagger.info",
+      "min": 0,
+      "max": 300,
+      "step": 10,
+      "unit": "ms",
+      "default": 120
+    },
+
+    {
+      "type": "header",
+      "content": "t:shared.spacing.section_header"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:shared.spacing.section_paragraph"
+    },
+    {
+      "type": "select",
+      "id": "padding_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        {
+          "value": "desktop",
+          "label": "t:shared.spacing.devices.options__1.label"
+        },
+        {
+          "value": "mobile",
+          "label": "t:shared.spacing.devices.options__2.label"
+        }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 160,
+      "step": 2,
+      "unit": "px",
+      "default": 100,
+      "visible_if": "{{ section.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 160,
+      "step": 2,
+      "unit": "px",
+      "default": 100,
+      "visible_if": "{{ section.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 160,
+      "step": 2,
+      "unit": "px",
+      "default": 50,
+      "visible_if": "{{ section.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 160,
+      "step": 2,
+      "unit": "px",
+      "default": 50,
+      "visible_if": "{{ section.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "margin_top",
+      "label": "t:shared.spacing.margin_top.label",
+      "info": "t:shared.spacing.margin_negative.info",
+      "min": -160,
+      "max": 160,
+      "step": 4,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "margin_bottom",
+      "label": "t:shared.spacing.margin_bottom.label",
+      "info": "t:shared.spacing.margin_negative.info",
+      "min": -160,
+      "max": 160,
+      "step": 4,
+      "unit": "px",
+      "default": 0
+    }
+  ],
+  "presets": [
+    {
+      "name": "t:sections.feature_cards.name",
+      "category": "t:categories.text",
+      "settings": {
+        "alignment": "center",
+        "layout": "grid",
+        "carousel_on_mobile": true,
+        "columns_desktop": 4,
+        "columns_tablet": 2,
+        "columns_mobile": "1",
+        "gap_horizontal": 24,
+        "gap_vertical": 24,
+        "panel_background": "#FFFFFF",
+        "panel_background_opacity": 100,
+        "panel_border_style": "dashed",
+        "panel_border_width": 1,
+        "panel_border_opacity": 100,
+        "panel_border_color": "#0F2E2F",
+        "panel_border_radius": 40,
+        "panel_border_radius_mobile": 24,
+        "panel_padding": 0,
+        "container_width": "standard",
+        "border_style": "none",
+        "border_radius": 0,
+        "carousel_peek_mobile": 15,
+        "carousel_pagination": "dots",
+        "carousel_navigation": false,
+        "animation_image": "fade-up",
+        "animation_duration": 800,
+        "animation_stagger": 120
+      },
+      "blocks": [
+        {
+          "type": "section-header",
+          "static": true,
+          "id": "feature-cards-header",
+          "settings": {
+            "direction": "column",
+            "alignment": "center",
+            "position": "start",
+            "gap": 16,
+            "gap_vertical": 16,
+            "gap_vertical_mobile": 12,
+            "width": "fill"
+          },
+          "blocks": [
+            {
+              "type": "subheading",
+              "settings": {
+                "text": "<p>Why us</p>",
+                "preset": "subheading",
+                "width": "fit",
+                "alignment": "center",
+                "alignment_mobile": "center",
+                "icon_source": "icon",
+                "icon": "star",
+                "icon_style": "solid",
+                "icon_size": "small",
+                "icon_width": 22,
+                "icon_height": 22,
+                "icon_border_radius": 50,
+                "show_divider": true,
+                "gap": 8,
+                "border_style": "dashed",
+                "border_thickness": 1,
+                "border_radius": 40,
+                "padding_top": 4,
+                "padding_bottom": 4,
+                "padding_left": 4,
+                "padding_right": 16
+              }
+            },
+            {
+              "type": "text",
+              "name": "t:blocks.text.presets.heading.name",
+              "settings": {
+                "text": "<p>Built around what you actually need</p>",
+                "preset": "h2",
+                "max_width": "none",
+                "alignment": "center",
+                "alignment_mobile": "center",
+                "color": "gradient",
+                "text_gradient": "linear-gradient(90deg, #161514 0%, #0F2E2F 50%, #03D26F 100%)"
+              }
+            },
+            {
+              "type": "text",
+              "name": "t:blocks.text.presets.text.name",
+              "settings": {
+                "text": "<p>Four things we get right every time, so the rest of the order takes care of itself.</p>",
+                "preset": "paragraph",
+                "max_width": "normal",
+                "alignment": "center",
+                "alignment_mobile": "center"
+              }
+            }
+          ]
+        },
+        {
+          "type": "_feature-card",
+          "blocks": [
+            { "type": "_feature-title", "settings": { "text": "Free delivery" } },
+            { "type": "_feature-icon", "settings": { "icon": "truck" } },
+            {
+              "type": "_feature-text",
+              "settings": {
+                "text": "<p>On every order over £50, packed the same day you place it.</p>"
+              }
+            }
+          ]
+        },
+        {
+          "type": "_feature-card",
+          "blocks": [
+            { "type": "_feature-title", "settings": { "text": "30 day returns" } },
+            { "type": "_feature-icon", "settings": { "icon": "refresh" } },
+            {
+              "type": "_feature-text",
+              "settings": {
+                "text": "<p>Changed your mind? Send it back, no questions and no restocking fee.</p>"
+              }
+            }
+          ]
+        },
+        {
+          "type": "_feature-card",
+          "blocks": [
+            { "type": "_feature-title", "settings": { "text": "Secure checkout" } },
+            { "type": "_feature-icon", "settings": { "icon": "lock" } },
+            {
+              "type": "_feature-text",
+              "settings": {
+                "text": "<p>Every payment encrypted end to end. We never see your card details.</p>"
+              }
+            }
+          ]
+        },
+        {
+          "type": "_feature-card",
+          "blocks": [
+            { "type": "_feature-title", "settings": { "text": "Here to help" } },
+            { "type": "_feature-icon", "settings": { "icon": "chat" } },
+            {
+              "type": "_feature-text",
+              "settings": {
+                "text": "<p>Real people, seven days a week, usually back to you within the hour.</p>"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+{% endschema %}
