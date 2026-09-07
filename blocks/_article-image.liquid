@@ -75,9 +75,64 @@
   endif
 -%}
 
+{%- liquid
+  comment
+    ---- what the picture does under a pointer ----
+
+    The same four answers `blocks/_feature-card.liquid` gives, resolved the same
+    way and named from the same place — `t:shared.image_effect` — so "Zoom in"
+    means one thing across the theme and a merchant learns the control once.
+
+    Zoom is a hover effect and Drift is a scroll effect, which is why they are
+    one select rather than a pair of toggles: they animate the same `transform`
+    on the same element, and two controls able to ask for both would resolve to
+    whichever declaration came last in the stylesheet.
+
+    Nothing here needs the picture to be clipped, because it already is:
+    `.article-image-block` carries the corner radius and `overflow: hidden` so
+    the rounded frame never sits over square corners. A scaled photograph is
+    clipped by the same rule, for free.
+
+    Drift is `<parallax-media>`, the element the hero uses, rather than
+    `motion-effect data-effect="parallax"`. The two are different mechanisms:
+    motion-effect translates the element and needs 120px of overscan around it —
+    a number coupled by hand to a clamp in `assets/motion-engine.js` — while
+    `<parallax-media>` writes `--parallax-offset` and lets CSS combine it with a
+    `scale()`, which covers the travel with no second number to keep in step.
+
+    The speed is converted here, not passed through. The engine wants a
+    multiplier and the schema stores a percentage a merchant can reason about;
+    handing 30 to a function that clamps at 0.5 pins every card to maximum
+    strength and the slider stops doing anything.
+    `snippets/background-image.liquid` documents this as the bug it had.
+  endcomment
+  assign image_effect = s.hover_image_effect | default: 'zoom_in'
+
+  assign image_scale = s.hover_image_scale | default: 106 | plus: 0
+  assign image_scale = image_scale | divided_by: 100.0
+
+  assign drift_speed = s.hover_image_parallax_speed | default: 30 | plus: 0
+  if drift_speed < 10
+    assign drift_speed = 10
+  endif
+  if drift_speed > 50
+    assign drift_speed = 50
+  endif
+  assign drift_speed = drift_speed | divided_by: 100.0
+
+  assign layer_tag = 'div'
+  if image_effect == 'drift'
+    assign layer_tag = 'parallax-media'
+  endif
+-%}
+
 {%- capture image_style -%}
   {%- render 'spacing', block: s, declarations: true -%}
   --article-image-radius: {{ radius }}px;
+  --article-image-transition: {{ s.hover_duration | default: 600 | plus: 0 }}ms;
+  {%- if image_effect == 'zoom_in' or image_effect == 'zoom_out' -%}
+    --article-image-scale: {{ image_scale }};
+  {%- endif -%}
   {%- if border_width > 0 -%}
     --article-image-border-width: {{ border_width }}px;
     --article-image-border-style: {{ s.border_style }};
@@ -98,14 +153,25 @@
       tabindex="-1"
       aria-hidden="true"
     >
-      {% render 'image',
-         image: article.image,
-         ratio: ratio,
-         mobile_ratio: s.ratio_mobile,
-         sizes: sizes,
-         priority: priority,
-         placeholder: 'blog-apparel-1',
-         wrapper_class: 'article-image-block__media' %}
+      {%- comment -%}
+        One inner layer, whichever effect is on it — a `<div>` for none and the
+        two zooms, `<parallax-media>` for Drift. The class is the same either
+        way, so the sizing rules in `base.css` do not have to know which element
+        they got, and the modifier is the only thing that varies.
+      {%- endcomment -%}
+      <{{ layer_tag }}
+        class="article-image-block__layer article-image-block__layer--{{ image_effect | replace: '_', '-' }}"
+        {% if image_effect == 'drift' %}data-speed="{{ drift_speed }}"{% endif %}
+      >
+        {% render 'image',
+           image: article.image,
+           ratio: ratio,
+           mobile_ratio: s.ratio_mobile,
+           sizes: sizes,
+           priority: priority,
+           placeholder: 'blog-apparel-1',
+           wrapper_class: 'article-image-block__media' %}
+      </{{ layer_tag }}>
     </a>
 
     {%- if has_meta -%}
@@ -169,6 +235,58 @@
         { "value": "long", "label": "t:blocks.image.settings.ratio.options__7.label" }
       ],
       "default": ""
+    },
+
+    { "type": "header", "content": "t:shared.image_effect.header" },
+    { "type": "paragraph", "content": "t:shared.image_effect.paragraph" },
+    {
+      "type": "select",
+      "id": "hover_image_effect",
+      "label": "t:shared.image_effect.label",
+      "info": "t:shared.image_effect.info",
+      "options": [
+        { "value": "none", "label": "t:shared.image_effect.options__1.label" },
+        { "value": "zoom_in", "label": "t:shared.image_effect.options__2.label" },
+        { "value": "zoom_out", "label": "t:shared.image_effect.options__3.label" },
+        { "value": "drift", "label": "t:shared.image_effect.options__4.label" }
+      ],
+      "default": "zoom_in"
+    },
+    {
+      "type": "range",
+      "id": "hover_image_scale",
+      "label": "t:shared.image_effect.scale.label",
+      "info": "t:shared.image_effect.scale.info",
+      "min": 100,
+      "max": 140,
+      "step": 2,
+      "unit": "%",
+      "default": 106,
+      "visible_if": "{{ block.settings.hover_image_effect == 'zoom_in' or block.settings.hover_image_effect == 'zoom_out' }}"
+    },
+    {
+      "type": "range",
+      "id": "hover_image_parallax_speed",
+      "label": "t:shared.image_effect.speed.label",
+      "info": "t:shared.image_effect.speed.info",
+      "min": 10,
+      "max": 50,
+      "step": 5,
+      "unit": "%",
+      "default": 30,
+      "visible_if": "{{ block.settings.hover_image_effect == 'drift' }}"
+    },
+    {
+      "type": "range",
+      "id": "hover_duration",
+      "label": "t:shared.image_effect.duration.label",
+      "info": "t:shared.image_effect.duration.info",
+      "min": 0,
+      "max": 1200,
+      "step": 50,
+      "unit": "ms",
+      "default": 600,
+      "visible_if": "{{ block.settings.hover_image_effect != 'none' and block.settings.hover_image_effect != 'drift' }}"
     },
 
     { "type": "header", "content": "t:blocks.group.headers.borders" },

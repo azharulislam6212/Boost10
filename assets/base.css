@@ -10465,6 +10465,68 @@ swiper-carousel {
 
   .article-image-block__link { display: block; border-radius: inherit; }
 
+  /* ---- the picture under a pointer -------------------------------------- */
+
+  /* The same four effects `.feature-card__layer` offers, on the same property
+     names where they mean the same thing. Two blocks, one behaviour: a merchant
+     who has set Zoom in on a feature card gets the same movement here.
+
+     Nothing needs clipping added for it. `.article-image-block` already carries
+     the radius and `overflow: hidden` so a rounded frame never sits over square
+     corners, and a scaled photograph is held inside by the same rule.
+
+     Keyed off `.article-card-block`, not off the picture: the card is what the
+     customer is pointing at, and the title's stretched link means a pointer
+     anywhere over the card is already hovering it. Zooming only when the
+     pointer happens to be over the photograph would make the effect flicker as
+     someone reads the excerpt underneath. */
+  .article-image-block__layer {
+    display: block;
+    transform-origin: center;
+    transition: transform var(--article-image-transition, 600ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+  }
+
+  .article-image-block__layer--zoom-in { transform: scale(1); }
+  .article-image-block__layer--zoom-out { transform: scale(var(--article-image-scale, 1.06)); }
+
+  /* Drift is scroll, not hover. `<parallax-media>` writes `--parallax-offset`
+     and the scale covers the travel, so there is no overscan to keep in step
+     with the clamp in `assets/motion-engine.js` — the arrangement
+     `.hero__parallax` and `.feature-card__layer--drift` both use.
+
+     The engine sits out on touch and under reduced motion by never writing the
+     property, so the fallback of `0` is the whole of the "off" state: a still
+     picture, cropped 12%, with no rule to remove. */
+  .article-image-block__layer--drift {
+    will-change: transform;
+    transform: translate3d(0, var(--parallax-offset, 0), 0) scale(1.12);
+    transition: none;
+  }
+
+  @media (hover: hover) {
+    .article-card-block:hover .article-image-block__layer--zoom-in,
+    .article-card-block:focus-within .article-image-block__layer--zoom-in {
+      transform: scale(var(--article-image-scale, 1.06));
+    }
+
+    .article-card-block:hover .article-image-block__layer--zoom-out,
+    .article-card-block:focus-within .article-image-block__layer--zoom-out {
+      transform: scale(1);
+    }
+  }
+
+  /* Decorative movement tied to a pointer is exactly what the preference is
+     asking to switch off, and unlike the feature card there is no colour change
+     underneath it that would be lost — so the whole effect stops. */
+  @media (prefers-reduced-motion: reduce) {
+    .article-image-block__layer,
+    .article-card-block:hover .article-image-block__layer,
+    .article-card-block:focus-within .article-image-block__layer {
+      transform: none;
+      transition-duration: 0.01ms;
+    }
+  }
+
   /* The minimum is the part that cannot be talked out of it — see the note on
      `.block-image__media`, which had the same problem: an element carrying an
      aspect ratio and a placeholder with an intrinsic size of its own can settle
