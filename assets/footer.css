@@ -565,6 +565,16 @@
     text-wrap: pretty;
   }
 
+  /* `<validated-form>` is an unregistered-until-hydrated custom element, so it
+     is `display: inline` and, as a flex item, shrink-to-fit. Under the centred
+     and right-aligned layouts — which is every footer column on a phone — that
+     made it collapse to the input's intrinsic ~20 character width, and a typed
+     address was cropped mid-domain. It carries the form's width instead. */
+  .email-signup validated-form {
+    display: block;
+    inline-size: 100%;
+  }
+
   .email-signup__form {
     inline-size: 100%;
   }
@@ -626,6 +636,10 @@
     background: none;
     color: var(--signup-input-color, var(--color-text));
     font-size: var(--font-size-md);
+    /* A field is always narrower than the longest address someone can type, so
+       what matters is how it runs out: an unfocused overflowing value ends in
+       an ellipsis rather than a glyph sliced in half against the arrow. */
+    text-overflow: ellipsis;
   }
 
   .email-signup__input:hover,
@@ -637,6 +651,35 @@
        and `:focus-within` on the field is that something. */
     outline: none;
     box-shadow: none;
+  }
+
+  /* Chrome paints an autofilled field with its own opaque light background and
+     near-black text. Inside a dark pill that reads as a white box with the
+     address cropped against its edge — which is the state a returning customer
+     sees, not an edge case.
+
+     The background cannot be set directly, so two inset shadows stand in for
+     it: the scheme's own background underneath to hide Chrome's, and the pill's
+     translucent tint over it, so the covered area matches the field it sits in.
+     `-webkit-text-fill-color` then carries the colour `color` no longer can. */
+  .email-signup__input:-webkit-autofill,
+  .email-signup__input:-webkit-autofill:hover,
+  .email-signup__input:-webkit-autofill:focus {
+    box-shadow: 0 0 0 100px rgb(var(--color-background-rgb) / 0.14) inset,
+      0 0 0 100px var(--signup-autofill-surface, var(--color-background)) inset;
+    -webkit-text-fill-color: var(--signup-input-color, var(--color-text));
+    caret-color: var(--signup-input-color, var(--color-text));
+    /* Chrome repaints its background after the shadow on some transitions, so
+       the property is parked on a transition long enough never to arrive. */
+    transition: background-color 100000s ease 0s;
+  }
+
+  /* An underlined signup has no pill, so the tint would be a rectangle sitting
+     on nothing. Only the flat cover is wanted there. */
+  .email-signup[data-border='underline'] .email-signup__input:-webkit-autofill,
+  .email-signup[data-border='underline'] .email-signup__input:-webkit-autofill:hover,
+  .email-signup[data-border='underline'] .email-signup__input:-webkit-autofill:focus {
+    box-shadow: 0 0 0 100px var(--signup-autofill-surface, var(--color-background)) inset;
   }
 
   .email-signup[data-text-preset='h5'] .email-signup__input { font-size: var(--font-size-h5, 1.8rem); }
