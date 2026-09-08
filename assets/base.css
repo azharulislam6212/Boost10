@@ -12267,10 +12267,9 @@ testimonial-product {
    `--tc-pad-end` is the block's own bottom padding at whichever width is in
    play, because `[data-block-spacing]` reads a different token on a phone and
    the reservation has to be measured from the same one. Stating the desktop
-   token here and correcting it in the touch block is what this used to do, and
-   it broke the moment the panel stopped being permanently open down there: the
-   panel's own margin had been doing the clearing, and with the panel closed
-   nothing was, so the last two lines of every review ran under the disc. */
+   token here and correcting it in a touch branch is what this used to do, and
+   it drifted every time the touch branch changed. One rule, both widths, and
+   the token underneath it is what varies. */
 .testimonial-card {
   --tc-pad-end: var(--block-padding-block-end, 0px);
 }
@@ -12371,51 +12370,28 @@ testimonial-product[data-open] .testimonial-card__info {
     border-color: var(--tc-hover-border-color, var(--tc-border-color, transparent));
   }
 
-  /* In flow, and closed until it is asked for.
+  /* The panel floats at every width. It is the same overlay a pointer gets —
+     same box, same arrow, same place over the disc — and touch only changes
+     what opens it.
 
-     A card with a pointer can afford an absolute panel: it covers the last two
-     lines of the quote for as long as the pointer is there, and the quote comes
-     back when it leaves. There is no "leaves" on a phone, so an absolute panel
-     there is two lines of every review permanently unreadable — and a panel
-     that is simply always open is most of the card, twice over in a two-across
-     row.
+     It was in the flow here for a while, pushed to the foot of the frame so the
+     quote sat above it. That reads as the card growing a section rather than as
+     a preview appearing, and the card jumping taller moves everything under it
+     down the page. Floating it keeps the row still: the panel covers the last
+     lines of the quote for as long as it is open, and the close button puts
+     them back.
 
-     So on touch it stops being an overlay and becomes the last row of the
-     frame, hidden until `<testimonial-product>` opens it. It is a child of the
-     frame for exactly this — see the note in
-     `blocks/_testimonial-card.liquid` — and `margin-block-start: auto` puts it
-     at the foot of the card with the quote above it.
-
-     `display: none` rather than the opacity pair: in the flow, a panel faded to
-     zero still holds its whole height open, so the card would be as tall closed
-     as it is open and nothing would appear to happen on a tap.
-
-     The arrow goes with the positioning. It pointed at a disc the panel is no
-     longer floating above. */
-  .testimonial-card--has-product .testimonial-card__info {
-    position: static;
-    inset: auto;
-
-    display: none;
-    opacity: 1;
-    visibility: visible;
-    pointer-events: auto;
-    transform: none;
-
-    margin-block-start: auto;
-    inline-size: 100%;
-  }
-
-  .testimonial-card--has-product testimonial-product[data-open] .testimonial-card__info {
-    display: flex;
-  }
+     So there is nothing to restate here. The base rules already position it and
+     `testimonial-product[data-open]` already reveals it. */
 
   /* Only reachable here. On a pointer the panel closes itself when the pointer
-     leaves, so a close button there is a control with nothing to do. */
+     leaves, so a close button there is a control with nothing to do — and one
+     drawn over a panel that is about to disappear is a target nobody can hit. */
   .testimonial-card__info-close {
     position: absolute;
     inset-block-start: var(--space-2);
     inset-inline-end: var(--space-2);
+    z-index: 1;
 
     display: grid;
     place-items: center;
@@ -12430,21 +12406,21 @@ testimonial-product[data-open] .testimonial-card__info {
     cursor: pointer;
   }
 
-  /* The panel is the close button's containing block, and only here — on a
-     pointer it is already positioned from the card. */
-  .testimonial-card--has-product .testimonial-card__info {
-    position: relative;
-  }
-
   /* The title sits clear of the button rather than under it. */
   .testimonial-card__info-title {
-    padding-inline: var(--space-5);
+    padding-inline-end: var(--space-6);
   }
 
-  .testimonial-card--has-product .testimonial-card__info::after {
-    content: none;
+  /* The inset is a merchant number sized for a card that is most of the screen.
+     In a two-across mobile row the card is about 165px, and 28px off each side
+     leaves a panel too narrow for a product name — so the inset is capped as a
+     share of the card instead. A percentage rather than a smaller constant:
+     8% is 23px on a full-width phone card, which is the setting all but
+     untouched, and 13px on a two-across one, which is the panel staying
+     readable. */
+  .testimonial-card__info {
+    inset-inline: min(var(--tc-info-inset, 28px), 8%);
   }
-
 }
 
 @media (prefers-reduced-motion: reduce) {
