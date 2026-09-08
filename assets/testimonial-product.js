@@ -58,6 +58,11 @@ const TOUCH_QUERY = '(hover: none), (max-width: 749px)';
  * The close is dispatched as a plain event on `document` rather than through a
  * registry, so a card that arrives later — Swiper cloning slides for a loop,
  * the editor re-rendering a section — takes part without being told about.
+ *
+ * In practice the press handler usually gets there first: pressing another
+ * card's disc is a press outside this one's panel. The event is what covers the
+ * rest — a panel opened by a keyboard, or by anything that does not start with
+ * a pointer.
  */
 export class TestimonialProduct extends BaseComponent {
   static requiredRefs = ['toggle', 'panel'];
@@ -83,12 +88,28 @@ export class TestimonialProduct extends BaseComponent {
       }
     });
 
-    // A tap outside closes it. `pointerdown` rather than `click` so the panel
-    // is gone before the tapped thing reacts, and scoped to the document
-    // because the thing tapped is by definition not inside this element.
+    // A press anywhere but the panel closes it.
+    //
+    // "Outside" is measured against the panel and the disc, not against this
+    // element. This element wraps the whole card — it has to, because the panel
+    // is inside the frame and the disc is not — so a `this.contains()` test made
+    // every press on the quote, the name, the stars and the ring count as
+    // inside. On a phone the card is most of the screen and in the theme editor
+    // it is most of what a merchant clicks, which is why the panel would not
+    // close: there was almost nowhere left that counted as outside.
+    //
+    // The disc is excluded because it is the toggle and owns that press; the
+    // panel is excluded so a link inside it still works. Everything else closes.
+    //
+    // `pointerdown` rather than `click` so the panel is gone before whatever was
+    // pressed reacts, and it still fires for a press that ends up being a drag.
     this.on(document, 'pointerdown', (event) => {
       if (!this.open) return;
-      if (this.contains(/** @type {Node} */ (event.target))) return;
+
+      const target = /** @type {Node} */ (event.target);
+      if (this.refs.panel.contains(target)) return;
+      if (this.refs.toggle.contains(target)) return;
+
       this.close();
     });
 

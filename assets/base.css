@@ -11636,38 +11636,68 @@ swiper-carousel {
   gap: var(--tc-row-gap, 32px);
 }
 
-@media screen and (min-width: 990px) {
+/* ---- when the panel sits beside the row, and when it sits above it ----
+
+   1200px, not the 990px this used the theme's other two-column layouts pick.
+   Those split into fractions; this one puts a *fixed pixel* panel next to the
+   row, so the breakpoint has to be the width at which the remainder still fits
+   the cards — not the width at which the viewport merely stops being a tablet.
+
+   The arithmetic, at the shipped defaults:
+
+       312  the panel
+     +  32  the gap beside it
+     + 780  three cards at a legible 260
+     +  48  the two gaps between them
+     +  80  the container's own padding
+     -----
+      1252
+
+   At 990 the same row gave each card 181px and stood it 559px tall — three
+   slivers of text beside a panel taking a third of the screen, which is what
+   "the desktop carousel is broken" looks like. Below the breakpoint the panel
+   goes full width above the row and the carousel gets the whole container,
+   which is what it already did on a phone.
+
+   A merchant who widens the panel past its default pushes that number up, and
+   a media query cannot read a custom property to follow them. The panel's
+   width slider is the control that trades one against the other, and its help
+   text says so. */
+@media screen and (min-width: 1200px) {
   .testimonials__layout--with-intro {
     grid-template-columns: var(--tc-intro-width, 312px) minmax(0, 1fr);
     align-items: stretch;
   }
-}
 
-/* Both columns reserve the same strip, so a stretched intro panel ends level
-   with the cards instead of level with the discs hanging below them.
+  /* Both columns reserve the same strip, so a stretched intro panel ends level
+     with the cards instead of level with the discs hanging below them.
 
-   The panel is `block-size: 100%` of this box, so paying for the reservation
-   out here is what keeps the two bottom edges on one line — subtracting it
-   inside the panel would work at one setting and drift at every other. */
-.testimonials__intro {
-  padding-block-end: var(--tc-track-reserve, 30px);
-}
+     The panel is `block-size: 100%` of this box, so paying for the reservation
+     out here is what keeps the two bottom edges on one line — subtracting it
+     inside the panel would work at one setting and drift at every other.
 
-/* Beside a carousel the panel stretches to the row, because the row is one line
-   of cards and the two boxes read as a pair.
+     Only while the two are side by side: stacked, there is no second column to
+     line up with and the reservation is a gap under the panel with no cause. */
+  .testimonials__intro {
+    padding-block-end: var(--tc-track-reserve, 30px);
+  }
 
-   Beside a *grid* the row is as tall as however many rows of cards there are —
-   two rows of five is over 900px — and a stretched panel becomes a column of
-   flat colour with the heading marooned at the top and the numbers at the
-   bottom of a screen's worth of nothing. So Grid pins the panel to its own
-   height and lets the row run past it.
+  /* Beside a carousel the panel stretches to the row, because the row is one
+     line of cards and the two boxes read as a pair.
 
-   `align-self` on the column rather than a height on the panel: the panel's own
-   minimum height is the merchant's setting, and overriding it here would take
-   that control away at one layout and not the other. */
-.testimonials__layout--grid .testimonials__intro {
-  align-self: start;
-  padding-block-end: 0;
+     Beside a *grid* the row is as tall as however many rows of cards there are
+     — two rows of five is over 900px — and a stretched panel becomes a column
+     of flat colour with the heading marooned at the top and the numbers at the
+     bottom of a screen's worth of nothing. So Grid pins the panel to its own
+     height and lets the row run past it.
+
+     `align-self` on the column rather than a height on the panel: the panel's
+     own minimum height is the merchant's setting, and overriding it here would
+     take that control away at one layout and not the other. */
+  .testimonials__layout--grid .testimonials__intro {
+    align-self: start;
+    padding-block-end: 0;
+  }
 }
 
 /* A grid item's automatic minimum size is its content, and the content here is
