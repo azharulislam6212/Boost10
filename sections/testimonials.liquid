@@ -1,85 +1,550 @@
 {% comment %}
   sections/testimonials.liquid
+  
+  A row of customer reviews that starts against a filled intro panel and runs
+  off the right-hand edge of the page.
 
-  Customer quotes, as a grid or a carousel.
+  ## The surface is `sections/feature-cards.liquid`'s, setting id for setting id
 
-  ## What changed in Phase 3
+  Colour scheme, background media, the four border widths, the opacity slider,
+  the two radii, the margins, the container, the gaps, the animation family —
+  every id here is the one that section already carries, and both reach them
+  through `snippets/spacing.liquid`, `snippets/background-media.liquid` and
+  `snippets/container.liquid` rather than reimplementing them. A merchant who
+  has set up a Feature cards section has set up this one.
 
-  Same duplication as the other two: a carousel branch carrying the arrows, the
-  pause button and the live region, and a grid branch carrying none of them.
+  The carousel is the same too. `carousel-shell-attrs` and `carousel-shell-tail`
+  supply the attributes and the controls from the same sub-snippets
+  `carousel-shell.liquid` itself uses, so the arrows, the peek, the pause button
+  and the live region are one implementation across all three sections. The
+  element is written out here rather than rendered through the shell because
+  its slides are theme blocks and `{% content_for %}` output cannot be captured
+  — theme-check reports it as an error, because Shopify renders blocks with
+  their editor bindings attached and buffering that into a variable is not
+  something the platform supports.
 
-  The pause button matters here more than anywhere else in the theme. Autoplay
-  is genuinely useful for testimonials and merchants switch it on, and moving
-  content that cannot be stopped is a WCAG 2.2.2 failure. In the old markup the
-  control existed only in one branch; the shell renders it whenever autoplay is
-  available, so it cannot go missing by choosing the other layout.
+  ## Two layouts, and the bleed belongs to one of them
+
+  The same Type select and **Carousel on mobile** pair as
+  `sections/feature-cards.liquid`, with the default the other way round: this
+  row is drawn as a slider against a fixed panel, so Carousel is what it ships
+  as, and Grid wraps the cards into columns beside the panel instead.
+
+  The bleed is resolved per breakpoint rather than once. A carousel that runs
+  off the side of the page is an affordance — a half-visible card says there is
+  more this way. A *grid* that does it is a row with its last column cut in half
+  and no way to reach it. So Grid at a breakpoint drops the bleed at that
+  breakpoint, and the arrows and the progress bar stand down with it.
+
+  ## Why the row runs off the edge
+
+  `.testimonials__track` cancels the container's end padding with a negative
+  margin, using the same `max()` expression `.container__bleed` reads back — so
+  it lands on the true viewport edge at every breakpoint and every container
+  width, rather than guessing a gutter.
+
+  Only the end side. Bleeding both would put the first card under the intro
+  panel; bleeding neither would end the row on the container line, which reads
+  as the last card being cut off by a margin rather than as more cards existing.
+  A half-visible card at the screen edge is the affordance — it says "there is
+  more this way" without a single arrow being drawn.
+
+  It is a setting rather than a constant because the section is also usable
+  inside a narrow column, where a track that escapes its parent is a bug.
+
+  ## The intro panel is a static block, outside the carousel
+
+  `{% content_for 'block', type: '_testimonial-intro' %}`, the same mechanism
+  `sections/feature-cards.liquid` uses for its heading cluster. Inside the track
+  it would be a slide: it would scroll away on the first arrow press, and Swiper
+  would count it when deciding whether the merchant's Loop setting is
+  achievable. Outside it, it holds its column and the reviews move past it.
+
+  `--tc-intro-width` is published by the block and read by the grid here, so the
+  panel's own width slider drives the section's column template. The block owns
+  its box; the section owns where the box sits.
+
+  ## The controls are outside the track, and that is why the id exists
+
+  Rendered under the row rather than inside `<swiper-carousel>`, because the
+  track bleeds off the screen and controls inside it would go with it — arrows
+  set to Outside would end up beyond the viewport edge.
+
+  `detached: true` on `carousel-shell-tail` keeps the pause button and the live
+  region, which are found by ref and announced from inside the element, and
+  stands the arrows and the pagination down so they can be drawn below instead.
+  They reach the carousel through `data-carousel-for`, which is what `id:` on
+  `carousel-shell-attrs` is for. The id is the section's, so two of these on one
+  page cannot claim each other's controls.
+
+  ## The cards arrive one at a time
+
+  One `<motion-effect>` around the track with `data-target=".testimonial-card"`
+  and a stagger, rather than an effect on each card. A card is a merchant block
+  — `{% content_for 'blocks' %}` renders them all in one call and passes no
+  index — so there is no `forloop.index0` to turn into a per-card delay.
+  Targeting rather than `data-children` is deliberate: once Swiper mounts it
+  moves the cards into a wrapper of its own, and a selector still finds them
+  where a child list would not.
+
+  ## Nothing clips
+
+  A card's product disc hangs past the bottom of the card on purpose. So the
+  track carries `--tc-thumb-overhang` worth of padding underneath it rather than
+  `overflow: hidden` anywhere, and Swiper's own wrapper is left visible in
+  `base.css`.
+
+  ## Migration note
+
+  This section used to take the theme's public `testimonial` block. It now takes
+  `_testimonial-card`, which is a different shape — a product, a verified badge
+  and a hover panel that the old block has no settings for. `blocks/testimonial.liquid`
+  is untouched and still works wherever else it is used.
 {% endcomment %}
 
+{%- liquid
+  assign s = section.settings
+
+  assign desktop = s.columns_desktop | default: 3 | plus: 0
+
+  comment
+    Mobile columns is a select of two, clamped rather than trusted — a section
+    saved at three before the control narrowed keeps the 3 in its settings data
+    and the picker has nowhere to show it. Same guard, same reason, as
+    `sections/feature-cards.liquid`.
+
+    `plus: 0` coerces the select's string first: `"2" > 2` compares a string to
+    an integer, which is false in every Liquid.
+  endcomment
+  assign cols_mobile = s.columns_mobile | default: 1 | plus: 0
+  if cols_mobile > 2
+    assign cols_mobile = 2
+  endif
+  if cols_mobile < 1
+    assign cols_mobile = 1
+  endif
+
+  assign cols_tablet = s.columns_tablet | default: 2 | plus: 0
+
+  comment
+    ---- the surface, from `sections/feature-cards.liquid` ----
+  endcomment
+  assign background_media = s.background_media | default: 'none'
+  assign has_background_media = false
+  if background_media != 'none'
+    assign has_background_media = true
+  endif
+
+  assign background_paint = ''
+  if has_background_media == false
+    assign background_paint = s.background_color | default: ''
+  endif
+
+  comment
+    Opacity goes into the colour rather than onto the element: `opacity` on the
+    section would fade the cards along with the frame.
+
+    With no colour picked the border is `currentColor`, which the colour filters
+    cannot take an alpha channel from — there is nothing to read until the
+    scheme resolves in the browser. `color-mix` does the same fade at that point
+    instead, so both paths honour the slider.
+  endcomment
+  assign border_line = s.border_style | default: 'none'
+
+  assign bw_top = 0
+  assign bw_right = 0
+  assign bw_bottom = 0
+  assign bw_left = 0
+  assign border_any = 0
+  assign border_paint = ''
+
+  if border_line != 'none'
+    assign bw_top = s.border_width_top | default: 0 | plus: 0
+    assign bw_right = s.border_width_right | default: 0 | plus: 0
+    assign bw_bottom = s.border_width_bottom | default: 0 | plus: 0
+    assign bw_left = s.border_width_left | default: 0 | plus: 0
+    assign border_any = bw_top | plus: bw_right | plus: bw_bottom | plus: bw_left
+
+    assign border_percent = s.border_opacity | default: 100 | plus: 0
+    if s.border_color == blank
+      assign border_paint = 'color-mix(in srgb, currentColor ' | append: border_percent | append: '%, transparent)'
+    else
+      assign border_alpha = border_percent | divided_by: 100.0
+      assign border_paint = s.border_color | color_modify: 'alpha', border_alpha
+    endif
+  endif
+
+  assign radius = s.border_radius | default: 0 | plus: 0
+  assign radius_mobile = s.border_radius_mobile | default: radius | plus: 0
+  assign margin_top = s.margin_top | default: 0 | plus: 0
+  assign margin_bottom = s.margin_bottom | default: 0 | plus: 0
+
+  comment
+    ---- the row ----
+
+    Two column templates, one number. The intro panel publishes its own width as
+    `--tc-intro-width` and the grid reads it, so the panel's slider is the only
+    place the number is stated. `snippets/container.liquid` and the bleed below
+    take care of where the row starts and ends.
+  endcomment
+  assign show_intro = s.show_intro
+  if show_intro == nil
+    assign show_intro = true
+  endif
+
+  comment
+    `false == blank` is true in Liquid, so a blank check would read "off" as
+    "not set" and turn the bleed back on. `nil` is the only value that means the
+    merchant has not answered yet.
+  endcomment
+  assign bleed_end = s.carousel_bleed
+  if bleed_end == nil
+    assign bleed_end = true
+  endif
+
+  comment
+    `plus: 0` rather than `default` alone on the mobile pair: 0 is a gap a merchant
+    can legitimately want on a phone — cards flush against each other — and
+    `default` would replace it with 16 every time.
+  endcomment
+  assign gap_x = s.gap_horizontal | default: 24 | plus: 0
+  assign gap_y = s.gap_vertical | default: 24 | plus: 0
+
+  assign gap_x_mobile = s.gap_horizontal_mobile | plus: 0
+  if s.gap_horizontal_mobile == nil
+    assign gap_x_mobile = 16
+  endif
+  assign gap_y_mobile = s.gap_vertical_mobile | plus: 0
+  if s.gap_vertical_mobile == nil
+    assign gap_y_mobile = 16
+  endif
+
+  assign row_gap = s.intro_gap | default: 32 | plus: 0
+
+  comment
+    ---- the carousel ----
+
+    Two types, two answers, resolved exactly as `sections/feature-cards.liquid`
+    resolves them. Only `carousel` reaches `data-layout`, or the component would
+    try to build a Swiper out of a layout that is not one.
+
+    The default is Carousel rather than Grid — the row is drawn against a fixed
+    intro panel and running past the edge of the page — but Grid is a real
+    option: it drops the bleed, wraps the cards into columns beside the panel
+    and stands the controls down.
+  endcomment
+  assign layout_type = s.layout | default: 'carousel'
+
+  assign cs_layout = 'grid'
+  if layout_type == 'carousel'
+    assign cs_layout = 'carousel'
+  endif
+
+  comment
+    `false == blank` is true in Liquid, so a blank check would read "off" as
+    "not set" and turn the mobile carousel back on. `nil` is the only value that
+    means the merchant has not answered yet.
+  endcomment
+  assign carousel_on_mobile = s.carousel_on_mobile
+  if carousel_on_mobile == nil
+    assign carousel_on_mobile = true
+  endif
+
+  assign cs_layout_mobile = 'grid'
+  if layout_type == 'carousel' or carousel_on_mobile
+    assign cs_layout_mobile = 'carousel'
+  endif
+
+  assign cs_is_carousel = false
+  if cs_layout == 'carousel' or cs_layout_mobile == 'carousel'
+    assign cs_is_carousel = true
+  endif
+
+  comment
+    The slide count, and only the slides.
+
+    `carousel-options` uses it to decide whether the merchant's Loop setting is
+    achievable — Swiper silently disables looping below twice `slidesPerView`,
+    which reads as the setting doing nothing. So it has to be the number of
+    cards, not `section.blocks.size`: an app block sitting in the row would
+    inflate the number and let a loop through that Swiper then refuses.
+  endcomment
+  assign cs_count = 0
+  for review_block in section.blocks
+    if review_block.type == '_testimonial-card'
+      assign cs_count = cs_count | plus: 1
+    endif
+  endfor
+
+  assign cs_label = 'accessibility.carousel' | t
+
+  comment
+    ---- the controls, outside the track ----
+  endcomment
+  assign carousel_id = 'testimonials-' | append: section.id
+
+  assign cs_pagination = s.carousel_pagination | default: 'controls'
+  assign cs_pagination_align = s.carousel_pagination_align | default: 'center'
+
+  assign cs_nav = s.carousel_navigation
+  if cs_nav == nil
+    assign cs_nav = true
+  endif
+
+  comment
+    `controls` is one bar carrying its own arrows, so the bare pair below would
+    be a duplicate of what it already draws — the same test
+    `carousel-shell-tail` makes when the controls are nested.
+  endcomment
+  comment
+    Whether the row is drawn at all is a Liquid question, not a runtime one. The
+    layout is known here for both breakpoints, so the visibility is a class and
+    a media query rather than a `:has()` test — and a progress bar can never be
+    left on a page where the cards are a static grid.
+  endcomment
+  assign has_controls = false
+  if cs_is_carousel and cs_nav or cs_is_carousel and cs_pagination != 'none'
+    assign has_controls = true
+  endif
+
+  assign controls_class = 'testimonials__controls testimonials__controls--' | append: cs_pagination_align
+  if cs_layout == 'carousel'
+    assign controls_class = controls_class | append: ' testimonials__controls--always'
+  elsif cs_layout_mobile == 'carousel'
+    assign controls_class = controls_class | append: ' testimonials__controls--mobile'
+  endif
+
+  comment
+    ---- the product disc ----
+
+    Stated here rather than on the card, and inherited by every card, because
+    the section is the only element that can reserve room for it: the disc hangs
+    past the bottom of the card and swiper.css gives the carousel element
+    `overflow: hidden`. The track's bottom padding and the disc's overhang are the
+    same number, so they are the same setting.
+
+    `blocks/_testimonial-card.liquid` documents the other half of this.
+  endcomment
+  assign thumb_size = s.thumb_size | default: 80 | plus: 0
+  assign thumb_overhang = s.thumb_overhang | default: 24 | plus: 0
+  assign thumb_inset = s.thumb_inset | default: 28 | plus: 0
+
+  assign thumb_line = s.thumb_border_style | default: 'dashed'
+  assign thumb_width = 0
+  assign thumb_paint = ''
+
+  if thumb_line != 'none'
+    assign thumb_width = s.thumb_border_width | default: 1 | plus: 0
+
+    assign thumb_percent = s.thumb_border_opacity | default: 100 | plus: 0
+    if s.thumb_border_color == blank
+      assign thumb_paint = 'color-mix(in srgb, currentColor ' | append: thumb_percent | append: '%, transparent)'
+    else
+      assign thumb_alpha = thumb_percent | divided_by: 100.0
+      assign thumb_paint = s.thumb_border_color | color_modify: 'alpha', thumb_alpha
+    endif
+  endif
+
+  assign info_inset = s.info_inset | default: 28 | plus: 0
+  assign info_gap = s.info_gap | default: 14 | plus: 0
+
+  comment
+    What the product picture does while a pointer is over the card.
+
+    A select rather than a pair of toggles, and a percentage rather than a
+    multiplier: the two effects animate the same `transform` on the same layer, so
+    two controls able to ask for both would resolve to whichever declaration
+    came last in the stylesheet. The scale is converted here — the stylesheet
+    wants 1.12 and the schema stores a number a merchant can reason about.
+  endcomment
+  assign thumb_effect = s.thumb_hover_effect | default: 'zoom_in'
+  assign thumb_scale = s.thumb_hover_scale | default: 112 | plus: 0
+  assign thumb_scale = thumb_scale | divided_by: 100.0
+
+  assign card_stagger = s.animation_stagger | default: 120 | plus: 0
+
+  comment
+    The accent the intro panel's numbers and the card's stars fall back to, so
+    the two stay in step with the heading's highlight above without either
+    knowing about the other.
+  endcomment
+  assign accent = s.accent_color | default: ''
+
+  comment
+    The bleed is per breakpoint, because it belongs to the carousel rather than
+    to the section: a grid that runs off the side of the page is a row with its
+    last column cut in half and no way to reach it. So each breakpoint gets the
+    class only where that breakpoint is actually a slider.
+  endcomment
+  assign track_classes = 'testimonials__track'
+  if bleed_end and cs_layout == 'carousel'
+    assign track_classes = track_classes | append: ' testimonials__track--bleed-desktop'
+  endif
+  if bleed_end and cs_layout_mobile == 'carousel'
+    assign track_classes = track_classes | append: ' testimonials__track--bleed-mobile'
+  endif
+-%}
+
+{%- capture section_style -%}
+  {%- render 'spacing', section: s, declarations: true -%}
+  --tc-gap-x: {{ gap_x }}px;
+  --tc-gap-y: {{ gap_y }}px;
+  --tc-gap-x-mobile: {{ gap_x_mobile }}px;
+  --tc-gap-y-mobile: {{ gap_y_mobile }}px;
+  --tc-row-gap: {{ row_gap }}px;
+  --testimonials-radius: {{ radius }}px;
+  --testimonials-radius-mobile: {{ radius_mobile }}px;
+  --testimonials-margin-block-start: {{ margin_top }}px;
+  --testimonials-margin-block-end: {{ margin_bottom }}px;
+  --testimonials-controls-gap: {{ s.carousel_controls_gap | default: 40 | plus: 0 }}px;
+  --tc-thumb-size: {{ thumb_size }}px;
+  --tc-thumb-overhang: {{ thumb_overhang }}px;
+  --tc-thumb-inset: {{ thumb_inset }}px;
+  --tc-info-inset: {{ info_inset }}px;
+  --tc-info-gap: {{ info_gap }}px;
+  {%- if thumb_effect != 'none' -%}
+    --tc-thumb-scale: {{ thumb_scale }};
+  {%- endif -%}
+  {%- if thumb_width > 0 -%}
+    --tc-thumb-border-width: {{ thumb_width }}px;
+    --tc-thumb-border-style: {{ thumb_line }};
+    --tc-thumb-border-color: {{ thumb_paint }};
+  {%- endif -%}
+  {%- if border_any > 0 -%}
+    --testimonials-border-width: {{ bw_top }}px {{ bw_right }}px {{ bw_bottom }}px {{ bw_left }}px;
+    --testimonials-border-style: {{ border_line }};
+    --testimonials-border-color: {{ border_paint }};
+  {%- endif -%}
+  {%- if background_paint != '' -%}
+    background: {{ background_paint }};
+  {%- endif -%}
+  {%- if accent != '' -%}
+    --tc-accent: {{ accent }};
+  {%- endif -%}
+{%- endcapture -%}
+
 <div
-  class="testimonials color-scheme-container color-{{ section.settings.color_scheme }}"
-  {% render 'spacing', section: section.settings %}
-> 
-  <div class="{% render 'container', width: section.settings.container_width %}">
-    {%- if section.settings.heading != blank -%}
-      <div class="testimonials__header testimonials__header--{{ section.settings.alignment }}">
-        <h2 class="testimonials__heading">{{ section.settings.heading | escape }}</h2>
+  class="testimonials testimonials--thumb-{{ thumb_effect | replace: '_', '-' }} color-scheme-container color-{{ s.color_scheme | default: 'scheme-1' }}{% if has_background_media %} has-background-media{% endif %}"
+  data-section-spacing
+  data-section-id="{{ section.id }}"
+  style="{{ section_style | strip_newlines | strip }}"
+>
+  {%- if has_background_media -%}
+    {% render 'background-media', settings: s %}
+  {%- endif -%}
+
+  <div class="{% render 'container', width: s.container_width %}">
+    {%- comment -%}
+      The merchant's heading cluster, as a static block so it cannot be dragged
+      into the row of reviews and cannot be deleted by accident. Same mechanism,
+      same reason, as `sections/feature-cards.liquid`.
+
+      `children: true` staggers the cluster's own parts — the pill, the heading,
+      the paragraph — so the section opens as one cascade rather than as a wall
+      of text arriving at once.
+    {%- endcomment -%}
+    <motion-effect
+      class="testimonials__header testimonials__header--{{ s.alignment | default: 'center' }}"
+      {% render 'motion-attrs', kind: 'text', section: s, children: true %}
+    >
+      {% content_for 'block', type: 'section-header', id: 'testimonials-header' %}
+    </motion-effect>
+
+    {%- comment -%}
+      The layout names its own type, because the intro panel behaves differently
+      in each. Beside a carousel it stretches to the row — one line of cards, one
+      panel the same height. Beside a *grid* the row is as tall as however many
+      rows of cards there are, and a stretched panel becomes a column of empty
+      colour with the heading marooned at the top of it. So Grid pins the panel
+      to its own height instead.
+    {%- endcomment -%}
+    <div class="testimonials__layout testimonials__layout--{{ cs_layout }}{% if show_intro %} testimonials__layout--with-intro{% endif %}">
+      {%- if show_intro -%}
+        <motion-effect
+          class="testimonials__intro"
+          {% render 'motion-attrs', kind: 'image', section: s %}
+        >
+          {% content_for 'block', type: '_testimonial-intro', id: 'testimonials-intro' %}
+        </motion-effect>
+      {%- endif -%}
+
+      {%- comment -%}
+        One `<motion-effect>` for the whole row — see the note at the top on why
+        the cards are found by selector rather than carrying an effect each.
+
+        `kind: 'image'` rather than `'text'`: a review card is a panel and a
+        photograph, and the text family's presets split their target into words
+        and letters.
+      {%- endcomment -%}
+      <motion-effect
+        class="{{ track_classes }} testimonials__track--{{ cs_layout }}"
+        {% render 'motion-attrs',
+           kind: 'image',
+           section: s,
+           target: '.testimonial-card',
+           stagger: card_stagger %}
+      >
+        <swiper-carousel
+          {% render 'carousel-shell-attrs',
+             settings: s,
+             id: carousel_id,
+             layout: cs_layout,
+             layout_mobile: cs_layout_mobile,
+             classes: 'testimonials__carousel',
+             columns_desktop: desktop,
+             columns_tablet: cols_tablet,
+             columns_mobile: cols_mobile,
+             count: cs_count %}
+        >
+          <div
+            class="carousel-shell__track testimonials__grid"
+            data-ref="track"
+            {% if cs_is_carousel %}aria-label="{{ cs_label | escape }}"{% endif %}
+          >
+            {% content_for 'blocks' %}
+          </div>
+
+          {%- comment -%}
+            `detached` keeps the pause button and the live region — both are
+            found by ref and announced from inside the element — and stands the
+            arrows and the pagination down so they can be rendered below the row
+            instead. Without it the section would draw each of them twice.
+          {%- endcomment -%}
+          {% render 'carousel-shell-tail',
+             settings: s,
+             layout: cs_layout,
+             layout_mobile: cs_layout_mobile,
+             detached: true %}
+        </swiper-carousel>
+      </motion-effect>
+    </div>
+
+    {%- if has_controls -%}
+      <div class="{{ controls_class }}">
+        {%- if cs_pagination == 'controls' -%}
+          {% render 'carousel-controls',
+             settings: s,
+             carousel: carousel_id,
+             align: cs_pagination_align %}
+        {%- else -%}
+          {%- if cs_nav -%}
+            {% render 'carousel-nav',
+               settings: s,
+               carousel: carousel_id,
+               position: 'bottom' %}
+          {%- endif -%}
+
+          {%- if cs_pagination != 'none' -%}
+            {% render 'carousel-pagination',
+               style: cs_pagination,
+               align: cs_pagination_align,
+               carousel: carousel_id %}
+          {%- endif -%}
+        {%- endif -%}
       </div>
     {%- endif -%}
-
-{%- comment -%}
-      The carousel element, written here rather than through
-      `snippets/carousel-shell.liquid`.
-
-      Its slides are theme blocks, and `{% content_for %}` cannot have its output
-      captured - theme-check reports it as an error, because Shopify renders
-      blocks with their editor bindings attached and buffering that output into a
-      variable is not something the platform supports. Handing slides to the shell
-      snippet meant capturing them first.
-
-      The shell is not duplicated. `carousel-shell-attrs` writes the element's
-      attributes and `carousel-shell-tail` writes the arrows, pagination, pause
-      button and live region - the same markup `carousel-shell.liquid` emits, from
-      the same sub-snippets. Only the element and its track live here, which is
-      the minimum that lets `content_for` sit inside the track.
-    {%- endcomment -%}
-    {%- liquid
-      assign cs_layout = section.settings.layout
-      assign cs_layout_mobile = section.settings.layout_mobile
-      assign cs_label = 'sections.testimonials.carousel_label' | t
-
-      assign cs_is_carousel = false
-      if cs_layout == 'carousel' or cs_layout_mobile == 'carousel'
-        assign cs_is_carousel = true
-      endif
-    -%}
-
-    <swiper-carousel
-      {% render 'carousel-shell-attrs',
-         settings: section.settings,
-         layout: cs_layout,
-         layout_mobile: cs_layout_mobile,
-         classes: 'testimonials__carousel',
-         columns_desktop: section.settings.columns_desktop,
-         columns_tablet: section.settings.columns_tablet,
-         columns_mobile: section.settings.columns_mobile %}
-    >
-      <div
-        class="carousel-shell__track testimonials__grid"
-        data-ref="track"
-        {% if cs_is_carousel %}aria-label="{{ cs_label | escape }}"{% endif %}
-      >
-        {% content_for 'blocks' %}
-      </div>
-
-      {% render 'carousel-shell-tail',
-         settings: section.settings,
-         layout: cs_layout,
-         layout_mobile: cs_layout_mobile %}
-    </swiper-carousel>
-
   </div>
 </div>
-
 
 {% schema %}
 {
@@ -88,13 +553,319 @@
   "class": "section",
   "blocks": [
     {
-      "type": "@theme"
+      "type": "_testimonial-card"
     },
     {
       "type": "@app"
     }
   ],
   "settings": [
+    {
+      "type": "select",
+      "id": "alignment",
+      "label": "t:blocks.group.settings.alignment.label",
+      "info": "t:sections.testimonials.settings.alignment.info",
+      "options": [
+        {
+          "value": "start",
+          "label": "t:blocks.group.settings.alignment.options__1.label"
+        },
+        {
+          "value": "center",
+          "label": "t:blocks.group.settings.alignment.options__2.label"
+        },
+        {
+          "value": "end",
+          "label": "t:blocks.group.settings.alignment.options__3.label"
+        }
+      ],
+      "default": "center"
+    },
+    {
+      "type": "header",
+      "content": "t:sections.testimonials.headers.row"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:sections.testimonials.paragraphs.row"
+    },
+    {
+      "type": "select",
+      "id": "layout",
+      "label": "t:shared.carousel.layout_type.label",
+      "info": "t:shared.carousel.layout_type.info",
+      "options": [
+        {
+          "value": "grid",
+          "label": "t:shared.carousel.layout_type.options__1.label"
+        },
+        {
+          "value": "carousel",
+          "label": "t:shared.carousel.layout_type.options__2.label"
+        }
+      ],
+      "default": "carousel"
+    },
+    {
+      "type": "checkbox",
+      "id": "carousel_on_mobile",
+      "label": "t:shared.carousel.carousel_on_mobile.label",
+      "info": "t:shared.carousel.carousel_on_mobile.info",
+      "default": true,
+      "visible_if": "{{ section.settings.layout != 'carousel' }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_intro",
+      "label": "t:sections.testimonials.settings.show_intro.label",
+      "info": "t:sections.testimonials.settings.show_intro.info",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "carousel_bleed",
+      "label": "t:sections.testimonials.settings.carousel_bleed.label",
+      "info": "t:sections.testimonials.settings.carousel_bleed.info",
+      "default": true,
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "range",
+      "id": "columns_desktop",
+      "label": "t:shared.columns.desktop.label",
+      "info": "t:sections.testimonials.settings.columns_desktop.info",
+      "min": 1,
+      "max": 6,
+      "step": 1,
+      "default": 3
+    },
+    {
+      "type": "range",
+      "id": "columns_tablet",
+      "label": "t:shared.carousel.columns_tablet.label",
+      "min": 1,
+      "max": 4,
+      "step": 1,
+      "default": 2
+    },
+    {
+      "type": "select",
+      "id": "columns_mobile",
+      "label": "t:shared.carousel.columns_mobile.label",
+      "options": [
+        {
+          "value": "1",
+          "label": "t:shared.carousel.columns_mobile.options__1.label"
+        },
+        {
+          "value": "2",
+          "label": "t:shared.carousel.columns_mobile.options__2.label"
+        }
+      ],
+      "default": "1"
+    },
+    {
+      "type": "range",
+      "id": "gap_horizontal",
+      "label": "t:blocks.group.settings.gap_horizontal.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 24
+    },
+    {
+      "type": "range",
+      "id": "gap_vertical",
+      "label": "t:blocks.group.settings.gap_vertical.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 24
+    },
+    {
+      "type": "range",
+      "id": "gap_horizontal_mobile",
+      "label": "t:sections.testimonials.settings.gap_horizontal_mobile.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 16
+    },
+    {
+      "type": "range",
+      "id": "gap_vertical_mobile",
+      "label": "t:sections.testimonials.settings.gap_vertical_mobile.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 16
+    },
+    {
+      "type": "range",
+      "id": "intro_gap",
+      "label": "t:sections.testimonials.settings.intro_gap.label",
+      "info": "t:sections.testimonials.settings.intro_gap.info",
+      "min": 0,
+      "max": 120,
+      "step": 2,
+      "unit": "px",
+      "default": 32,
+      "visible_if": "{{ section.settings.show_intro }}"
+    },
+    {
+      "type": "header",
+      "content": "t:sections.testimonials.headers.disc"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:sections.testimonials.paragraphs.disc"
+    },
+    {
+      "type": "range",
+      "id": "thumb_size",
+      "label": "t:sections.testimonials.settings.thumb_size.label",
+      "min": 48,
+      "max": 140,
+      "step": 2,
+      "unit": "px",
+      "default": 80
+    },
+    {
+      "type": "range",
+      "id": "thumb_overhang",
+      "label": "t:sections.testimonials.settings.thumb_overhang.label",
+      "info": "t:sections.testimonials.settings.thumb_overhang.info",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 24
+    },
+    {
+      "type": "range",
+      "id": "thumb_inset",
+      "label": "t:sections.testimonials.settings.thumb_inset.label",
+      "info": "t:sections.testimonials.settings.thumb_inset.info",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 28
+    },
+    {
+      "type": "select",
+      "id": "thumb_border_style",
+      "label": "t:sections.testimonials.settings.thumb_border_style.label",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.options.none"
+        },
+        {
+          "value": "solid",
+          "label": "t:shared.options.solid"
+        },
+        {
+          "value": "dashed",
+          "label": "t:shared.options.dashed"
+        },
+        {
+          "value": "dotted",
+          "label": "t:shared.border.style.options__3.label"
+        }
+      ],
+      "default": "dashed"
+    },
+    {
+      "type": "range",
+      "id": "thumb_border_width",
+      "label": "t:shared.border.thickness.label",
+      "min": 0,
+      "max": 6,
+      "step": 1,
+      "unit": "px",
+      "default": 1,
+      "visible_if": "{{ section.settings.thumb_border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "thumb_border_opacity",
+      "label": "t:shared.border.opacity.label",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 100,
+      "visible_if": "{{ section.settings.thumb_border_style != 'none' }}"
+    },
+    {
+      "type": "color",
+      "id": "thumb_border_color",
+      "label": "t:shared.border.color.label",
+      "default": "#0F2E2F",
+      "visible_if": "{{ section.settings.thumb_border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "info_inset",
+      "label": "t:sections.testimonials.settings.info_inset.label",
+      "info": "t:sections.testimonials.settings.info_inset.info",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 28
+    },
+    {
+      "type": "range",
+      "id": "info_gap",
+      "label": "t:sections.testimonials.settings.info_gap.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 14
+    },
+    {
+      "type": "select",
+      "id": "thumb_hover_effect",
+      "label": "t:sections.testimonials.settings.thumb_hover_effect.label",
+      "info": "t:sections.testimonials.settings.thumb_hover_effect.info",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.options.none"
+        },
+        {
+          "value": "zoom_in",
+          "label": "t:shared.image_effect.options__2.label"
+        },
+        {
+          "value": "zoom_out",
+          "label": "t:shared.image_effect.options__3.label"
+        }
+      ],
+      "default": "zoom_in"
+    },
+    {
+      "type": "range",
+      "id": "thumb_hover_scale",
+      "label": "t:shared.image_effect.scale.label",
+      "min": 100,
+      "max": 150,
+      "step": 1,
+      "unit": "%",
+      "default": 112,
+      "visible_if": "{{ section.settings.thumb_hover_effect != 'none' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:sections.featured_blog.headers.section"
+    },
     {
       "type": "select",
       "id": "container_width",
@@ -125,177 +896,183 @@
       "default": "standard"
     },
     {
-      "type": "text",
-      "id": "heading",
-      "label": "t:shared.heading.label",
-      "default": "What customers say"
-    },
-    {
-      "type": "range",
-      "id": "columns_desktop",
-      "label": "t:shared.columns.desktop.label",
-      "min": 1,
-      "max": 4,
-      "step": 1,
-      "default": 3
-    },
-    {
-      "type": "select",
-      "id": "layout",
-      "label": "t:sections.featured_collection.settings.layout.label",
-      "options": [
-        {
-          "value": "grid",
-          "label": "t:sections.featured_collection.settings.layout.options__1.label"
-        },
-        {
-          "value": "carousel",
-          "label": "t:sections.featured_collection.settings.layout.options__2.label"
-        }
-      ],
-      "default": "grid"
-    },
-    {
-      "type": "select",
-      "id": "alignment",
-      "label": "t:blocks.group.settings.alignment.label",
-      "options": [
-        {
-          "value": "start",
-          "label": "t:blocks.group.settings.alignment.options__1.label"
-        },
-        {
-          "value": "center",
-          "label": "t:blocks.group.settings.alignment.options__2.label"
-        },
-        {
-          "value": "end",
-          "label": "t:blocks.group.settings.alignment.options__3.label"
-        }
-      ],
-      "default": "center"
-    },
-    {
       "type": "header",
-      "content": "t:shared.animation.header"
-    },
-    {
-      "type": "select",
-      "id": "animation_text",
-      "label": "t:shared.animation.animation_text.label",
-      "options": [
-        {
-          "value": "inherit",
-          "label": "t:shared.animation.animation_text.options__1.label"
-        },
-        {
-          "value": "none",
-          "label": "t:shared.animation.animation_text.options__2.label"
-        },
-        {
-          "value": "fade-up",
-          "label": "t:shared.animation.animation_text.options__4.label"
-        },
-        {
-          "value": "words-slide-up",
-          "label": "t:shared.animation.animation_text.options__9.label"
-        }
-      ],
-      "default": "inherit"
+      "content": "t:shared.appearance.header"
     },
     {
       "type": "color_scheme",
       "id": "color_scheme",
       "label": "t:shared.color_scheme.label",
-      "default": "scheme-2"
+      "default": "scheme-1"
     },
     {
-      "type": "header",
-      "content": "t:shared.spacing.section_header"
-    },
-    {
-      "type": "range",
-      "id": "padding_top",
-      "label": "t:shared.spacing.padding_top.label",
-      "min": 0,
-      "max": 160,
-      "step": 2,
-      "unit": "px",
-      "default": 100
-    },
-    {
-      "type": "range",
-      "id": "padding_bottom",
-      "label": "t:shared.spacing.padding_bottom.label",
-      "min": 0,
-      "max": 160,
-      "step": 2,
-      "unit": "px",
-      "default": 100
-    },
-    {
-      "type": "range",
-      "id": "padding_top_mobile",
-      "label": "t:shared.spacing.padding_top_mobile.label",
-      "info": "t:shared.spacing.padding_top_mobile.info",
-      "min": 0,
-      "max": 120,
-      "step": 2,
-      "unit": "px",
-      "default": 50
-    },
-    {
-      "type": "range",
-      "id": "padding_bottom_mobile",
-      "label": "t:shared.spacing.padding_bottom_mobile.label",
-      "info": "t:shared.spacing.padding_bottom_mobile.info",
-      "min": 0,
-      "max": 120,
-      "step": 2,
-      "unit": "px",
-      "default": 50
-    },
-    {
-      "type": "header",
-      "content": "t:shared.carousel.header"
+      "type": "color",
+      "id": "accent_color",
+      "label": "t:sections.testimonials.settings.accent_color.label",
+      "info": "t:sections.testimonials.settings.accent_color.info",
+      "default": "#03D26F"
     },
     {
       "type": "select",
-      "id": "layout_mobile",
-      "label": "t:shared.carousel.layout_mobile.label",
+      "id": "background_media",
+      "label": "t:shared.background.media.label",
       "options": [
         {
-          "value": "grid",
-          "label": "t:shared.carousel.layout.options__1.label"
+          "value": "none",
+          "label": "t:shared.background.media.options__1.label"
         },
         {
-          "value": "carousel",
-          "label": "t:shared.carousel.layout.options__2.label"
+          "value": "image",
+          "label": "t:shared.background.media.options__2.label"
         }
       ],
-      "default": "carousel"
+      "default": "none"
     },
     {
-      "type": "range",
-      "id": "columns_tablet",
-      "label": "t:shared.carousel.columns_tablet.label",
-      "min": 1,
-      "max": 4,
-      "step": 1,
-      "default": 2
+      "type": "color_background",
+      "id": "background_color",
+      "label": "t:shared.background.color.label",
+      "visible_if": "{{ section.settings.background_media == 'none' }}"
     },
     {
-      "type": "range",
-      "id": "columns_mobile",
-      "label": "t:shared.carousel.columns_mobile.label",
-      "min": 1,
-      "max": 3,
-      "step": 1,
-      "default": 1
+      "type": "image_picker",
+      "id": "image",
+      "label": "t:shared.background.image.label",
+      "visible_if": "{{ section.settings.background_media == 'image' }}"
+    },
+    {
+      "type": "image_picker",
+      "id": "image_mobile",
+      "label": "t:shared.background.image_mobile.label",
+      "visible_if": "{{ section.settings.background_media == 'image' }}"
     },
     {
       "type": "header",
-      "content": "t:shared.carousel.headers.motion"
+      "content": "t:blocks.group.headers.borders"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:sections.testimonials.paragraphs.borders"
+    },
+    {
+      "type": "select",
+      "id": "border_style",
+      "label": "t:blocks.group.settings.border_style.label",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.options.none"
+        },
+        {
+          "value": "solid",
+          "label": "t:shared.options.solid"
+        },
+        {
+          "value": "dashed",
+          "label": "t:shared.options.dashed"
+        },
+        {
+          "value": "dotted",
+          "label": "t:shared.border.style.options__3.label"
+        }
+      ],
+      "default": "none"
+    },
+    {
+      "type": "range",
+      "id": "border_width_top",
+      "label": "t:shared.border.sides.top.label",
+      "info": "t:shared.border.sides.info",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 1,
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_width_right",
+      "label": "t:shared.border.sides.right.label",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_width_bottom",
+      "label": "t:shared.border.sides.bottom.label",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_width_left",
+      "label": "t:shared.border.sides.left.label",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_opacity",
+      "label": "t:shared.border.opacity.label",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 100,
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "color",
+      "id": "border_color",
+      "label": "t:blocks.group.settings.border_color.label",
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.corners.header"
+    },
+    {
+      "type": "range",
+      "id": "border_radius",
+      "label": "t:shared.corners.radius.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "border_radius_mobile",
+      "label": "t:shared.corners.radius_mobile.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "header",
+      "content": "t:sections.featured_blog.headers.carousel",
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:sections.featured_blog.paragraphs.carousel",
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
     },
     {
       "type": "range",
@@ -306,20 +1083,23 @@
       "max": 1500,
       "step": 50,
       "unit": "ms",
-      "default": 500
+      "default": 500,
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
     },
     {
       "type": "checkbox",
       "id": "carousel_loop",
       "label": "t:shared.carousel.loop.label",
-      "default": false
+      "default": false,
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
     },
     {
       "type": "checkbox",
       "id": "carousel_autoplay",
       "label": "t:shared.carousel.autoplay.label",
-      "info": "t:shared.carousel.autoplay.info",
-      "default": false
+      "info": "t:sections.testimonials.settings.autoplay.info",
+      "default": false,
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
     },
     {
       "type": "range",
@@ -334,11 +1114,13 @@
     },
     {
       "type": "header",
-      "content": "t:shared.carousel.headers.peek"
+      "content": "t:shared.carousel.headers.peek",
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
     },
     {
       "type": "paragraph",
-      "content": "t:shared.carousel.paragraphs.peek"
+      "content": "t:shared.carousel.paragraphs.peek",
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
     },
     {
       "type": "range",
@@ -349,7 +1131,8 @@
       "max": 90,
       "step": 5,
       "unit": "%",
-      "default": 25
+      "default": 25,
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
     },
     {
       "type": "range",
@@ -360,68 +1143,103 @@
       "max": 90,
       "step": 5,
       "unit": "%",
-      "default": 0
+      "default": 0,
+      "visible_if": "{{ section.settings.layout == 'carousel' }}"
     },
     {
       "type": "header",
-      "content": "t:shared.carousel.headers.navigation"
+      "content": "t:shared.carousel.headers.navigation",
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
     },
     {
       "type": "checkbox",
       "id": "carousel_navigation",
       "label": "t:shared.carousel.navigation.label",
-      "default": true
-    },
-    {
-      "type": "select",
-      "id": "carousel_nav_position",
-      "label": "t:shared.carousel.nav_position.label",
-      "info": "t:shared.carousel.nav_position.info",
-      "options": [
-        {
-          "value": "outside",
-          "label": "t:shared.carousel.nav_position.options__1.label"
-        },
-        {
-          "value": "inside",
-          "label": "t:shared.carousel.nav_position.options__2.label"
-        },
-        {
-          "value": "bottom",
-          "label": "t:shared.carousel.nav_position.options__3.label"
-        },
-        {
-          "value": "inline",
-          "label": "t:shared.carousel.nav_position.options__4.label"
-        }
-      ],
-      "default": "outside",
-      "visible_if": "{{ section.settings.carousel_navigation }}"
+      "default": true,
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
     },
     {
       "type": "select",
       "id": "carousel_nav_icon",
-      "label": "t:shared.carousel.nav_icon.label",
+      "label": "t:shared.carousel.nav_glyph.label",
       "options": [
         {
-          "value": "chevron",
-          "label": "t:shared.carousel.nav_icon.options__1.label"
-        },
-        {
           "value": "arrow",
-          "label": "t:shared.carousel.nav_icon.options__2.label"
+          "label": "t:shared.carousel.nav_glyph.options__1.label"
         },
         {
-          "value": "play",
-          "label": "t:shared.carousel.nav_icon.options__3.label"
+          "value": "chevron",
+          "label": "t:shared.carousel.nav_glyph.options__2.label"
         },
         {
-          "value": "external",
-          "label": "t:shared.carousel.nav_icon.options__4.label"
+          "value": "arrow-large",
+          "label": "t:shared.carousel.nav_glyph.options__3.label"
+        },
+        {
+          "value": "chevron-large",
+          "label": "t:shared.carousel.nav_glyph.options__4.label"
+        },
+        {
+          "value": "none",
+          "label": "t:shared.carousel.nav_glyph.options__5.label"
         }
       ],
       "default": "arrow",
-      "visible_if": "{{ section.settings.carousel_navigation }}"
+      "visible_if": "{{ section.settings.carousel_navigation and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "select",
+      "id": "carousel_nav_shape",
+      "label": "t:shared.carousel.nav_shape.label",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.carousel.nav_shape.options__1.label"
+        },
+        {
+          "value": "circle",
+          "label": "t:shared.carousel.nav_shape.options__2.label"
+        },
+        {
+          "value": "square",
+          "label": "t:shared.carousel.nav_shape.options__3.label"
+        }
+      ],
+      "default": "circle",
+      "visible_if": "{{ section.settings.carousel_navigation and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "select",
+      "id": "carousel_nav_border_style",
+      "label": "t:shared.carousel.nav_border_style.label",
+      "options": [
+        {
+          "value": "solid",
+          "label": "t:shared.options.solid"
+        },
+        {
+          "value": "dashed",
+          "label": "t:shared.options.dashed"
+        },
+        {
+          "value": "none",
+          "label": "t:shared.options.none"
+        }
+      ],
+      "default": "solid",
+      "visible_if": "{{ section.settings.carousel_nav_shape != 'none' and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "range",
+      "id": "carousel_nav_border_radius",
+      "label": "t:shared.carousel.nav_border_radius.label",
+      "info": "t:shared.carousel.nav_border_radius.info",
+      "min": 0,
+      "max": 30,
+      "step": 1,
+      "unit": "px",
+      "default": 8,
+      "visible_if": "{{ section.settings.carousel_nav_shape == 'square' and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
     },
     {
       "type": "select",
@@ -442,8 +1260,8 @@
           "label": "t:shared.carousel.controls_style.options__3.label"
         }
       ],
-      "default": "ghost",
-      "visible_if": "{{ section.settings.carousel_navigation }}"
+      "default": "split",
+      "visible_if": "{{ section.settings.carousel_navigation and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
     },
     {
       "type": "range",
@@ -454,11 +1272,12 @@
       "step": 2,
       "unit": "px",
       "default": 44,
-      "visible_if": "{{ section.settings.carousel_navigation }}"
+      "visible_if": "{{ section.settings.carousel_navigation and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
     },
     {
       "type": "header",
-      "content": "t:shared.carousel.headers.pagination"
+      "content": "t:shared.carousel.headers.pagination",
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
     },
     {
       "type": "select",
@@ -487,12 +1306,14 @@
           "label": "t:shared.carousel.pagination.options__5.label"
         }
       ],
-      "default": "none"
+      "default": "controls",
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
     },
     {
       "type": "select",
-      "id": "carousel_controls_align",
-      "label": "t:shared.carousel.controls_align.label",
+      "id": "carousel_pagination_align",
+      "label": "t:shared.carousel.pagination_align.label",
+      "info": "t:shared.carousel.pagination_align.info",
       "options": [
         {
           "value": "start",
@@ -507,23 +1328,46 @@
           "label": "t:shared.carousel.controls_align.options__3.label"
         }
       ],
-      "default": "start",
-      "visible_if": "{{ section.settings.carousel_pagination == 'controls' }}"
+      "default": "center",
+      "visible_if": "{{ section.settings.carousel_pagination != 'none' and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "range",
+      "id": "carousel_controls_gap",
+      "label": "t:sections.feature_cards.settings.carousel_controls_gap.label",
+      "info": "t:sections.testimonials.settings.carousel_controls_gap.info",
+      "min": 0,
+      "max": 120,
+      "step": 4,
+      "unit": "px",
+      "default": 40,
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
     },
     {
       "type": "header",
-      "content": "t:shared.carousel.headers.colors"
+      "content": "t:shared.carousel.headers.controls",
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
     },
     {
       "type": "paragraph",
-      "content": "t:shared.carousel.paragraphs.colors"
+      "content": "t:shared.carousel.paragraphs.colors",
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
     },
     {
       "type": "checkbox",
-      "id": "carousel_custom_colors",
-      "label": "t:shared.carousel.custom_colors.label",
-      "info": "t:shared.carousel.custom_colors.info",
-      "default": false
+      "id": "carousel_inherit_scheme",
+      "label": "t:shared.carousel.inherit_scheme.label",
+      "info": "t:shared.carousel.inherit_scheme.info",
+      "default": true,
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "color_scheme",
+      "id": "carousel_color_scheme",
+      "label": "t:shared.color_scheme.label",
+      "info": "t:shared.carousel.color_scheme.info",
+      "default": "scheme-1",
+      "visible_if": "{{ section.settings.carousel_inherit_scheme == false }}"
     },
     {
       "type": "select",
@@ -540,111 +1384,670 @@
         }
       ],
       "default": "solid",
-      "visible_if": "{{ section.settings.carousel_custom_colors }}"
+      "visible_if": "{{ section.settings.carousel_inherit_scheme == false }}"
     },
     {
       "type": "color",
       "id": "carousel_nav_bg",
       "label": "t:shared.carousel.nav_bg.label",
-      "visible_if": "{{ section.settings.carousel_custom_colors and section.settings.carousel_nav_style == 'solid' }}"
+      "visible_if": "{{ section.settings.carousel_inherit_scheme == false and section.settings.carousel_nav_style == 'solid' }}"
     },
     {
       "type": "color",
       "id": "carousel_nav_bg_hover",
       "label": "t:shared.carousel.nav_bg_hover.label",
-      "visible_if": "{{ section.settings.carousel_custom_colors and section.settings.carousel_nav_style == 'solid' }}"
+      "visible_if": "{{ section.settings.carousel_inherit_scheme == false and section.settings.carousel_nav_style == 'solid' }}"
     },
     {
       "type": "color_background",
       "id": "carousel_nav_gradient",
       "label": "t:shared.carousel.nav_gradient.label",
       "default": "linear-gradient(135deg, #1a1a1a 0%, #4a4a4a 100%)",
-      "visible_if": "{{ section.settings.carousel_custom_colors and section.settings.carousel_nav_style == 'gradient' }}"
+      "visible_if": "{{ section.settings.carousel_inherit_scheme == false and section.settings.carousel_nav_style == 'gradient' }}"
     },
     {
       "type": "color_background",
       "id": "carousel_nav_gradient_hover",
       "label": "t:shared.carousel.nav_gradient_hover.label",
-      "visible_if": "{{ section.settings.carousel_custom_colors and section.settings.carousel_nav_style == 'gradient' }}"
+      "visible_if": "{{ section.settings.carousel_inherit_scheme == false and section.settings.carousel_nav_style == 'gradient' }}"
     },
     {
       "type": "color",
       "id": "carousel_nav_icon_color",
       "label": "t:shared.carousel.nav_icon_color.label",
-      "visible_if": "{{ section.settings.carousel_custom_colors }}"
+      "visible_if": "{{ section.settings.carousel_inherit_scheme == false }}"
     },
     {
       "type": "color",
       "id": "carousel_nav_icon_hover",
       "label": "t:shared.carousel.nav_icon_hover.label",
-      "visible_if": "{{ section.settings.carousel_custom_colors }}"
+      "visible_if": "{{ section.settings.carousel_inherit_scheme == false }}"
     },
     {
       "type": "color",
       "id": "carousel_nav_border_color",
       "label": "t:shared.carousel.nav_border_color.label",
-      "visible_if": "{{ section.settings.carousel_custom_colors }}"
+      "visible_if": "{{ section.settings.carousel_inherit_scheme == false }}"
     },
     {
       "type": "color",
       "id": "carousel_nav_border_hover",
       "label": "t:shared.carousel.nav_border_hover.label",
-      "visible_if": "{{ section.settings.carousel_custom_colors }}"
+      "visible_if": "{{ section.settings.carousel_inherit_scheme == false }}"
     },
     {
       "type": "color",
       "id": "carousel_dot_color",
       "label": "t:shared.carousel.dot_color.label",
-      "visible_if": "{{ section.settings.carousel_custom_colors and section.settings.carousel_pagination != 'none' }}"
+      "info": "t:shared.carousel.dot_color.info",
+      "visible_if": "{{ section.settings.carousel_inherit_scheme == false }}"
     },
     {
       "type": "color",
       "id": "carousel_dot_active_color",
       "label": "t:shared.carousel.dot_active_color.label",
-      "visible_if": "{{ section.settings.carousel_custom_colors and section.settings.carousel_pagination != 'none' }}"
+      "visible_if": "{{ section.settings.carousel_inherit_scheme == false }}"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.animation.header"
+    },
+    {
+      "type": "select",
+      "id": "animation_text",
+      "label": "t:shared.animation.animation_text.label",
+      "info": "t:sections.feature_cards.settings.animation_text.info",
+      "options": [
+        {
+          "value": "inherit",
+          "label": "t:shared.animation.animation_text.options__1.label"
+        },
+        {
+          "value": "none",
+          "label": "t:shared.animation.animation_text.options__2.label"
+        },
+        {
+          "value": "fade-up",
+          "label": "t:shared.animation.animation_text.options__4.label"
+        },
+        {
+          "value": "words-slide-up",
+          "label": "t:shared.animation.animation_text.options__9.label"
+        }
+      ],
+      "default": "inherit"
+    },
+    {
+      "type": "select",
+      "id": "animation_image",
+      "label": "t:sections.feature_cards.settings.animation_image.label",
+      "info": "t:sections.testimonials.settings.animation_image.info",
+      "options": [
+        {
+          "value": "inherit",
+          "label": "t:shared.animation.animation_text.options__1.label"
+        },
+        {
+          "value": "none",
+          "label": "t:shared.animation.animation_text.options__2.label"
+        },
+        {
+          "value": "fade-in",
+          "label": "t:shared.animation.animation_text.options__3.label"
+        },
+        {
+          "value": "fade-up",
+          "label": "t:shared.animation.animation_text.options__4.label"
+        }
+      ],
+      "default": "inherit"
+    },
+    {
+      "type": "range",
+      "id": "animation_duration",
+      "label": "t:shared.animation.animation_duration.label",
+      "min": 0,
+      "max": 2000,
+      "step": 50,
+      "unit": "ms",
+      "default": 1000
+    },
+    {
+      "type": "range",
+      "id": "animation_delay",
+      "label": "t:shared.animation.animation_delay.label",
+      "min": 0,
+      "max": 2000,
+      "step": 50,
+      "unit": "ms",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "animation_stagger",
+      "label": "t:shared.animation.animation_stagger.label",
+      "info": "t:sections.feature_cards.settings.animation_stagger.info",
+      "min": 0,
+      "max": 400,
+      "step": 10,
+      "unit": "ms",
+      "default": 120
+    },
+    {
+      "type": "header",
+      "content": "t:shared.spacing.section_header"
+    },
+    {
+      "type": "select",
+      "id": "padding_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        {
+          "value": "desktop",
+          "label": "t:shared.spacing.devices.options__1.label"
+        },
+        {
+          "value": "mobile",
+          "label": "t:shared.spacing.devices.options__2.label"
+        }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 200,
+      "step": 2,
+      "unit": "px",
+      "default": 100,
+      "visible_if": "{{ section.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 200,
+      "step": 2,
+      "unit": "px",
+      "default": 100,
+      "visible_if": "{{ section.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "label": "t:shared.spacing.padding_top_mobile.label",
+      "info": "t:shared.spacing.padding_top_mobile.info",
+      "min": 0,
+      "max": 160,
+      "step": 2,
+      "unit": "px",
+      "default": 56,
+      "visible_if": "{{ section.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "label": "t:shared.spacing.padding_bottom_mobile.label",
+      "info": "t:shared.spacing.padding_bottom_mobile.info",
+      "min": 0,
+      "max": 160,
+      "step": 2,
+      "unit": "px",
+      "default": 56,
+      "visible_if": "{{ section.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "margin_top",
+      "label": "t:shared.spacing.margin_top.label",
+      "min": 0,
+      "max": 120,
+      "step": 2,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "margin_bottom",
+      "label": "t:shared.spacing.margin_bottom.label",
+      "min": 0,
+      "max": 120,
+      "step": 2,
+      "unit": "px",
+      "default": 0
     }
   ],
   "presets": [
     {
       "name": "t:sections.testimonials.name",
+      "category": "t:categories.text",
+      "settings": {
+        "alignment": "center",
+        "layout": "carousel",
+        "carousel_on_mobile": true,
+        "show_intro": true,
+        "carousel_bleed": true,
+        "columns_desktop": 3,
+        "columns_tablet": 2,
+        "columns_mobile": "1",
+        "gap_horizontal": 24,
+        "gap_vertical": 24,
+        "intro_gap": 32,
+        "thumb_size": 80,
+        "thumb_overhang": 24,
+        "thumb_inset": 28,
+        "thumb_border_style": "dashed",
+        "thumb_border_width": 1,
+        "thumb_border_opacity": 100,
+        "thumb_border_color": "#0F2E2F",
+        "info_inset": 28,
+        "info_gap": 14,
+        "container_width": "standard",
+        "color_scheme": "scheme-1",
+        "accent_color": "#03D26F",
+        "border_style": "none",
+        "border_radius": 0,
+        "border_radius_mobile": 0,
+        "carousel_peek_mobile": 25,
+        "carousel_navigation": true,
+        "carousel_nav_icon": "arrow",
+        "carousel_nav_shape": "circle",
+        "carousel_nav_border_style": "solid",
+        "carousel_controls_style": "split",
+        "carousel_nav_size": 44,
+        "carousel_pagination": "controls",
+        "carousel_pagination_align": "center",
+        "carousel_controls_gap": 40,
+        "carousel_inherit_scheme": true,
+        "animation_image": "fade-up",
+        "animation_duration": 800,
+        "animation_stagger": 120,
+        "padding_top": 100,
+        "padding_bottom": 100,
+        "gap_horizontal_mobile": 16,
+        "gap_vertical_mobile": 16,
+        "thumb_hover_effect": "zoom_in",
+        "thumb_hover_scale": 112
+      },
       "blocks": [
         {
-          "type": "testimonial"
+          "type": "section-header",
+          "static": true,
+          "id": "testimonials-header",
+          "settings": {
+            "direction": "column",
+            "alignment": "center",
+            "position": "start",
+            "gap": 16,
+            "gap_vertical": 16,
+            "gap_vertical_mobile": 12,
+            "width": "fill"
+          },
+          "blocks": [
+            {
+              "type": "subheading",
+              "settings": {
+                "text": "<p>Testimonial</p>",
+                "preset": "subheading",
+                "width": "fit",
+                "alignment": "center",
+                "alignment_mobile": "center",
+                "icon_source": "icon",
+                "icon": "heart",
+                "icon_style": "solid",
+                "icon_size": "small",
+                "icon_width": 22,
+                "icon_height": 22,
+                "icon_border_radius": 50,
+                "show_divider": true,
+                "gap": 8,
+                "border_style": "dashed",
+                "border_thickness": 1,
+                "border_radius": 40,
+                "padding_top": 4,
+                "padding_bottom": 4,
+                "padding_left": 4,
+                "padding_right": 16
+              }
+            },
+            {
+              "type": "text",
+              "name": "t:blocks.text.presets.heading.name",
+              "settings": {
+                "text": "<p>Trusted by 25k+ wellness seekers.</p>",
+                "preset": "h2",
+                "max_width": "none",
+                "alignment": "center",
+                "alignment_mobile": "center",
+                "color": "gradient",
+                "text_gradient": "linear-gradient(90deg, #161514 0%, #0F2E2F 45%, #03D26F 100%)"
+              }
+            },
+            {
+              "type": "text",
+              "name": "t:blocks.text.presets.text.name",
+              "settings": {
+                "text": "<p>Hear from our community who finally found relief from bloating and digestive discomfort.</p>",
+                "preset": "paragraph",
+                "max_width": "normal",
+                "alignment": "center",
+                "alignment_mobile": "center"
+              }
+            }
+          ]
         },
         {
-          "type": "testimonial"
+          "type": "_testimonial-intro",
+          "static": true,
+          "id": "testimonials-intro",
+          "settings": {
+            "heading": "See why our community loves us",
+            "heading_size": 24,
+            "alignment": "start",
+            "width": 312,
+            "min_height": 366,
+            "gap": 20,
+            "stat_gap": 28,
+            "background_color": "#0F2E2F",
+            "background_opacity": 100,
+            "text_color": "#FFFFFF",
+            "border_style": "none",
+            "border_radius": 20,
+            "border_radius_mobile": 20,
+            "padding_device": "desktop",
+            "padding_top": 40,
+            "padding_bottom": 40,
+            "padding_left": 40,
+            "padding_right": 40,
+            "padding_top_mobile": 28,
+            "padding_bottom_mobile": 28,
+            "padding_left_mobile": 24,
+            "padding_right_mobile": 24
+          },
+          "blocks": [
+            {
+              "type": "_testimonial-stat",
+              "settings": {
+                "value": "4,500+",
+                "label": "top-rated experiences",
+                "value_size": 28,
+                "value_color": "#03D26F",
+                "label_size": 15,
+                "gap": 6,
+                "padding_top": 0,
+                "padding_bottom": 0
+              }
+            },
+            {
+              "type": "_testimonial-stat",
+              "settings": {
+                "value": "4.9/5",
+                "label": "stars from over 825 verified buyers",
+                "value_size": 28,
+                "value_color": "#03D26F",
+                "label_size": 15,
+                "gap": 6,
+                "padding_top": 0,
+                "padding_bottom": 0
+              }
+            }
+          ]
         },
         {
-          "type": "testimonial"
+          "type": "_testimonial-card",
+          "settings": {
+            "author": "Jordan W.",
+            "role": "Morning Recovery",
+            "quote": "<p>Bite-sized insights that effortlessly fit into a busy morning routine. No fluff, just highly actionable habits that stick. A perfect daily reset button for mind and body.</p>",
+            "rating": 5,
+            "gap": 16,
+            "star_size": 14,
+            "show_verified": true,
+            "verified_label": "Verified",
+            "show_product": true,
+            "show_info_rating": true,
+            "show_info_price": true,
+            "placeholder_title": "Morning Recovery",
+            "placeholder_rating": 5,
+            "placeholder_reviews": 889,
+            "placeholder_compare_price": "$54.9",
+            "placeholder_price": "$44.9",
+            "frame_background": "#E5F1EE",
+            "frame_background_opacity": 100,
+            "frame_radius": 12,
+            "frame_radius_mobile": 12,
+            "min_height": 350,
+            "border_style": "solid",
+            "border_width_top": 1,
+            "border_width_right": 1,
+            "border_width_bottom": 1,
+            "border_width_left": 1,
+            "border_opacity": 100,
+            "border_color": "#E5F1EE",
+            "ring_gap": 7,
+            "border_radius": 20,
+            "border_radius_mobile": 20,
+            "hover_border_style": "dashed",
+            "hover_border_color": "#0F2E2F",
+            "hover_border_opacity": 100,
+            "hover_duration": 400,
+            "hover_lift": 0,
+            "padding_device": "desktop",
+            "padding_top": 28,
+            "padding_bottom": 28,
+            "padding_left": 28,
+            "padding_right": 28,
+            "padding_top_mobile": 24,
+            "padding_bottom_mobile": 24,
+            "padding_left_mobile": 20,
+            "padding_right_mobile": 20
+          }
+        },
+        {
+          "type": "_testimonial-card",
+          "settings": {
+            "author": "James L.",
+            "role": "Skin + Hair recovery",
+            "quote": "<p>The perfect blueprint to elevate your daily energy naturally. Consistent, gentle and something I actually look forward to taking every morning.</p>",
+            "rating": 4,
+            "gap": 16,
+            "star_size": 14,
+            "show_verified": true,
+            "verified_label": "Verified",
+            "show_product": true,
+            "show_info_rating": true,
+            "show_info_price": true,
+            "placeholder_title": "Skin + Hair Recovery",
+            "placeholder_rating": 5,
+            "placeholder_reviews": 612,
+            "placeholder_compare_price": "$54.9",
+            "placeholder_price": "$44.9",
+            "frame_background": "#E5F1EE",
+            "frame_background_opacity": 100,
+            "frame_radius": 12,
+            "frame_radius_mobile": 12,
+            "min_height": 350,
+            "border_style": "solid",
+            "border_width_top": 1,
+            "border_width_right": 1,
+            "border_width_bottom": 1,
+            "border_width_left": 1,
+            "border_opacity": 100,
+            "border_color": "#E5F1EE",
+            "ring_gap": 7,
+            "border_radius": 20,
+            "border_radius_mobile": 20,
+            "hover_border_style": "dashed",
+            "hover_border_color": "#0F2E2F",
+            "hover_border_opacity": 100,
+            "hover_duration": 400,
+            "hover_lift": 0,
+            "padding_device": "desktop",
+            "padding_top": 28,
+            "padding_bottom": 28,
+            "padding_left": 28,
+            "padding_right": 28,
+            "padding_top_mobile": 24,
+            "padding_bottom_mobile": 24,
+            "padding_left_mobile": 20,
+            "padding_right_mobile": 20
+          }
+        },
+        {
+          "type": "_testimonial-card",
+          "settings": {
+            "author": "Chloe B.",
+            "role": "Energy performance",
+            "quote": "<p>From the moment you wake up. Practical strategies to structure your day for peak performance. Pure, unfiltered wisdom for daily growth.</p>",
+            "rating": 5,
+            "gap": 16,
+            "star_size": 14,
+            "show_verified": true,
+            "verified_label": "Verified",
+            "show_product": true,
+            "show_info_rating": true,
+            "show_info_price": true,
+            "placeholder_title": "Energy Performance",
+            "placeholder_rating": 5,
+            "placeholder_reviews": 1204,
+            "placeholder_compare_price": "$54.9",
+            "placeholder_price": "$44.9",
+            "frame_background": "#E5F1EE",
+            "frame_background_opacity": 100,
+            "frame_radius": 12,
+            "frame_radius_mobile": 12,
+            "min_height": 350,
+            "border_style": "solid",
+            "border_width_top": 1,
+            "border_width_right": 1,
+            "border_width_bottom": 1,
+            "border_width_left": 1,
+            "border_opacity": 100,
+            "border_color": "#E5F1EE",
+            "ring_gap": 7,
+            "border_radius": 20,
+            "border_radius_mobile": 20,
+            "hover_border_style": "dashed",
+            "hover_border_color": "#0F2E2F",
+            "hover_border_opacity": 100,
+            "hover_duration": 400,
+            "hover_lift": 0,
+            "padding_device": "desktop",
+            "padding_top": 28,
+            "padding_bottom": 28,
+            "padding_left": 28,
+            "padding_right": 28,
+            "padding_top_mobile": 24,
+            "padding_bottom_mobile": 24,
+            "padding_left_mobile": 20,
+            "padding_right_mobile": 20
+          }
+        },
+        {
+          "type": "_testimonial-card",
+          "settings": {
+            "author": "Priya N.",
+            "role": "Gut Health",
+            "quote": "<p>Three weeks in and the bloating I had made peace with is simply gone. I did not expect to notice a difference this quickly.</p>",
+            "rating": 5,
+            "gap": 16,
+            "star_size": 14,
+            "show_verified": true,
+            "verified_label": "Verified",
+            "show_product": true,
+            "show_info_rating": true,
+            "show_info_price": true,
+            "placeholder_title": "Gut Health",
+            "placeholder_rating": 5,
+            "placeholder_reviews": 734,
+            "placeholder_compare_price": "$54.9",
+            "placeholder_price": "$44.9",
+            "frame_background": "#E5F1EE",
+            "frame_background_opacity": 100,
+            "frame_radius": 12,
+            "frame_radius_mobile": 12,
+            "min_height": 350,
+            "border_style": "solid",
+            "border_width_top": 1,
+            "border_width_right": 1,
+            "border_width_bottom": 1,
+            "border_width_left": 1,
+            "border_opacity": 100,
+            "border_color": "#E5F1EE",
+            "ring_gap": 7,
+            "border_radius": 20,
+            "border_radius_mobile": 20,
+            "hover_border_style": "dashed",
+            "hover_border_color": "#0F2E2F",
+            "hover_border_opacity": 100,
+            "hover_duration": 400,
+            "hover_lift": 0,
+            "padding_device": "desktop",
+            "padding_top": 28,
+            "padding_bottom": 28,
+            "padding_left": 28,
+            "padding_right": 28,
+            "padding_top_mobile": 24,
+            "padding_bottom_mobile": 24,
+            "padding_left_mobile": 20,
+            "padding_right_mobile": 20
+          }
+        },
+        {
+          "type": "_testimonial-card",
+          "settings": {
+            "author": "Marcus T.",
+            "role": "Daily Greens",
+            "quote": "<p>Mixes clean, tastes like nothing, and it is the one thing in my cupboard I have never run out of. That is the whole review.</p>",
+            "rating": 5,
+            "gap": 16,
+            "star_size": 14,
+            "show_verified": true,
+            "verified_label": "Verified",
+            "show_product": true,
+            "show_info_rating": true,
+            "show_info_price": true,
+            "placeholder_title": "Daily Greens",
+            "placeholder_rating": 5,
+            "placeholder_reviews": 458,
+            "placeholder_compare_price": "$54.9",
+            "placeholder_price": "$44.9",
+            "frame_background": "#E5F1EE",
+            "frame_background_opacity": 100,
+            "frame_radius": 12,
+            "frame_radius_mobile": 12,
+            "min_height": 350,
+            "border_style": "solid",
+            "border_width_top": 1,
+            "border_width_right": 1,
+            "border_width_bottom": 1,
+            "border_width_left": 1,
+            "border_opacity": 100,
+            "border_color": "#E5F1EE",
+            "ring_gap": 7,
+            "border_radius": 20,
+            "border_radius_mobile": 20,
+            "hover_border_style": "dashed",
+            "hover_border_color": "#0F2E2F",
+            "hover_border_opacity": 100,
+            "hover_duration": 400,
+            "hover_lift": 0,
+            "padding_device": "desktop",
+            "padding_top": 28,
+            "padding_bottom": 28,
+            "padding_left": 28,
+            "padding_right": 28,
+            "padding_top_mobile": 24,
+            "padding_bottom_mobile": 24,
+            "padding_left_mobile": 20,
+            "padding_right_mobile": 20
+          }
         }
       ]
     }
   ]
 }
 {% endschema %}
-{% comment %}
-
-This file has been rewritten to preserve the original behavior.
-
----
-Changes:
-- from: |-
-    {% render 'carousel-shell',
-           children: children,
-           layout: section.settings.layout,
-           layout_mobile: section.settings.layout_mobile,
-           tag: 'div',
-           label: 'sections.testimonials.carousel_label' | t,
-           classes: 'testimonials__carousel',
-           track_classes: 'testimonials__grid',
-           columns_desktop: section.settings.columns_desktop,
-           columns_tablet: section.settings.columns_tablet,
-           columns_mobile: section.settings.columns_mobile,
-           settings: section.settings %}
-  to: "{% render 'carousel-shell', children: children, layout: section.settings.layout,
-    layout_mobile: section.settings.layout_mobile, tag: 'div', label: 'sections.testimonials.carousel_label',
-    classes: 'testimonials__carousel', track_classes: 'testimonials__grid', columns_desktop:
-    section.settings.columns_desktop, columns_tablet: section.settings.columns_tablet,
-    columns_mobile: section.settings.columns_mobile, settings: section.settings %}"
-  position: 1242..1679
-{% endcomment %}

@@ -1,0 +1,156 @@
+{% doc %}
+  blocks/_testimonial-stat.liquid — private to `blocks/_testimonial-intro.liquid`.
+
+  One number and the sentence under it: "4,500+ / top-rated experiences".
+
+  ## Why this is not two Text blocks
+
+  It is two lines of text, and a merchant could build it from the theme's own
+  Text block twice over. The reason it is one block is that the pair is a
+  *unit*: the number is loud and coloured and the line under it is quiet, and
+  the relationship between the two sizes is the design. Built from two Text
+  blocks that relationship is two independent font-size settings that can be
+  set to the same number, and then the stat stops being a stat.
+
+  It also makes the number semantically first. Screen readers get
+  "4,500+, top-rated experiences" as one run rather than two unrelated
+  paragraphs, which is what `<p>` twice would produce.
+
+  ## The colours default to the panel's, not to the theme's
+
+  Both are blank by default and inherit, so a merchant who recolours
+  `_testimonial-intro` recolours its stats with it. The accent is the one
+  exception — a stat's number is the thing the panel is drawing attention to,
+  so it takes the section's accent colour when nothing is set, through
+  `--tc-stat-value-color`'s fallback in `base.css`.
+{% enddoc %}
+
+{%- liquid
+  assign s = block.settings
+
+  assign value_size = s.value_size | default: 28 | plus: 0
+  assign label_size = s.label_size | default: 15 | plus: 0
+  assign gap = s.gap | default: 6 | plus: 0
+-%}
+
+{%- capture stat_style -%}
+  {%- render 'spacing', block: s, declarations: true -%}
+  --tc-stat-value-size: {{ value_size }}px;
+  --tc-stat-label-size: {{ label_size }}px;
+  --tc-stat-gap: {{ gap }}px;
+  {%- if s.value_color != blank -%}
+    --tc-stat-value-color: {{ s.value_color }};
+  {%- endif -%}
+  {%- if s.label_color != blank -%}
+    --tc-stat-label-color: {{ s.label_color }};
+  {%- endif -%}
+{%- endcapture -%}
+
+<div
+  class="testimonial-stat"
+  data-block-spacing
+  style="{{ stat_style | strip_newlines | strip }}"
+  {{ block.shopify_attributes }}
+>
+  {%- if s.value != blank -%}
+    <span class="testimonial-stat__value">{{ s.value | escape }}</span>
+  {%- endif -%}
+  {%- if s.label != blank -%}
+    <span class="testimonial-stat__label">{{ s.label | escape }}</span>
+  {%- endif -%}
+</div>
+
+{% schema %}
+{
+  "name": "t:blocks.testimonial_stat.name",
+  "tag": null,
+  "settings": [
+    {
+      "type": "text",
+      "id": "value",
+      "label": "t:blocks.testimonial_stat.settings.value.label",
+      "default": "4,500+"
+    },
+    {
+      "type": "text",
+      "id": "label",
+      "label": "t:blocks.testimonial_stat.settings.label.label",
+      "default": "top-rated experiences"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.appearance.header"
+    },
+    {
+      "type": "range",
+      "id": "value_size",
+      "label": "t:blocks.testimonial_stat.settings.value_size.label",
+      "min": 16,
+      "max": 64,
+      "step": 1,
+      "unit": "px",
+      "default": 28
+    },
+    {
+      "type": "color",
+      "id": "value_color",
+      "label": "t:blocks.testimonial_stat.settings.value_color.label",
+      "info": "t:blocks.testimonial_stat.settings.value_color.info"
+    },
+    {
+      "type": "range",
+      "id": "label_size",
+      "label": "t:blocks.testimonial_stat.settings.label_size.label",
+      "min": 11,
+      "max": 28,
+      "step": 1,
+      "unit": "px",
+      "default": 15
+    },
+    {
+      "type": "color",
+      "id": "label_color",
+      "label": "t:blocks.testimonial_stat.settings.label_color.label"
+    },
+    {
+      "type": "range",
+      "id": "gap",
+      "label": "t:blocks.testimonial_stat.settings.gap.label",
+      "min": 0,
+      "max": 24,
+      "step": 1,
+      "unit": "px",
+      "default": 6
+    },
+    {
+      "type": "header",
+      "content": "t:shared.spacing.block_header"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 0
+    }
+  ],
+  "presets": [
+    {
+      "name": "t:blocks.testimonial_stat.name"
+    }
+  ]
+}
+{% endschema %}

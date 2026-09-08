@@ -38,6 +38,11 @@
   pass `carousel:` with the carousel's id and it links up from across the document —
   a section header, a sticky bar, the opposite column.
 
+  All five parts link up, not just the arrows. `findExternalControls()` resolves
+  previous, next, current, total and bar through the same
+  `[data-carousel-for]` scope, so every one of them has to carry the attribute or
+  it is silently left at the value in the markup.
+
   @param {object} [settings] - Section settings
   @param {string} [carousel] - Carousel element id. Omit when nested inside it.
   @param {string} [style] - split | ghost | solid. Default from settings.
@@ -146,14 +151,39 @@
     The numbers and the bar are decoration: the position is already announced
     through the carousel's `role="status"` region, and a second announcement of
     the same change is noise rather than redundancy.
+
+    They carry `data-carousel-for` for the same reason the buttons do, and it was
+    missing here. `findExternalControls()` in `assets/carousel-controls.js` looks
+    up all five refs — previous, next, current, total, bar — through one
+    `[data-carousel-for="<id>"]` scope, so a detached bar whose numbers did not
+    carry the attribute resolved its arrows and nothing else: the position stayed
+    on "01", the total stayed on "01" and the progress bar never moved.
+
+    Nested inside the carousel the parameter is blank and nothing is emitted, so
+    every existing caller is unchanged — those five are found by `data-ref`
+    collection, which only reaches inside the element.
   {%- endcomment -%}
-  <span class="carousel-controls__count carousel-controls__count--current" data-ref="current" aria-hidden="true">01</span>
+  <span
+    class="carousel-controls__count carousel-controls__count--current"
+    data-ref="current"
+    {% if carousel != blank %}data-carousel-for="{{ carousel }}"{% endif %}
+    aria-hidden="true"
+  >01</span>
 
   <div class="carousel-controls__progress" aria-hidden="true">
-    <span class="carousel-controls__bar" data-ref="bar"></span>
+    <span
+      class="carousel-controls__bar"
+      data-ref="bar"
+      {% if carousel != blank %}data-carousel-for="{{ carousel }}"{% endif %}
+    ></span>
   </div>
 
-  <span class="carousel-controls__count carousel-controls__count--total" data-ref="total" aria-hidden="true">01</span>
+  <span
+    class="carousel-controls__count carousel-controls__count--total"
+    data-ref="total"
+    {% if carousel != blank %}data-carousel-for="{{ carousel }}"{% endif %}
+    aria-hidden="true"
+  >01</span>
 
   <button
     type="button"

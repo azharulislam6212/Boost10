@@ -1,0 +1,650 @@
+{% doc %}
+  blocks/_testimonial-intro.liquid — private to `sections/testimonials.liquid`.
+
+  The filled panel at the head of the row: a line about the reviews, and the
+  numbers that back it up.
+
+  ## It is a static block, so it cannot be dragged into the carousel
+
+  `sections/testimonials.liquid` renders it through
+  `{% content_for 'block', type: '_testimonial-intro', id: 'testimonials-intro' %}`,
+  the same mechanism `sections/feature-cards.liquid` uses for its heading
+  cluster and for the same reason: it is part of the section's layout rather
+  than one of its slides. A merchant editing it on the canvas cannot reorder it
+  among the reviews, cannot delete it by accident, and cannot end up with two.
+
+  It is also outside the `<swiper-carousel>` entirely. Inside the track it would
+  be a slide — it would scroll away with the first arrow press, and Swiper would
+  count it when deciding whether the merchant's Loop setting is achievable.
+
+  ## The stats are blocks, and the heading is a setting
+
+  The heading is one line that every panel has. The stats are a list whose
+  length is content — two numbers here, one or three somewhere else — so they
+  are `_testimonial-stat` blocks the merchant adds, reorders and removes.
+
+  `@theme` is accepted alongside them, so a panel that wants a button under its
+  numbers, or a logo above them, does not need this file changed.
+
+  ## The panel paints itself rather than taking a colour scheme
+
+  A colour scheme would be the theme's usual answer and it is the wrong one
+  here: this panel is the *inverse* of the section it sits in — dark on light —
+  and reaching for a second scheme to express that means a merchant who
+  recolours the section has to remember to recolour a scheme they did not know
+  was involved. A background and a text colour on the block say what they do.
+
+  The section's own `--tc-accent` still reaches the stats, so the numbers stay
+  in step with the heading's highlight above without either knowing about the
+  other.
+{% enddoc %}
+
+{%- liquid
+  assign s = block.settings
+
+  assign align = s.alignment | default: 'start'
+  assign gap = s.gap | default: 20 | plus: 0
+  assign min_height = s.min_height | default: 366 | plus: 0
+  assign width = s.width | default: 312 | plus: 0
+
+  comment
+    Same three-part border resolution as everything else in the theme —
+    `sections/feature-cards.liquid`'s panel, `blocks/_feature-card.liquid`,
+    `blocks/_testimonial-card.liquid`. One width rather than four: this panel is
+    a filled box, and the frame a merchant wants around a filled box is the
+    whole outline or nothing.
+  endcomment
+  assign border_line = s.border_style | default: 'none'
+  assign border_width = 0
+  assign border_paint = ''
+
+  if border_line != 'none'
+    assign border_width = s.border_width | default: 1 | plus: 0
+
+    assign border_percent = s.border_opacity | default: 100 | plus: 0
+    if s.border_color == blank
+      assign border_paint = 'color-mix(in srgb, currentColor ' | append: border_percent | append: '%, transparent)'
+    else
+      assign border_alpha = border_percent | divided_by: 100.0
+      assign border_paint = s.border_color | color_modify: 'alpha', border_alpha
+    endif
+  endif
+
+  assign radius = s.border_radius | default: 20 | plus: 0
+  assign radius_mobile = s.border_radius_mobile | default: radius | plus: 0
+
+  comment
+    The colour is only painted when there is no picture over it. A tint under a
+    photograph that covers the panel is a colour nobody sees, and one under a
+    *fitted* photograph is a second background fighting the overlay — which is
+    the control that exists for exactly that job.
+  endcomment
+  assign background_media = s.background_media | default: 'none'
+  assign has_background_media = false
+  if background_media != 'none'
+    assign has_background_media = true
+  endif
+
+  assign background_paint = ''
+  if has_background_media == false and s.background_color != blank
+    assign background_alpha = s.background_opacity | default: 100 | plus: 0
+    assign background_alpha = background_alpha | divided_by: 100.0
+    assign background_paint = s.background_color | color_modify: 'alpha', background_alpha
+  endif
+-%}
+
+{%- capture intro_style -%}
+  {%- render 'spacing', block: s, declarations: true -%}
+  --tc-intro-align: {{ align }};
+  --tc-intro-gap: {{ gap }}px;
+  --tc-intro-width: {{ width }}px;
+  --tc-intro-radius: {{ radius }}px;
+  --tc-intro-radius-mobile: {{ radius_mobile }}px;
+  --tc-intro-heading-size: {{ s.heading_size | default: 24 | plus: 0 }}px;
+  --tc-intro-stat-gap: {{ s.stat_gap | default: 28 | plus: 0 }}px;
+  {%- if min_height > 0 -%}
+    --tc-intro-min-height: {{ min_height }}px;
+  {%- endif -%}
+  {%- if border_width > 0 -%}
+    --tc-intro-border-width: {{ border_width }}px;
+    --tc-intro-border-style: {{ border_line }};
+    --tc-intro-border-color: {{ border_paint }};
+  {%- endif -%}
+  {%- if background_paint != '' -%}
+    --tc-intro-background: {{ background_paint }};
+  {%- endif -%}
+  {%- if s.text_color != blank -%}
+    --tc-intro-text: {{ s.text_color }};
+  {%- endif -%}
+{%- endcapture -%}
+
+<div
+  class="testimonial-intro{% if has_background_media %} has-background-media{% endif %}"
+  data-block-spacing
+  style="{{ intro_style | strip_newlines | strip }}"
+  {{ block.shopify_attributes }}
+>
+  {%- comment -%}
+    The same `snippets/background-media.liquid` every other surface in the theme
+    uses, handed the block's own settings — so a picture, a video, the parallax
+    and the overlay all arrive by adding settings rather than by adding markup
+    here.
+
+    `base.css` clips it to the panel's radius and lifts the heading and the stats
+    above it. The snippet renders nothing at all when nothing is chosen, so the
+    panel is not given a stacking context it has no use for.
+  {%- endcomment -%}
+  {%- if has_background_media -%}
+    {% render 'background-media', settings: s %}
+  {%- endif -%}
+
+  {%- if s.heading != blank -%}
+    {%- comment -%}
+      An `<h3>`, not an `<h2>`. The section's own heading cluster above is the
+      `<h2>`, and this panel is a part of the row under it — promoting it would
+      give the page two headings at the same level saying different things.
+    {%- endcomment -%}
+    <h3 class="testimonial-intro__heading">{{ s.heading }}</h3>
+  {%- endif -%}
+
+  {%- comment -%}
+    The stats are pushed to the bottom of the panel by `margin-block-start: auto`
+    in `base.css` rather than by a spacer here, so a panel taller than its
+    content keeps the heading at the top and the numbers at the foot — which is
+    what the design draws and what a fixed gap cannot hold at two viewport
+    widths.
+  {%- endcomment -%}
+  <div class="testimonial-intro__stats">
+    {% content_for 'blocks' %}
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "t:blocks.testimonial_intro.name",
+  "tag": null,
+  "blocks": [
+    {
+      "type": "_testimonial-stat"
+    },
+    {
+      "type": "@theme"
+    },
+    {
+      "type": "@app"
+    }
+  ],
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "t:blocks.testimonial_intro.paragraph"
+    },
+    {
+      "type": "inline_richtext",
+      "id": "heading",
+      "label": "t:shared.heading.label",
+      "default": "See why our community loves us"
+    },
+    {
+      "type": "range",
+      "id": "heading_size",
+      "label": "t:blocks.testimonial_intro.settings.heading_size.label",
+      "min": 16,
+      "max": 56,
+      "step": 1,
+      "unit": "px",
+      "default": 24
+    },
+    {
+      "type": "select",
+      "id": "alignment",
+      "label": "t:blocks.group.settings.alignment.label",
+      "options": [
+        {
+          "value": "start",
+          "label": "t:blocks.group.settings.alignment.options__1.label"
+        },
+        {
+          "value": "center",
+          "label": "t:blocks.group.settings.alignment.options__2.label"
+        },
+        {
+          "value": "end",
+          "label": "t:blocks.group.settings.alignment.options__3.label"
+        }
+      ],
+      "default": "start"
+    },
+    {
+      "type": "range",
+      "id": "width",
+      "label": "t:blocks.testimonial_intro.settings.width.label",
+      "info": "t:blocks.testimonial_intro.settings.width.info",
+      "min": 200,
+      "max": 560,
+      "step": 4,
+      "unit": "px",
+      "default": 312
+    },
+    {
+      "type": "range",
+      "id": "min_height",
+      "label": "t:blocks.feature_card.settings.min_height.label",
+      "info": "t:blocks.testimonial_intro.settings.min_height.info",
+      "min": 0,
+      "max": 600,
+      "step": 6,
+      "unit": "px",
+      "default": 366
+    },
+    {
+      "type": "range",
+      "id": "gap",
+      "label": "t:blocks.testimonial_intro.settings.gap.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 20
+    },
+    {
+      "type": "range",
+      "id": "stat_gap",
+      "label": "t:blocks.testimonial_intro.settings.stat_gap.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 28
+    },
+    {
+      "type": "header",
+      "content": "t:shared.appearance.header"
+    },
+    {
+      "type": "color",
+      "id": "background_color",
+      "label": "t:shared.appearance.background_color.label",
+      "default": "#0F2E2F",
+      "visible_if": "{{ block.settings.background_media == 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "background_opacity",
+      "label": "t:sections.feature_cards.settings.panel_background_opacity.label",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 100,
+      "visible_if": "{{ block.settings.background_media == 'none' }}"
+    },
+    {
+      "type": "select",
+      "id": "background_media",
+      "label": "t:shared.background.media.label",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.background.media.options__1.label"
+        },
+        {
+          "value": "image",
+          "label": "t:shared.background.media.options__2.label"
+        },
+        {
+          "value": "video",
+          "label": "t:shared.background.media.options__3.label"
+        }
+      ],
+      "default": "none"
+    },
+    {
+      "type": "image_picker",
+      "id": "image",
+      "label": "t:shared.background.image.label",
+      "visible_if": "{{ block.settings.background_media == 'image' }}"
+    },
+    {
+      "type": "image_picker",
+      "id": "image_mobile",
+      "label": "t:shared.background.image_mobile.label",
+      "info": "t:shared.background.image_mobile.info",
+      "visible_if": "{{ block.settings.background_media == 'image' }}"
+    },
+    {
+      "type": "select",
+      "id": "image_position",
+      "label": "t:shared.background.image_position.label",
+      "info": "t:shared.background.image_position.info",
+      "options": [
+        {
+          "value": "cover",
+          "label": "t:shared.background.image_position.options__1.label"
+        },
+        {
+          "value": "fit",
+          "label": "t:shared.background.image_position.options__2.label"
+        }
+      ],
+      "default": "cover",
+      "visible_if": "{{ block.settings.background_media == 'image' }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "image_parallax",
+      "label": "t:shared.background.image_parallax.label",
+      "info": "t:shared.background.image_parallax.info",
+      "default": false,
+      "visible_if": "{{ block.settings.background_media == 'image' }}"
+    },
+    {
+      "type": "range",
+      "id": "image_parallax_speed",
+      "label": "t:shared.background.image_parallax_speed.label",
+      "min": 5,
+      "max": 40,
+      "step": 5,
+      "unit": "%",
+      "default": 15,
+      "visible_if": "{{ block.settings.background_media == 'image' and block.settings.image_parallax }}",
+      "info": "t:shared.background.image_parallax_speed.info"
+    },
+    {
+      "type": "video",
+      "id": "video",
+      "label": "t:shared.background.video.label",
+      "info": "t:shared.background.video.info",
+      "visible_if": "{{ block.settings.background_media == 'video' }}"
+    },
+    {
+      "type": "video_url",
+      "id": "video_url",
+      "label": "t:shared.background.video_url.label",
+      "info": "t:shared.background.video_url.info",
+      "accept": [
+        "youtube",
+        "vimeo"
+      ],
+      "visible_if": "{{ block.settings.background_media == 'video' }}"
+    },
+    {
+      "type": "image_picker",
+      "id": "video_poster",
+      "label": "t:shared.background.video_poster.label",
+      "info": "t:shared.background.video_poster.info",
+      "visible_if": "{{ block.settings.background_media == 'video' }}"
+    },
+    {
+      "type": "select",
+      "id": "video_position",
+      "label": "t:shared.background.video_position.label",
+      "options": [
+        {
+          "value": "cover",
+          "label": "t:shared.background.video_position.options__1.label"
+        },
+        {
+          "value": "contain",
+          "label": "t:shared.background.video_position.options__2.label"
+        }
+      ],
+      "default": "cover",
+      "visible_if": "{{ block.settings.background_media == 'video' }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "video_loop",
+      "label": "t:shared.background.video_loop.label",
+      "default": true,
+      "visible_if": "{{ block.settings.background_media == 'video' }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "overlay_enabled",
+      "label": "t:shared.background.overlay_enabled.label",
+      "info": "t:shared.background.overlay_enabled.info",
+      "default": false,
+      "visible_if": "{{ block.settings.background_media != 'none' }}"
+    },
+    {
+      "type": "select",
+      "id": "overlay_style",
+      "label": "t:shared.background.overlay_style.label",
+      "info": "t:shared.background.overlay_style.info",
+      "options": [
+        {
+          "value": "solid",
+          "label": "t:shared.background.overlay_style.options__1.label"
+        },
+        {
+          "value": "gradient",
+          "label": "t:shared.background.overlay_style.options__2.label"
+        }
+      ],
+      "default": "solid",
+      "visible_if": "{{ block.settings.background_media != 'none' and block.settings.overlay_enabled }}"
+    },
+    {
+      "type": "color",
+      "id": "overlay_color",
+      "label": "t:shared.background.overlay_color.label",
+      "default": "#000000",
+      "visible_if": "{{ block.settings.background_media != 'none' and block.settings.overlay_enabled and block.settings.overlay_style == 'solid' }}"
+    },
+    {
+      "type": "color_background",
+      "id": "overlay_gradient",
+      "label": "t:shared.background.overlay_gradient.label",
+      "info": "t:shared.background.overlay_gradient.info",
+      "default": "linear-gradient(180deg, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 1) 100%)",
+      "visible_if": "{{ block.settings.background_media != 'none' and block.settings.overlay_enabled and block.settings.overlay_style == 'gradient' }}"
+    },
+    {
+      "type": "range",
+      "id": "overlay_opacity",
+      "label": "t:shared.background.overlay_opacity.label",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 40,
+      "visible_if": "{{ block.settings.background_media != 'none' and block.settings.overlay_enabled }}"
+    },
+    {
+      "type": "color",
+      "id": "text_color",
+      "label": "t:blocks.testimonial_intro.settings.text_color.label",
+      "default": "#FFFFFF"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.group.headers.borders"
+    },
+    {
+      "type": "select",
+      "id": "border_style",
+      "label": "t:shared.border.style.label",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.options.none"
+        },
+        {
+          "value": "solid",
+          "label": "t:shared.options.solid"
+        },
+        {
+          "value": "dashed",
+          "label": "t:shared.options.dashed"
+        },
+        {
+          "value": "dotted",
+          "label": "t:shared.border.style.options__3.label"
+        }
+      ],
+      "default": "none"
+    },
+    {
+      "type": "range",
+      "id": "border_width",
+      "label": "t:shared.border.thickness.label",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 1,
+      "visible_if": "{{ block.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_opacity",
+      "label": "t:shared.border.opacity.label",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 100,
+      "visible_if": "{{ block.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "color",
+      "id": "border_color",
+      "label": "t:shared.border.color.label",
+      "visible_if": "{{ block.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.corners.header"
+    },
+    {
+      "type": "range",
+      "id": "border_radius",
+      "label": "t:shared.corners.radius.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 20
+    },
+    {
+      "type": "range",
+      "id": "border_radius_mobile",
+      "label": "t:shared.corners.radius_mobile.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 20
+    },
+    {
+      "type": "header",
+      "content": "t:shared.spacing.block_header"
+    },
+    {
+      "type": "select",
+      "id": "padding_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        {
+          "value": "desktop",
+          "label": "t:shared.spacing.devices.options__1.label"
+        },
+        {
+          "value": "mobile",
+          "label": "t:shared.spacing.devices.options__2.label"
+        }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 120,
+      "step": 2,
+      "unit": "px",
+      "default": 40,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 120,
+      "step": 2,
+      "unit": "px",
+      "default": 40,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 120,
+      "step": 2,
+      "unit": "px",
+      "default": 40,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 120,
+      "step": 2,
+      "unit": "px",
+      "default": 40,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 120,
+      "step": 2,
+      "unit": "px",
+      "default": 28,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 120,
+      "step": 2,
+      "unit": "px",
+      "default": 28,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left_mobile",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 120,
+      "step": 2,
+      "unit": "px",
+      "default": 24,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right_mobile",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 120,
+      "step": 2,
+      "unit": "px",
+      "default": 24,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    }
+  ]
+}
+{% endschema %}

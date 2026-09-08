@@ -1,0 +1,76 @@
+{% doc %}
+  A row of stars for a rating a merchant typed, rather than one a review app
+  stored.
+
+  ## Why this is not `snippets/rating.liquid`
+
+  That one reads `product.metafields.reviews.rating` and renders nothing when
+  the metafield is missing, which is the right behaviour for a product: a store
+  with no review app should show no rating, not "0 out of 5".
+
+  This one is handed a number. It is what a testimonial's own star row needs —
+  the merchant typed 4, so four stars — and what the placeholder state of a
+  product card needs, where there is no product to read a metafield off yet.
+  Both used to draw their own `for` loop; `blocks/testimonial.liquid`'s drew
+  five identical glyphs because the `class:` argument it passed was the loop
+  index rather than a comparison against the rating.
+
+  ## The stars are decoration and the number is the content
+
+  Five star glyphs read aloud are five identical words with no number attached,
+  so the row is `aria-hidden` and the rating is announced as the same translated
+  sentence `snippets/rating.liquid` uses. `announce: false` turns that off for
+  the one case where it is noise — a second star row inside a card that has
+  already announced its rating.
+
+  Halves are drawn at the same 0.5 threshold as `snippets/rating.liquid`, so a
+  4.5 typed here and a 4.5 stored by an app produce the same row.
+
+  @param {number} rating - 0 to `max`. Renders nothing at 0 or below.
+  @param {number} [max] - Default 5
+  @param {number} [size] - Pixel size of one star. Default 14
+  @param {string} [class] - Extra classes on the wrapper
+  @param {boolean} [announce] - Emit the visually hidden sentence. Default true
+
+  @example
+    {% render 'rating-stars', rating: block.settings.rating %}
+
+  @example
+    {% render 'rating-stars', rating: 5, size: 12, announce: false, class: 'testimonial-card__info-stars' %}
+{% enddoc %}
+
+{%- liquid
+  assign scale_max = max | default: 5 | plus: 0
+  assign value = rating | default: 0 | times: 1.0
+  assign star_size = size | default: 14 | plus: 0
+
+  assign say_it = true
+  if announce == false
+    assign say_it = false
+  endif
+-%}
+
+{%- if value > 0 -%}
+  <div class="rating-stars {{ class }}" data-rating="{{ value | round: 1 }}">
+    <span class="rating-stars__row" aria-hidden="true">
+      {%- for index in (1..scale_max) -%}
+        {%- liquid
+          assign threshold = index | minus: 0.5
+        -%}
+        {%- if value >= index -%}
+          {% render 'icon', icon: 'star', size: star_size, class: 'rating-stars__star rating-stars__star--full' %}
+        {%- elsif value >= threshold -%}
+          {% render 'icon', icon: 'star-half', size: star_size, class: 'rating-stars__star rating-stars__star--half' %}
+        {%- else -%}
+          {% render 'icon', icon: 'star', size: star_size, class: 'rating-stars__star rating-stars__star--empty' %}
+        {%- endif -%}
+      {%- endfor -%}
+    </span>
+
+    {%- if say_it -%}
+      <span class="visually-hidden">
+        {{- 'products.product.rating_html' | t: rating: value, max: scale_max -}}
+      </span>
+    {%- endif -%}
+  </div>
+{%- endif -%}

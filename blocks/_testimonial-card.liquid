@@ -1,0 +1,919 @@
+{% doc %}
+  blocks/_testimonial-card.liquid — private to `sections/testimonials.liquid`.
+
+  One review: who said it, what they bought, their stars, their words, and the
+  product itself as a disc hanging off the bottom corner. Hovering the card
+  raises a panel over the disc with the product's title, rating and price.
+
+  ## Two boxes, because the design draws two
+
+  The card is a ring and a filled panel with a gap between them:
+
+      .testimonial-card          the ring — border, radius, and `--tc-ring-gap`
+      .testimonial-card__frame   the panel the words sit in
+
+  They are one element in most themes and two here because the ring changes on
+  hover and the panel does not. Nesting them means the hover rule touches one
+  property on one element rather than re-stating the panel's fill, radius and
+  padding in a second state.
+
+  The ring's settings are the theme's border group — style, four widths,
+  opacity, colour, and a radius per breakpoint — resolved exactly as
+  `blocks/_feature-card.liquid` resolves its own, including the `color-mix`
+  fallback for a blank colour. A blank colour has no alpha channel to read until
+  the scheme resolves in the browser, so the filters cannot fade it and
+  `color-mix` does that job at paint time instead.
+
+  ## The disc hangs outside the card, and that is deliberate
+
+  It overhangs the ring's bottom edge by `--tc-thumb-overhang`, which is the
+  section's setting rather than this block's — see the note beside it below.
+  swiper.css gives the carousel element `overflow: hidden`, so the section pays
+  for the overhang in padding under the track rather than by opting out of the
+  clip: an element that is a scroll container on one axis cannot be `visible` on
+  the other, and asking for that turns the track into something a trackpad can
+  scroll vertically by accident.
+
+  ## The panel is anchored to the card, the arrow to the disc
+
+  The panel is a child of the frame and the disc is a sibling of it, and both
+  are measured from `.testimonial-card` — the frame is never given `position`, so
+  an absolute child of it resolves against the card instead. That is why the
+  arrow's offset can subtract one inset from the other:
+
+      arrow inset-end = thumb inset-end + thumb size / 2 − arrow width / 2 − panel inset
+
+  The panel spans nearly the full width of the card while its arrow points at
+  the disc in the corner, which is what the design does and what centring the
+  panel on the disc could not do — a 250px panel centred on a disc 68px from
+  the card's edge hangs 57px off the side of it.
+
+  ## No product is a state, not an absence
+
+  A card with nothing picked still draws the disc and still raises the panel.
+  The disc is Shopify's product placeholder through `snippets/image.liquid` —
+  same wrapper, same fade, same load behaviour as a real photograph — and the
+  panel shows the four placeholder settings below it.
+
+  That is the same call `blocks/_feature-card.liquid` makes about its hover
+  picture, for the same reason: a card whose hover does nothing until a product
+  is picked reads as a broken setting rather than an empty one, and the theme
+  editor is where this section is judged.
+
+  A picked product overrides all four. Its rating comes from
+  `snippets/rating.liquid` — the reviews metafield every major app writes to —
+  and falls back to the placeholder rating when the store has no review app, so
+  the panel is never a title with a gap under it.
+
+  ## Touch has no hover, so touch gets the panel
+
+  Every hover rule in `base.css` sits inside `@media (hover: hover)` and is
+  mirrored by an `@media (hover: none), (max-width: 749px)` block that makes the
+  same state the resting one. The product's title and price are content, and
+  content a phone can never reach is content that does not exist on a phone.
+
+  `:focus-within` is paired with `:hover` throughout, so a keyboard reaching the
+  product link gets the panel a pointer gets. The link only exists when a
+  product is picked — a placeholder disc is not a destination.
+
+  ## Three copies of every default
+
+  The schema default, the `| default:` beside the setting that reads it, and the
+  section preset. They have to agree: a card created from a preset that omits a
+  setting has nothing stored, so it falls through to the Liquid fallback while
+  the editor panel shows the schema's number.
+  `blocks/_feature-card.liquid` documents the bug this caused there.
+{% enddoc %}
+
+
+{%- liquid
+  assign s = block.settings
+
+ 
+  assign border_line = s.border_style | default: 'solid'
+  assign bw_top = 0
+  assign bw_right = 0
+  assign bw_bottom = 0
+  assign bw_left = 0
+  assign border_any = 0
+  assign border_paint = ''
+
+  if border_line != 'none'
+    assign bw_top = s.border_width_top | default: 1 | plus: 0
+    assign bw_right = s.border_width_right | default: 1 | plus: 0
+    assign bw_bottom = s.border_width_bottom | default: 1 | plus: 0
+    assign bw_left = s.border_width_left | default: 1 | plus: 0
+    assign border_any = bw_top | plus: bw_right | plus: bw_bottom | plus: bw_left
+
+    assign border_percent = s.border_opacity | default: 100 | plus: 0
+    if s.border_color == blank
+      assign border_paint = 'color-mix(in srgb, currentColor ' | append: border_percent | append: '%, transparent)'
+    else
+      assign border_alpha = border_percent | divided_by: 100.0
+      assign border_paint = s.border_color | color_modify: 'alpha', border_alpha
+    endif
+  endif
+
+ 
+  assign radius = s.border_radius | default: 20 | plus: 0
+  assign radius_mobile = s.border_radius_mobile | default: radius | plus: 0
+  assign ring_gap = s.ring_gap | default: 7 | plus: 0
+
+  
+  assign hover_line = s.hover_border_style | default: 'dashed'
+  assign hover_paint = ''
+  if s.hover_border_color != blank
+    assign hover_percent = s.hover_border_opacity | default: 100 | plus: 0
+    assign hover_alpha = hover_percent | divided_by: 100.0
+    assign hover_paint = s.hover_border_color | color_modify: 'alpha', hover_alpha
+  endif
+
+  assign has_hover_border = false
+  if hover_line != 'inherit' or hover_paint != ''
+    assign has_hover_border = true
+  endif
+
+ 
+  assign frame_radius = s.frame_radius | default: 12 | plus: 0
+  assign frame_radius_mobile = s.frame_radius_mobile | default: frame_radius | plus: 0
+
+  assign frame_paint = ''
+  if s.frame_background != blank
+    assign frame_alpha = s.frame_background_opacity | default: 100 | plus: 0
+    assign frame_alpha = frame_alpha | divided_by: 100.0
+    assign frame_paint = s.frame_background | color_modify: 'alpha', frame_alpha
+  endif
+
+  assign min_height = s.min_height | default: 350 | plus: 0
+
+ 
+  assign star_size = s.star_size | default: 14 | plus: 0
+
+ 
+  assign product = s.product
+  assign has_product = false
+  if product != blank
+    assign has_product = true
+  endif
+
+  assign show_product = s.show_product
+  if show_product == nil
+    assign show_product = true
+  endif
+
+ 
+  assign info_title = s.placeholder_title | default: 'Morning Recovery'
+  if has_product
+    assign info_title = product.title
+  endif
+
+  assign product_rating = product.metafields.reviews.rating.value
+  assign has_product_rating = false
+  if has_product and product_rating != blank and product_rating.rating != blank
+    assign has_product_rating = true
+  endif
+
+  assign info_rating = s.placeholder_rating | default: 5 | plus: 0
+  assign info_reviews = s.placeholder_reviews | default: 889 | plus: 0
+
+  assign show_info_rating = s.show_info_rating
+  if show_info_rating == nil
+    assign show_info_rating = true
+  endif
+
+  assign show_info_price = s.show_info_price
+  if show_info_price == nil
+    assign show_info_price = true
+  endif
+
+  comment
+    The panel's id, so the disc's `aria-controls` has something to name. Block
+    ids are unique per section, so two cards on one page cannot collide.
+  endcomment
+  assign panel_id = 'tc-panel-' | append: block.id
+
+  comment
+    ---- the classes ----
+  endcomment
+  assign card_classes = 'testimonial-card'
+  if show_product
+    assign card_classes = card_classes | append: ' testimonial-card--has-product'
+  endif
+  unless has_product
+    assign card_classes = card_classes | append: ' testimonial-card--placeholder-product'
+  endunless
+  if has_hover_border
+    assign card_classes = card_classes | append: ' testimonial-card--hover-border'
+  endif
+
+  comment
+    `sizes` describes the widest the disc is ever painted. The section's slider
+    tops out at 140px, so that is the hint: a wrong one here is the usual cause
+    of a thumbnail arriving three sizes larger than the box it fills — on a row
+    of five cards, five times over.
+  endcomment
+  assign thumb_sizes = '140px'
+-%}
+
+{%- capture card_style -%}
+  {%- render 'spacing', block: s, declarations: true -%}
+  --tc-ring-gap: {{ ring_gap }}px;
+  --tc-frame-gap: {{ s.gap | default: 16 | plus: 0 }}px;
+  --tc-radius: {{ radius }}px;
+  --tc-radius-mobile: {{ radius_mobile }}px;
+  --tc-frame-radius: {{ frame_radius }}px;
+  --tc-frame-radius-mobile: {{ frame_radius_mobile }}px;
+  --tc-transition: {{ s.hover_duration | default: 400 | plus: 0 }}ms;
+  --tc-lift: {{ s.hover_lift | default: 0 | plus: 0 }}px;
+  {%- if min_height > 0 -%}
+    --tc-min-height: {{ min_height }}px;
+  {%- endif -%}
+  {%- if border_any > 0 -%}
+    --tc-border-width: {{ bw_top }}px {{ bw_right }}px {{ bw_bottom }}px {{ bw_left }}px;
+    --tc-border-style: {{ border_line }};
+    --tc-border-color: {{ border_paint }};
+  {%- endif -%}
+  {%- if has_hover_border -%}
+    {%- if hover_line != 'inherit' -%}
+      --tc-hover-border-style: {{ hover_line }};
+    {%- endif -%}
+    {%- if hover_paint != '' -%}
+      --tc-hover-border-color: {{ hover_paint }};
+    {%- endif -%}
+  {%- endif -%}
+  {%- if frame_paint != '' -%}
+    --tc-frame-background: {{ frame_paint }};
+  {%- endif -%}
+{%- endcapture -%}
+<div
+  class="{{ card_classes }}"
+  style="{{ card_style | strip_newlines | strip }}"
+  {{ block.shopify_attributes }}
+>
+  {%- comment -%}
+    `data-block-spacing` is on the frame and the `style` attribute is on the
+    ring, which looks like a mistake and is not.
+
+    The ring's own inset is `--tc-ring-gap` — the gap between the two boxes the
+    design draws. The four padding sliders are the room inside the panel the
+    words sit in, which is the frame. Custom properties inherit, so the ring can
+    publish `--block-padding-*` and the frame can be the element that reads them.
+
+    Putting the hook on the ring instead would give the ring 28px of padding and
+    the frame none: one very fat ring around a panel with the text pressed
+    against its edge.
+  {%- endcomment -%}
+
+  {%- comment -%}
+    `<testimonial-product>` wraps the frame and the disc rather than sitting
+    between them, because the panel it opens is inside the frame and the disc
+    that opens it is not — this is the nearest element containing both.
+    `display: contents` in `base.css` keeps it out of the card's layout, so the
+    ring, the frame and the disc are positioned exactly as they were.
+
+    It is rendered whether or not a product is picked: the placeholder panel is
+    what a merchant is looking at while they configure the card, and a preview
+    that only works once a product is chosen reads as broken rather than empty.
+  {%- endcomment -%}
+  {%- if show_product -%}<testimonial-product>{%- endif -%}
+
+  <div class="testimonial-card__frame" data-block-spacing>
+    {%- comment -%}
+      The attribution sits above the quote rather than under it, which is where
+      a `<figcaption>` would go. So it is a plain header row and the quote below
+      it carries the `<cite>` through markup the HTML spec's own example for an
+      attribution outside the quote uses.
+    {%- endcomment -%}
+    <div class="testimonial-card__head">
+      <div class="testimonial-card__identity">
+        {%- if s.author != blank -%}
+          <cite class="testimonial-card__name">{{ s.author | escape }}</cite>
+        {%- endif -%}
+        {%- if s.role != blank -%}
+          <span class="testimonial-card__role">{{ s.role | escape }}</span>
+        {%- endif -%}
+      </div>
+
+      {%- if s.show_verified and s.verified_label != blank -%}
+        {%- comment -%}
+          A claim the merchant is making, so it is text rather than a glyph with
+          a title attribute. The disc around the tick is decoration on top of a
+          word that is already there.
+        {%- endcomment -%}
+        <span class="testimonial-card__verified">
+          <span class="testimonial-card__verified-mark" aria-hidden="true">
+            {% render 'icon', icon: 'check', size: 10 %}
+          </span>
+          {{ s.verified_label | escape }}
+        </span>
+      {%- endif -%}
+    </div>
+
+    {%- if s.rating > 0 -%}
+      {% render 'rating-stars', rating: s.rating, size: star_size, class: 'testimonial-card__stars' %}
+    {%- endif -%}
+
+    {%- if s.quote != blank -%}
+      <blockquote class="testimonial-card__quote">{{ s.quote }}</blockquote>
+    {%- endif -%}
+
+    {%- if show_product -%}
+      {%- comment -%}
+        The product panel, and it lives inside the frame.
+
+        On a pointer it is absolutely positioned and its containing block is
+        `.testimonial-card` — the frame is deliberately never given `position`,
+        so the panel and the disc are measured from the same box and the arrow's
+        offset can subtract one inset from the other.
+
+        On a touch screen `base.css` sets it back to `static`, and then it has to
+        be a child of the frame or it would fall out of the panel it is drawn
+        on. With the panel open on a phone, an absolutely positioned one covers
+        the last two lines of every quote.
+
+        It is not `aria-hidden`. A title and a price are content.
+      {%- endcomment -%}
+      <div class="testimonial-card__info" id="{{ panel_id }}" data-ref="panel">
+        {%- comment -%}
+          The title is the product's link, and the disc is not.
+
+          A disc that navigates cannot also reveal — tap-to-reveal-then-tap-to-
+          follow means the first tap on a product does nothing anyone asked for.
+          So the picture opens the preview and the name goes to the product, at
+          both breakpoints.
+        {%- endcomment -%}
+        {%- if has_product -%}
+          <a class="testimonial-card__info-title" href="{{ product.url }}">{{ info_title }}</a>
+        {%- else -%}
+          <p class="testimonial-card__info-title">{{ info_title }}</p>
+        {%- endif -%}
+
+        {%- if show_info_rating -%}
+          {%- if has_product_rating -%}
+            {% render 'rating', product: product, class: 'testimonial-card__info-rating' %}
+          {%- else -%}
+            <div class="rating testimonial-card__info-rating">
+              {% render 'rating-stars', rating: info_rating, size: 12, announce: false %}
+              {%- if info_reviews > 0 -%}
+                <span class="rating__count" aria-hidden="true">
+                  ({{ 'products.product.rating_count' | t: count: info_reviews }})
+                </span>
+                <span class="visually-hidden">
+                  {{- 'products.product.rating_html' | t: rating: info_rating, max: 5 }},
+                  {{ 'products.product.rating_count' | t: count: info_reviews -}}
+                </span>
+              {%- endif -%}
+            </div>
+          {%- endif -%}
+        {%- endif -%}
+
+        {%- if show_info_price -%}
+          {%- if has_product -%}
+            {% render 'price', product: product, price_class: 'testimonial-card__info-price' %}
+          {%- else -%}
+            {%- comment -%}
+              The placeholder prices are typed, not money-filtered: they are two
+              strings standing in for a product nobody has picked, and running a
+              merchant's "$54.9" through `money` would need a number in the
+              shop's base currency that they did not give.
+            {%- endcomment -%}
+            <div class="price testimonial-card__info-price">
+              {%- if s.placeholder_compare_price != blank -%}
+                <s class="price__compare">{{ s.placeholder_compare_price | escape }}</s>
+              {%- endif -%}
+              {%- if s.placeholder_price != blank -%}
+                <span class="price__current">{{ s.placeholder_price | escape }}</span>
+              {%- endif -%}
+            </div>
+          {%- endif -%}
+        {%- endif -%}
+
+        {%- comment -%}
+          Only ever seen on a touch screen, where the panel opens on a tap
+          rather than on a hover it can never receive. `base.css` hides it
+          wherever the panel is a hover state, because a close button on
+          something that closes itself when the pointer leaves is a control with
+          nothing to do.
+        {%- endcomment -%}
+        <button
+          type="button"
+          class="testimonial-card__info-close"
+          data-ref="close"
+          aria-label="{{ 'general.actions.close' | t }}"
+        >
+          {% render 'icon', icon: 'close', size: 12 %}
+        </button>
+      </div>
+    {%- endif -%}
+  </div>
+
+  {%- if show_product -%}
+    {%- comment -%}
+      The disc is a sibling of the frame rather than a child of it. It hangs off
+      the corner of the *card*, and a child of the frame would be measured from
+      inside the frame's padding — so the four padding sliders would move the
+      disc, which is not what they say they do.
+
+      It is a button, not a link: it owns `aria-expanded` and points at the
+      panel by id, so a keyboard user on a desktop gets the same explicit
+      control a phone does rather than having to discover that focus alone
+      reveals something.
+    {%- endcomment -%}
+    <button
+      type="button"
+      class="testimonial-card__thumb"
+      data-ref="toggle"
+      aria-expanded="false"
+      aria-controls="{{ panel_id }}"
+      aria-label="{{ info_title | escape }}"
+    >
+      {% render 'image',
+         image: product.featured_image,
+         alt: '',
+         ratio: 'square',
+         class: 'testimonial-card__thumb-image',
+         placeholder: 'product-apparel-1',
+         sizes: thumb_sizes %}
+    </button>
+  </testimonial-product>
+  {%- endif -%}
+</div>
+
+{% schema %}
+{
+  "name": "t:blocks.testimonial_card.name",
+  "tag": null,
+  "settings": [
+    {
+      "type": "text",
+      "id": "author",
+      "label": "t:blocks.testimonial.settings.author.label",
+      "default": "Jordan W."
+    },
+    {
+      "type": "text",
+      "id": "role",
+      "label": "t:blocks.testimonial_card.settings.role.label",
+      "info": "t:blocks.testimonial_card.settings.role.info",
+      "default": "Morning Recovery"
+    },
+    {
+      "type": "richtext",
+      "id": "quote",
+      "label": "t:blocks.testimonial.settings.quote.label",
+      "default": "<p>Bite-sized insights that effortlessly fit into a busy morning routine. No fluff, just highly actionable habits that stick. A perfect daily reset button for mind and body.</p>"
+    },
+    {
+      "type": "range",
+      "id": "rating",
+      "label": "t:blocks.testimonial.settings.rating.label",
+      "info": "t:blocks.testimonial.settings.rating.info",
+      "min": 0,
+      "max": 5,
+      "step": 1,
+      "default": 5
+    },
+    {
+      "type": "range",
+      "id": "gap",
+      "label": "t:blocks.article_card.settings.gap.label",
+      "info": "t:blocks.testimonial_card.settings.gap.info",
+      "min": 0,
+      "max": 48,
+      "step": 2,
+      "unit": "px",
+      "default": 16
+    },
+    {
+      "type": "range",
+      "id": "star_size",
+      "label": "t:blocks.testimonial_card.settings.star_size.label",
+      "min": 10,
+      "max": 24,
+      "step": 1,
+      "unit": "px",
+      "default": 14
+    },
+    {
+      "type": "checkbox",
+      "id": "show_verified",
+      "label": "t:blocks.testimonial_card.settings.show_verified.label",
+      "info": "t:blocks.testimonial_card.settings.show_verified.info",
+      "default": true
+    },
+    {
+      "type": "text",
+      "id": "verified_label",
+      "label": "t:blocks.testimonial_card.settings.verified_label.label",
+      "default": "Verified",
+      "visible_if": "{{ block.settings.show_verified }}"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.testimonial_card.headers.product"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:blocks.testimonial_card.paragraphs.product"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_product",
+      "label": "t:blocks.testimonial_card.settings.show_product.label",
+      "default": true
+    },
+    {
+      "type": "product",
+      "id": "product",
+      "label": "t:blocks.testimonial_card.settings.product.label",
+      "info": "t:blocks.testimonial_card.settings.product.info"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_info_rating",
+      "label": "t:blocks.testimonial_card.settings.show_info_rating.label",
+      "default": true,
+      "visible_if": "{{ block.settings.show_product }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_info_price",
+      "label": "t:blocks.testimonial_card.settings.show_info_price.label",
+      "default": true,
+      "visible_if": "{{ block.settings.show_product }}"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.testimonial_card.headers.placeholder"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:blocks.testimonial_card.paragraphs.placeholder"
+    },
+    {
+      "type": "text",
+      "id": "placeholder_title",
+      "label": "t:blocks.testimonial_card.settings.placeholder_title.label",
+      "default": "Morning Recovery"
+    },
+    {
+      "type": "range",
+      "id": "placeholder_rating",
+      "label": "t:blocks.testimonial_card.settings.placeholder_rating.label",
+      "min": 0,
+      "max": 5,
+      "step": 1,
+      "default": 5
+    },
+    {
+      "type": "number",
+      "id": "placeholder_reviews",
+      "label": "t:blocks.testimonial_card.settings.placeholder_reviews.label",
+      "default": 889
+    },
+    {
+      "type": "text",
+      "id": "placeholder_compare_price",
+      "label": "t:blocks.testimonial_card.settings.placeholder_compare_price.label",
+      "default": "$54.9"
+    },
+    {
+      "type": "text",
+      "id": "placeholder_price",
+      "label": "t:blocks.testimonial_card.settings.placeholder_price.label",
+      "default": "$44.9"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.appearance.header"
+    },
+    {
+      "type": "color",
+      "id": "frame_background",
+      "label": "t:blocks.testimonial_card.settings.frame_background.label",
+      "info": "t:blocks.testimonial_card.settings.frame_background.info",
+      "default": "#E5F1EE"
+    },
+    {
+      "type": "range",
+      "id": "frame_background_opacity",
+      "label": "t:sections.feature_cards.settings.panel_background_opacity.label",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 100
+    },
+    {
+      "type": "range",
+      "id": "frame_radius",
+      "label": "t:blocks.testimonial_card.settings.frame_radius.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 12
+    },
+    {
+      "type": "range",
+      "id": "frame_radius_mobile",
+      "label": "t:blocks.testimonial_card.settings.frame_radius_mobile.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 12
+    },
+    {
+      "type": "range",
+      "id": "min_height",
+      "label": "t:blocks.feature_card.settings.min_height.label",
+      "info": "t:blocks.testimonial_card.settings.min_height.info",
+      "min": 0,
+      "max": 640,
+      "step": 10,
+      "unit": "px",
+      "default": 350
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.group.headers.borders"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:blocks.testimonial_card.paragraphs.borders"
+    },
+    {
+      "type": "select",
+      "id": "border_style",
+      "label": "t:shared.border.style.label",
+      "options": [
+        { "value": "none", "label": "t:shared.options.none" },
+        { "value": "solid", "label": "t:shared.options.solid" },
+        { "value": "dashed", "label": "t:shared.options.dashed" },
+        { "value": "dotted", "label": "t:shared.border.style.options__3.label" }
+      ],
+      "default": "solid"
+    },
+    {
+      "type": "range",
+      "id": "border_width_top",
+      "label": "t:shared.border.sides.top.label",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 1,
+      "visible_if": "{{ block.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_width_right",
+      "label": "t:shared.border.sides.right.label",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 1,
+      "visible_if": "{{ block.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_width_bottom",
+      "label": "t:shared.border.sides.bottom.label",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 1,
+      "visible_if": "{{ block.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_width_left",
+      "label": "t:shared.border.sides.left.label",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 1,
+      "visible_if": "{{ block.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_opacity",
+      "label": "t:shared.border.opacity.label",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 100,
+      "visible_if": "{{ block.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "color",
+      "id": "border_color",
+      "label": "t:shared.border.color.label",
+      "default": "#E5F1EE",
+      "visible_if": "{{ block.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "ring_gap",
+      "label": "t:blocks.testimonial_card.settings.ring_gap.label",
+      "info": "t:blocks.testimonial_card.settings.ring_gap.info",
+      "min": 0,
+      "max": 40,
+      "step": 1,
+      "unit": "px",
+      "default": 7
+    },
+    {
+      "type": "header",
+      "content": "t:shared.corners.header"
+    },
+    {
+      "type": "range",
+      "id": "border_radius",
+      "label": "t:shared.corners.radius.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 20
+    },
+    {
+      "type": "range",
+      "id": "border_radius_mobile",
+      "label": "t:shared.corners.radius_mobile.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 20
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.feature_card.headers.hover"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:blocks.testimonial_card.paragraphs.hover"
+    },
+    {
+      "type": "select",
+      "id": "hover_border_style",
+      "label": "t:blocks.testimonial_card.settings.hover_border_style.label",
+      "options": [
+        { "value": "inherit", "label": "t:blocks.testimonial_card.settings.hover_border_style.options__1.label" },
+        { "value": "solid", "label": "t:shared.options.solid" },
+        { "value": "dashed", "label": "t:shared.options.dashed" },
+        { "value": "dotted", "label": "t:shared.border.style.options__3.label" }
+      ],
+      "default": "dashed"
+    },
+    {
+      "type": "color",
+      "id": "hover_border_color",
+      "label": "t:blocks.testimonial_card.settings.hover_border_color.label",
+      "info": "t:blocks.testimonial_card.settings.hover_border_color.info",
+      "default": "#0F2E2F"
+    },
+    {
+      "type": "range",
+      "id": "hover_border_opacity",
+      "label": "t:shared.border.opacity.label",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 100
+    },
+    {
+      "type": "range",
+      "id": "hover_duration",
+      "label": "t:blocks.feature_card.settings.hover_duration.label",
+      "info": "t:blocks.testimonial_card.settings.hover_duration.info",
+      "min": 0,
+      "max": 1200,
+      "step": 50,
+      "unit": "ms",
+      "default": 400
+    },
+    {
+      "type": "range",
+      "id": "hover_lift",
+      "label": "t:blocks.feature_card.settings.hover_lift.label",
+      "info": "t:blocks.feature_card.settings.hover_lift.info",
+      "min": 0,
+      "max": 24,
+      "step": 1,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "header",
+      "content": "t:shared.spacing.block_header"
+    },
+    {
+      "type": "select",
+      "id": "padding_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        { "value": "desktop", "label": "t:shared.spacing.devices.options__1.label" },
+        { "value": "mobile", "label": "t:shared.spacing.devices.options__2.label" }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 28,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 28,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 28,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 28,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 24,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 24,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left_mobile",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 20,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right_mobile",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 20,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    }
+  ],
+  "presets": [{ "name": "t:blocks.testimonial_card.name" }]
+}
+{% endschema %}

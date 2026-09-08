@@ -97,6 +97,7 @@ const LAZY_MODULES = [
   { specifier: '@theme/variant-swatch', tags: ['variant-swatch'] },
 
   { specifier: '@theme/carousel', tags: ['swiper-carousel'] },
+  { specifier: '@theme/testimonial-product', tags: ['testimonial-product'] },
 
   // `<button-swap>` is only emitted for buttons whose hover effect actually
   // needs a duplicated track, so a page of ordinary buttons never fetches this.
