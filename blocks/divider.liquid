@@ -9,12 +9,44 @@
   each one lives in.
 {% endcomment %}
 
-<div class="divider-block" {% render 'spacing', block: block.settings %} {{ block.shopify_attributes }}>
+{%- liquid
+  comment
+    Vertical is the same rule turned on its side, for the case a horizontal one
+    cannot serve: a hairline *between* blocks laid out in a row — the tick marks
+    between "No hidden fees", "Skip anytime" and "Secure checkout".
+
+    It is an orientation rather than a second block because everything else is
+    identical: the same three styles, the same colour, the same thickness, the
+    same snippet. What changes is which border edge is drawn and which axis the
+    length runs along.
+
+    A vertical rule stretches to the row it sits in, so it needs no length of
+    its own. `--divider-length` is the escape hatch for a row whose items are
+    much taller than the mark should be.
+  endcomment
+  assign orientation = block.settings.orientation | default: 'horizontal'
+  assign length = block.settings.length | default: 0 | plus: 0
+-%}
+
+{%- capture divider_style -%}
+  {%- render 'spacing', block: block.settings, declarations: true -%}
+  {%- if orientation == 'vertical' and length > 0 -%}
+    --divider-length: {{ length }}px;
+  {%- endif -%}
+{%- endcapture -%}
+
+<div
+  class="divider-block divider-block--{{ orientation }}"
+  data-block-spacing
+  style="{{ divider_style | strip_newlines | strip }}"
+  {{ block.shopify_attributes }}
+>
   {% render 'divider',
      style: block.settings.style,
      color: block.settings.color,
      thickness: block.settings.thickness,
-     width: block.settings.width %}
+     width: block.settings.width,
+     orientation: orientation %}
 </div>
 
 {% schema %}
@@ -22,6 +54,29 @@
   "name": "t:blocks.divider.name",
   "tag": null,
   "settings": [
+    {
+      "type": "select",
+      "id": "orientation",
+      "label": "t:blocks.divider.settings.orientation.label",
+      "info": "t:blocks.divider.settings.orientation.info",
+      "options": [
+        { "value": "horizontal", "label": "t:blocks.divider.settings.orientation.options__1.label" },
+        { "value": "vertical", "label": "t:blocks.divider.settings.orientation.options__2.label" }
+      ],
+      "default": "horizontal"
+    },
+    {
+      "type": "range",
+      "id": "length",
+      "label": "t:blocks.divider.settings.length.label",
+      "info": "t:blocks.divider.settings.length.info",
+      "min": 0,
+      "max": 200,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.orientation == 'vertical' }}"
+    },
     {
       "type": "select", "id": "style", "label": "t:sections.divider.settings.style.label",
       "options": [

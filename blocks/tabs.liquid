@@ -26,6 +26,16 @@
   from nowhere. This is its first caller, so the strip in a section and the
   strip in the mega menu are one implementation with one set of bugs.
 
+  ## A note on the range settings below
+
+  Shopify validates every `range` for `(max - min) / step <= 101`, and a range
+  that fails it does not fail alone: the schema is rejected whole and *every*
+  setting in this block reads as undefined, so the first thing that breaks is a
+  section preset elsewhere reporting an unrelated setting as missing. **Track
+  corners** was `0..999 step 1` and produced exactly that — a preset complaining
+  that `strip_style` did not exist. Both radius sliders now stop at 50, which is
+  a pill at any strip height this component produces.
+
   ## Vertical and horizontal are a grid, not two layouts
 
   `assets/header.css` reads `.tabs--vertical` and `.tabs--horizontal` and puts
@@ -75,10 +85,37 @@
   assign tabs_id = 'Tabs-' | append: block.id
 
   comment
+    ## Plain and Segmented are one strip with a track drawn round it
+
+    Segmented is the pill chooser — a filled track, the tabs sharing its width,
+    the marker sliding inside it. It is a modifier and not a second component
+    because everything that makes a tab strip work is already here: the measured
+    marker, the keyboard walk, the overflow scroller, the ARIA. What changes is
+    a background, a padding and how the tabs divide the space.
+
+    It is the arrangement a delivery-frequency chooser wants, and equally a
+    Monthly/Yearly price switch or a two-state filter — so it is a look this
+    block offers rather than something a section grows its own copy of.
+
+    Segmented is horizontal by definition: a filled track running down the side
+    of a page with the options stacked in it is a menu, not a switch. The
+    orientation is forced rather than hidden behind a `visible_if`, so a
+    merchant who chooses Segmented on a strip that was vertical gets the strip
+    they picked instead of a broken one.
+  endcomment
+  assign strip_style = s.strip_style | default: 'plain'
+  if strip_style == 'segmented'
+    assign orientation = 'horizontal'
+  endif
+
+  comment
     `tabs` and `tabs--<orientation>` are the snippet's. This is the modifier
     list on top of them, which is why it does not repeat either.
   endcomment
   assign classes = 'tabs--block'
+  if strip_style == 'segmented'
+    assign classes = classes | append: ' tabs--segmented'
+  endif
   if orientation == 'vertical' and s.show_divider
     assign classes = classes | append: ' tabs--divided'
   endif
@@ -89,6 +126,16 @@
   --tabs-rail-width: {{ rail_width }}px;
   --tabs-gap: {{ gap }}px;
   --tabs-marker-radius: {{ marker_radius }}px;
+  {%- if strip_style == 'segmented' -%}
+    --tabs-track-padding: {{ s.track_padding | default: 6 | plus: 0 }}px;
+    --tabs-track-radius: {{ s.track_radius | default: 999 | plus: 0 }}px;
+    {%- if s.track_background != blank -%}
+      --tabs-track-background: {{ s.track_background }};
+    {%- endif -%}
+    {%- if s.marker_background != blank -%}
+      --tabs-marker-background: {{ s.marker_background }};
+    {%- endif -%}
+  {%- endif -%}
   --tabs-flex: {{ width_flex }};
   --tabs-width: {{ width_size }};
   --tabs-tab-border-width: {{ tab_border_width }}px;
@@ -149,6 +196,52 @@
     { "type": "header", "content": "t:blocks.group.headers.layout" },
     {
       "type": "select",
+      "id": "strip_style",
+      "label": "t:blocks.tabs.settings.strip_style.label",
+      "info": "t:blocks.tabs.settings.strip_style.info",
+      "options": [
+        { "value": "plain", "label": "t:blocks.tabs.settings.strip_style.options__1.label" },
+        { "value": "segmented", "label": "t:blocks.tabs.settings.strip_style.options__2.label" }
+      ],
+      "default": "plain"
+    },
+    {
+      "type": "color",
+      "id": "track_background",
+      "label": "t:blocks.tabs.settings.track_background.label",
+      "visible_if": "{{ block.settings.strip_style == 'segmented' }}"
+    },
+    {
+      "type": "color",
+      "id": "marker_background",
+      "label": "t:blocks.tabs.settings.marker_background.label",
+      "visible_if": "{{ block.settings.strip_style == 'segmented' }}"
+    },
+    {
+      "type": "range",
+      "id": "track_padding",
+      "label": "t:blocks.tabs.settings.track_padding.label",
+      "min": 0,
+      "max": 24,
+      "step": 1,
+      "unit": "px",
+      "default": 6,
+      "visible_if": "{{ block.settings.strip_style == 'segmented' }}"
+    },
+    {
+      "type": "range",
+      "id": "track_radius",
+      "label": "t:blocks.tabs.settings.track_radius.label",
+      "info": "t:blocks.tabs.settings.track_radius.info",
+      "min": 0,
+      "max": 50,
+      "step": 2,
+      "unit": "px",
+      "default": 50,
+      "visible_if": "{{ block.settings.strip_style == 'segmented' }}"
+    },
+    {
+      "type": "select",
       "id": "direction",
       "label": "t:blocks.tabs.settings.direction.label",
       "info": "t:blocks.tabs.settings.direction.info",
@@ -156,7 +249,8 @@
         { "value": "vertical", "label": "t:blocks.tabs.settings.direction.options__1.label" },
         { "value": "horizontal", "label": "t:blocks.tabs.settings.direction.options__2.label" }
       ],
-      "default": "vertical"
+      "default": "vertical",
+      "visible_if": "{{ block.settings.strip_style != 'segmented' }}"
     },
     {
       "type": "range",
@@ -168,7 +262,7 @@
       "step": 10,
       "unit": "px",
       "default": 260,
-      "visible_if": "{{ block.settings.direction == 'vertical' }}"
+      "visible_if": "{{ block.settings.direction == 'vertical' and block.settings.strip_style != 'segmented' }}"
     },
     {
       "type": "checkbox",
@@ -176,7 +270,7 @@
       "label": "t:blocks.tabs.settings.show_divider.label",
       "info": "t:blocks.tabs.settings.show_divider.info",
       "default": true,
-      "visible_if": "{{ block.settings.direction == 'vertical' }}"
+      "visible_if": "{{ block.settings.direction == 'vertical' and block.settings.strip_style != 'segmented' }}"
     },
     {
       "type": "range",

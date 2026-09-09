@@ -1,0 +1,1715 @@
+{% comment %}
+  sections/featured-offer.liquid
+
+  One offer over a photograph: a panel on one side, highlight cards on the
+  other, and a strip of details under both.
+
+  ## Why it is not a subscription section
+
+  It was drawn as one, and the Theme Store requirements are the reason it is
+  not. Subscriptions there are the Selling Plan API — a merchant creates selling
+  plans and the theme has to show the selected plan through to the cart. This
+  section has no part in that: its options are links, so a strip that said
+  "Every month / Every 2 months" would advertise a purchase flow the section
+  cannot carry out, and the customer would arrive at a page with nothing
+  subscribed.
+
+  So the option chooser stayed and the subscription vocabulary went. A merchant
+  whose store does sell subscriptions can label the options however their app
+  requires and point each one at the right page; every other merchant gets a
+  chooser for sizes, tiers, bundles or plans. The section is honest about being
+  a promotion either way.
+
+  The same requirement is why the preset carries no ratings, review counts or
+  customer totals. Fabricated figures are listed there as false data and claims,
+  alongside fake countdowns and stock levels, and a number a merchant has to
+  remember to go and delete is a number some store will ship.
+
+  ## The shell is `sections/main-faq.liquid`'s, setting id for setting id
+
+  Container, colour scheme, background media, the four border widths, the two
+  radii, the margins, the layout vocabulary and the gaps — every id here is one
+  that section already carries, and both reach them through
+  `snippets/spacing.liquid`, `snippets/background-media.liquid` and
+  `snippets/container.liquid` rather than reimplementing any of it. A merchant
+  who has arranged an FAQ section has arranged this one.
+
+  What it adds is a minimum height. A panel over a photograph is a hero, and a
+  hero sized only by its content is as tall as whichever paragraph the merchant
+  last edited. The two sliders are a floor, not a height: the section still
+  grows when the content needs more room.
+
+  ## The background drifts, and it is never an empty box
+
+  Parallax is `snippets/background-image.liquid`'s, reached by two settings the
+  Group block already carries. It stands down on touch and under
+  `prefers-reduced-motion`, and it is one shared ticker rather than a scroll
+  listener per section.
+
+  The placeholder is the other half of the same idea. A section whose whole
+  subject is a photograph should show the shape of one before anything is
+  uploaded, so `background-media` is asked for a placeholder here — the panel
+  lands on a picture-shaped box in the editor rather than on the colour scheme,
+  and the merchant can see the layout they are filling in.
+
+  ## The option chooser is `blocks/tabs.liquid`, not a control of its own
+
+  Several options, one selected, and a button under the selected one that goes
+  to that option's page. That is a tablist with one panel each, so it is the
+  theme's tab block set to **Segmented** with a **Button** block inside each
+  tab, and the keyboard behaviour, the sliding marker, the ARIA and the whole
+  button system come with it.
+
+  Three things were added to the tab blocks to make it, and each is generic:
+
+    Segmented           `blocks/tabs.liquid` — the filled track and the options
+                        sharing its width. A Monthly/Yearly switch wants it too.
+    A flag on a tab     `blocks/_tab.liquid` — a short word above an option.
+                        It ships empty; it is the merchant's to write.
+    The tab that opens  `blocks/_tab.liquid` — so the option a merchant leads
+                        with need not be the one listed first, which would
+                        change the order a customer reads and a keyboard walks.
+
+  ## Everything else is blocks the theme already had
+
+  The panel is a **Card content** with a background and a border. The label is a
+  **Subheading**, the heading and the paragraph are **Text**, the cards are
+  **Badge highlight** and the short notes are **Icon with text**. The preset
+  wires them together; none of them knows it is in this section.
+
+  That is also why the layout controls matter more than they look. The section
+  is a flex container of its own children, so the panel sits beside the cards
+  because they are siblings — not because a selector went looking for them —
+  and a merchant who deletes one is left with a section that still lays out
+  rather than one with a hole in it.
+{% endcomment %}
+
+{%- liquid
+  assign s = section.settings
+
+  comment
+    The background is the colour scheme's until the merchant says otherwise:
+    either a colour of their own, or a picture behind the whole section.
+
+    The colour is emitted as a real `background` declaration rather than a
+    custom property because `color-scheme-container` paints a background *and* a
+    gradient image, and only the shorthand clears both.
+  endcomment
+  assign background_media = s.background_media | default: 'none'
+  assign has_background_media = false
+  if background_media != 'none'
+    assign has_background_media = true
+  endif
+
+  assign background_paint = ''
+  if has_background_media == false
+    assign background_paint = s.background_color | default: ''
+  endif
+
+  comment
+    ---- the frame ----
+
+    One width per side rather than one for the box, summed into `border_any` so
+    the three properties are emitted only when at least one side is drawn — a
+    zero-width border with a colour on it is three declarations that paint
+    nothing.
+
+    Opacity goes into the colour rather than onto the element: `opacity` on the
+    section would fade the offer along with its frame. With no colour picked the
+    border is `currentColor`, which the colour filters cannot take an alpha
+    channel from, so `color-mix` does the same fade in the browser instead and
+    both paths honour the slider.
+  endcomment
+  assign border_line = s.border_style | default: 'none'
+
+  assign bw_top = 0
+  assign bw_right = 0
+  assign bw_bottom = 0
+  assign bw_left = 0
+  assign border_any = 0
+
+  if border_line != 'none'
+    assign bw_top = s.border_width_top | default: 0 | plus: 0
+    assign bw_right = s.border_width_right | default: 0 | plus: 0
+    assign bw_bottom = s.border_width_bottom | default: 0 | plus: 0
+    assign bw_left = s.border_width_left | default: 0 | plus: 0
+    assign border_any = bw_top | plus: bw_right | plus: bw_bottom | plus: bw_left
+
+    assign border_percent = s.border_opacity | default: 100 | plus: 0
+    if s.border_color == blank
+      assign border_paint = 'color-mix(in srgb, currentColor ' | append: border_percent | append: '%, transparent)'
+    else
+      assign border_alpha = border_percent | divided_by: 100.0
+      assign border_paint = s.border_color | color_modify: 'alpha', border_alpha
+    endif
+  endif
+
+  comment
+    ---- corners and margins ----
+
+    A phone gets its own radius because the same number does not read the same
+    at both widths — 40px is a soft lift across 1400px and a heavy scoop out of
+    a 390px screen. `| default: radius` rather than a constant, so a section
+    saved before the mobile slider existed keeps one shape at every width.
+  endcomment
+  assign radius = s.border_radius | default: 40 | plus: 0
+  assign radius_mobile = s.border_radius_mobile | default: radius | plus: 0
+  assign margin_top = s.margin_top | default: 0 | plus: 0
+  assign margin_bottom = s.margin_bottom | default: 0 | plus: 0
+
+  comment
+    ---- the floor ----
+
+    A minimum, not a height. The section grows past it whenever the content
+    needs the room, so a merchant who adds a fourth promise to the panel gets a
+    taller section rather than a scrollbar inside one.
+
+    Zero is the off switch and is what an untouched section carries, which is
+    why this is emitted unconditionally: `min-block-size: 0px` is what the box
+    would do anyway, so there is no state where writing it changes a layout that
+    was not asking for it.
+
+    The phone falls back to the desktop number rather than to a constant. A hero
+    900px tall on a laptop is most of a phone screen, so the two are nearly
+    always different — but a section saved before the mobile slider existed
+    should keep the one height it was given.
+  endcomment
+  assign min_height = s.min_height | default: 0 | plus: 0
+  assign min_height_mobile = s.min_height_mobile | default: min_height | plus: 0
+
+  comment
+    ---- layout ----
+
+    The Group block's vocabulary rather than a second one invented here:
+    Alignment is always the horizontal axis and Position always the vertical,
+    and `assets/base.css` decides which CSS property reads which from the
+    direction. `snippets/group.liquid` sets out why that swap lives in one
+    place.
+
+    This file does not guess which child is which. Horizontal is a flex row of
+    the section's own children, so the offer panel and the proof cards sit side
+    by side because they are siblings.
+  endcomment
+  assign direction = s.direction | default: 'row'
+  assign is_row = false
+  if direction == 'row'
+    assign is_row = true
+  endif
+
+  comment
+    Two settings, one control. The horizontal list carries the distribution
+    options on top of the three alignments, because on a row they land on the
+    same `justify-content` and only one of the two could win. On a column they
+    would be inert, so that list is the plain three and the merchant never sees
+    an option that does nothing.
+  endcomment
+  if is_row
+    assign alignment_setting = s.alignment_row | default: 'start'
+  else
+    assign alignment_setting = s.alignment | default: 'start'
+  endif
+
+  case alignment_setting
+    when 'center'
+      assign alignment_axis = 'center'
+    when 'end'
+      assign alignment_axis = 'end'
+    else
+      assign alignment_axis = 'start'
+  endcase
+
+  comment
+    The alignment with the distribution folded in, and the plain one beside it.
+    They differ exactly when a distribution is chosen, and the phone stack needs
+    the plain one: `space-between` is valid on the `justify-content` it feeds on
+    a desktop row and invalid on the `align-items` it would feed once stacked.
+  endcomment
+  assign inline_axis = alignment_axis
+  if is_row
+    case alignment_setting
+      when 'space-between', 'space-around', 'space-evenly'
+        assign inline_axis = alignment_setting
+    endcase
+  endif
+
+  comment
+    `stretch` is offered here and not on the FAQ's list because this section's
+    two columns are panels rather than runs of text: an offer panel that ends
+    where its paragraph ends, beside a taller column of proof cards, reads as an
+    unfinished box. It is the vertical axis, so it only ever reaches
+    `align-items`, where `stretch` is valid.
+  endcomment
+  case s.position
+    when 'center'
+      assign block_axis = 'center'
+    when 'end'
+      assign block_axis = 'end'
+    when 'stretch'
+      assign block_axis = 'stretch'
+    else
+      assign block_axis = 'start'
+  endcase
+
+  comment
+    ---- the gaps ----
+
+    A Desktop/Mobile pair behind one switch, the shape every other section in
+    the theme uses. Both pairs are published unconditionally and
+    `assets/base.css` picks which applies at a given width, because the pair the
+    merchant is not looking at in the editor is still the pair the other
+    breakpoint renders.
+
+    `plus: 0` rather than `default` alone, which would replace a deliberate 0 —
+    a gap a merchant can legitimately want when the panel is meant to sit flush
+    against the cards beside it. Each mobile axis falls back to its desktop
+    value when the setting is absent entirely, so a section saved before the
+    mobile pair existed renders as it did; one added since gets the schema
+    default, which is half the desktop one.
+  endcomment
+  assign gap_x = s.gap_horizontal | default: 24 | plus: 0
+  assign gap_y = s.gap_vertical | default: 24 | plus: 0
+  assign gap_x_mobile = s.gap_horizontal_mobile | default: gap_x | plus: 0
+  assign gap_y_mobile = s.gap_vertical_mobile | default: gap_y | plus: 0
+
+  assign content_classes = 'featured-offer__content featured-offer__content--' | append: direction
+  if is_row and s.stack_on_mobile
+    assign content_classes = content_classes | append: ' featured-offer__content--stack-mobile'
+  endif
+
+  comment
+    Reverse is `flex-direction: row-reverse`, not a second ordering of the
+    blocks — the markup stays in the order a screen reader and a keyboard read
+    it, and only the paint order changes. That is also why it is row-only: a
+    reversed *column* would put the guarantees above the offer for everybody
+    using the page without sight of it.
+
+    What it is for is the mirrored arrangement, where the photograph's subject
+    is on the other side of the frame and the panel has to move off it. Which
+    side is a design decision rather than a rebuild, so it is a checkbox and not
+    a second preset that would need every change made to it twice.
+  endcomment
+  if is_row and s.reverse
+    assign content_classes = content_classes | append: ' featured-offer__content--reverse'
+  endif
+-%}
+
+{%- capture content_style -%}
+  --featured-offer-gap-x: {{ gap_x }}px;
+  --featured-offer-gap-y: {{ gap_y }}px;
+  --featured-offer-gap-x-mobile: {{ gap_x_mobile }}px;
+  --featured-offer-gap-y-mobile: {{ gap_y_mobile }}px;
+  --featured-offer-inline: {{ inline_axis }};
+  --featured-offer-align: {{ alignment_axis }};
+  --featured-offer-block: {{ block_axis }};
+{%- endcapture -%}
+
+{%- capture section_style -%}
+  {%- render 'spacing', section: s, declarations: true -%}
+  --featured-offer-radius: {{ radius }}px;
+  --featured-offer-radius-mobile: {{ radius_mobile }}px;
+  --featured-offer-margin-block-start: {{ margin_top }}px;
+  --featured-offer-margin-block-end: {{ margin_bottom }}px;
+  --featured-offer-min-height: {{ min_height }}px;
+  --featured-offer-min-height-mobile: {{ min_height_mobile }}px;
+  {%- if border_any > 0 -%}
+    --featured-offer-border-width: {{ bw_top }}px {{ bw_right }}px {{ bw_bottom }}px {{ bw_left }}px;
+    --featured-offer-border-style: {{ border_line }};
+    --featured-offer-border-color: {{ border_paint }};
+  {%- endif -%}
+  {%- if background_paint != '' -%}
+    background: {{ background_paint }};
+  {%- endif -%}
+{%- endcapture -%}
+
+<div
+  class="featured-offer color-scheme-container color-{{ s.color_scheme | default: 'scheme-1' }}{% if has_background_media %} has-background-media{% endif %}"
+  data-section-spacing
+  data-section-id="{{ section.id }}"
+  style="{{ section_style | strip_newlines | strip }}"
+>
+  {%- comment -%}
+    `priority: true` because this section is a hero and a hero is above the
+    fold. A lazy background here is the largest paint on the page arriving after
+    everything around it, which is the one picture in a theme worth loading
+    eagerly.
+
+    `placeholder` is opt-in in `background-media`, and this is a section that
+    wants it: the whole layout is a panel read against a photograph, so before
+    one is uploaded the merchant should be looking at a picture-shaped box
+    rather than at flat scheme colour with the panel floating on it. It is drawn
+    only when Image is the chosen background and none has been picked — a
+    merchant who wants no picture chooses None and gets nothing.
+  {%- endcomment -%}
+  {%- if has_background_media -%}
+    {% render 'background-media',
+       settings: s,
+       priority: true,
+       placeholder: 'hero-apparel-1' %}
+  {%- endif -%}
+  
+
+  <div class="featured-offer__inner {% render 'container', width: s.container_width %}">
+    {%- comment -%}
+      `children: true` staggers the direct children — the offer panel, then the
+      proof cards, then the guarantees — so the section arrives as one cascade
+      rather than as a wall that appears at once. The stagger is a setting; at
+      its default of 0 they simply arrive together.
+    {%- endcomment -%}
+    <motion-effect
+      class="{{ content_classes }}"
+      data-easing="outQuint"
+      style="{{ content_style | strip_newlines | strip }}"
+      {% render 'motion-attrs', kind: 'text', section: s, children: true %}
+    >
+      {% content_for 'blocks' %}
+    </motion-effect>
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "t:sections.featured_offer.name",
+  "tag": "section",
+  "class": "section",
+  "blocks": [
+    {
+      "type": "@theme"
+    },
+    {
+      "type": "@app"
+    }
+  ],
+  "settings": [
+    {
+      "type": "select",
+      "id": "container_width",
+      "label": "t:shared.container.width.label",
+      "info": "t:shared.container.width.info",
+      "options": [
+        {
+          "value": "edge",
+          "label": "t:shared.container.width.options__1.label"
+        },
+        {
+          "value": "wide",
+          "label": "t:shared.container.width.options__2.label"
+        },
+        {
+          "value": "standard",
+          "label": "t:shared.container.width.options__3.label"
+        },
+        {
+          "value": "compact",
+          "label": "t:shared.container.width.options__4.label"
+        },
+        {
+          "value": "custom",
+          "label": "t:shared.container.width.options__5.label"
+        }
+      ],
+      "default": "standard"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.group.headers.layout"
+    },
+    {
+      "type": "select",
+      "id": "direction",
+      "label": "t:blocks.group.settings.direction.label",
+      "options": [
+        {
+          "value": "column",
+          "label": "t:blocks.group.settings.direction.options__1.label"
+        },
+        {
+          "value": "row",
+          "label": "t:blocks.group.settings.direction.options__2.label"
+        }
+      ],
+      "default": "row"
+    },
+    {
+      "type": "checkbox",
+      "id": "reverse",
+      "label": "t:sections.featured_offer.settings.reverse.label",
+      "info": "t:sections.featured_offer.settings.reverse.info",
+      "default": false,
+      "visible_if": "{{ section.settings.direction == 'row' }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "stack_on_mobile",
+      "label": "t:blocks.group.settings.stack_on_mobile.label",
+      "info": "t:blocks.group.settings.stack_on_mobile.info",
+      "default": true,
+      "visible_if": "{{ section.settings.direction == 'row' }}"
+    },
+    {
+      "type": "select",
+      "id": "alignment",
+      "label": "t:blocks.group.settings.alignment.label",
+      "options": [
+        {
+          "value": "start",
+          "label": "t:blocks.group.settings.alignment.options__1.label"
+        },
+        {
+          "value": "center",
+          "label": "t:blocks.group.settings.alignment.options__2.label"
+        },
+        {
+          "value": "end",
+          "label": "t:blocks.group.settings.alignment.options__3.label"
+        }
+      ],
+      "default": "start",
+      "visible_if": "{{ section.settings.direction == 'column' }}"
+    },
+    {
+      "type": "select",
+      "id": "alignment_row",
+      "label": "t:blocks.group.settings.alignment.label",
+      "options": [
+        {
+          "value": "start",
+          "label": "t:blocks.group.settings.alignment.options__1.label"
+        },
+        {
+          "value": "center",
+          "label": "t:blocks.group.settings.alignment.options__2.label"
+        },
+        {
+          "value": "end",
+          "label": "t:blocks.group.settings.alignment.options__3.label"
+        },
+        {
+          "value": "space-between",
+          "label": "t:blocks.group.settings.distribution.options__2.label"
+        },
+        {
+          "value": "space-around",
+          "label": "t:blocks.group.settings.distribution.options__3.label"
+        },
+        {
+          "value": "space-evenly",
+          "label": "t:blocks.group.settings.distribution.options__4.label"
+        }
+      ],
+      "default": "start",
+      "visible_if": "{{ section.settings.direction == 'row' }}"
+    },
+    {
+      "type": "select",
+      "id": "position",
+      "label": "t:blocks.group.settings.position.label",
+      "options": [
+        {
+          "value": "start",
+          "label": "t:blocks.group.settings.position.options__1.label"
+        },
+        {
+          "value": "center",
+          "label": "t:blocks.group.settings.position.options__2.label"
+        },
+        {
+          "value": "end",
+          "label": "t:blocks.group.settings.position.options__3.label"
+        },
+        {
+          "value": "stretch",
+          "label": "t:sections.featured_offer.settings.position.options__4.label"
+        }
+      ],
+      "default": "start",
+      "visible_if": "{{ section.settings.direction == 'row' }}"
+    },
+    {
+      "type": "select",
+      "id": "gap_device",
+      "label": "t:shared.gap.label",
+      "options": [
+        {
+          "value": "desktop",
+          "label": "t:shared.spacing.devices.options__1.label"
+        },
+        {
+          "value": "mobile",
+          "label": "t:shared.spacing.devices.options__2.label"
+        }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "gap_horizontal",
+      "label": "t:shared.gap.horizontal.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 24,
+      "visible_if": "{{ section.settings.gap_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "gap_vertical",
+      "label": "t:shared.gap.vertical.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 24,
+      "visible_if": "{{ section.settings.gap_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "gap_horizontal_mobile",
+      "label": "t:shared.gap.horizontal.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 12,
+      "visible_if": "{{ section.settings.gap_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "gap_vertical_mobile",
+      "label": "t:shared.gap.vertical.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 12,
+      "visible_if": "{{ section.settings.gap_device == 'mobile' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:sections.featured_offer.headers.height"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:sections.featured_offer.paragraphs.height"
+    },
+    {
+      "type": "range",
+      "id": "min_height",
+      "label": "t:sections.featured_offer.settings.min_height.label",
+      "min": 0,
+      "max": 1000,
+      "step": 20,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "min_height_mobile",
+      "label": "t:sections.featured_offer.settings.min_height_mobile.label",
+      "info": "t:sections.featured_offer.settings.min_height_mobile.info",
+      "min": 0,
+      "max": 1000,
+      "step": 20,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "header",
+      "content": "t:shared.appearance.header"
+    },
+    {
+      "type": "color_scheme",
+      "id": "color_scheme",
+      "label": "t:shared.color_scheme.label",
+      "default": "scheme-1"
+    },
+    {
+      "type": "select",
+      "id": "background_media",
+      "label": "t:shared.background.media.label",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.background.media.options__1.label"
+        },
+        {
+          "value": "image",
+          "label": "t:shared.background.media.options__2.label"
+        },
+        {
+          "value": "video",
+          "label": "t:shared.background.media.options__3.label"
+        }
+      ],
+      "default": "none"
+    },
+    {
+      "type": "color_background",
+      "id": "background_color",
+      "label": "t:shared.background.color.label",
+      "info": "t:shared.background.color.info",
+      "visible_if": "{{ section.settings.background_media == 'none' }}"
+    },
+    {
+      "type": "image_picker",
+      "id": "image",
+      "label": "t:shared.background.image.label",
+      "visible_if": "{{ section.settings.background_media == 'image' }}"
+    },
+    {
+      "type": "image_picker",
+      "id": "image_mobile",
+      "label": "t:shared.background.image_mobile.label",
+      "info": "t:shared.background.image_mobile.info",
+      "visible_if": "{{ section.settings.background_media == 'image' }}"
+    },
+    {
+      "type": "select",
+      "id": "image_position",
+      "label": "t:shared.background.image_position.label",
+      "info": "t:shared.background.image_position.info",
+      "options": [
+        {
+          "value": "cover",
+          "label": "t:shared.background.image_position.options__1.label"
+        },
+        {
+          "value": "fit",
+          "label": "t:shared.background.image_position.options__2.label"
+        }
+      ],
+      "default": "cover",
+      "visible_if": "{{ section.settings.background_media == 'image' }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "image_parallax",
+      "label": "t:shared.background.image_parallax.label",
+      "info": "t:shared.background.image_parallax.info",
+      "default": false,
+      "visible_if": "{{ section.settings.background_media == 'image' }}"
+    },
+    {
+      "type": "range",
+      "id": "image_parallax_speed",
+      "label": "t:shared.background.image_parallax_speed.label",
+      "min": 5,
+      "max": 40,
+      "step": 5,
+      "unit": "%",
+      "default": 15,
+      "visible_if": "{{ section.settings.background_media == 'image' and section.settings.image_parallax }}",
+      "info": "t:shared.background.image_parallax_speed.info"
+    },
+    {
+      "type": "video",
+      "id": "video",
+      "label": "t:shared.background.video.label",
+      "info": "t:shared.background.video.info",
+      "visible_if": "{{ section.settings.background_media == 'video' }}"
+    },
+    {
+      "type": "video_url",
+      "id": "video_url",
+      "label": "t:shared.background.video_url.label",
+      "info": "t:shared.background.video_url.info",
+      "accept": [
+        "youtube",
+        "vimeo"
+      ],
+      "visible_if": "{{ section.settings.background_media == 'video' }}"
+    },
+    {
+      "type": "image_picker",
+      "id": "video_poster",
+      "label": "t:shared.background.video_poster.label",
+      "info": "t:shared.background.video_poster.info",
+      "visible_if": "{{ section.settings.background_media == 'video' }}"
+    },
+    {
+      "type": "select",
+      "id": "video_position",
+      "label": "t:shared.background.video_position.label",
+      "options": [
+        {
+          "value": "cover",
+          "label": "t:shared.background.video_position.options__1.label"
+        },
+        {
+          "value": "contain",
+          "label": "t:shared.background.video_position.options__2.label"
+        }
+      ],
+      "default": "cover",
+      "visible_if": "{{ section.settings.background_media == 'video' }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "video_loop",
+      "label": "t:shared.background.video_loop.label",
+      "default": true,
+      "visible_if": "{{ section.settings.background_media == 'video' }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "overlay_enabled",
+      "label": "t:shared.background.overlay_enabled.label",
+      "info": "t:shared.background.overlay_enabled.info",
+      "default": false,
+      "visible_if": "{{ section.settings.background_media != 'none' }}"
+    },
+    {
+      "type": "select",
+      "id": "overlay_style",
+      "label": "t:shared.background.overlay_style.label",
+      "info": "t:shared.background.overlay_style.info",
+      "options": [
+        {
+          "value": "solid",
+          "label": "t:shared.background.overlay_style.options__1.label"
+        },
+        {
+          "value": "gradient",
+          "label": "t:shared.background.overlay_style.options__2.label"
+        }
+      ],
+      "default": "solid",
+      "visible_if": "{{ section.settings.background_media != 'none' and section.settings.overlay_enabled }}"
+    },
+    {
+      "type": "color",
+      "id": "overlay_color",
+      "label": "t:shared.background.overlay_color.label",
+      "default": "#000000",
+      "visible_if": "{{ section.settings.background_media != 'none' and section.settings.overlay_enabled and section.settings.overlay_style == 'solid' }}"
+    },
+    {
+      "type": "color_background",
+      "id": "overlay_gradient",
+      "label": "t:shared.background.overlay_gradient.label",
+      "info": "t:shared.background.overlay_gradient.info",
+      "default": "linear-gradient(180deg, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 1) 100%)",
+      "visible_if": "{{ section.settings.background_media != 'none' and section.settings.overlay_enabled and section.settings.overlay_style == 'gradient' }}"
+    },
+    {
+      "type": "range",
+      "id": "overlay_opacity",
+      "label": "t:shared.background.overlay_opacity.label",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 40,
+      "visible_if": "{{ section.settings.background_media != 'none' and section.settings.overlay_enabled }}"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.group.headers.borders"
+    },
+    {
+      "type": "select",
+      "id": "border_style",
+      "label": "t:blocks.group.settings.border_style.label",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.options.none"
+        },
+        {
+          "value": "solid",
+          "label": "t:shared.options.solid"
+        },
+        {
+          "value": "dashed",
+          "label": "t:shared.border.style.options__2.label"
+        }
+      ],
+      "default": "dashed"
+    },
+    {
+      "type": "range",
+      "id": "border_width_top",
+      "label": "t:shared.border.sides.top.label",
+      "info": "t:shared.border.sides.info",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 1,
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_width_right",
+      "label": "t:shared.border.sides.right.label",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_width_bottom",
+      "label": "t:shared.border.sides.bottom.label",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_width_left",
+      "label": "t:shared.border.sides.left.label",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_opacity",
+      "label": "t:shared.border.opacity.label",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 100,
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "color",
+      "id": "border_color",
+      "label": "t:blocks.group.settings.border_color.label",
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.corners.header"
+    },
+    {
+      "type": "range",
+      "id": "border_radius",
+      "label": "t:shared.corners.radius.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 40
+    },
+    {
+      "type": "range",
+      "id": "border_radius_mobile",
+      "label": "t:shared.corners.radius_mobile.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 24
+    },
+    {
+      "type": "header",
+      "content": "t:shared.animation.header"
+    },
+    {
+      "type": "select",
+      "id": "animation_text",
+      "label": "t:shared.animation.animation_text.label",
+      "options": [
+        {
+          "value": "inherit",
+          "label": "t:shared.animation.animation_text.options__1.label"
+        },
+        {
+          "value": "none",
+          "label": "t:shared.animation.animation_text.options__2.label"
+        },
+        {
+          "value": "fade-in",
+          "label": "t:shared.animation.animation_text.options__3.label"
+        },
+        {
+          "value": "fade-up",
+          "label": "t:shared.animation.animation_text.options__4.label"
+        },
+        {
+          "value": "slide-up",
+          "label": "t:shared.animation.animation_text.options__5.label"
+        }
+      ],
+      "default": "inherit"
+    },
+    {
+      "type": "range",
+      "id": "animation_duration",
+      "label": "t:shared.animation.animation_duration.label",
+      "info": "t:shared.animation.animation_duration.info",
+      "min": 0,
+      "max": 2000,
+      "step": 100,
+      "unit": "ms",
+      "default": 1000
+    },
+    {
+      "type": "range",
+      "id": "animation_stagger",
+      "label": "t:shared.animation.animation_stagger.label",
+      "info": "t:shared.animation.animation_stagger.info",
+      "min": 0,
+      "max": 300,
+      "step": 10,
+      "unit": "ms",
+      "default": 0
+    },
+    {
+      "type": "header",
+      "content": "t:shared.spacing.section_header"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:shared.spacing.section_paragraph"
+    },
+    {
+      "type": "select",
+      "id": "padding_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        {
+          "value": "desktop",
+          "label": "t:shared.spacing.devices.options__1.label"
+        },
+        {
+          "value": "mobile",
+          "label": "t:shared.spacing.devices.options__2.label"
+        }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 160,
+      "step": 2,
+      "unit": "px",
+      "default": 100,
+      "visible_if": "{{ section.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 160,
+      "step": 2,
+      "unit": "px",
+      "default": 100,
+      "visible_if": "{{ section.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 160,
+      "step": 2,
+      "unit": "px",
+      "default": 50,
+      "visible_if": "{{ section.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 160,
+      "step": 2,
+      "unit": "px",
+      "default": 50,
+      "visible_if": "{{ section.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "margin_top",
+      "label": "t:shared.spacing.margin_top.label",
+      "info": "t:shared.spacing.margin_negative.info",
+      "min": -160,
+      "max": 160,
+      "step": 4,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "margin_bottom",
+      "label": "t:shared.spacing.margin_bottom.label",
+      "info": "t:shared.spacing.margin_negative.info",
+      "min": -160,
+      "max": 160,
+      "step": 4,
+      "unit": "px",
+      "default": 0
+    }
+  ],
+  "presets": [
+    {
+      "name": "t:sections.featured_offer.presets.default.name",
+      "settings": {
+        "container_width": "standard",
+        "direction": "column",
+        "alignment": "start",
+        "position": "start",
+        "stack_on_mobile": true,
+        "gap_device": "desktop",
+        "gap_horizontal": 24,
+        "gap_vertical": 40,
+        "gap_horizontal_mobile": 12,
+        "gap_vertical_mobile": 24,
+        "min_height": 880,
+        "min_height_mobile": 620,
+        "color_scheme": "scheme-4",
+        "background_media": "image",
+        "image_position": "cover",
+        "image_parallax": true,
+        "image_parallax_speed": 20,
+        "overlay_enabled": true,
+        "overlay_style": "gradient",
+        "overlay_gradient": "linear-gradient(90deg, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.4) 45%, rgba(0, 0, 0, 0) 100%)",
+        "overlay_opacity": 100,
+        "border_style": "none",
+        "border_radius": 40,
+        "border_radius_mobile": 24,
+        "animation_text": "inherit",
+        "animation_duration": 1000,
+        "animation_stagger": 80,
+        "padding_device": "desktop",
+        "padding_top": 48,
+        "padding_bottom": 48,
+        "padding_top_mobile": 28,
+        "padding_bottom_mobile": 28,
+        "margin_top": 0,
+        "margin_bottom": 0
+      },
+      "blocks": [
+        {
+          "type": "group",
+          "settings": {
+            "inherit_color_scheme": true,
+            "direction": "row",
+            "stack_on_mobile": true,
+            "alignment": "start",
+            "distribution": "space-between",
+            "position": "start",
+            "gap": 24,
+            "gap_horizontal": 24,
+            "gap_vertical": 24,
+            "gap_horizontal_mobile": 12,
+            "gap_vertical_mobile": 16,
+            "width": "fill",
+            "border_style": "none"
+          },
+          "blocks": [
+            {
+              "type": "card-content",
+              "settings": {
+                "direction": "column",
+                "alignment": "start",
+                "position": "start",
+                "gap_vertical": 20,
+                "gap_vertical_mobile": 16,
+                "width": "custom",
+                "width_custom": 40,
+                "width_mobile": "fill",
+                "background_style": "gradient",
+                "background_gradient": "linear-gradient(180deg, rgba(15, 46, 47, 0.1) 0%, rgba(15, 46, 47, 0.4) 100%)",
+                "backdrop_blur": 10,
+                "text_color": "#FFFFFF",
+                "border_style": "solid",
+                "border_width": 1,
+                "border_opacity": 20,
+                "border_color": "#FFFFFF",
+                "border_radius": 32,
+                "padding_top": 32,
+                "padding_bottom": 32,
+                "padding_left": 32,
+                "padding_right": 32,
+                "padding_top_mobile": 24,
+                "padding_bottom_mobile": 24,
+                "padding_left_mobile": 20,
+                "padding_right_mobile": 20
+              },
+              "blocks": [
+                {
+                  "type": "subheading",
+                  "settings": {
+                    "text": "<p>Offer</p>",
+                    "icon_source": "none",
+                    "show_divider": false,
+                    "preset": "subheading",
+                    "font_size": "12",
+                    "font_size_mobile": "12",
+                    "letter_spacing": "wide",
+                    "color": "custom",
+                    "text_color_custom": "#03D26F",
+                    "background": "custom",
+                    "background_color": "linear-gradient(rgba(3, 210, 111, 0.14), rgba(3, 210, 111, 0.14))",
+                    "border_style": "none",
+                    "border_radius": 40,
+                    "width": "fit",
+                    "alignment": "start",
+                    "padding_top": 4,
+                    "padding_bottom": 4,
+                    "padding_left": 12,
+                    "padding_right": 12
+                  }
+                },
+                {
+                  "type": "text",
+                  "name": "t:blocks.text.presets.heading.name",
+                  "settings": {
+                    "text": "<p>Name the offer you are featuring</p>",
+                    "preset": "h2",
+                    "max_width": "none",
+                    "alignment": "start",
+                    "alignment_mobile": "start"
+                  }
+                },
+                {
+                  "type": "text",
+                  "name": "t:blocks.text.presets.text.name",
+                  "settings": {
+                    "text": "<p>Use this text to say what the offer includes and who it is for.</p>",
+                    "preset": "paragraph",
+                    "max_width": "none",
+                    "alignment": "start",
+                    "alignment_mobile": "start"
+                  }
+                },
+                {
+                  "type": "divider",
+                  "settings": {
+                    "orientation": "horizontal",
+                    "style": "solid",
+                    "thickness": 1,
+                    "width": "full",
+                    "padding_top": 4,
+                    "padding_bottom": 4
+                  }
+                },
+                {
+                  "type": "rating-badge",
+                  "settings": {
+                    "rating_max": 5,
+                    "review_count": 0,
+                    "show_score": true,
+                    "text": "Add a line of context here",
+                    "star_size": 16,
+                    "layout": "inline"
+                  }
+                },
+                {
+                  "type": "group",
+                  "settings": {
+                    "inherit_color_scheme": true,
+                    "direction": "row",
+                    "stack_on_mobile": false,
+                    "alignment": "start",
+                    "position": "stretch",
+                    "gap": 12,
+                    "gap_horizontal": 12,
+                    "gap_vertical": 12,
+                    "gap_horizontal_mobile": 8,
+                    "gap_vertical_mobile": 8,
+                    "width": "fill",
+                    "border_style": "none",
+                    "padding_top": 4,
+                    "padding_bottom": 4
+                  },
+                  "blocks": [
+                    {
+                      "type": "badge-highlight",
+                      "settings": {
+                        "icon": "refresh",
+                        "icon_size": "small",
+                        "icon_color": "#03D26F",
+                        "icon_frame_style": "dotted",
+                        "icon_frame_size": 56,
+                        "icon_frame_width": 1,
+                        "text": "<p>Describe a benefit of this offer.</p>",
+                        "inherit_color_scheme": true,
+                        "background": "#FFFFFF",
+                        "background_opacity": 5,
+                        "border_width": 0,
+                        "radius": 16,
+                        "width": 146,
+                        "height": 142,
+                        "alignment": "center",
+                        "hover": "none",
+                        "padding_top": 16,
+                        "padding_bottom": 16,
+                        "padding_left": 12,
+                        "padding_right": 12,
+                        "padding_top_mobile": 12,
+                        "padding_bottom_mobile": 12,
+                        "padding_left_mobile": 12,
+                        "padding_right_mobile": 12
+                      }
+                    },
+                    {
+                      "type": "badge-highlight",
+                      "settings": {
+                        "icon": "truck",
+                        "icon_size": "small",
+                        "icon_color": "#03D26F",
+                        "icon_frame_style": "dotted",
+                        "icon_frame_size": 56,
+                        "icon_frame_width": 1,
+                        "text": "<p>Describe what is included.</p>",
+                        "inherit_color_scheme": true,
+                        "background": "#FFFFFF",
+                        "background_opacity": 5,
+                        "border_width": 0,
+                        "radius": 16,
+                        "width": 146,
+                        "height": 142,
+                        "alignment": "center",
+                        "hover": "none",
+                        "padding_top": 16,
+                        "padding_bottom": 16,
+                        "padding_left": 12,
+                        "padding_right": 12,
+                        "padding_top_mobile": 12,
+                        "padding_bottom_mobile": 12,
+                        "padding_left_mobile": 12,
+                        "padding_right_mobile": 12
+                      }
+                    },
+                    {
+                      "type": "badge-highlight",
+                      "settings": {
+                        "icon": "star",
+                        "icon_size": "small",
+                        "icon_color": "#03D26F",
+                        "icon_frame_style": "dotted",
+                        "icon_frame_size": 56,
+                        "icon_frame_width": 1,
+                        "text": "<p>Describe how it works.</p>",
+                        "inherit_color_scheme": true,
+                        "background": "#FFFFFF",
+                        "background_opacity": 5,
+                        "border_width": 0,
+                        "radius": 16,
+                        "width": 146,
+                        "height": 142,
+                        "alignment": "center",
+                        "hover": "none",
+                        "padding_top": 16,
+                        "padding_bottom": 16,
+                        "padding_left": 12,
+                        "padding_right": 12,
+                        "padding_top_mobile": 12,
+                        "padding_bottom_mobile": 12,
+                        "padding_left_mobile": 12,
+                        "padding_right_mobile": 12
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "settings": {
+                    "text": "<p>Choose an option</p>",
+                    "preset": "subheading",
+                    "font_size": "12",
+                    "font_size_mobile": "12",
+                    "letter_spacing": "wide",
+                    "text_transform": "uppercase",
+                    "color": "muted",
+                    "max_width": "none",
+                    "alignment": "start",
+                    "alignment_mobile": "start",
+                    "padding_top": 4
+                  }
+                },
+                {
+                  "type": "tabs",
+                  "settings": {
+                    "strip_style": "segmented",
+                    "track_background": "#04100C",
+                    "marker_background": "#25332C",
+                    "track_padding": 6,
+                    "track_radius": 40,
+                    "gap": 20,
+                    "marker_radius": 40,
+                    "width": "fill",
+                    "tab_border_style": "none",
+                    "label": "Offer options"
+                  },
+                  "blocks": [
+                    {
+                      "type": "_tab",
+                      "settings": {
+                        "label": "First option",
+                        "gap_vertical": 16,
+                        "gap_vertical_mobile": 12,
+                        "icon_source": "none",
+                        "preset": "default",
+                        "font_size": "14",
+                        "font_size_mobile": "13"
+                      },
+                      "blocks": [
+                        {
+                          "type": "button",
+                          "settings": {
+                            "label": "Shop now",
+                            "link": "shopify://collections/all",
+                            "style": "primary",
+                            "size": "large",
+                            "width": "full",
+                            "corner_radius": 40,
+                            "icon": "arrow-right",
+                            "icon_style": "solid",
+                            "icon_position": "end",
+                            "icon_size": "small",
+                            "alignment": "center",
+                            "padding_top": 0,
+                            "padding_bottom": 0
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "_tab",
+                      "settings": {
+                        "label": "Second option",
+                        "selected": true,
+                        "gap_vertical": 16,
+                        "gap_vertical_mobile": 12,
+                        "icon_source": "none",
+                        "preset": "default",
+                        "font_size": "14",
+                        "font_size_mobile": "13"
+                      },
+                      "blocks": [
+                        {
+                          "type": "button",
+                          "settings": {
+                            "label": "Shop now",
+                            "link": "shopify://collections/all",
+                            "style": "primary",
+                            "size": "large",
+                            "width": "full",
+                            "corner_radius": 40,
+                            "icon": "arrow-right",
+                            "icon_style": "solid",
+                            "icon_position": "end",
+                            "icon_size": "small",
+                            "alignment": "center",
+                            "padding_top": 0,
+                            "padding_bottom": 0
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "_tab",
+                      "settings": {
+                        "label": "Third option",
+                        "gap_vertical": 16,
+                        "gap_vertical_mobile": 12,
+                        "icon_source": "none",
+                        "preset": "default",
+                        "font_size": "14",
+                        "font_size_mobile": "13"
+                      },
+                      "blocks": [
+                        {
+                          "type": "button",
+                          "settings": {
+                            "label": "Shop now",
+                            "link": "shopify://collections/all",
+                            "style": "primary",
+                            "size": "large",
+                            "width": "full",
+                            "corner_radius": 40,
+                            "icon": "arrow-right",
+                            "icon_style": "solid",
+                            "icon_position": "end",
+                            "icon_size": "small",
+                            "alignment": "center",
+                            "padding_top": 0,
+                            "padding_bottom": 0
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "group",
+                  "settings": {
+                    "inherit_color_scheme": true,
+                    "direction": "row",
+                    "stack_on_mobile": false,
+                    "alignment": "start",
+                    "distribution": "space-between",
+                    "position": "center",
+                    "gap": 12,
+                    "gap_horizontal": 12,
+                    "gap_vertical": 8,
+                    "gap_horizontal_mobile": 8,
+                    "gap_vertical_mobile": 8,
+                    "width": "fill",
+                    "border_style": "none"
+                  },
+                  "blocks": [
+                    {
+                      "type": "icon-with-text",
+                      "settings": {
+                        "icon": "check",
+                        "icon_size": "extra_small",
+                        "heading": "Payment",
+                        "alignment": "row",
+                        "gap": 8
+                      }
+                    },
+                    {
+                      "type": "divider",
+                      "settings": {
+                        "orientation": "vertical",
+                        "style": "solid",
+                        "thickness": 1,
+                        "length": 0,
+                        "padding_top": 0,
+                        "padding_bottom": 0
+                      }
+                    },
+                    {
+                      "type": "icon-with-text",
+                      "settings": {
+                        "icon": "truck",
+                        "icon_size": "extra_small",
+                        "heading": "Delivery",
+                        "alignment": "row",
+                        "gap": 8
+                      }
+                    },
+                    {
+                      "type": "divider",
+                      "settings": {
+                        "orientation": "vertical",
+                        "style": "solid",
+                        "thickness": 1,
+                        "length": 0,
+                        "padding_top": 0,
+                        "padding_bottom": 0
+                      }
+                    },
+                    {
+                      "type": "icon-with-text",
+                      "settings": {
+                        "icon": "refresh",
+                        "icon_size": "extra_small",
+                        "heading": "Returns",
+                        "alignment": "row",
+                        "gap": 8
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "group",
+              "settings": {
+                "inherit_color_scheme": true,
+                "direction": "column",
+                "alignment": "end",
+                "position": "start",
+                "gap": 12,
+                "gap_vertical": 12,
+                "gap_vertical_mobile": 10,
+                "width": "custom",
+                "width_custom": 24,
+                "width_mobile": "fill",
+                "border_style": "none"
+              },
+              "blocks": [
+                {
+                  "type": "badge-highlight",
+                  "settings": {
+                    "icon": "truck",
+                    "icon_size": "medium",
+                    "icon_color": "#03D26F",
+                    "heading": "Shipping",
+                    "text": "<p>Describe your shipping options.</p>",
+                    "background": "#0B1512",
+                    "border_width": 0,
+                    "radius": 18,
+                    "alignment": "start",
+                    "hover": "lift",
+                    "padding_top": 16,
+                    "padding_bottom": 16,
+                    "padding_left": 16,
+                    "padding_right": 20
+                  }
+                },
+                {
+                  "type": "badge-highlight",
+                  "settings": {
+                    "icon": "refresh",
+                    "icon_size": "medium",
+                    "icon_color": "#03D26F",
+                    "heading": "Returns",
+                    "text": "<p>Describe your returns policy.</p>",
+                    "background": "#0B1512",
+                    "border_width": 0,
+                    "radius": 18,
+                    "alignment": "start",
+                    "hover": "lift",
+                    "padding_top": 16,
+                    "padding_bottom": 16,
+                    "padding_left": 16,
+                    "padding_right": 20
+                  }
+                },
+                {
+                  "type": "badge-highlight",
+                  "settings": {
+                    "icon": "check",
+                    "icon_size": "medium",
+                    "icon_color": "#03D26F",
+                    "heading": "Support",
+                    "text": "<p>Describe how customers can reach you.</p>",
+                    "background": "#0B1512",
+                    "border_width": 0,
+                    "radius": 18,
+                    "alignment": "start",
+                    "hover": "lift",
+                    "padding_top": 16,
+                    "padding_bottom": 16,
+                    "padding_left": 16,
+                    "padding_right": 20
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "group",
+          "settings": {
+            "inherit_color_scheme": true,
+            "direction": "row",
+            "stack_on_mobile": true,
+            "alignment": "start",
+            "distribution": "space-between",
+            "position": "center",
+            "gap": 24,
+            "gap_horizontal": 24,
+            "gap_vertical": 16,
+            "gap_horizontal_mobile": 12,
+            "gap_vertical_mobile": 12,
+            "width": "fill",
+            "background_media": "none",
+            "background_color": "linear-gradient(rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.07))",
+            "border_style": "solid",
+            "border_width": 1,
+            "border_opacity": 10,
+            "border_color": "#FFFFFF",
+            "border_radius": 24,
+            "padding_top": 24,
+            "padding_bottom": 24,
+            "padding_left": 24,
+            "padding_right": 24,
+            "padding_top_mobile": 16,
+            "padding_bottom_mobile": 16,
+            "padding_left_mobile": 16,
+            "padding_right_mobile": 16
+          },
+          "blocks": [
+            {
+              "type": "badge-highlight",
+              "settings": {
+                "icon": "check",
+                "icon_size": "medium",
+                "icon_color": "#FFFFFF",
+                "heading": "Ingredients",
+                "text": "<p>Describe what goes into your products.</p>",
+                "border_width": 0,
+                "radius": 0,
+                "alignment": "start",
+                "hover": "none",
+                "padding_top": 0,
+                "padding_bottom": 0,
+                "padding_left": 0,
+                "padding_right": 0
+              }
+            },
+            {
+              "type": "badge-highlight",
+              "settings": {
+                "icon": "star",
+                "icon_size": "medium",
+                "icon_color": "#FFFFFF",
+                "heading": "Made in",
+                "text": "<p>Describe where your products are made.</p>",
+                "border_width": 0,
+                "radius": 0,
+                "alignment": "start",
+                "hover": "none",
+                "padding_top": 0,
+                "padding_bottom": 0,
+                "padding_left": 0,
+                "padding_right": 0
+              }
+            },
+            {
+              "type": "badge-highlight",
+              "settings": {
+                "icon": "info",
+                "icon_size": "medium",
+                "icon_color": "#FFFFFF",
+                "heading": "Testing",
+                "text": "<p>Describe how your products are tested.</p>",
+                "border_width": 0,
+                "radius": 0,
+                "alignment": "start",
+                "hover": "none",
+                "padding_top": 0,
+                "padding_bottom": 0,
+                "padding_left": 0,
+                "padding_right": 0
+              }
+            },
+            {
+              "type": "badge-highlight",
+              "settings": {
+                "icon": "shield",
+                "icon_size": "medium",
+                "icon_color": "#FFFFFF",
+                "heading": "Certification",
+                "text": "<p>Describe the standards you meet.</p>",
+                "border_width": 0,
+                "radius": 0,
+                "alignment": "start",
+                "hover": "none",
+                "padding_top": 0,
+                "padding_bottom": 0,
+                "padding_left": 0,
+                "padding_right": 0
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+{% endschema %}

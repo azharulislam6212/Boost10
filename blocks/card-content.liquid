@@ -41,11 +41,31 @@
   assign s = block.settings
 
   comment
-    The alpha goes into the colour. `opacity` on the element would fade the
-    content the panel is there to make readable.
+    ---- the surface ----
+
+    Solid or a gradient, the same two-way split the overlay controls use in
+    `blocks/group.liquid` — one style select, one field per style, and the
+    merchant never sees a picker that does not apply.
+
+    A gradient rather than a second colour, because a pane over a photograph is
+    usually darker at one end: the panel has to hold text against a bright part
+    of the picture at the bottom and can afford to disappear at the top.
+
+    Only Solid carries the opacity slider. A gradient states its own alpha at
+    every stop — that is most of what a merchant is choosing when they pick one
+    — and a second slider on top of it would mean two places to look for the
+    same number, one of which silently multiplies the other.
   endcomment
+  assign background_style = s.background_style | default: 'solid'
   assign background_paint = ''
-  if s.background_color != blank
+
+  if background_style == 'gradient'
+    assign background_paint = s.background_gradient | default: ''
+  elsif s.background_color != blank
+    comment
+      The alpha goes into the colour. `opacity` on the element would fade the
+      content the panel is there to make readable.
+    endcomment
     assign background_alpha = s.background_opacity | default: 100 | plus: 0
     assign background_alpha = background_alpha | divided_by: 100.0
     assign background_paint = s.background_color | color_modify: 'alpha', background_alpha
@@ -189,16 +209,36 @@
 
     { "type": "header", "content": "t:shared.appearance.header" },
     {
+      "type": "select",
+      "id": "background_style",
+      "label": "t:blocks.card_content.settings.background_style.label",
+      "info": "t:blocks.card_content.settings.background_style.info",
+      "options": [
+        { "value": "solid", "label": "t:blocks.card_content.settings.background_style.options__1.label" },
+        { "value": "gradient", "label": "t:blocks.card_content.settings.background_style.options__2.label" }
+      ],
+      "default": "solid"
+    },
+    {
+      "type": "color_background",
+      "id": "background_gradient",
+      "label": "t:blocks.card_content.settings.background_gradient.label",
+      "info": "t:blocks.card_content.settings.background_gradient.info",
+      "visible_if": "{{ block.settings.background_style == 'gradient' }}"
+    },
+    {
       "type": "color",
       "id": "background_color",
       "label": "t:shared.background.color.label",
       "info": "t:blocks.card_content.settings.background_color.info",
-      "default": "#000000"
+      "default": "#000000",
+      "visible_if": "{{ block.settings.background_style == 'solid' }}"
     },
     {
       "type": "range",
       "id": "background_opacity",
       "label": "t:blocks.card_content.settings.background_opacity.label",
+      "visible_if": "{{ block.settings.background_style == 'solid' }}",
       "min": 0,
       "max": 100,
       "step": 5,

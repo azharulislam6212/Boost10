@@ -447,6 +447,13 @@ export class TabGroup extends BaseComponent {
    * either way: it is the fallback, and the accessible name if the template
    * turns out to hold nothing but decoration.
    *
+   * ## Which tab opens
+   *
+   * The first, unless a panel carries `data-tab-selected`. A strip whose
+   * recommended option sits in the middle — a plan chooser with the popular
+   * plan second — otherwise has to be reordered to make that one open, which
+   * changes the order the customer reads and the order a keyboard walks.
+   *
    * Without JavaScript every panel simply stays visible, stacked, which is a
    * readable page rather than an empty one.
    *
@@ -457,6 +464,17 @@ export class TabGroup extends BaseComponent {
 
     const panels = this.panels.filter((panel) => panel.dataset.tabLabel);
     if (panels.length === 0) return;
+
+    // The panel a merchant marked as the one to open on. Only the first is
+    // honoured, because two panels claiming it is a setting left on in two
+    // places rather than an instruction — and the first is the one nearest the
+    // start of the strip either way.
+    //
+    // `setup()` re-reads the selection from `aria-selected` immediately after
+    // this runs, so writing it onto the button here is enough; there is no
+    // second place to keep in step.
+    const preferred = panels.findIndex((panel) => panel.dataset.tabSelected != null);
+    const selected = preferred === -1 ? 0 : preferred;
 
     const fragment = document.createDocumentFragment();
 
@@ -470,8 +488,8 @@ export class TabGroup extends BaseComponent {
       tab.setAttribute('role', 'tab');
       tab.id = `${id}-tab`;
       tab.setAttribute('aria-controls', id);
-      tab.setAttribute('aria-selected', index === 0 ? 'true' : 'false');
-      tab.tabIndex = index === 0 ? 0 : -1;
+      tab.setAttribute('aria-selected', index === selected ? 'true' : 'false');
+      tab.tabIndex = index === selected ? 0 : -1;
 
       // `:scope >` so a tab group nested inside a panel keeps its own buttons.
       const template = panel.querySelector(':scope > template[data-tab-button]');
@@ -483,7 +501,7 @@ export class TabGroup extends BaseComponent {
       }
 
       panel.setAttribute('aria-labelledby', tab.id);
-      panel.toggleAttribute('hidden', index !== 0);
+      panel.toggleAttribute('hidden', index !== selected);
 
       fragment.append(tab);
     });

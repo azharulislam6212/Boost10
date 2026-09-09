@@ -13,11 +13,29 @@
     render 'icon-size', size: block.settings.icon_size, custom: block.settings.icon_size_custom
   endcapture
   assign icon_size = icon_px | plus: 0
+
+  comment
+    The space between the icon and the words. It was a fixed `--space-3` in the
+    stylesheet, which is right for a stacked card and too wide for a row of
+    short labels where the icon should sit close enough to read as belonging to
+    the text beside it.
+
+    `plus: 0` and not a blank test: an unset range is nil in Shopify and
+    Undefined elsewhere, and only one of those is blank — the difference that
+    emits `--icon-text-gap:px` and takes the whole style attribute down with it.
+  endcomment
+  assign gap = block.settings.gap | default: 12 | plus: 0
 -%}
+
+{%- capture icon_text_style -%}
+  {%- render 'spacing', block: block.settings, declarations: true -%}
+  --icon-text-gap: {{ gap }}px;
+{%- endcapture -%}
 
 <div
   class="block-icon-text block-icon-text--{{ block.settings.alignment }}"
-  {% render 'spacing', block: block.settings %}
+  data-block-spacing
+  style="{{ icon_text_style | strip_newlines | strip }}"
   {{ block.shopify_attributes }}
 >
   {%- if block.settings.custom_icon != blank -%}
@@ -84,7 +102,17 @@
       ],
       "default": "row"
     },
-        {
+    {
+      "type": "range",
+      "id": "gap",
+      "label": "t:blocks.icon_with_text.settings.gap.label",
+      "min": 0,
+      "max": 40,
+      "step": 2,
+      "unit": "px",
+      "default": 12
+    },
+    {
       "type": "header",
       "content": "t:shared.spacing.block_header"
     },

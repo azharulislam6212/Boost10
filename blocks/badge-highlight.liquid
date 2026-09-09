@@ -24,69 +24,151 @@
 {% endcomment %}
 
 {%- liquid
+  assign s = block.settings
+
   assign has_link = false
-  if block.settings.link != blank
+  if s.link != blank
     assign has_link = true
   endif
 
   capture icon_px
-    render 'icon-size', size: block.settings.icon_size, custom: block.settings.icon_size_custom
+    render 'icon-size', size: s.icon_size, custom: s.icon_size_custom
   endcapture
   assign icon_size = icon_px | plus: 0
+
+  comment
+    ---- the surface ----
+
+    The alpha goes into the colour rather than onto the element, the same split
+    `blocks/card-content.liquid` sets out at length: `opacity` here would fade
+    the icon and the words along with the tile they are read against.
+
+    Default 100, so a badge saved before the slider existed paints exactly the
+    colour it was given.
+  endcomment
+  assign background_paint = ''
+  if s.background != blank
+    assign background_alpha = s.background_opacity | default: 100 | plus: 0
+    assign background_alpha = background_alpha | divided_by: 100.0
+    assign background_paint = s.background | color_modify: 'alpha', background_alpha
+  endif
+
+  comment
+    ---- the box ----
+
+    A fixed width and height, because a row of these is a row of tiles and tiles
+    that size themselves to their own sentence are a row of different boxes.
+    Zero is the off switch and the value a badge saved before this existed
+    carries, so those keep sizing to their content exactly as they did.
+
+    `min-` rather than a hard size — see the note in `base.css`. A merchant who
+    writes four lines into a 142px tile gets a taller tile rather than text
+    spilling out of it.
+  endcomment
+  assign box_width = s.width | default: 0 | plus: 0
+  assign box_height = s.height | default: 0 | plus: 0
+
+  comment
+    ---- the ring round the icon ----
+
+    A frame the icon sits inside, which is what turns a bare glyph into a mark.
+    `none` is the default, so every badge already in a theme is untouched.
+
+    The frame has its own size because it is not the icon's: the ring in the
+    design is 56px around a 20px glyph, and tying the two together would mean
+    growing the icon to grow the ring.
+  endcomment
+  assign frame_style = s.icon_frame_style | default: 'none'
+  assign frame_size = s.icon_frame_size | default: 56 | plus: 0
+  assign frame_width = s.icon_frame_width | default: 1 | plus: 0
+
+  assign classes = 'badge-highlight badge-highlight--' | append: s.alignment
+  if s.hover != 'none'
+    assign classes = classes | append: ' badge-highlight--hover-' | append: s.hover
+  endif
+  if frame_style != 'none'
+    assign classes = classes | append: ' badge-highlight--framed'
+  endif
+
+  comment
+    The colour scheme is the parent's unless the merchant says otherwise — the
+    same control, spelled the same way, as `blocks/group.liquid`. A tile on a
+    photograph almost always wants the section's scheme, and a picker left on
+    its default is how a light card ends up on a dark hero.
+  endcomment
+  assign inherit_scheme = s.inherit_color_scheme
+  if inherit_scheme == nil
+    assign inherit_scheme = false
+  endif
+  if inherit_scheme == false and s.color_scheme != blank
+    assign classes = classes | append: ' color-scheme-container color-' | append: s.color_scheme
+  endif
 -%}
 
+{%- capture badge_style -%}
+  {%- render 'spacing', block: s, declarations: true -%}
+  {%- if background_paint != '' -%}--badge-background: {{ background_paint }};{%- endif -%}
+  {%- if s.border_color != blank -%}--badge-border-color: {{ s.border_color }};{%- endif -%}
+  --badge-border-width: {{ s.border_width }}px;
+  --badge-radius: {{ s.radius }}px;
+  --badge-icon-size: {{ icon_size }}px;
+  {%- if s.icon_color != blank -%}--badge-icon-color: {{ s.icon_color }};{%- endif -%}
+  {%- if box_width > 0 -%}--badge-width: {{ box_width }}px;{%- endif -%}
+  {%- if box_height > 0 -%}--badge-height: {{ box_height }}px;{%- endif -%}
+  {%- if frame_style != 'none' -%}
+    --badge-frame-size: {{ frame_size }}px;
+    --badge-frame-style: {{ frame_style }};
+    --badge-frame-width: {{ frame_width }}px;
+    {%- if s.icon_frame_color != blank -%}--badge-frame-color: {{ s.icon_frame_color }};{%- endif -%}
+    {%- if s.icon_frame_background != blank -%}--badge-frame-background: {{ s.icon_frame_background }};{%- endif -%}
+  {%- endif -%}
+{%- endcapture -%}
+
 <div
-  class="badge-highlight badge-highlight--{{ block.settings.alignment }}{% if block.settings.hover != 'none' %} badge-highlight--hover-{{ block.settings.hover }}{% endif %}"
-  style="
-    {%- if block.settings.background != blank %}--badge-background: {{ block.settings.background }};{% endif -%}
-    {%- if block.settings.border_color != blank %}--badge-border-color: {{ block.settings.border_color }};{% endif -%}
-    --badge-border-width: {{ block.settings.border_width }}px;
-    --badge-radius: {{ block.settings.radius }}px;
-    --badge-icon-size: {{ icon_size }}px;
-    {%- if block.settings.icon_color != blank %}--badge-icon-color: {{ block.settings.icon_color }};{% endif -%}
-  "
-  {% render 'spacing', block: block.settings %}
+  class="{{ classes }}"
+  data-block-spacing
+  style="{{ badge_style | strip_newlines | strip }}"
   {{ block.shopify_attributes }}
 >
   <div class="badge-highlight__icon">
-    {%- if block.settings.custom_svg != blank -%}
-      <span class="badge-highlight__svg" aria-hidden="true">{{ block.settings.custom_svg }}</span>
-    {%- elsif block.settings.icon_image != blank -%}
+    {%- if s.custom_svg != blank -%}
+      <span class="badge-highlight__svg" aria-hidden="true">{{ s.custom_svg }}</span>
+    {%- elsif s.icon_image != blank -%}
       {% render 'image',
-         image: block.settings.icon_image,
+         image: s.icon_image,
          alt: '',
          ratio: 'square',
          sizes: '64px' %}
-    {%- elsif block.settings.icon != 'none' -%}
-      {% render 'icon', icon: block.settings.icon, size: 32 %}
+    {%- elsif s.icon != 'none' -%}
+      {% render 'icon', icon: s.icon, size: icon_size %}
     {%- endif -%}
   </div>
 
   <div class="badge-highlight__body">
-    {%- if block.settings.pill != blank -%}
+    {%- if s.pill != blank -%}
       <span
         class="badge-highlight__pill"
         style="
-          {%- if block.settings.pill_background != blank %}--pill-background: {{ block.settings.pill_background }};{% endif -%}
-          {%- if block.settings.pill_color != blank %}--pill-color: {{ block.settings.pill_color }};{% endif -%}
+          {%- if s.pill_background != blank %}--pill-background: {{ s.pill_background }};{% endif -%}
+          {%- if s.pill_color != blank %}--pill-color: {{ s.pill_color }};{% endif -%}
         "
       >
-        {{ block.settings.pill }}
+        {{ s.pill }}
       </span>
     {%- endif -%}
 
-    {%- if block.settings.heading != blank -%}
+    {%- if s.heading != blank -%}
       <h3 class="badge-highlight__heading">
         {%- if has_link -%}
-          <a class="badge-highlight__link" href="{{ block.settings.link }}">{{ block.settings.heading }}</a>
+          <a class="badge-highlight__link" href="{{ s.link }}">{{ s.heading }}</a>
         {%- else -%}
-          {{ block.settings.heading }}
+          {{ s.heading }}
         {%- endif -%}
       </h3>
     {%- endif -%}
 
-    {%- if block.settings.text != blank -%}
-      <div class="badge-highlight__text rte">{{ block.settings.text }}</div>
+    {%- if s.text != blank -%}
+      <div class="badge-highlight__text rte">{{ s.text }}</div>
     {%- endif -%}
   </div>
 </div>
@@ -132,6 +214,45 @@
       "visible_if": "{{ block.settings.icon_size == 'custom' }}"
     },
     { "type": "color", "id": "icon_color", "label": "t:blocks.badge_highlight.settings.icon_color.label" },
+    {
+      "type": "select",
+      "id": "icon_frame_style",
+      "label": "t:blocks.badge_highlight.settings.icon_frame_style.label",
+      "info": "t:blocks.badge_highlight.settings.icon_frame_style.info",
+      "options": [
+        { "value": "none", "label": "t:blocks.badge_highlight.settings.icon_frame_style.options__1.label" },
+        { "value": "solid", "label": "t:blocks.badge_highlight.settings.icon_frame_style.options__2.label" },
+        { "value": "dashed", "label": "t:blocks.badge_highlight.settings.icon_frame_style.options__3.label" },
+        { "value": "dotted", "label": "t:blocks.badge_highlight.settings.icon_frame_style.options__4.label" }
+      ],
+      "default": "none"
+    },
+    {
+      "type": "range",
+      "id": "icon_frame_size",
+      "label": "t:blocks.badge_highlight.settings.icon_frame_size.label",
+      "min": 24, "max": 120, "step": 2, "unit": "px", "default": 56,
+      "visible_if": "{{ block.settings.icon_frame_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "icon_frame_width",
+      "label": "t:blocks.badge_highlight.settings.icon_frame_width.label",
+      "min": 1, "max": 6, "step": 1, "unit": "px", "default": 1,
+      "visible_if": "{{ block.settings.icon_frame_style != 'none' }}"
+    },
+    {
+      "type": "color",
+      "id": "icon_frame_color",
+      "label": "t:blocks.badge_highlight.settings.icon_frame_color.label",
+      "visible_if": "{{ block.settings.icon_frame_style != 'none' }}"
+    },
+    {
+      "type": "color",
+      "id": "icon_frame_background",
+      "label": "t:blocks.badge_highlight.settings.icon_frame_background.label",
+      "visible_if": "{{ block.settings.icon_frame_style != 'none' }}"
+    },
     { "type": "header", "content": "t:blocks.badge_highlight.headers.content" },
     { "type": "text", "id": "pill", "label": "t:blocks.badge_highlight.settings.pill.label" },
     { "type": "color", "id": "pill_background", "label": "t:blocks.badge_highlight.settings.pill_background.label" },
@@ -140,10 +261,43 @@
     { "type": "richtext", "id": "text", "label": "t:shared.text.label" },
     { "type": "url", "id": "link", "label": "t:shared.link.label", "info": "t:blocks.badge_highlight.settings.link.info" },
     { "type": "header", "content": "t:blocks.badge_highlight.headers.style" },
+    {
+      "type": "checkbox",
+      "id": "inherit_color_scheme",
+      "label": "t:blocks.group.settings.inherit_color_scheme.label",
+      "default": false
+    },
+    {
+      "type": "color_scheme",
+      "id": "color_scheme",
+      "label": "t:shared.color_scheme.label",
+      "visible_if": "{{ block.settings.inherit_color_scheme == false }}"
+    },
     { "type": "color", "id": "background", "label": "t:blocks.badge_highlight.settings.background.label" },
+    {
+      "type": "range",
+      "id": "background_opacity",
+      "label": "t:blocks.card_content.settings.background_opacity.label",
+      "info": "t:blocks.badge_highlight.settings.background_opacity.info",
+      "min": 0, "max": 100, "step": 5, "unit": "%", "default": 100
+    },
     { "type": "color", "id": "border_color", "label": "t:blocks.badge_highlight.settings.border_color.label" },
     { "type": "range", "id": "border_width", "label": "t:blocks.badge_highlight.settings.border_width.label", "min": 0, "max": 6, "step": 1, "unit": "px", "default": 0 },
     { "type": "range", "id": "radius", "label": "t:blocks.badge_highlight.settings.radius.label", "min": 0, "max": 40, "step": 2, "unit": "px", "default": 8 },
+    {
+      "type": "range",
+      "id": "width",
+      "label": "t:blocks.badge_highlight.settings.width.label",
+      "info": "t:blocks.badge_highlight.settings.width.info",
+      "min": 0, "max": 200, "step": 2, "unit": "px", "default": 0
+    },
+    {
+      "type": "range",
+      "id": "height",
+      "label": "t:blocks.badge_highlight.settings.height.label",
+      "info": "t:blocks.badge_highlight.settings.height.info",
+      "min": 0, "max": 200, "step": 2, "unit": "px", "default": 0
+    },
     {
       "type": "select", "id": "alignment", "label": "t:blocks.badge_highlight.settings.alignment.label",
       "options": [

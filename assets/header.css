@@ -1456,6 +1456,116 @@ a.menu-promo:hover .menu-promo__cta svg {
 }
 
 /* --------------------------------------------------------------------------
+   Segmented — the same strip drawn as a switch
+   --------------------------------------------------------------------------
+   A filled track with the options sharing its width and the marker sliding
+   inside it: the delivery-frequency chooser, a Monthly/Yearly price switch, a
+   two-state filter.
+
+   Nothing below re-implements a tab. The marker still travels, the keyboard
+   still walks the strip, the ARIA is still the tablist's — this is a
+   background, a padding and a rule about how the tabs divide the space. That is
+   why it is a modifier on `.tabs` rather than a component of its own.
+
+   `--tabs-track-*` and `--tabs-marker-background` are `blocks/tabs.liquid`'s
+   settings; every one of them has a fallback here so the look is complete
+   before a merchant touches anything. */
+.tabs--segmented .tabs__list {
+  gap: 0;
+  padding: var(--tabs-track-padding, 6px);
+  border-radius: var(--tabs-track-radius, 50px);
+  background-color: var(--tabs-track-background, rgb(0 0 0 / 0.24));
+
+  /* The track is the box the marker is measured against, so it must not be the
+     thing that scrolls: a scrolled track leaves the marker behind by exactly
+     the scroll offset. Below 749px the options wrap instead — see the note
+     there. */
+  overflow: visible;
+}
+
+/* Equal thirds, whatever the words are. A switch whose segments resize with
+   their labels reads as three different controls rather than one choice, and
+   the marker travelling between two widths draws attention to the resize
+   rather than to the selection. */
+.tabs--segmented .tabs__tab {
+  flex: 1 1 0;
+  min-inline-size: 0;
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--font-size-sm);
+  text-align: center;
+
+  /* Room above for the flag, and the same room on every tab so the strip does
+     not change height when the flag moves with the selection. `--tabs-tab-pill`
+     is set only while a flag exists anywhere in the strip; see below. */
+  margin-block-start: var(--tabs-tab-pill-space, 0px);
+}
+
+/* The unselected options are quieter than the plain strip's 0.65, because here
+   they sit on a filled track and the marker behind the selected one is already
+   carrying most of the contrast. */
+.tabs--segmented .tabs__tab[aria-selected='false'] {
+  opacity: 0.6;
+}
+
+.tabs--segmented .tabs__marker {
+  background-color: var(--tabs-marker-background, rgb(255 255 255 / 0.12));
+  box-shadow: none;
+}
+
+/* The flag above an option — "Most Popular", "Best value", "New".
+   `blocks/_tab.liquid` puts it in the `<template>` the button is built from, so
+   it belongs to the option and travels with it in the strip's own order.
+
+   Absolutely positioned out of the button's flow rather than laid out inside
+   it: in flow it would make one tab taller than its neighbours, and a switch
+   whose segments are two different heights is no longer a switch. The space it
+   needs is reserved on every tab by the margin above instead, so nothing moves
+   when the customer picks a different option.
+
+   The strip declares the space only when a flag exists. A `:has()` on the list
+   is what makes that conditional — without it every segmented strip in the
+   theme would carry 14px of empty room above it for a flag it does not have. */
+.tabs--segmented .tabs__list:has(.tabs__tab-pill) {
+  --tabs-tab-pill-space: 14px;
+}
+
+.tabs__tab-pill {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 50%;
+  translate: -50% -50%;
+  z-index: 2;
+  padding: 2px var(--space-2);
+  border-radius: 999px;
+  background-color: var(--tabs-tab-pill-background, var(--color-primary, #03d26f));
+  color: var(--tabs-tab-pill-color, #fff);
+  font-family: var(--font-body-family);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  line-height: 1.6;
+  white-space: nowrap;
+
+  /* The button is the containing block. `.tabs__tab` is already
+     `position: relative` for the marker's z-index to work against, so there is
+     nothing to add there. */
+}
+
+/* Three segments at 390px are three words broken across two lines each. The
+   track keeps its shape and the options stack inside it, which is a taller
+   control and a legible one — and the marker follows without any change here,
+   because it is measured from whatever box the selected tab ends up with. */
+@media screen and (max-width: 749px) {
+  .tabs--segmented .tabs__list {
+    flex-wrap: wrap;
+    border-radius: var(--tabs-track-radius-mobile, var(--tabs-track-radius, 50px));
+  }
+
+  .tabs--segmented .tabs__tab {
+    flex: 1 1 auto;
+  }
+}
+
+/* --------------------------------------------------------------------------
    The panel rises when the tab changes
    --------------------------------------------------------------------------
    An `animation`, not a `transition`, and that is the whole reason this works.

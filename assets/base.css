@@ -4193,10 +4193,29 @@
     border: var(--badge-border-width, 0) solid var(--badge-border-color, var(--color-border));
     border-radius: var(--badge-radius, 8px);
     transition: transform var(--transition-base), opacity var(--transition-base);
+
+    /* ---- the box -------------------------------------------------------
+       `min-` and not `inline-size`/`block-size`, deliberately. A row of these
+       is a row of tiles and the merchant sets one size for all of them, but a
+       hard size turns a fourth line of text into text sitting outside its own
+       tile. A minimum holds the row even when every tile is short, and gives
+       way when one of them is not.
+
+       Both are unset until the merchant asks — the properties are only emitted
+       above zero — so a badge in an existing theme still sizes to its content
+       exactly as it did. */
+    min-inline-size: var(--badge-width, 0);
+    min-block-size: var(--badge-height, 0);
+
+    /* A width that is a minimum still grows in a flex row, and three tiles
+       sharing a row is what a set width is usually for. Basis, not width, so
+       the number is a starting point the row can distribute from. */
+    flex: 0 1 var(--badge-width, auto);
+    box-sizing: border-box;
   }
 
   .badge-highlight--top { flex-direction: column; }
-  .badge-highlight--center { flex-direction: column; align-items: center; text-align: center; }
+  .badge-highlight--center { flex-direction: column; align-items: center; text-align: center; justify-content: center; }
   .badge-highlight--start { flex-direction: row; align-items: flex-start; }
 
   .badge-highlight__icon {
@@ -4204,6 +4223,37 @@
     inline-size: var(--badge-icon-size, 32px);
     block-size: var(--badge-icon-size, 32px);
     color: var(--badge-icon-color, var(--color-heading));
+  }
+
+  /* ---- the ring round the icon ------------------------------------------
+     A frame the glyph sits inside, which is what turns an icon into a mark.
+     It is the icon element itself that grows to the frame size and the glyph
+     inside that is held to its own — so the two sizes stay independent and a
+     merchant can widen the ring without inflating the icon.
+
+     `grid` rather than flex for the centring: one child, dead centre, with no
+     line box to reason about. */
+  .badge-highlight--framed .badge-highlight__icon {
+    display: grid;
+    place-items: center;
+    inline-size: var(--badge-frame-size, 56px);
+    block-size: var(--badge-frame-size, 56px);
+    border-width: var(--badge-frame-width, 1px);
+    border-style: var(--badge-frame-style, solid);
+
+    /* `currentColor` at a low alpha rather than a fixed grey: the ring in the
+       design is the panel's own text colour thinned out, so it follows the
+       colour scheme instead of needing to be re-picked for every surface. */
+    border-color: var(--badge-frame-color, color-mix(in srgb, currentColor 25%, transparent));
+    border-radius: 999px;
+    background-color: var(--badge-frame-background, transparent);
+  }
+
+  /* The glyph keeps the icon size the merchant chose; only the ring is bigger.
+     Without this the SVG's `inline-size: 100%` below would fill the frame. */
+  .badge-highlight--framed .badge-highlight__icon > * {
+    inline-size: var(--badge-icon-size, 32px);
+    block-size: var(--badge-icon-size, 32px);
   }
 
   .badge-highlight__svg svg,
@@ -4289,6 +4339,37 @@
   .divider--solid { border-block-start-style: solid; }
   .divider--dashed { border-block-start-style: dashed; }
   .divider--dotted { border-block-start-style: dotted; }
+
+  /* ---- the same rule, turned on its side ---------------------------------
+     A hairline between items laid out in a row. The three style rules above are
+     block-start borders, so vertical has to undo each of them and draw on the
+     inline-start edge instead — `revert` rather than a competing width, because
+     a `0` block-start border still leaves the shorthand's colour and style set
+     and reads as a rule that is there but invisible.
+
+     No length of its own: it stretches to the row, which is what makes it line
+     up with items whose height the merchant is still editing.
+     `--divider-length` caps it for a row whose items are much taller than the
+     mark should be. */
+  .divider--vertical {
+    inline-size: 0;
+    block-size: var(--divider-length, auto);
+    align-self: stretch;
+    border-block-start: revert;
+    border-inline-start-width: var(--divider-thickness, 1px);
+    border-inline-start-color: var(--divider-color, var(--color-border));
+  }
+
+  .divider--vertical.divider--solid { border-inline-start-style: solid; }
+  .divider--vertical.divider--dashed { border-inline-start-style: dashed; }
+  .divider--vertical.divider--dotted { border-inline-start-style: dotted; }
+
+  /* The block wrapper is what the row lays out, so it has to stretch too —
+     the rule inside it can only be as tall as the box it is given. */
+  .divider-block--vertical {
+    align-self: stretch;
+    display: flex;
+  }
 
   /* The wave scales rather than repeats, so one path covers every viewport. */
   .divider--wave { block-size: 4rem; line-height: 0; }
@@ -6283,6 +6364,16 @@
   .block-button--center { align-items: center; }
   .block-button--end { align-items: flex-end; }
 
+  /* Width: Full, and it has to be here rather than only on the button. The
+     button's own `inline-size: 100%` resolves against the cross size this
+     wrapper's `align-items` gives it, which for anything but `stretch` is the
+     button's content width — so Full read as a setting that did nothing.
+
+     After the three alignment modifiers so it wins over whichever one is also
+     on the element: they are the same specificity, and Full is the more
+     specific intent. */
+  .block-button--full { align-items: stretch; }
+
   .block-buttons { display: flex; flex-wrap: wrap; gap: var(--space-3); }
   .block-buttons--center { justify-content: center; }
   .block-buttons--end { justify-content: flex-end; }
@@ -6442,7 +6533,15 @@
   .block-image__link { display: block; }
   .block-image__caption { margin-block-start: var(--space-2); font-size: var(--font-size-xs); color: var(--color-accent-text); }
 
-  .block-icon-text { display: flex; gap: var(--space-3); }
+  .block-icon-text { display: flex; gap: var(--icon-text-gap, var(--space-3)); }
+
+  /* A row had no cross-axis rule at all, so it took the flex default of
+     `stretch`: the icon's box grew to whatever height the words next to it
+     needed, and a one-line label left the glyph sitting against the top of a
+     taller box rather than beside the text. Centred is what the pairing reads
+     as — a mark and a label, on one line. */
+  .block-icon-text--row { flex-direction: row; align-items: center; }
+
   .block-icon-text--column { flex-direction: column; align-items: center; text-align: center; }
   .block-icon-text__heading { font-weight: 500; }
   .block-icon-text__text { font-size: var(--font-size-sm); color: var(--color-accent-text); }
@@ -12511,5 +12610,180 @@ testimonial-product[data-open] .testimonial-card__info {
   .testimonial-card,
   .testimonial-card__info {
     transition-duration: 1ms;
+  }
+}
+
+
+/* ==========================================================================
+   Featured offer
+   ==========================================================================
+   `sections/featured-offer.liquid` — an offer panel over a photograph,
+   highlight cards beside it, details under both.
+
+   The frame is `.faq`'s, property for property, because the section's settings
+   are `sections/main-faq.liquid`'s: the same four border widths, the same two
+   radii, the same margins, resolved by the same Liquid. What is different is
+   the height floor, and the reason it is here rather than in the section's
+   `style` attribute is the same reason the gaps are — see the note on the
+   content below.
+
+   Nothing in this file knows what is inside the section. The offer panel is a
+   Card content block, the cards are Badge highlight blocks and the option
+   chooser is a Tabs block in Segmented, and each of those is styled where it
+   lives. This is the frame and the two axes.
+   -------------------------------------------------------------------------- */
+
+@layer components {
+  .featured-offer {
+    /* A flex column so the height floor below can reach the content — see the
+       note on `.featured-offer__inner`. */
+    display: flex;
+    flex-direction: column;
+
+    border-radius: var(--featured-offer-radius, 0);
+
+    /* Longhands, not the `border` shorthand: the width is four values — one per
+       side — and `border` accepts only a single width. Same split as `.faq`,
+       `.featured-blog` and `.footer`.
+
+       `transparent` rather than `currentColor` so a width of 0 cannot paint a
+       hairline, and the style is a custom property so Dashed is one declaration
+       from Liquid rather than a modifier class per value. */
+    border-width: var(--featured-offer-border-width, 0px);
+    border-style: var(--featured-offer-border-style, solid);
+    border-color: var(--featured-offer-border-color, transparent);
+
+    margin-block-start: var(--featured-offer-margin-block-start, 0px);
+    margin-block-end: var(--featured-offer-margin-block-end, 0px);
+
+    /* The floor. `min-block-size` and not `block-size`, so a merchant who adds a
+       fourth promise to the panel gets a taller section rather than content
+       overflowing a fixed box.
+
+       It is on the section and not on the content because the background
+       picture fills the section: a floor on the inner box would leave the
+       photograph the height of the text and the frame taller than it. */
+    min-block-size: var(--featured-offer-min-height, 0px);
+  }
+
+  /* The phone's own corner and its own floor. Liquid resolves both unset mobile
+     values to the desktop one, so these only ever differ when the merchant said
+     they should. */
+  @media screen and (max-width: 749px) {
+    .featured-offer {
+      border-radius: var(--featured-offer-radius-mobile, var(--featured-offer-radius, 0));
+      min-block-size: var(--featured-offer-min-height-mobile, var(--featured-offer-min-height, 0px));
+    }
+  }
+
+  /* Clipping only where a background picture has to stay inside the corners. An
+     unconditional `overflow: hidden` here would cut the focus ring off the
+     outermost block, and the proof cards' hover lift with it.
+     `.has-background-media` already supplies `position: relative` and the
+     isolated stacking context, so `z-index: 1` is all the content needs. */
+  .featured-offer.has-background-media { overflow: hidden; }
+
+  .featured-offer.has-background-media > :not(.background-media) {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ---- the floor reaches the content ------------------------------------
+     Two flex columns between the section and the blocks, so the height the
+     merchant asked for is height the content can be positioned inside.
+
+     `flex: 1` and not `min-block-size: inherit` on the inner. Inheriting the
+     value would give the container the section's whole minimum *on top of* the
+     section's padding, making the section taller than the number in the slider
+     by however much padding it carries. Filling the space that is left is the
+     same intent without the arithmetic.
+
+     Without this the content is only as tall as the blocks inside it, the floor
+     lifts the frame alone, and Position — Top, Middle, Bottom — has nothing to
+     move the blocks within. The photograph would gain height and the offer
+     panel would stay pinned to the top of it whatever the merchant chose. */
+  .featured-offer__inner {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+  }
+
+  .featured-offer__content {
+    flex: 1 1 auto;
+  }
+
+  /* ---- the two axes ------------------------------------------------------
+     The layout is the Group block's vocabulary, resolved into flexbox keywords
+     by the section and read here: `--featured-offer-inline` is always the
+     horizontal axis and `--featured-offer-block` always the vertical, whichever
+     CSS property each of them lands on at a given direction.
+
+     `--featured-offer-align` is the alignment with no distribution folded into
+     it. The two differ exactly when a distribution is chosen: `space-between`
+     is valid on the `justify-content` it feeds on a desktop row, and invalid on
+     the `align-items` it would feed once the row stacks — where an invalid
+     declaration is dropped and the stack silently falls back to `stretch`. The
+     mobile rule reads the plain one for that reason.
+
+     Every property keeps a fallback, so a section saved before any of these
+     settings existed still renders as a stack with a `--space-6` gap. */
+  .featured-offer__content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--featured-offer-gap-y, var(--space-6)) var(--featured-offer-gap-x, var(--space-6));
+    min-inline-size: 0;
+  }
+
+  .featured-offer__content--column {
+    flex-direction: column;
+    align-items: var(--featured-offer-inline, stretch);
+    justify-content: var(--featured-offer-block, start);
+  }
+
+  .featured-offer__content--row {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: var(--featured-offer-inline, start);
+    align-items: var(--featured-offer-block, start);
+  }
+
+  /* The same row, painted the other way round.
+
+     `row-reverse` rather than an `order` on each child, and rather than a
+     second preset with the blocks written the other way: the source order is
+     what a screen reader announces and what the Tab key follows, and a panel
+     that changed sides should not change the order the page is read in.
+
+     It is only ever paired with `--row`, so the two classes together are as
+     specific as the mobile stack below and come first — which is what lets the
+     stack win at 749px.
+
+     `justify-content` flips meaning with the direction: on a reversed row,
+     `start` packs against the right. Nothing here compensates, because that is
+     what reversing the row means. */
+  .featured-offer__content--row.featured-offer__content--reverse {
+    flex-direction: row-reverse;
+  }
+
+  /* Text follows the box, the same way it does inside a group. A column aligned
+     right whose paragraphs stayed left-aligned reads as a mistake rather than a
+     choice. */
+  .featured-offer__content--column:where([style*='--featured-offer-inline: center']) { text-align: center; }
+  .featured-offer__content--column:where([style*='--featured-offer-inline: end']) { text-align: end; }
+
+  @media screen and (max-width: 749px) {
+    .featured-offer__content {
+      gap: var(--featured-offer-gap-y-mobile, var(--featured-offer-gap-y, var(--space-6)))
+        var(--featured-offer-gap-x-mobile, var(--featured-offer-gap-x, var(--space-6)));
+    }
+
+    /* An offer panel beside its proof cards is two unreadable columns at 390px,
+       so the row stacks unless the merchant said otherwise. `--featured-offer-align`
+       and not `--featured-offer-inline` — see the note on the two above. */
+    .featured-offer__content--row.featured-offer__content--stack-mobile {
+      flex-direction: column;
+      justify-content: var(--featured-offer-block, start);
+      align-items: var(--featured-offer-align, var(--featured-offer-inline, start));
+    }
   }
 }
