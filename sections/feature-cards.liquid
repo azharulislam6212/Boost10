@@ -342,26 +342,50 @@
   comment
     ---- the gaps ----
 
-    `--grid-gap-x` / `--grid-gap-y` rather than section-private names, because
-    those two are what the whole theme spaces a card grid with: the pre-init
-    grid reads them and `carousel.js` falls back to `--grid-gap-x` for Swiper's
-    `spaceBetween`. One pair of sliders moves the grid, the pre-init layout and
-    the live carousel together.
+    A Desktop/Mobile pair, published as section-private tokens and mapped onto
+    `--grid-gap-x` / `--grid-gap-y` in `base.css` rather than written to those
+    two names directly.
+
+    That indirection is the whole point. A section's settings land in a `style`
+    attribute, and an inline custom property beats every rule in every
+    stylesheet — so a section that wrote `--grid-gap-x` itself could never be
+    stepped down in a media query, at any specificity, and a Mobile slider here
+    would be a control that moves nothing. Writing a private token instead lets
+    the cascade in `base.css` pick which of the two applies at a given width.
+
+    `--grid-gap-*` is still what the row is finally spaced by, so the pre-init
+    grid, the `.feature-cards` grid layout and `carousel-vars`' slide widths all
+    keep reading the one pair of names they already read. `carousel.js` measures
+    the track's used `column-gap` and re-measures on a breakpoint change, so
+    Swiper's `spaceBetween` follows the step-down without being told about it.
 
     `plus: 0` rather than `default` alone: 0 is a gap a merchant can legitimately
     want here — the design's panel has its cards flush against a shared frame —
-    and `default` would replace it.
+    and `default` would replace it. The mobile pair takes the same treatment
+    through an explicit `nil` test, because `default` cannot tell a deliberate 0
+    from an unanswered setting.
   endcomment
   assign gap_x = s.gap_horizontal | default: 24 | plus: 0
   assign gap_y = s.gap_vertical | default: 24 | plus: 0
+
+  assign gap_x_mobile = s.gap_horizontal_mobile | plus: 0
+  if s.gap_horizontal_mobile == nil
+    assign gap_x_mobile = 12
+  endif
+  assign gap_y_mobile = s.gap_vertical_mobile | plus: 0
+  if s.gap_vertical_mobile == nil
+    assign gap_y_mobile = 12
+  endif
 
   assign card_stagger = s.animation_stagger | default: 120 | plus: 0
 -%}
 
 {%- capture section_style -%}
   {%- render 'spacing', section: s, declarations: true -%}
-  --grid-gap-x: {{ gap_x }}px;
-  --grid-gap-y: {{ gap_y }}px;
+  --fc-gap-x: {{ gap_x }}px;
+  --fc-gap-y: {{ gap_y }}px;
+  --fc-gap-x-mobile: {{ gap_x_mobile }}px;
+  --fc-gap-y-mobile: {{ gap_y_mobile }}px;
   --feature-cards-radius: {{ radius }}px;
   --feature-cards-radius-mobile: {{ radius_mobile }}px;
   --feature-cards-margin-block-start: {{ margin_top }}px;
@@ -654,24 +678,64 @@
       "default": "1"
     },
     {
+      "type": "select",
+      "id": "gap_device",
+      "label": "t:shared.gap.label",
+      "options": [
+        {
+          "value": "desktop",
+          "label": "t:shared.spacing.devices.options__1.label"
+        },
+        {
+          "value": "mobile",
+          "label": "t:shared.spacing.devices.options__2.label"
+        }
+      ],
+      "default": "desktop"
+    },
+    {
       "type": "range",
       "id": "gap_horizontal",
-      "label": "t:blocks.group.settings.gap_horizontal.label",
+      "label": "t:shared.gap.horizontal.label",
       "min": 0,
       "max": 100,
       "step": 2,
       "unit": "px",
-      "default": 24
+      "default": 24,
+      "visible_if": "{{ section.settings.gap_device == 'desktop' }}"
     },
     {
       "type": "range",
       "id": "gap_vertical",
-      "label": "t:blocks.group.settings.gap_vertical.label",
+      "label": "t:shared.gap.vertical.label",
       "min": 0,
       "max": 100,
       "step": 2,
       "unit": "px",
-      "default": 24
+      "default": 24,
+      "visible_if": "{{ section.settings.gap_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "gap_horizontal_mobile",
+      "label": "t:shared.gap.horizontal.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 12,
+      "visible_if": "{{ section.settings.gap_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "gap_vertical_mobile",
+      "label": "t:shared.gap.vertical.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 12,
+      "visible_if": "{{ section.settings.gap_device == 'mobile' }}"
     },
 
     {

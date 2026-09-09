@@ -237,10 +237,20 @@
   endcase
 
   comment
+    ---- the gaps ----
+
+    A Desktop/Mobile pair behind one switch, the same control every other
+    section in the theme uses. Both pairs are published unconditionally and
+    `base.css` picks which applies at a given width, because the pair the
+    merchant is not currently looking at in the editor is still the pair the
+    other breakpoint renders.
+
     `plus: 0` coerces the range to a number rather than relying on `default`
     alone, which would replace a deliberate 0 — a gap a merchant can legitimately
-    want. Each mobile axis falls back to its desktop value, so a section that
-    never opens Mobile layout behaves as it did.
+    want. Each mobile axis still falls back to its desktop value when the
+    setting is absent entirely, so a section saved before the mobile pair
+    existed renders exactly as it did; a section added since gets the schema
+    default, which is half the desktop one.
   endcomment
   assign gap_x = s.gap_horizontal | default: 24 | plus: 0
   assign gap_y = s.gap_vertical | default: 24 | plus: 0
@@ -478,48 +488,64 @@
       "visible_if": "{{ section.settings.direction == 'row' }}"
     },
     {
+      "type": "select",
+      "id": "gap_device",
+      "label": "t:shared.gap.label",
+      "options": [
+        {
+          "value": "desktop",
+          "label": "t:shared.spacing.devices.options__1.label"
+        },
+        {
+          "value": "mobile",
+          "label": "t:shared.spacing.devices.options__2.label"
+        }
+      ],
+      "default": "desktop"
+    },
+    {
       "type": "range",
       "id": "gap_horizontal",
-      "label": "t:blocks.group.settings.gap_horizontal.label",
+      "label": "t:shared.gap.horizontal.label",
       "min": 0,
       "max": 100,
       "step": 2,
       "unit": "px",
-      "default": 24
+      "default": 24,
+      "visible_if": "{{ section.settings.gap_device == 'desktop' }}"
     },
     {
       "type": "range",
       "id": "gap_vertical",
-      "label": "t:blocks.group.settings.gap_vertical.label",
+      "label": "t:shared.gap.vertical.label",
       "min": 0,
       "max": 100,
       "step": 2,
       "unit": "px",
-      "default": 24
-    },
-    {
-      "type": "header",
-      "content": "t:blocks.group.headers.mobile_layout"
+      "default": 24,
+      "visible_if": "{{ section.settings.gap_device == 'desktop' }}"
     },
     {
       "type": "range",
       "id": "gap_horizontal_mobile",
-      "label": "t:blocks.group.settings.gap_horizontal.label",
+      "label": "t:shared.gap.horizontal.label",
       "min": 0,
       "max": 100,
       "step": 2,
       "unit": "px",
-      "default": 24
+      "default": 12,
+      "visible_if": "{{ section.settings.gap_device == 'mobile' }}"
     },
     {
       "type": "range",
       "id": "gap_vertical_mobile",
-      "label": "t:blocks.group.settings.gap_vertical.label",
+      "label": "t:shared.gap.vertical.label",
       "min": 0,
       "max": 100,
       "step": 2,
       "unit": "px",
-      "default": 24
+      "default": 12,
+      "visible_if": "{{ section.settings.gap_device == 'mobile' }}"
     },
     {
       "type": "header",

@@ -279,19 +279,40 @@
   comment
     ---- the gaps ----
 
-    Written as `--grid-gap-x` / `--grid-gap-y` rather than a pair of
-    section-private properties, because those two names are what the whole theme
-    spaces a card grid with — `.article-grid` and the shell's pre-init grid both
-    read them, and `carousel.js` falls back to `--grid-gap-x` for Swiper's
-    `spaceBetween`. So one pair of sliders moves the grid, the pre-init layout
-    and the live carousel together, and a row cannot space itself one way before
+    A Desktop/Mobile pair, published as section-private tokens and mapped onto
+    `--grid-gap-x` / `--grid-gap-y` in `base.css` rather than written to those
+    two names directly.
+
+    Those two names are still what the whole theme spaces a card grid with —
+    `.article-grid` and the shell's pre-init grid both read them, and
+    `carousel.js` measures the track's used `column-gap`, which resolves from
+    them. So one pair of sliders still moves the grid, the pre-init layout and
+    the live carousel together, and a row cannot space itself one way before
     Swiper mounts and another way after.
 
+    What the indirection buys is the Mobile half. A section's settings land in a
+    `style` attribute, and an inline custom property beats every rule in every
+    stylesheet — so a section that wrote `--grid-gap-x` itself could never be
+    stepped down in a media query, at any specificity, and the mobile sliders
+    would be controls that move nothing. `carousel.js` re-measures on a
+    breakpoint change, so `spaceBetween` follows the step-down too.
+
     `plus: 0` rather than `default` alone: 0 is a gap a merchant can legitimately
-    want, and `default` would replace it.
+    want, and `default` would replace it. The mobile pair uses an explicit `nil`
+    test for the same reason — `default` cannot tell a deliberate 0 from an
+    unanswered setting.
   endcomment
   assign gap_x = s.gap_horizontal | default: 24 | plus: 0
   assign gap_y = s.gap_vertical | default: 32 | plus: 0
+
+  assign gap_x_mobile = s.gap_horizontal_mobile | plus: 0
+  if s.gap_horizontal_mobile == nil
+    assign gap_x_mobile = 12
+  endif
+  assign gap_y_mobile = s.gap_vertical_mobile | plus: 0
+  if s.gap_vertical_mobile == nil
+    assign gap_y_mobile = 16
+  endif
 
   assign cs_count = featured.articles_count | default: 0 | plus: 0
   if cs_count > limit
@@ -366,8 +387,10 @@
 
 {%- capture section_style -%}
   {%- render 'spacing', section: s, declarations: true -%}
-  --grid-gap-x: {{ gap_x }}px;
-  --grid-gap-y: {{ gap_y }}px;
+  --fb-gap-x: {{ gap_x }}px;
+  --fb-gap-y: {{ gap_y }}px;
+  --fb-gap-x-mobile: {{ gap_x_mobile }}px;
+  --fb-gap-y-mobile: {{ gap_y_mobile }}px;
   --featured-blog-radius: {{ radius }}px;
   --featured-blog-radius-mobile: {{ radius_mobile }}px;
   --featured-blog-margin-block-start: {{ margin_top }}px;
@@ -610,24 +633,64 @@
       "default": "1"
     },
     {
+      "type": "select",
+      "id": "gap_device",
+      "label": "t:shared.gap.label",
+      "options": [
+        {
+          "value": "desktop",
+          "label": "t:shared.spacing.devices.options__1.label"
+        },
+        {
+          "value": "mobile",
+          "label": "t:shared.spacing.devices.options__2.label"
+        }
+      ],
+      "default": "desktop"
+    },
+    {
       "type": "range",
       "id": "gap_horizontal",
-      "label": "t:blocks.group.settings.gap_horizontal.label",
+      "label": "t:shared.gap.horizontal.label",
       "min": 0,
       "max": 100,
       "step": 2,
       "unit": "px",
-      "default": 24
+      "default": 24,
+      "visible_if": "{{ section.settings.gap_device == 'desktop' }}"
     },
     {
       "type": "range",
       "id": "gap_vertical",
-      "label": "t:blocks.group.settings.gap_vertical.label",
+      "label": "t:shared.gap.vertical.label",
       "min": 0,
       "max": 100,
       "step": 2,
       "unit": "px",
-      "default": 32
+      "default": 32,
+      "visible_if": "{{ section.settings.gap_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "gap_horizontal_mobile",
+      "label": "t:shared.gap.horizontal.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 12,
+      "visible_if": "{{ section.settings.gap_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "gap_vertical_mobile",
+      "label": "t:shared.gap.vertical.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 16,
+      "visible_if": "{{ section.settings.gap_device == 'mobile' }}"
     },
 
     {
