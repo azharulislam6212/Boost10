@@ -2250,6 +2250,54 @@
     .icon-mark-host:focus-within .icon-mark__ring { transform: none; }
   }
 
+  /* ==========================================================================
+     Section overlap order
+     ==========================================================================
+     **Overlap** on the six sections that can pull themselves over a neighbour
+     with a negative Margin top or Margin bottom. A negative margin decides
+     *where* a section sits; this decides *which of the two is on top* once they
+     are in the same place.
+
+     Without it the answer is paint order — later sections win — which is right
+     about half the time and unfixable from the editor the rest of it.
+
+     ## It is a select, not a number
+
+     See the note beside `--z-section-*` in `snippets/critical-style.liquid`.
+     The short version: the three tokens sit at 1, 2 and 3, and the first thing
+     a section must never cover — the sticky header — is at 100. A control that
+     cannot express 999 cannot cause the bug where a section paints over the
+     header, and there is nothing to clamp or validate.
+
+     ## The z-index goes on the section, not on Shopify's wrapper
+
+     `#shopify-section-…` is the element that is actually a sibling in the flow,
+     but it carries no `position` and no `z-index`, so it creates no stacking
+     context — which means the section root inside it takes part in the page's
+     own context and can be ordered against the roots of other sections. That is
+     what makes three integers enough.
+
+     ## Default emits nothing
+
+     The attribute is written only when the merchant picks a side, so an
+     untouched section has no `position: relative`, no stacking context, and
+     nothing about it changes. The stacking context is also the point of setting
+     `z-index` here rather than `isolation`: a positioned element with a
+     `z-index` already makes one, so a card inside the section that uses
+     `z-index: 3` for its own reasons is sealed in and cannot compete with the
+     section next door. */
+  [data-section-layer] {
+    position: relative;
+  }
+
+  [data-section-layer='under'] {
+    z-index: var(--z-section-under, 1);
+  }
+
+  [data-section-layer='over'] {
+    z-index: var(--z-section-over, 3);
+  }
+
   /* ---- badges ---------------------------------------------------------- */
 
   .badges {
