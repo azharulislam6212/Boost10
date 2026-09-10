@@ -1358,7 +1358,21 @@
     min-inline-size: var(--button-min-width, 19.6rem);
   }
 
-  .button--full {
+  /* Two class names, one rule, and that is a fix rather than a tidy-up.
+
+     `snippets/button.liquid` has two ways in: thirteen callers in the theme pass
+     the legacy `full: true` and get `.button--full`, while every merchant-facing
+     block passes the three-mode `width:` setting and gets `.button--width-` plus
+     the mode. Only the first of those had a rule. **Width: Full** on the Button
+     and Buttons blocks therefore emitted `button--width-full`, which matched
+     nothing at all — a control that has been in the editor, set by merchants,
+     and doing nothing since the three modes were introduced.
+
+     The single Button block hid it: `.block-button--full` stretches the wrapper,
+     and a flex item with no width of its own fills a stretched cross axis. The
+     Buttons block has no such wrapper, so there the setting was simply dead. */
+  .button--full,
+  .button--width-full {
     inline-size: 100%;
   }
 
@@ -4189,7 +4203,6 @@
   .badge-highlight {
     display: flex;
     gap: var(--space-3);
-    background-color: var(--badge-background, transparent);
     border: var(--badge-border-width, 0) solid var(--badge-border-color, var(--color-border));
     border-radius: var(--badge-radius, 8px);
     transition: transform var(--transition-base), opacity var(--transition-base);
@@ -4212,6 +4225,48 @@
        the number is a starting point the row can distribute from. */
     flex: 0 1 var(--badge-width, auto);
     box-sizing: border-box;
+  }
+
+  /* The background is the tile's own or none — never an ancestor's.
+     -------------------------------------------------------------------------
+     Same fix, same reason, as `.block-group` above: `--badge-background` is
+     emitted only when the merchant picks a colour, and custom properties
+     inherit — so a tile with no colour of its own read the nearest ancestor
+     that had one and painted it. A row of tiles inside a panel whose tiles were
+     tinted came out as four filled rectangles nobody had asked for, and the
+     tile could not be cleared from its own settings because the value was not
+     coming from its own settings.
+
+     Presence in the element's own `style` attribute is the test. A tile that
+     sets no background matches nothing and paints nothing, whatever is above
+     it; a tile that sets one paints exactly what it always did. */
+  .badge-highlight[style*='--badge-background'] {
+    background-color: var(--badge-background);
+  }
+
+  /* Frosted, and keyed off the property for the same reason the background
+     above is — plus the one the group's blur rule already gives: the element
+     carries the value, so a class kept in step with it is a class that can fall
+     out of step. `-webkit-` first for older iOS. */
+  .badge-highlight[style*='--badge-backdrop-blur'] {
+    -webkit-backdrop-filter: blur(var(--badge-backdrop-blur));
+    backdrop-filter: blur(var(--badge-backdrop-blur));
+  }
+
+  /* **Text alignment**, when the merchant has set one.
+     -------------------------------------------------------------------------
+     Keyed off the property being present in the tile's own `style` attribute,
+     the same idiom the background and the blur above already use — and here it
+     also buys the weight the rule needs. `.badge-highlight--center` sets
+     `text-align: center` as part of its layout at `(0,1,0)`; this is `(0,2,0)`,
+     so an explicit choice wins over the layout's assumption and a tile left on
+     Default is not touched by this rule at all.
+
+     It is what lets a tile in a right-aligned group keep its words on the left.
+     `text-align` inherits, so a group that sets one hands it to every tile
+     inside it, and before this the tile had nothing of its own to say back. */
+  .badge-highlight[style*='--badge-text-align'] {
+    text-align: var(--badge-text-align);
   }
 
   .badge-highlight--top { flex-direction: column; }
@@ -4245,8 +4300,18 @@
        design is the panel's own text colour thinned out, so it follows the
        colour scheme instead of needing to be re-picked for every surface. */
     border-color: var(--badge-frame-color, color-mix(in srgb, currentColor 25%, transparent));
-    border-radius: 999px;
-    background-color: var(--badge-frame-background, transparent);
+
+    /* A percentage, so 50% is a circle at any frame size and anything below it
+       is a rounded square that keeps its proportion as the frame grows. */
+    border-radius: var(--badge-frame-radius, 50%);
+
+    /* `background`, not `background-color`. **Icon ring background** is a
+       `color_background` field, so what arrives here is either a flat colour or
+       a `linear-gradient(...)` — and a gradient handed to `background-color` is
+       an invalid declaration the browser drops, which paints nothing at all.
+       The shorthand takes both, and nothing else on this rule sets a
+       `background-*` for it to reset. */
+    background: var(--badge-frame-background, transparent);
   }
 
   /* The glyph keeps the icon size the merchant chose; only the ring is bigger.
@@ -4268,6 +4333,56 @@
     background-color: var(--pill-background, var(--color-secondary-background));
     color: var(--pill-color, var(--color-text));
     font-size: var(--font-size-xs);
+  }
+
+  /* ---- a border that is a gradient ---------------------------------------
+     `border-color` takes a colour and nothing else, so a merchant who picks a
+     gradient in **Border color** gets a dropped declaration and no border. The
+     ring is painted instead: a pseudo-element the size of the border box,
+     filled with the gradient, with its own middle punched out by a two-layer
+     mask — one layer clipped to the content box, one to the border box, the
+     first excluded from the second. What is left is exactly the border's own
+     band, in the gradient, following the corner radius.
+
+     `inset` is the negative border width rather than `0`. An absolutely
+     positioned child resolves `inset` against its containing block's *padding*
+     box, so at `0` the ring would sit one border-width inside the edge it is
+     meant to be. Pulling it back out by that width lands it on the border box,
+     which is also the box `border-radius` is measured against — so
+     `border-radius: inherit` lines the corners up exactly.
+
+     The element keeps its real border at transparent rather than dropping to
+     zero width, so the box measures the same whether the merchant picked a
+     colour or a gradient and switching between the two does not move the
+     content inside.
+
+     `-webkit-` first, and `xor` beside `exclude`: Safari shipped this behind
+     the prefix with the older keyword, and it is still the spelling it reads.
+     A browser with neither shows the pseudo unmasked — a filled rectangle
+     behind the tile's own background, which is the tile looking normal. */
+  .badge-highlight--gradient-border {
+    border-color: transparent;
+  }
+
+  .badge-highlight--gradient-border::before {
+    content: '';
+    position: absolute;
+    inset: calc(-1 * var(--badge-border-width, 1px));
+    border-radius: inherit;
+    padding: var(--badge-border-width, 1px);
+    background: var(--badge-border-paint, transparent);
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+
+    /* The stretched link's `::after` is painted after this one and stays on
+       top; this is decoration and must never take the click. */
+    pointer-events: none;
   }
 
   .badge-highlight--center .badge-highlight__pill { align-self: center; }
@@ -4365,8 +4480,19 @@
   .divider--vertical.divider--dotted { border-inline-start-style: dotted; }
 
   /* The block wrapper is what the row lays out, so it has to stretch too —
-     the rule inside it can only be as tall as the box it is given. */
-  .divider-block--vertical {
+     the rule inside it can only be as tall as the box it is given.
+
+     The class is doubled for weight, and that is the whole fix. Twelve lines
+     below, `.divider-block, .divider-section { display: block }` sets the
+     wrapper back to a block container at exactly this specificity and later in
+     the file, so it won — and `display: block` takes the whole rule down with
+     it. The rule inside is `inline-size: 0` with `block-size: auto`, sized by
+     `align-self: stretch` against a flex parent; with no flex parent
+     `align-self` is inert and `auto` on an empty box is zero. Every vertical
+     divider in the theme was rendering at zero height — present in the markup,
+     invisible on the page, and unfixable from its own settings because no
+     colour or thickness can make a box with no height show. */
+  .divider-block.divider-block--vertical {
     align-self: stretch;
     display: flex;
   }
@@ -5907,7 +6033,27 @@
     min-inline-size: 0;
 
     border-radius: var(--group-radius, 0px);
-    background: var(--group-background, transparent);
+  }
+
+  /* The background is the group's own or none — never an ancestor's.
+     -------------------------------------------------------------------------
+     This used to be `background: var(--group-background, transparent)` in the
+     rule above, and that is a bug the moment groups nest. Custom properties
+     inherit, and `--group-background` is the one group property the snippet
+     emits *conditionally* — every other one is written on every group, so every
+     group overrides its parent's copy and the fallback is never reached.
+
+     Not this one. A group with no background of its own inherited its parent's
+     value and painted it a second time: a row inside a tinted panel came out a
+     shade darker than the panel, a row inside that darker again, and a
+     translucent panel stacked its own alpha once per level of nesting.
+
+     Keyed off the property being present in the element's own `style`
+     attribute, which is exactly how the border and the blur below already work
+     and for the same reason. A group that sets no background matches nothing
+     and paints nothing, whatever its ancestors carry. */
+  .block-group[style*='--group-background'] {
+    background: var(--group-background);
   }
 
   /* Only painted when the merchant chose a style; `0px` of border still
@@ -5926,6 +6072,29 @@
   .block-group[style*='--group-backdrop-blur'] {
     -webkit-backdrop-filter: blur(var(--group-backdrop-blur));
     backdrop-filter: blur(var(--group-backdrop-blur));
+  }
+
+  /* ---- per-device visibility --------------------------------------------
+     The three ranges are the theme's own and do not overlap: phones end at
+     749px, desktop starts at 990px, and tablet is the band between them. A
+     group hidden on two of the three is therefore visible on exactly one, with
+     no width where two rules disagree.
+
+     Doubled class for specificity — `.block-group` sets `display: flex` at the
+     same weight, and a modifier that only sometimes wins is worse than none.
+     `display: none` and not `visibility`, because a hidden group should take no
+     space and its contents should be out of the tab order, not merely invisible
+     to the eye. */
+  @media screen and (max-width: 749px) {
+    .block-group.block-group--hide-mobile { display: none; }
+  }
+
+  @media screen and (min-width: 750px) and (max-width: 989px) {
+    .block-group.block-group--hide-tablet { display: none; }
+  }
+
+  @media screen and (min-width: 990px) {
+    .block-group.block-group--hide-desktop { display: none; }
   }
 
   .block-group--column {
@@ -6140,6 +6309,30 @@
     .tabs__panel-content > * + * {
       margin-block-start: var(--tab-content-gap-mobile, var(--tab-content-gap, var(--space-5)));
     }
+  }
+
+  /* ---- a button under a segmented switch fills the switch ------------------
+     The segmented strip is an option chooser — three plans, three frequencies —
+     and the button under it is the one action that follows from the choice. A
+     pill sized to the words "Shop now" sitting under a track that spans the
+     column reads as unrelated to it; the same button matched to the track reads
+     as the end of the same control.
+
+     Scoped to `.tabs--segmented`, and deliberately not to every tab panel. The
+     plain strip's panels hold prose, tables and accordions — the *FAQ: Tabs*
+     preset is a Section header over an Accordion — and a button in one of those
+     is a link at the end of an answer, which should keep its own size.
+
+     `align-items` and not a width: `.block-button` is a flex column, and
+     stretching the item is what gives the button a cross size to resolve its
+     own `inline-size: 100%` against. It is the same mechanism `.block-button--full`
+     uses, which is why a merchant who has already chosen Full sees no change.
+
+     A **Buttons** block is not included. That one is a flex *row*, where filling
+     is `flex-grow` on each child and the result is two equal halves — and a
+     label beside a round icon button is the arrangement that pairing is for. */
+  .tabs--segmented .tabs__panel-content > .block-button {
+    align-items: stretch;
   }
 
   /* The strip carries its own width, so the wrapper has to carry it instead:
@@ -6374,7 +6567,63 @@
      specific intent. */
   .block-button--full { align-items: stretch; }
 
+  /* ...and the wrapper has to claim the row, not just fill itself.
+     -------------------------------------------------------------------------
+     Full width inside a *row* is a second problem. The rule above makes the
+     button fill its wrapper; the wrapper is still a flex item sized to its own
+     content, so a button beside anything else came out label-width and Full
+     looked broken again — which is what a label button next to a round icon
+     button is: the label takes the row and the disc keeps its size.
+
+     Scoped to a row on purpose. `flex: 1 1 auto` on a *column* item grows on
+     the block axis, so an unscoped rule would stretch a full-width button
+     vertically the moment its group had spare height — a taller pill nobody
+     asked for. This is the only arrangement where growing is what Full means.
+
+     Nothing here reaches a button left on the default width. The modifier is
+     emitted only when the merchant chooses Full, so the default button keeps
+     every measurement it had.
+
+     `0%` and not `auto` for the basis. With `auto` the basis is the item's own
+     content, and the content here is a button carrying `inline-size: 100%` — a
+     cyclic value that resolves to max-content while the basis is being worked
+     out. The wrapper then starts out as wide as the label at its widest and
+     grows from there, which is a pill sized to its text rather than to the row.
+     From a basis of zero the item is only ever the free space it is given,
+     which is what "fills what is left" means. */
+  .block-group--row > .block-group__content > .block-button--full {
+    flex: 1 1 0%;
+    min-inline-size: 0;
+  }
+
   .block-buttons { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+
+  /* Full width, in a pair.
+     -------------------------------------------------------------------------
+     `inline-size: 100%` on its own is right for a button that is alone in its
+     box and wrong for two of them side by side: in a wrapping flex row each one
+     asks for the whole line, so the second is pushed onto a line of its own and
+     Full reads as "stack them" rather than as "fill the row".
+
+     `flex: 1 1 0%` is the same answer `.block-group--row > … > .block-button--full`
+     already gives one row further out, and for the same reason — from a basis of
+     zero an item is only ever the free space it is given, so the pair divides
+     the row instead of each claiming it. `min-inline-size: 0` lets that happen
+     below the label's own width, which is what a flex item otherwise refuses.
+
+     An icon-only button is excluded on both counts. It is a disc whose width is
+     its height, the label button beside it is the one meant to grow, and its own
+     `min-inline-size` is what keeps it round — so it keeps its size and takes
+     none of the row. */
+  .block-buttons > .button--full:not(.button--icon-only),
+  .block-buttons > .button--width-full:not(.button--icon-only) {
+    flex: 1 1 0%;
+    min-inline-size: 0;
+  }
+
+  .block-buttons > .button--icon-only {
+    flex: 0 0 auto;
+  }
   .block-buttons--center { justify-content: center; }
   .block-buttons--end { justify-content: flex-end; }
 
@@ -10144,12 +10393,33 @@ swiper-carousel {
   object-fit: contain;
 }
 
-/* A border needs breathing room for the same reason a background does — see
-   `.block-text--has-background` above, whose values these match so a pill with
-   both does not sit differently from a pill with one. Custom properties rather
-   than `padding`, because `[data-block-spacing]` reads those and a `padding`
-   shorthand here would win outright and kill all four sliders. */
-.block-subheading--bordered {
+/* A border needs breathing room, and so does a background — but an eyebrow is
+   not a paragraph, and it must not take the paragraph's answer.
+
+   `.block-text--has-background` above is written for a run of body copy: a panel
+   behind a sentence, padded `--space-4` block and `--space-5` inline, 16px and
+   20px. `blocks/subheading.liquid` puts that same class on the row whenever the
+   merchant picks a custom background, so a pill — one word and an icon — took a
+   paragraph's box and stood 32px tall before its own contents were counted.
+
+   Worse, it was unreachable. `[data-block-spacing]` resolves every side as
+   `max(emitted, default)`, so a Padding slider dragged down to 4px still
+   rendered at 16px and the four sliders read as broken on every painted pill in
+   the theme. `sections/featured-offer.liquid` is where it showed: 4 / 4 / 4 / 16
+   in the preset, 16 / 20 on the page.
+
+   So the two treatments are listed together and given the pill's own numbers. A
+   painted pill, an outlined pill and a pill with both are the same shape and
+   should sit the same way — which is what the note here always claimed and the
+   selector never delivered. Specificity is `(0,2,0)` against the Text block's
+   `(0,1,0)` and both rules are unlayered, so this wins on the cascade rather
+   than on source order.
+
+   Custom properties rather than `padding`, because `[data-block-spacing]` reads
+   those and a `padding` shorthand here would win outright and kill all four
+   sliders. */
+.block-subheading--bordered,
+.block-subheading.block-text--has-background {
   --block-padding-default-block-start: var(--space-1);
   --block-padding-default-block-end: var(--space-1);
   --block-padding-default-inline-start: var(--space-1);
@@ -10159,6 +10429,19 @@ swiper-carousel {
 @media screen and (max-width: 749px) {
   .block-subheading {
     justify-content: var(--subheading-justify-mobile, var(--subheading-justify, flex-start));
+  }
+
+  /* Half the desktop default on a phone, the ratio the gap switches already
+     take. The floor has to come down with the slider or the mobile fields
+     cannot reach past it: `max(2px, var(--space-1))` is 4px, so a mobile
+     block-direction padding of 2 would be silently rounded back up to the
+     desktop value. Inline is left alone — the pill's sides are what keep the
+     words off a rounded corner, and a narrow screen does not make that less
+     true. */
+  .block-subheading--bordered,
+  .block-subheading.block-text--has-background {
+    --block-padding-default-block-start: 0.2rem;
+    --block-padding-default-block-end: 0.2rem;
   }
 }
 

@@ -82,6 +82,46 @@
   assign frame_size = s.icon_frame_size | default: 56 | plus: 0
   assign frame_width = s.icon_frame_width | default: 1 | plus: 0
 
+  comment
+    A percentage, so 50 is a circle at any frame size and everything below it is
+    a rounded square that stays in proportion when the frame grows. A px radius
+    would have to be re-picked every time the size slider moved.
+  endcomment
+  assign frame_radius = s.icon_frame_radius | default: 50 | plus: 0
+
+  comment
+    Frosted, for a tile read against a photograph. Same property, same rule
+    shape and same caveat as `blocks/card-content.liquid`: `backdrop-filter`
+    samples what is painted underneath, so over a flat colour it has nothing to
+    frost and appears to do nothing. Zero by default, so no tile that existed
+    before this gains a filter.
+  endcomment
+  assign backdrop_blur = s.backdrop_blur | default: 0 | plus: 0
+
+  comment
+    ---- a border that is a gradient ----
+
+    **Border color** is a `color_background`, so the merchant can hand it either
+    a flat colour or a gradient — the same field type the Group block's surface
+    already uses, and the only one in Shopify that returns a gradient at all.
+
+    A gradient cannot go through `border-color`: that property takes a colour,
+    and a `linear-gradient(...)` handed to it is an invalid declaration the
+    browser drops, which renders as no border at all rather than as an error the
+    merchant can see. So the two cases take two different routes — a real border
+    for a colour, a masked ring painted in `::before` for a gradient — and this
+    is the test that decides which.
+
+    `contains 'gradient'` rather than a parse: every gradient CSS can express
+    has the word in its own name — `linear-gradient`, `radial-gradient`,
+    `conic-gradient` and the `repeating-` forms — and no notation for a flat
+    colour contains it.
+  endcomment
+  assign border_is_gradient = false
+  if s.border_color contains 'gradient'
+    assign border_is_gradient = true
+  endif
+
   assign classes = 'badge-highlight badge-highlight--' | append: s.alignment
   if s.hover != 'none'
     assign classes = classes | append: ' badge-highlight--hover-' | append: s.hover
@@ -89,16 +129,33 @@
   if frame_style != 'none'
     assign classes = classes | append: ' badge-highlight--framed'
   endif
+  if border_is_gradient
+    assign classes = classes | append: ' badge-highlight--gradient-border'
+  endif
 
   comment
     The colour scheme is the parent's unless the merchant says otherwise — the
-    same control, spelled the same way, as `blocks/group.liquid`. A tile on a
-    photograph almost always wants the section's scheme, and a picker left on
-    its default is how a light card ends up on a dark hero.
+    same control, spelled the same way, as `blocks/group.liquid`.
+
+    It defaults the other way round from the Group block's, on purpose. A group
+    is a container and often wants a surface of its own; a badge is a tile that
+    sits inside one, and painting it a second scheme puts a rectangle of colour
+    behind every item in a row that already has a background.
+
+    That default is also what keeps this setting from changing anything that
+    existed before it. This block had no scheme control at all and never painted
+    one, so `false` here would have given every badge already in a theme a
+    background it had never had — the section's scheme resolved and painted
+    behind each tile. Inheriting is the behaviour they have; the picker is the
+    new thing, and it is opt-in.
+
+    `nil` rather than `blank` for the unset test: `false == blank` is true in
+    Liquid, so a blank check would read a merchant's deliberate "off" as "not
+    answered" and silently turn inheriting back on.
   endcomment
   assign inherit_scheme = s.inherit_color_scheme
   if inherit_scheme == nil
-    assign inherit_scheme = false
+    assign inherit_scheme = true
   endif
   if inherit_scheme == false and s.color_scheme != blank
     assign classes = classes | append: ' color-scheme-container color-' | append: s.color_scheme
@@ -108,17 +165,44 @@
 {%- capture badge_style -%}
   {%- render 'spacing', block: s, declarations: true -%}
   {%- if background_paint != '' -%}--badge-background: {{ background_paint }};{%- endif -%}
-  {%- if s.border_color != blank -%}--badge-border-color: {{ s.border_color }};{%- endif -%}
+  {%- if s.border_color != blank -%}
+    {%- if border_is_gradient -%}
+      --badge-border-paint: {{ s.border_color }};
+    {%- else -%}
+      --badge-border-color: {{ s.border_color }};
+    {%- endif -%}
+  {%- endif -%}
+  {%- comment -%}
+    ---- which way the words run ----
+
+    Separate from **Icon position**, because they answer different questions.
+    Icon position lays the tile out — glyph above the words, beside them, or the
+    pair centred as a column — and until now the text alignment came along with
+    it: the row arrangements said nothing, so the words took whatever the
+    container was doing. A tile in a right-aligned group came out right-aligned
+    with its icon on the left, which is a tile nobody chose and could not fix
+    from its own settings.
+
+    `inherit` is the default and emits nothing at all, so every tile already in
+    a theme keeps the alignment it has — including the centred one, whose
+    `text-align: center` is part of the Icon position: Center layout and is not
+    this setting's to undo.
+  {%- endcomment -%}
+  {%- if s.text_alignment != blank and s.text_alignment != 'inherit' -%}
+    --badge-text-align: {{ s.text_alignment }};
+  {%- endif -%}
   --badge-border-width: {{ s.border_width }}px;
   --badge-radius: {{ s.radius }}px;
   --badge-icon-size: {{ icon_size }}px;
   {%- if s.icon_color != blank -%}--badge-icon-color: {{ s.icon_color }};{%- endif -%}
   {%- if box_width > 0 -%}--badge-width: {{ box_width }}px;{%- endif -%}
   {%- if box_height > 0 -%}--badge-height: {{ box_height }}px;{%- endif -%}
+  {%- if backdrop_blur > 0 -%}--badge-backdrop-blur: {{ backdrop_blur }}px;{%- endif -%}
   {%- if frame_style != 'none' -%}
     --badge-frame-size: {{ frame_size }}px;
     --badge-frame-style: {{ frame_style }};
     --badge-frame-width: {{ frame_width }}px;
+    --badge-frame-radius: {{ frame_radius }}%;
     {%- if s.icon_frame_color != blank -%}--badge-frame-color: {{ s.icon_frame_color }};{%- endif -%}
     {%- if s.icon_frame_background != blank -%}--badge-frame-background: {{ s.icon_frame_background }};{%- endif -%}
   {%- endif -%}
@@ -238,7 +322,15 @@
       "type": "range",
       "id": "icon_frame_width",
       "label": "t:blocks.badge_highlight.settings.icon_frame_width.label",
-      "min": 1, "max": 6, "step": 1, "unit": "px", "default": 1,
+      "min": 0, "max": 6, "step": 1, "unit": "px", "default": 1,
+      "visible_if": "{{ block.settings.icon_frame_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "icon_frame_radius",
+      "label": "t:blocks.badge_highlight.settings.icon_frame_radius.label",
+      "info": "t:blocks.badge_highlight.settings.icon_frame_radius.info",
+      "min": 0, "max": 50, "step": 2, "unit": "%", "default": 50,
       "visible_if": "{{ block.settings.icon_frame_style != 'none' }}"
     },
     {
@@ -248,9 +340,10 @@
       "visible_if": "{{ block.settings.icon_frame_style != 'none' }}"
     },
     {
-      "type": "color",
+      "type": "color_background",
       "id": "icon_frame_background",
       "label": "t:blocks.badge_highlight.settings.icon_frame_background.label",
+      "info": "t:blocks.badge_highlight.settings.icon_frame_background.info",
       "visible_if": "{{ block.settings.icon_frame_style != 'none' }}"
     },
     { "type": "header", "content": "t:blocks.badge_highlight.headers.content" },
@@ -265,7 +358,8 @@
       "type": "checkbox",
       "id": "inherit_color_scheme",
       "label": "t:blocks.group.settings.inherit_color_scheme.label",
-      "default": false
+      "info": "t:blocks.badge_highlight.settings.inherit_color_scheme.info",
+      "default": true
     },
     {
       "type": "color_scheme",
@@ -281,7 +375,14 @@
       "info": "t:blocks.badge_highlight.settings.background_opacity.info",
       "min": 0, "max": 100, "step": 5, "unit": "%", "default": 100
     },
-    { "type": "color", "id": "border_color", "label": "t:blocks.badge_highlight.settings.border_color.label" },
+    {
+      "type": "range",
+      "id": "backdrop_blur",
+      "label": "t:blocks.card_content.settings.backdrop_blur.label",
+      "info": "t:blocks.card_content.settings.backdrop_blur.info",
+      "min": 0, "max": 40, "step": 2, "unit": "px", "default": 0
+    },
+    { "type": "color_background", "id": "border_color", "label": "t:blocks.badge_highlight.settings.border_color.label", "info": "t:blocks.badge_highlight.settings.border_color.info" },
     { "type": "range", "id": "border_width", "label": "t:blocks.badge_highlight.settings.border_width.label", "min": 0, "max": 6, "step": 1, "unit": "px", "default": 0 },
     { "type": "range", "id": "radius", "label": "t:blocks.badge_highlight.settings.radius.label", "min": 0, "max": 40, "step": 2, "unit": "px", "default": 8 },
     {
@@ -306,6 +407,17 @@
         { "value": "start", "label": "t:blocks.badge_highlight.settings.alignment.options__3.label" }
       ],
       "default": "top"
+    },
+    {
+      "type": "select", "id": "text_alignment", "label": "t:blocks.badge_highlight.settings.text_alignment.label",
+      "info": "t:blocks.badge_highlight.settings.text_alignment.info",
+      "options": [
+        { "value": "inherit", "label": "t:settings_schema.typography.options.case_default" },
+        { "value": "start", "label": "t:shared.alignment.options__1.label" },
+        { "value": "center", "label": "t:shared.alignment.options__2.label" },
+        { "value": "end", "label": "t:shared.alignment.options__3.label" }
+      ],
+      "default": "inherit"
     },
     {
       "type": "select", "id": "hover", "label": "t:blocks.badge_highlight.settings.hover.label", "info": "t:blocks.badge_highlight.settings.hover.info",

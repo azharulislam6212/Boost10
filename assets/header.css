@@ -1380,7 +1380,7 @@ a.menu-promo:hover .menu-promo__cta svg {
 }
 
 .tabs__tab[aria-selected='false'] {
-  opacity: 0.65;
+  opacity: var(--tabs-tab-idle-opacity, 0.65);
 }
 
 .tabs__tab[aria-selected='false']:hover {
@@ -1493,21 +1493,22 @@ a.menu-promo:hover .menu-promo__cta svg {
   padding: var(--space-3) var(--space-4);
   font-size: var(--font-size-sm);
   text-align: center;
-
-  /* Room above for the flag, and the same room on every tab so the strip does
-     not change height when the flag moves with the selection. `--tabs-tab-pill`
-     is set only while a flag exists anywhere in the strip; see below. */
-  margin-block-start: var(--tabs-tab-pill-space, 0px);
 }
 
 /* The unselected options are quieter than the plain strip's 0.65, because here
    they sit on a filled track and the marker behind the selected one is already
    carrying most of the contrast. */
 .tabs--segmented .tabs__tab[aria-selected='false'] {
-  opacity: 0.6;
+  opacity: var(--tabs-tab-idle-opacity, 0.6);
 }
 
-.tabs--segmented .tabs__marker {
+/* Doubled class, so the switch keeps its own answer whatever the file order is.
+   `.tabs--block .tabs__marker` below sets the same property at `(0,2,0)` and
+   later in the file; at `(0,3,0)` this wins on the cascade instead, which keeps
+   the segmented default — a faint white pill on the merchant's dark track —
+   rather than borrowing the primary button's fill from a rule written for the
+   plain strip. */
+.tabs--block.tabs--segmented .tabs__marker {
   background-color: var(--tabs-marker-background, rgb(255 255 255 / 0.12));
   box-shadow: none;
 }
@@ -1516,19 +1517,17 @@ a.menu-promo:hover .menu-promo__cta svg {
    `blocks/_tab.liquid` puts it in the `<template>` the button is built from, so
    it belongs to the option and travels with it in the strip's own order.
 
-   Absolutely positioned out of the button's flow rather than laid out inside
-   it: in flow it would make one tab taller than its neighbours, and a switch
-   whose segments are two different heights is no longer a switch. The space it
-   needs is reserved on every tab by the margin above instead, so nothing moves
-   when the customer picks a different option.
+   It is out of flow completely — positioned, and taking no room from anything.
+   The strip used to reserve 14px above every tab for it, which is why the
+   options sat low in their own track and the track carried a band of empty
+   colour along its top edge that only existed because one option somewhere had
+   a flag. The flag is decoration on the option, and decoration should not be
+   able to move the control it decorates.
 
-   The strip declares the space only when a flag exists. A `:has()` on the list
-   is what makes that conditional — without it every segmented strip in the
-   theme would carry 14px of empty room above it for a flag it does not have. */
-.tabs--segmented .tabs__list:has(.tabs__tab-pill) {
-  --tabs-tab-pill-space: 14px;
-}
-
+   Straddling the track's top edge is the intended look, not an overflow: the
+   translate centres the flag on that edge, `.tabs--segmented .tabs__list` is
+   `overflow: visible` so the half above is painted, and the marker underneath
+   is measured from the button's own box and never sees it. */
 .tabs__tab-pill {
   position: absolute;
   inset-block-start: 0;
@@ -1651,9 +1650,21 @@ a.menu-promo:hover .menu-promo__cta svg {
 /* The selected tab is the primary button's colours, not a pale card. The menu
    gets away with a near-white marker because it sits in a tinted field; in a
    section the same pill is invisible on half the colour schemes, and "which tab
-   am I on" is the one question a tab strip exists to answer. */
+   am I on" is the one question a tab strip exists to answer.
+
+   `--tabs-marker-background` comes first, and that is a fix rather than an
+   extra. A segmented strip carries both classes — `tabs--block tabs--segmented`
+   — so this rule matched it too, and it used to hard-code the primary button's
+   fill. Same specificity as the segmented rule above and later in the file, so
+   it won: **Selected color** was in the panel, saved by merchants, and painted
+   over on every segmented strip in the theme. That rule now carries the extra
+   class and wins on the cascade, and this one reads the property as well, so
+   the setting reaches the marker by either route.
+
+   The fallback is unchanged, so a plain strip that sets nothing still gets the
+   primary button's colour and looks exactly as it did. */
 .tabs--block .tabs__marker {
-  background-color: var(--color-primary-button-background);
+  background-color: var(--tabs-marker-background, var(--color-primary-button-background));
   box-shadow: none;
 }
 
@@ -1665,6 +1676,13 @@ a.menu-promo:hover .menu-promo__cta svg {
   padding: var(--space-3) var(--space-5);
   border: var(--tabs-tab-border-width, 1px) var(--tabs-tab-border-style, solid)
     var(--tabs-tab-border-color, var(--color-border));
+
+  /* **Tab color**, and `inherit` when the merchant has not picked one — which
+     is the value this rule had before the setting existed, so an untouched
+     strip renders unchanged. Only `blocks/tabs.liquid` emits the property; the
+     mega menu's and the drawer's strips share these classes and set nothing,
+     so they keep inheriting. */
+  color: var(--tabs-tab-color, inherit);
   transition:
     opacity var(--header-speed) var(--header-ease),
     color var(--header-speed) var(--header-ease),
@@ -1676,7 +1694,13 @@ a.menu-promo:hover .menu-promo__cta svg {
    on looks like. */
 .tabs--block .tabs__tab[aria-selected='true'] {
   border-color: transparent;
-  color: var(--color-primary-button-text);
+
+  /* **Selected tab text color** first, then the answer this rule gave on its
+     own: the marker behind the selected tab is the primary button's fill, so
+     its text colour is the one that is guaranteed to read against it. The
+     setting exists because the marker is not always that fill — the segmented
+     switch paints its own — and then the guarantee no longer holds. */
+  color: var(--tabs-tab-active-color, var(--color-primary-button-text));
 }
 
 .tabs--block .tabs__tab-icon {
