@@ -987,41 +987,49 @@
 
   /* The disc is sized from the icon rather than fixed, so a merchant who takes
      the icon from 14px to 28px gets a badge that still fits it. */
+  /* Every one of these is an `--icon-mark-own-*`, which is the last link of the
+     chain `.icon-mark` reads — the merchant's own Shape, Shape size, Corner
+     radius and Fill color come first, and until one is set this is what paints.
+
+     Threading the properties directly does not work here and that is the reason
+     for the whole arrangement: the four `[data-icon-style]` rules below are
+     `(0,3,0)`, so any shared rule would have lost to them. A variable cannot
+     lose to itself. */
   .utility-item__icon {
-    display: grid;
-    place-items: center;
-    flex: 0 0 auto;
-    inline-size: calc(var(--utility-icon-size, 18px) * 2.2);
-    block-size: calc(var(--utility-icon-size, 18px) * 2.2);
-    border-radius: 50%;
-    overflow: hidden;
+    --icon-mark-own-size: calc(var(--utility-icon-size, 18px) * 2.2);
+    --icon-mark-own-radius: 50%;
+    --icon-mark-own-overflow: hidden;
   }
 
+  /* An uploaded square is round because the disc clips it, and it can go on
+     clipping: the ring is drawn inside this box now, not outside it, so there
+     is nothing left that needs to escape. */
+
   .utility-item[data-icon-style='solid'] .utility-item__icon {
-    background-color: var(--utility-icon-bg, var(--footer-accent));
-    color: var(--utility-icon-color, var(--color-primary-button-text));
+    --icon-mark-own-fill: var(--utility-icon-bg, var(--footer-accent));
+    --icon-mark-own-color: var(--utility-icon-color, var(--color-primary-button-text));
   }
 
   /* Soft is the accent at low alpha with the accent as the mark — the badge a
      dark footer wants when a solid disc would be the loudest thing in the row. */
   .utility-item[data-icon-style='soft'] .utility-item__icon {
-    background-color: var(--utility-icon-bg, rgb(var(--color-primary-button-background-rgb, 0 200 83) / 0.16));
-    color: var(--utility-icon-color, var(--footer-accent));
+    --icon-mark-own-fill: var(--utility-icon-bg, rgb(var(--color-primary-button-background-rgb, 0 200 83) / 0.16));
+    --icon-mark-own-color: var(--utility-icon-color, var(--footer-accent));
   }
 
   .utility-item[data-icon-style='outline'] .utility-item__icon {
+    --icon-mark-own-color: var(--utility-icon-color, var(--footer-accent));
+
     border: 1px solid var(--utility-icon-bg, rgb(var(--color-primary-button-background-rgb, 0 200 83) / 0.45));
-    color: var(--utility-icon-color, var(--footer-accent));
   }
 
   /* No badge at all: the mark sits on the footer's own ground, so the box
      collapses to the glyph rather than keeping a circle's worth of space. */
   .utility-item[data-icon-style='none'] .utility-item__icon {
-    inline-size: auto;
-    block-size: auto;
-    border-radius: 0;
-    background: none;
-    color: var(--utility-icon-color, var(--footer-accent));
+    --icon-mark-own-size: auto;
+    --icon-mark-own-radius: 0px;
+    --icon-mark-own-fill: none;
+    --icon-mark-own-color: var(--utility-icon-color, var(--footer-accent));
   }
 
   .utility-item__image-wrapper,

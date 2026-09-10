@@ -6,13 +6,72 @@
 
   The icon is decorative and `aria-hidden`: the text beside it is the content,
   and announcing "truck, free delivery over fifty pounds" helps nobody.
+
+  ## The mark is the theme's shared one
+
+  `snippets/icon-mark.liquid` resolves the Shape and the Ring — the same three
+  groups the Feature icon, the Highlight tile, the Accordion row and the
+  footer's Utility item all offer. It emits nothing until a merchant chooses
+  something, so this block still draws what it always drew: a bare glyph beside
+  the words, with no box behind it.
+
+  The wrapper around the glyph is new and paints nothing. It exists because a
+  ring has to be positioned against *something*, and an `<svg>` that is itself
+  the flex item has nowhere to hang one. `inline-flex` with `flex: 0 0 auto` is
+  what the glyph had from `.icon`, so the row and the column arrangements
+  measure exactly as they did.
+
+  ## The source is stated, not inferred
+
+  `custom_icon` used to win simply by holding an upload, so a merchant who had
+  tried one and moved on could not get back to the theme glyph without clearing
+  the field. **Icon** now says which, and the upload keeps its own id so nothing
+  saved is lost — an item with no source stored falls back to the old rule.
 {% endcomment %}
 
 {%- liquid
+  assign s = block.settings
+
   capture icon_px
-    render 'icon-size', size: block.settings.icon_size, custom: block.settings.icon_size_custom
+    render 'icon-size', size: s.icon_size, custom: s.icon_size_custom
   endcapture
   assign icon_size = icon_px | plus: 0
+
+  comment
+    ---- the upload has two homes ----
+
+    The shared panel calls its image `icon_image`, which every other block that
+    offers the mark uses. This block called it `custom_icon`, and renaming a
+    setting in Shopify does not carry the value across — the upload would simply
+    be gone from every block already using one.
+
+    So the new id is read first and the old one is the fallback, exactly the way
+    the Highlight tile still reads its retired `icon_frame_*` keys. The old
+    field stays in the schema, hidden behind the same source, so a merchant can
+    see and clear what they uploaded rather than being left with a picture they
+    cannot reach.
+  endcomment
+  assign icon_upload = s.icon_image | default: s.custom_icon
+
+  comment
+    The old order, reproduced for anything saved before the select existed: an
+    upload won if there was one, otherwise the theme glyph.
+  endcomment
+  assign icon_source = s.icon_source
+  if icon_source == blank
+    if icon_upload != blank
+      assign icon_source = 'image'
+    else
+      assign icon_source = 'icon'
+    endif
+  endif
+
+  assign has_icon = false
+  if icon_source == 'icon' and s.icon != blank and s.icon != 'none'
+    assign has_icon = true
+  elsif icon_source == 'image' and icon_upload != blank
+    assign has_icon = true
+  endif
 
   comment
     The space between the icon and the words. It was a fixed `--space-3` in the
@@ -32,16 +91,31 @@
   --icon-text-gap: {{ gap }}px;
 {%- endcapture -%}
 
+{%- comment -%}
+  On the wrapper and not on the block, because `.icon-mark` is matched on the
+  presence of each property name in the element's *own* `style` attribute — a
+  value inherited from an ancestor is invisible to that test, which is exactly
+  what keeps a mark that set nothing from being restyled.
+{%- endcomment -%}
+{%- capture icon_mark_style -%}
+  {%- render 'icon-mark', block: s, declarations: true -%}
+{%- endcapture -%}
+
 <div
-  class="block-icon-text block-icon-text--{{ block.settings.alignment }}"
+  class="block-icon-text icon-mark-host block-icon-text--{{ block.settings.alignment }}"
   data-block-spacing
   style="{{ icon_text_style | strip_newlines | strip }}"
   {{ block.shopify_attributes }}
 >
-  {%- if block.settings.custom_icon != blank -%}
-    {% render 'image', image: block.settings.custom_icon, ratio: 'square', sizes: '48px', wrapper_class: 'block-icon-text__custom' %}
-  {%- else -%}
-    {% render 'icon', icon: block.settings.icon, size: icon_size, class: 'block-icon-text__icon' %}
+  {%- if has_icon -%}
+    <span class="block-icon-text__mark icon-mark" style="{{ icon_mark_style | strip_newlines | strip }}">
+      {% render 'icon-mark', block: s %}
+      {%- if icon_source == 'image' -%}
+        {% render 'image', image: icon_upload, alt: s.icon_image_alt, ratio: 'square', sizes: '48px', wrapper_class: 'block-icon-text__custom' %}
+      {%- else -%}
+        {% render 'icon', icon: s.icon, size: icon_size, class: 'block-icon-text__icon' %}
+      {%- endif -%}
+    </span>
   {%- endif -%}
 
   <div class="block-icon-text__body">
@@ -60,22 +134,69 @@
   "name": "t:blocks.icon_with_text.name",
   "tag": null,
   "settings": [
+    { "type": "header", "content": "t:blocks.subheading.headers.icon" },
     {
-      "type": "select", "id": "icon", "label": "t:blocks.icon_with_text.settings.icon.label",
+      "type": "select",
+      "id": "icon_source",
+      "label": "t:blocks.subheading.settings.icon_source.label",
       "options": [
-        { "value": "truck", "label": "t:blocks.icon_with_text.settings.icon.options__1.label" },
-        { "value": "refresh", "label": "t:blocks.icon_with_text.settings.icon.options__2.label" },
-        { "value": "lock", "label": "t:blocks.icon_with_text.settings.icon.options__3.label" },
-        { "value": "check", "label": "t:blocks.icon_with_text.settings.icon.options__4.label" },
-        { "value": "star", "label": "t:blocks.icon_with_text.settings.icon.options__5.label" },
-        { "value": "heart", "label": "t:blocks.icon_with_text.settings.icon.options__6.label" },
-        { "value": "info", "label": "t:blocks.icon_with_text.settings.icon.options__7.label" }
+        { "value": "none", "label": "t:shared.options.none" },
+        { "value": "icon", "label": "t:blocks.subheading.settings.icon_source.options__2.label" },
+        { "value": "image", "label": "t:blocks.subheading.settings.icon_source.options__3.label" }
       ],
-      "default": "truck"
+      "default": "icon"
     },
-    { "type": "image_picker", "id": "custom_icon", "label": "t:blocks.icon_with_text.settings.custom_icon.label", "info": "t:blocks.icon_with_text.settings.custom_icon.info" },
     {
-      "type": "select", "id": "icon_size", "label": "t:blocks.icon_with_text.settings.icon_size.label",
+      "type": "select",
+      "id": "icon",
+      "label": "t:blocks.subheading.settings.icon.label",
+      "options": [
+        { "value": "star", "label": "t:blocks.subheading.settings.icon.options__1" },
+        { "value": "check", "label": "t:blocks.subheading.settings.icon.options__2" },
+        { "value": "heart", "label": "t:blocks.subheading.settings.icon.options__3" },
+        { "value": "tag", "label": "t:blocks.subheading.settings.icon.options__4" },
+        { "value": "truck", "label": "t:blocks.subheading.settings.icon.options__5" },
+        { "value": "refresh", "label": "t:blocks.subheading.settings.icon.options__6" },
+        { "value": "lock", "label": "t:blocks.subheading.settings.icon.options__7" },
+        { "value": "clock", "label": "t:blocks.subheading.settings.icon.options__8" },
+        { "value": "location", "label": "t:blocks.subheading.settings.icon.options__9" },
+        { "value": "mail", "label": "t:blocks.subheading.settings.icon.options__10" },
+        { "value": "note", "label": "t:blocks.subheading.settings.icon.options__11" },
+        { "value": "info", "label": "t:blocks.subheading.settings.icon.options__12" },
+        { "value": "chat", "label": "t:blocks.feature_icon.settings.icon.options__13" },
+        { "value": "phone", "label": "t:blocks.feature_icon.settings.icon.options__14" },
+        { "value": "share", "label": "t:blocks.feature_icon.settings.icon.options__15" },
+        { "value": "grid", "label": "t:blocks.feature_icon.settings.icon.options__16" },
+        { "value": "shield", "label": "t:blocks.icon_with_text.settings.icon.options__2" }
+      ],
+      "default": "truck",
+      "visible_if": "{{ block.settings.icon_source == 'icon' }}"
+    },
+    {
+      "type": "image_picker",
+      "id": "icon_image",
+      "label": "t:blocks.subheading.settings.icon_image.label",
+      "info": "t:blocks.subheading.settings.icon_image.info",
+      "visible_if": "{{ block.settings.icon_source == 'image' }}"
+    },
+    {
+      "type": "image_picker",
+      "id": "custom_icon",
+      "label": "t:blocks.icon_with_text.settings.custom_icon.label",
+      "info": "t:blocks.icon_with_text.settings.custom_icon.info",
+      "visible_if": "{{ block.settings.custom_icon != blank }}"
+    },
+    {
+      "type": "text",
+      "id": "icon_image_alt",
+      "label": "t:blocks.subheading.settings.icon_image_alt.label",
+      "info": "t:blocks.subheading.settings.icon_image_alt.info",
+      "visible_if": "{{ block.settings.icon_source == 'image' }}"
+    },
+    {
+      "type": "select",
+      "id": "icon_size",
+      "label": "t:shared.icon_size.label",
       "options": [
         { "value": "extra_small", "label": "t:shared.icon_size.options__1.label" },
         { "value": "small", "label": "t:shared.icon_size.options__2.label" },
@@ -87,10 +208,163 @@
       "default": "medium"
     },
     {
-      "type": "range", "id": "icon_size_custom", "label": "t:shared.icon_size.custom.label",
+      "type": "range",
+      "id": "icon_size_custom",
+      "label": "t:shared.icon_size.custom.label",
       "info": "t:shared.icon_size.custom.info",
-      "min": 16, "max": 48, "step": 4, "unit": "px", "default": 24,
+      "min": 12,
+      "max": 72,
+      "step": 2,
+      "unit": "px",
+      "default": 24,
       "visible_if": "{{ block.settings.icon_size == 'custom' }}"
+    },
+    {
+      "type": "color",
+      "id": "icon_color",
+      "label": "t:blocks.feature_icon.settings.icon_color.label"
+    },
+    {
+      "type": "color",
+      "id": "icon_hover_color",
+      "label": "t:blocks.feature_icon.settings.icon_hover_color.label",
+      "info": "t:blocks.feature_icon.settings.icon_hover_color.info"
+    },
+    { "type": "header", "content": "t:blocks.feature_icon.headers.shape" },
+    {
+      "type": "select",
+      "id": "shape",
+      "label": "t:blocks.feature_icon.settings.shape.label",
+      "info": "t:blocks.feature_icon.settings.shape.info",
+      "options": [
+        { "value": "none", "label": "t:shared.options.none" },
+        { "value": "circle", "label": "t:shared.carousel.nav_shape.options__2.label" },
+        { "value": "square", "label": "t:shared.carousel.nav_shape.options__3.label" }
+      ],
+      "default": "none"
+    },
+    {
+      "type": "range",
+      "id": "shape_size",
+      "label": "t:blocks.feature_icon.settings.shape_size.label",
+      "min": 16,
+      "max": 160,
+      "step": 2,
+      "unit": "px",
+      "default": 40
+    },
+    {
+      "type": "range",
+      "id": "shape_size_mobile",
+      "label": "t:blocks.feature_icon.settings.shape_size_mobile.label",
+      "info": "t:blocks.feature_icon.settings.shape_size_mobile.info",
+      "min": 16,
+      "max": 160,
+      "step": 2,
+      "unit": "px",
+      "default": 32
+    },
+    {
+      "type": "range",
+      "id": "shape_radius",
+      "label": "t:shared.corners.radius.label",
+      "min": 0,
+      "max": 48,
+      "step": 2,
+      "unit": "px",
+      "default": 8,
+      "visible_if": "{{ block.settings.shape == 'square' }}"
+    },
+    {
+      "type": "color_background",
+      "id": "fill_color",
+      "label": "t:blocks.feature_icon.settings.fill_color.label"
+    },
+    {
+      "type": "color_background",
+      "id": "fill_hover_color",
+      "label": "t:blocks.feature_icon.settings.fill_hover_color.label",
+      "info": "t:blocks.feature_icon.settings.fill_hover_color.info"
+    },
+
+    { "type": "header", "content": "t:blocks.feature_icon.headers.ring" },
+    { "type": "paragraph", "content": "t:blocks.feature_icon.paragraphs.ring" },
+    {
+      "type": "select",
+      "id": "ring_style",
+      "label": "t:shared.border.style.label",
+      "options": [
+        { "value": "none", "label": "t:shared.options.none" },
+        { "value": "solid", "label": "t:shared.options.solid" },
+        { "value": "dashed", "label": "t:shared.options.dashed" },
+        { "value": "dotted", "label": "t:shared.options.dotted" }
+      ],
+      "default": "none"
+    },
+    {
+      "type": "range",
+      "id": "ring_offset",
+      "label": "t:blocks.feature_icon.settings.ring_offset.label",
+      "info": "t:blocks.feature_icon.settings.ring_offset.info",
+      "min": 0,
+      "max": 40,
+      "step": 1,
+      "unit": "px",
+      "default": 4
+    },
+    {
+      "type": "range",
+      "id": "ring_width",
+      "label": "t:shared.border.thickness.label",
+      "min": 1,
+      "max": 8,
+      "step": 1,
+      "unit": "px",
+      "default": 2
+    },
+    {
+      "type": "range",
+      "id": "ring_dash",
+      "label": "t:blocks.feature_icon.settings.ring_dash.label",
+      "info": "t:blocks.feature_icon.settings.ring_dash.info",
+      "min": 1,
+      "max": 20,
+      "step": 1,
+      "unit": "px",
+      "default": 2,
+      "visible_if": "{{ block.settings.ring_style == 'dashed' }}"
+    },
+    {
+      "type": "range",
+      "id": "ring_dash_gap",
+      "label": "t:blocks.feature_icon.settings.ring_dash_gap.label",
+      "min": 1,
+      "max": 24,
+      "step": 1,
+      "unit": "px",
+      "default": 8,
+      "visible_if": "{{ block.settings.ring_style == 'dashed' }}"
+    },
+    {
+      "type": "color",
+      "id": "ring_color",
+      "label": "t:shared.border.color.label"
+    },
+    {
+      "type": "color",
+      "id": "ring_hover_color",
+      "label": "t:blocks.feature_icon.settings.ring_hover_color.label"
+    },
+    {
+      "type": "range",
+      "id": "ring_spin",
+      "label": "t:blocks.feature_icon.settings.ring_spin.label",
+      "info": "t:blocks.feature_icon.settings.ring_spin.info",
+      "min": 0,
+      "max": 360,
+      "step": 15,
+      "unit": "°",
+      "default": 0
     },
     { "type": "text", "id": "heading", "label": "t:shared.heading.label", "default": "Free delivery" },
     { "type": "richtext", "id": "text", "label": "t:shared.text.label" },

@@ -137,150 +137,24 @@
   assign box_height = s.height | default: 0 | plus: 0
 
   comment
-    ---- the frame the old vocabulary drew ----
+    ---- the mark ----
 
-    Read first, and only ever used as a fallback below. `icon_frame_style` was
-    one control doing the work of two — a shape *and* a line around it — with a
-    radius stated as a percentage of its own size. The new vocabulary splits
-    those apart, so a saved frame is translated once, here, rather than tested
-    for in six places further down.
+    The glyph, the shape behind it and the ring around that are resolved by
+    `snippets/icon-mark.liquid`, which four blocks in this theme now share. What
+    is left here is whether there is a mark at all: the box carries a size, so an
+    empty one is a hole in the row holding a gap open beside words that have
+    nothing to sit next to.
 
-    50% of a square box is a circle and anything under it is a rounded square:
-    that is what the old radius meant, so it is what decides the Shape.
+    `shape_default: 'none'` because a tile with Shape unset draws a bare glyph.
+    There is no box of this block's own for a ring to trace, which is the case
+    that parameter exists to describe.
   endcomment
-  assign frame_style = s.icon_frame_style | default: 'none'
-  assign frame_size = s.icon_frame_size | default: 56 | plus: 0
-  assign frame_radius_pct = s.icon_frame_radius | default: 50 | plus: 0
-
-  assign frame_shape = 'none'
-  if frame_style != 'none'
-    if frame_radius_pct >= 50
-      assign frame_shape = 'circle'
-    else
-      assign frame_shape = 'square'
-    endif
+  assign has_shape = false
+  if s.shape != blank and s.shape != 'none'
+    assign has_shape = true
+  elsif s.shape == blank and s.icon_frame_style != blank and s.icon_frame_style != 'none'
+    assign has_shape = true
   endif
-  assign frame_radius_px = frame_size | times: frame_radius_pct | divided_by: 100
-
-  comment
-    ---- the shape behind the glyph ----
-
-    `blocks/_feature-icon.liquid`'s three values and its meanings: None leaves
-    the glyph on its own and hides the fill, the size and the radius with it,
-    because there is no box for any of them to describe.
-
-    No `default` in the schema, deliberately. A select with one resolves to its
-    default the moment it is read, which cannot be told apart from a merchant
-    choosing that value — and the difference is exactly what decides whether a
-    badge saved against `icon_frame_style` keeps its frame. Nil means "never
-    answered", so the old frame answers; anything else is the merchant's own.
-  endcomment
-  assign shape = s.shape
-  if shape == blank
-    assign shape = frame_shape
-  endif
-
-  assign shape_size = s.shape_size | default: frame_size | plus: 0
-  assign shape_size_mobile = s.shape_size_mobile | default: shape_size | plus: 0
-
-  comment
-    A circle is a radius of half the box at every size, so it is derived rather
-    than asked for — the Corner radius slider belongs to Square and is hidden
-    on Circle for the same reason Fill is hidden on None.
-  endcomment
-  if shape == 'circle'
-    assign shape_radius = shape_size
-  else
-    assign shape_radius = s.shape_radius | default: frame_radius_px | plus: 0
-  endif
-
-  comment
-    ---- the ring ----
-
-    Offset is the clear space between the shape and the ring, so the ring's own
-    size is derived rather than asked for twice — the same arrangement, and the
-    same reasoning, as the Feature icon's.
-
-    It defaults to 0 here rather than to the feature card's 11. At zero the ring
-    is drawn on the shape's own edge, which is a border — and a border is what
-    the frame this replaces always drew, so a translated badge lands exactly
-    where it was.
-  endcomment
-  assign ring_style = s.ring_style | default: frame_style
-  assign has_ring = false
-  if ring_style != 'none' and shape != 'none'
-    assign has_ring = true
-  endif
-
-  assign ring_width = s.ring_width | default: s.icon_frame_width | default: 1 | plus: 0
-  assign ring_offset = s.ring_offset | default: 0 | plus: 0
-  assign ring_size = shape_size | plus: ring_offset | plus: ring_offset
-  assign ring_size_mobile = shape_size_mobile | plus: ring_offset | plus: ring_offset
-
-  comment
-    The stroke is centred on the path, so the radius is inset by half the width
-    or the ring is clipped by its own viewBox on both sides.
-  endcomment
-  assign ring_half = ring_size | divided_by: 2.0
-  assign ring_radius = ring_size | minus: ring_width | divided_by: 2.0
-  assign ring_inset = ring_width | divided_by: 2.0
-  assign ring_box = ring_size | minus: ring_width
-
-  comment
-    With no ring there is no clear space to hold open, so the shape's box is the
-    shape; with no shape either, the box is the glyph. Both matter to the
-    stylesheet, which sizes the outer box from one property whatever is in it.
-  endcomment
-  unless has_ring
-    assign ring_size = shape_size
-    assign ring_size_mobile = shape_size_mobile
-  endunless
-  if shape == 'none'
-    assign ring_size = icon_size
-    assign ring_size_mobile = icon_size
-  endif
-
-  comment
-    One code path for all three styles, so switching between them cannot change
-    anything but the dash. Solid states no pattern at all. Dotted is a dash of
-    no length with a round cap, which a browser draws as a circle the width of
-    the stroke — the only way to get a true dot out of `stroke-dasharray`, and
-    the reason the gap is stated relative to the width rather than asked for.
-  endcomment
-  assign ring_dash = ''
-  assign ring_cap = 'butt'
-  if ring_style == 'dashed'
-    assign dash_on = s.ring_dash | default: 2 | plus: 0
-    assign dash_off = s.ring_dash_gap | default: 8 | plus: 0
-    assign ring_dash = dash_on | append: ' ' | append: dash_off
-  elsif ring_style == 'dotted'
-    comment
-      The pitch is derived from the thickness rather than asked for, which is
-      what dotted means everywhere else: CSS gives no control over a dotted
-      border's spacing either, because a dot and the space beside it are one
-      proportion and not two numbers. Twice the width is the spacing a browser
-      draws, so a frame translated from the old vocabulary keeps the rhythm it
-      had. Dash gap stays hidden here for the same reason.
-    endcomment
-    assign dash_off = ring_width | times: 2
-    assign ring_dash = '0.01 ' | append: dash_off
-    assign ring_cap = 'round'
-  endif
-
-  assign ring_spin = s.ring_spin | default: 0 | plus: 0
-
-  comment
-    ---- the colours ----
-
-    Each falls back to the frame value it replaces, and every one of them is
-    emitted only when it holds something — so a badge that never picked a fill
-    still gets `transparent` from the stylesheet rather than a colour nobody
-    chose.
-  endcomment
-  assign fill_paint = s.fill_color | default: s.icon_frame_background
-  assign fill_hover_paint = s.fill_hover_color
-  assign ring_paint = s.ring_color | default: s.icon_frame_color
-  assign ring_hover_paint = s.ring_hover_color
 
   comment
     Frosted, for a tile read against a photograph. Same property, same rule
@@ -315,12 +189,9 @@
     assign border_is_gradient = true
   endif
 
-  assign classes = 'badge-highlight badge-highlight--' | append: s.alignment
+  assign classes = 'badge-highlight icon-mark-host badge-highlight--' | append: s.alignment
   if s.hover != 'none'
     assign classes = classes | append: ' badge-highlight--hover-' | append: s.hover
-  endif
-  if shape != 'none'
-    assign classes = classes | append: ' badge-highlight--shape-' | append: shape
   endif
   if border_is_gradient
     assign classes = classes | append: ' badge-highlight--gradient-border'
@@ -391,28 +262,17 @@
   {%- if box_width > 0 -%}--badge-width: {{ box_width }}px;{%- endif -%}
   {%- if box_height > 0 -%}--badge-height: {{ box_height }}px;{%- endif -%}
   {%- if backdrop_blur > 0 -%}--badge-backdrop-blur: {{ backdrop_blur }}px;{%- endif -%}
-  {%- comment -%}
-    Two names per size, one resolved by `base.css` at the breakpoint. Writing
-    the mobile value into the same property is not an option:
-    `--x: var(--x-mobile, var(--x))` is a self-reference, which resolves to the
-    guaranteed-invalid value and takes the declaration down with it. Same pair,
-    same reason, as the Feature icon's.
-  {%- endcomment -%}
-  --badge-ring-size-desktop: {{ ring_size }}px;
-  --badge-ring-size-mobile: {{ ring_size_mobile }}px;
-  {%- if s.icon_hover_color != blank -%}--badge-icon-color-hover: {{ s.icon_hover_color }};{%- endif -%}
-  {%- if shape != 'none' -%}
-    --badge-shape-size-desktop: {{ shape_size }}px;
-    --badge-shape-size-mobile: {{ shape_size_mobile }}px;
-    --badge-shape-radius: {{ shape_radius }}px;
-    {%- if fill_paint != blank -%}--badge-fill: {{ fill_paint }};{%- endif -%}
-    {%- if fill_hover_paint != blank -%}--badge-fill-hover: {{ fill_hover_paint }};{%- endif -%}
-  {%- endif -%}
-  {%- if has_ring -%}
-    {%- if ring_paint != blank -%}--badge-ring-color: {{ ring_paint }};{%- endif -%}
-    {%- if ring_hover_paint != blank -%}--badge-ring-color-hover: {{ ring_hover_paint }};{%- endif -%}
-    {%- if ring_spin != 0 -%}--badge-ring-spin: {{ ring_spin }}deg;{%- endif -%}
-  {%- endif -%}
+{%- endcapture -%}
+
+{%- comment -%}
+  The mark's properties belong on the mark and not on the tile. They are custom
+  properties, so writing them on the tile would inherit them down just the same
+  — but `.icon-mark` is matched on the *presence* of each name in the element's
+  own `style` attribute, and an inherited value is invisible to that test. It is
+  what keeps a mark that set nothing from being restyled.
+{%- endcomment -%}
+{%- capture icon_mark_style -%}
+  {%- render 'icon-mark', block: s, declarations: true, size: icon_size, shape_default: 'none' -%}
 {%- endcapture -%}
 
 <div
@@ -426,72 +286,23 @@
     size of its own, so an empty one is a hole in the row holding a gap open
     beside words that have nothing to sit next to.
   {%- endcomment -%}
-  {%- if has_icon or shape != 'none' -%}
-    <div class="badge-highlight__icon">
-      {%- if has_ring -%}
-        {%- comment -%}
-          Drawn at the desktop size with a matching viewBox, so at that width the
-          dash is exactly the length the merchant asked for. The stylesheet
-          stretches it to whatever box it is in, so at the mobile size the dash
-          scales with the ring rather than the desktop dash being wrapped around
-          a smaller circle.
-
-          A `border` cannot do this. Every browser picks its own dash length and
-          gap from the width, so "2px dash, 8px gap" is not something CSS can be
-          asked for — and Dotted needs a round cap on a zero-length dash, which
-          a border has no way to express at all.
-        {%- endcomment -%}
-        <svg
-          class="badge-highlight__ring"
-          width="{{ ring_size }}"
-          height="{{ ring_size }}"
-          viewBox="0 0 {{ ring_size }} {{ ring_size }}"
-          fill="none"
-          aria-hidden="true"
-          focusable="false"
+  {%- if has_icon or has_shape -%}
+    <div class="badge-highlight__icon icon-mark" style="{{ icon_mark_style | strip_newlines | strip }}">
+      {% render 'icon-mark', block: s, size: icon_size, shape_default: 'none' %}
+      {%- if icon_source == 'svg' and s.custom_svg != blank -%}
+        <span class="badge-highlight__svg" aria-hidden="true">{{ s.custom_svg }}</span>
+      {%- elsif icon_source == 'image' and s.icon_image != blank -%}
+        <img
+          class="badge-highlight__image"
+          src="{{ s.icon_image | image_url: width: 160 }}"
+          alt="{{ s.icon_image_alt | default: '' | escape }}"
+          width="{{ icon_size }}"
+          height="{{ icon_size }}"
+          loading="lazy"
         >
-          {%- if shape == 'square' -%}
-            <rect
-              x="{{ ring_inset }}"
-              y="{{ ring_inset }}"
-              width="{{ ring_box }}"
-              height="{{ ring_box }}"
-              rx="{{ shape_radius | plus: ring_offset }}"
-              stroke="currentColor"
-              stroke-width="{{ ring_width }}"
-              stroke-linecap="{{ ring_cap }}"
-              {% if ring_dash != blank %}stroke-dasharray="{{ ring_dash }}"{% endif %}
-            />
-          {%- else -%}
-            <circle
-              cx="{{ ring_half }}"
-              cy="{{ ring_half }}"
-              r="{{ ring_radius }}"
-              stroke="currentColor"
-              stroke-width="{{ ring_width }}"
-              stroke-linecap="{{ ring_cap }}"
-              {% if ring_dash != blank %}stroke-dasharray="{{ ring_dash }}"{% endif %}
-            />
-          {%- endif -%}
-        </svg>
+      {%- elsif has_icon -%}
+        {% render 'icon', icon: s.icon, size: icon_size, class: 'badge-highlight__glyph' %}
       {%- endif -%}
-
-      <span class="badge-highlight__disc">
-        {%- if icon_source == 'svg' and s.custom_svg != blank -%}
-          <span class="badge-highlight__svg" aria-hidden="true">{{ s.custom_svg }}</span>
-        {%- elsif icon_source == 'image' and s.icon_image != blank -%}
-          <img
-            class="badge-highlight__image"
-            src="{{ s.icon_image | image_url: width: 160 }}"
-            alt="{{ s.icon_image_alt | default: '' | escape }}"
-            width="{{ icon_size }}"
-            height="{{ icon_size }}"
-            loading="lazy"
-          >
-        {%- elsif has_icon -%}
-          {% render 'icon', icon: s.icon, size: icon_size, class: 'badge-highlight__glyph' %}
-        {%- endif -%}
-      </span>
     </div>
   {%- endif -%}
 
@@ -536,7 +347,7 @@
       "id": "icon_source",
       "label": "t:blocks.subheading.settings.icon_source.label",
       "options": [
-        { "value": "none", "label": "t:blocks.subheading.settings.icon_source.options__1.label" },
+        { "value": "none", "label": "t:shared.options.none" },
         { "value": "icon", "label": "t:blocks.subheading.settings.icon_source.options__2.label" },
         { "value": "image", "label": "t:blocks.subheading.settings.icon_source.options__3.label" },
         { "value": "svg", "label": "t:blocks.badge_highlight.settings.icon_source.options__4.label" }
@@ -636,7 +447,7 @@
       "type": "range",
       "id": "shape_size",
       "label": "t:blocks.feature_icon.settings.shape_size.label",
-      "min": 24, "max": 160, "step": 2, "unit": "px", "default": 56,
+      "min": 16, "max": 160, "step": 2, "unit": "px", "default": 56,
       "visible_if": "{{ block.settings.shape != 'none' }}"
     },
     {
@@ -644,7 +455,7 @@
       "id": "shape_size_mobile",
       "label": "t:blocks.feature_icon.settings.shape_size_mobile.label",
       "info": "t:blocks.feature_icon.settings.shape_size_mobile.info",
-      "min": 24, "max": 160, "step": 2, "unit": "px", "default": 56,
+      "min": 16, "max": 160, "step": 2, "unit": "px", "default": 56,
       "visible_if": "{{ block.settings.shape != 'none' }}"
     },
     {

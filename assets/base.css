@@ -2051,6 +2051,205 @@
     flex: 0 0 auto;
   }
 
+  /* ==========================================================================
+     The icon mark — a glyph, a shape behind it, a ring around that
+     ==========================================================================
+     `snippets/icon-mark.liquid` renders this, and four blocks share it: the
+     Highlight tile, the Accordion row, the Icon with text block and the
+     footer's Utility item.
+
+     ## One chain, three links, in priority order
+
+         --icon-mark-<x>          the merchant's setting, written inline by the
+                                  snippet and only when they have set it
+         --icon-mark-own-<x>      the caller's own design, written by the
+                                  caller's own rule
+         a bare CSS default       what a mark with neither looks like
+
+     Every property below is one `var()` down that chain, and that is the whole
+     mechanism. A block that has never been touched resolves to its own value
+     and looks exactly as it did; the moment a setting is set, the inline value
+     is first and wins.
+
+     ## Why it is a chain and not a second rule
+
+     The first version keyed each property off the *presence* of its name in the
+     element's `style` attribute — `.icon-mark[style*='--icon-mark-fill:']` and
+     friends. It reads well and it did not work: the footer's disc kept its
+     40px whatever Shape size said, because `--icon-mark-size` was only ever
+     declared inside one of those selectors, so anything reading
+     `var(--icon-mark-size, …)` got the fallback every time.
+
+     Worse, it could not be made to work by adding rules. A caller like
+     `.utility-item[data-icon-style='solid'] .utility-item__icon` is `(0,3,0)`
+     and the shared rules were `(0,2,0)`, so each new caller needed its own
+     hand-written override at its own weight — which is four places for one
+     idea to be wrong in, and exactly what a shared component is for avoiding.
+
+     A variable cannot lose a specificity contest to itself. The caller keeps
+     its rule, sets `--icon-mark-own-*` in it instead of the property, and the
+     one declaration here reads both.
+     -------------------------------------------------------------------------- */
+
+  .icon-mark {
+    /* The ring is absolutely positioned against this box. */
+    position: relative;
+
+    /* One child, dead centre, and never squeezed by the words beside it. */
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+
+    /* Two source names for the size, resolved here into one. Writing the mobile
+       value into the same name is not an option: `--x: var(--x-mobile, var(--x))`
+       is a self-reference, which resolves to the guaranteed-invalid value and
+       takes the declaration down with it. */
+    --icon-mark-size: var(--icon-mark-size-desktop, var(--icon-mark-own-size, auto));
+    --icon-mark-corner: var(--icon-mark-radius, var(--icon-mark-own-radius, 0px));
+
+    inline-size: var(--icon-mark-size);
+    block-size: var(--icon-mark-size);
+    border-radius: var(--icon-mark-corner);
+    color: var(--icon-mark-color, var(--icon-mark-own-color, inherit));
+    overflow: var(--icon-mark-own-overflow, visible);
+
+    transition: color var(--transition-base);
+  }
+
+  /* ---- the fill, and why the ring offset moves it inward -----------------
+     **Ring offset** used to grow the ring: the box stayed the shape's size and
+     the SVG was pulled out past it by the offset on all four sides. That reads
+     as broken the moment a mark lives inside anything — an 8px offset on a row
+     icon put a dotted ring over the row's own edge, and the fix from there is
+     either clipping the ring off or padding every caller that might ever hold
+     one.
+
+     So the offset scales inward instead. The box is exactly Shape size and
+     nothing ever paints outside it; the ring sits on its edge, and the filled
+     shape shrinks by the offset on each side to make the clear space. Same
+     picture, one direction reversed, and a mark can now be dropped into any
+     layout without moving it.
+
+     The fill therefore cannot be on `.icon-mark` itself — that box is the
+     ring's now — so it is a pseudo-element inset by the offset, with its corners
+     reduced by the same amount so the two curves stay concentric. `max(0px, …)`
+     because an offset larger than the radius would otherwise ask for a negative
+     one, which is invalid and takes the whole declaration down.
+
+     `background`, not `background-color`: **Fill color** is a
+     `color_background`, so a gradient is one of the two things that can arrive,
+     and a gradient handed to `background-color` is dropped outright. */
+  .icon-mark::before {
+    content: '';
+    position: absolute;
+
+    /* Clamped, because **Ring offset** is a number of pixels and the shape it
+       is taken out of is another. The slider runs to 40px and a mark can be
+       16px across, so the two disagree constantly: 22px of offset on a 32px
+       square asks for a shape of −12, the fill disappears, and the control
+       reads as broken rather than as out of range.
+
+       `50% - 4px` is half the box less a floor, so the shape always keeps at
+       least 8px of itself whatever the offset says. The offset stops having an
+       effect rather than turning inside out — which is what a merchant dragging
+       past the useful range should see. */
+    inset: min(var(--icon-mark-inset, 0px), calc(50% - 4px));
+    border-radius: max(0px, calc(var(--icon-mark-corner) - var(--icon-mark-inset, 0px)));
+    background: var(--icon-mark-fill, var(--icon-mark-own-fill, transparent));
+    pointer-events: none;
+    transition: background var(--transition-base);
+  }
+
+  /* The fill is the first child in tree order, so everything after it paints on
+     top — but only if those children are positioned too. `relative` with no
+     `z-index` is enough: it moves the glyph and the ring into the same painting
+     phase as the pseudo-element, where tree order decides. */
+  .icon-mark > * {
+    position: relative;
+  }
+
+  @media screen and (max-width: 749px) {
+    .icon-mark {
+      --icon-mark-size: var(
+        --icon-mark-size-mobile,
+        var(--icon-mark-size-desktop, var(--icon-mark-own-size, auto))
+      );
+    }
+  }
+
+  /* The ring is an inline SVG, not a `border`, and that is the whole reason
+     Dash, Dash gap and Dotted can be settings at all: every browser picks its
+     own dash rhythm from a border's width, and none of them can draw a
+     round-capped zero-length dash. `color` here is what `stroke="currentColor"`
+     reads, which makes the hover swap one declaration.
+
+     `inset` is the offset pulled back out of the box rather than a bigger box,
+     because growing the mark would push the words beside it — the one thing a
+     ring must not do to a design that is already finished. */
+  .icon-mark__ring {
+    position: absolute;
+    inset: 0;
+    inline-size: 100%;
+    block-size: 100%;
+    pointer-events: none;
+    color: var(--icon-mark-ring-color, var(--icon-mark-own-ring-color, currentColor));
+
+    transform: rotate(0deg);
+    transition:
+      color var(--transition-base),
+      transform var(--transition-base);
+  }
+
+  /* The hover swap.
+     -------------------------------------------------------------------------
+     Driven by the mark itself and by a host that opts in, because "hovered" is
+     a different element in each design: a Highlight tile is the thing under the
+     pointer, an Accordion row is, and a Utility item in a footer column is. The
+     caller puts `icon-mark-host` on whichever that is.
+
+     Each colour falls all the way back down the same chain, so a mark with no
+     hover colour set resolves to its resting value and a pointer changes
+     nothing. `--icon-mark-ring-spin` is emitted only when a rotation was asked
+     for, and the `0deg` fallback still has to be declared here or the transform
+     would not return on the way out. */
+  @media (hover: hover) {
+    .icon-mark:hover,
+    .icon-mark-host:hover .icon-mark,
+    .icon-mark-host:focus-within .icon-mark {
+      color: var(
+        --icon-mark-color-hover,
+        var(--icon-mark-color, var(--icon-mark-own-color, inherit))
+      );
+    }
+
+    .icon-mark:hover::before,
+    .icon-mark-host:hover .icon-mark::before,
+    .icon-mark-host:focus-within .icon-mark::before {
+      background: var(
+        --icon-mark-fill-hover,
+        var(--icon-mark-fill, var(--icon-mark-own-fill, transparent))
+      );
+    }
+
+    .icon-mark:hover .icon-mark__ring,
+    .icon-mark-host:hover .icon-mark__ring,
+    .icon-mark-host:focus-within .icon-mark__ring {
+      color: var(
+        --icon-mark-ring-color-hover,
+        var(--icon-mark-ring-color, var(--icon-mark-own-ring-color, currentColor))
+      );
+      transform: rotate(var(--icon-mark-ring-spin, 0deg));
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .icon-mark__ring { transition: color var(--transition-base); }
+
+    .icon-mark:hover .icon-mark__ring,
+    .icon-mark-host:hover .icon-mark__ring,
+    .icon-mark-host:focus-within .icon-mark__ring { transform: none; }
+  }
+
   /* ---- badges ---------------------------------------------------------- */
 
   .badges {
@@ -4273,91 +4472,21 @@
   .badge-highlight--center { flex-direction: column; align-items: center; text-align: center; justify-content: center; }
   .badge-highlight--start { flex-direction: row; align-items: flex-start; }
 
-  /* ---- the mark: a glyph, a shape behind it, a ring around that ----------
-     The same three-part assembly `.feature-icon-block` builds, with the same
-     structure and the same property names one prefix along, because
-     `blocks/badge-highlight.liquid` now offers the Feature icon's controls. What
-     it does not build is the connectors: those tie a feature card's title and
-     text into one column, and a badge has its words beside the mark, not above
-     and below it.
+  /* ---- the mark ----------------------------------------------------------
+     A glyph, a shape behind it, a ring around that — all of it is
+     `snippets/icon-mark.liquid` and the `.icon-mark` component above, which
+     four blocks now share. This block had its own copy of that component and
+     does not any more: the same three groups in two implementations is two
+     places for a fix to land in one of.
 
-     One indirection so everything below follows the breakpoint for free. Two
-     source names, because `--x: var(--x-mobile, var(--x))` is a self-reference
-     that resolves to the guaranteed-invalid value and takes the declaration
-     down with it. */
-  .badge-highlight {
-    --badge-shape-size: var(--badge-shape-size-desktop, 56px);
-    --badge-ring-size: var(--badge-ring-size-desktop, 56px);
-  }
-
-  @media screen and (max-width: 749px) {
-    .badge-highlight {
-      --badge-shape-size: var(--badge-shape-size-mobile, var(--badge-shape-size-desktop, 56px));
-      --badge-ring-size: var(--badge-ring-size-mobile, var(--badge-ring-size-desktop, 56px));
-    }
-  }
-
-  /* The outer box, which is the ring's box when there is a ring and the glyph's
-     when there is not — the block collapses one into the other, so this reads
-     one property either way.
-
-     `flex: 0 0 auto` so a long line of text never squeezes the mark narrower
-     than the merchant set it. */
+     What is left is the box a tile draws when the merchant has *not* chosen a
+     Shape, which is this block's own answer and nobody else's: a box the size
+     of the glyph, in the heading colour. The shared rules are `(0,2,0)` and
+     these are `(0,1,0)`, so the moment a Shape or an Icon color is set the
+     component wins and this is the fallback it fell back from. */
   .badge-highlight__icon {
-    flex: 0 0 auto;
-    position: relative;
-    display: grid;
-    place-items: center;
-    inline-size: var(--badge-ring-size, var(--badge-icon-size, 32px));
-    block-size: var(--badge-ring-size, var(--badge-icon-size, 32px));
-  }
-
-  /* The ring is an inline SVG, not a `border`, and that is the whole reason
-     Dash, Dash gap and Dotted can be settings at all: every browser picks its
-     own dash rhythm from a border's width, and none of them can draw a
-     round-capped zero-length dash. `color` here is what `stroke="currentColor"`
-     reads, which makes the hover swap one declaration.
-
-     The default is the panel's own text colour thinned out, so a ring follows
-     the colour scheme rather than needing to be re-picked per surface — the
-     value the frame this replaces already used. */
-  .badge-highlight__ring {
-    position: absolute;
-    inset: 0;
-    inline-size: 100%;
-    block-size: 100%;
-    pointer-events: none;
-    color: var(--badge-ring-color, color-mix(in srgb, currentColor 25%, transparent));
-
-    transform: rotate(0deg);
-    transition:
-      color var(--transition-base),
-      transform var(--transition-base);
-  }
-
-  /* The filled shape. Sized and painted by the modifier rather than by the
-     property alone, so Shape: None leaves a bare glyph at its own size instead
-     of a 56px transparent box around it. */
-  .badge-highlight__disc {
-    display: grid;
-    place-items: center;
-    color: var(--badge-icon-color, var(--color-heading));
-    transition:
-      background var(--transition-base),
-      color var(--transition-base);
-  }
-
-  .badge-highlight--shape-circle .badge-highlight__disc,
-  .badge-highlight--shape-square .badge-highlight__disc {
-    inline-size: var(--badge-shape-size, 56px);
-    block-size: var(--badge-shape-size, 56px);
-    border-radius: var(--badge-shape-radius, 0);
-
-    /* `background`, not `background-color`: **Fill color** is a
-       `color_background`, so a gradient is one of the two things that can
-       arrive — and a gradient handed to `background-color` is an invalid
-       declaration the browser drops, which paints nothing at all. */
-    background: var(--badge-fill, transparent);
+    --icon-mark-own-size: var(--badge-icon-size, 32px);
+    --icon-mark-own-color: var(--badge-icon-color, var(--color-heading));
   }
 
   /* The glyph keeps the size the merchant chose; only the shape around it is
@@ -4372,34 +4501,6 @@
   }
 
   .badge-highlight__image { object-fit: contain; }
-
-  /* The mark reads the tile's own state, not a card's — a badge is the thing
-     being hovered. Each hover colour falls back to its resting one, so a
-     merchant who cleared a hover swatch gets no change rather than
-     `currentColor`.
-
-     `--badge-ring-spin` is emitted only when a rotation was asked for, and the
-     `0deg` fallback still has to be declared here or the transform would not
-     return on the way out. */
-  @media (hover: hover) {
-    .badge-highlight:hover .badge-highlight__disc,
-    .badge-highlight:focus-within .badge-highlight__disc {
-      background: var(--badge-fill-hover, var(--badge-fill, transparent));
-      color: var(--badge-icon-color-hover, var(--badge-icon-color, var(--color-heading)));
-    }
-
-    .badge-highlight:hover .badge-highlight__ring,
-    .badge-highlight:focus-within .badge-highlight__ring {
-      color: var(--badge-ring-color-hover, var(--badge-ring-color, currentColor));
-      transform: rotate(var(--badge-ring-spin, 0deg));
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .badge-highlight__ring { transition: color var(--transition-base); }
-    .badge-highlight:hover .badge-highlight__ring,
-    .badge-highlight:focus-within .badge-highlight__ring { transform: none; }
-  }
 
   .badge-highlight__body { min-inline-size: 0; display: flex; flex-direction: column; gap: var(--space-2); }
 
@@ -5473,17 +5574,31 @@
   /* The two tiles take the row's own line. One border decision per row: a
      dashed frame with solid tiles inside it is a row that looks like two
      designs arguing. */
+  /* The tile behind the question's icon. Its size, corners, fill and colour are
+     stated as `--icon-mark-own-*` rather than as the properties themselves, so
+     `.icon-mark` reads them as the last link of its chain — and a merchant who
+     sets Shape, Shape size or Fill color has their value read first. Nothing
+     here changes until they do.
+
+     The box, the centring and the flex behaviour now come from `.icon-mark`,
+     which sets all three the same way this rule did. */
   .accordion-row__icon {
-    flex-shrink: 0;
-    display: grid;
-    place-items: center;
-    inline-size: var(--accordion-row-icon-box, 28px);
-    block-size: var(--accordion-row-icon-box, 28px);
+    --icon-mark-own-size: var(--accordion-row-icon-box, 28px);
+    --icon-mark-own-radius: 6px;
+    --icon-mark-own-fill: rgb(var(--color-primary-button-background-rgb) / 0.2);
+    --icon-mark-own-color: var(--color-heading);
+
+    /* The ring's own colour, and the reason **Color** can ship empty.
+       `.icon-mark__ring` falls back to `currentColor`, which here is the heading
+       colour — a hard dark outline around a pale green tile, which is not the
+       tile any more. The accent at a little under half strength is the same
+       colour the fill already is, one step stronger: it reads as the edge of
+       the tile rather than as a box drawn around it. A merchant who picks a
+       Color still wins, because theirs is earlier in the chain. */
+    --icon-mark-own-ring-color: rgb(var(--color-primary-button-background-rgb) / 0.45);
+
     border: var(--accordion-row-border-width, 0) var(--accordion-row-border-style, solid)
       var(--accordion-row-border-color, transparent);
-    border-radius: 6px;
-    background-color: rgb(var(--color-primary-button-background-rgb) / 0.2);
-    color: var(--color-heading);
   }
 
   .accordion-row__icon-image { inline-size: var(--accordion-row-icon-size, 16px); }
@@ -6872,6 +6987,14 @@
   .block-icon-text__heading { font-weight: 500; }
   .block-icon-text__text { font-size: var(--font-size-sm); color: var(--color-accent-text); }
   .block-icon-text__custom { inline-size: 4.8rem; }
+
+  /* The box a ring can be positioned against. It paints nothing and measures
+     nothing of its own — `auto` is the last link of the size chain, so the
+     wrapper hugs the glyph exactly as the bare `<svg>` did before it existed.
+     Shape gives it a size only when a merchant asks for one. */
+  .block-icon-text__mark {
+    --icon-mark-own-size: auto;
+  }
 
   .block-spacer { block-size: var(--spacer-height, 3.2rem); }
 

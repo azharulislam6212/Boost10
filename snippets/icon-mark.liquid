@@ -1,0 +1,330 @@
+{% doc %}
+  snippets/icon-mark.liquid
+
+  The **Icon / Shape / Ring** vocabulary, resolved in one place for every block
+  that offers it.
+
+  `blocks/_feature-icon.liquid` settled what a mark is in this theme: a glyph, a
+  filled shape behind it, and a ring around that. Four blocks now offer the same
+  three groups — the Highlight tile, the Accordion row, the Icon with text block
+  and the footer's Utility item — and a fifth will want it tomorrow. This is the
+  one implementation they share, so "the same settings" means the same code and
+  not four copies that drift.
+
+  ## It adds, it does not replace
+
+  Every property below is emitted **only when the merchant has actually chosen
+  something**. A block whose Shape and Ring have never been touched writes no
+  declarations at all and draws no ring, so its own stylesheet rules are the
+  whole answer and the mark looks exactly as it did before this file existed.
+
+  That is what makes the snippet safe to drop into a block that already has a
+  design. The caller does not hand over its rules; it threads this vocabulary
+  through them as the first fallback:
+
+      background: var(--icon-mark-fill, <whatever it painted before>);
+
+  No specificity contest, no rule to keep in step, and nothing changes until a
+  setting is set.
+
+  ## Two calls, one snippet
+
+  `declarations: true` returns the custom property list for the caller's own
+  `style` attribute; called without it the snippet returns the ring's `<svg>`,
+  to be placed inside the element that carries those properties. Same two-mode
+  arrangement as `snippets/spacing.liquid`, and for the same reason: an element
+  can only have one `style` attribute, so the caller has to be the one that
+  writes it.
+
+  ## The ring is an SVG, not a `border`
+
+  `border-style: dashed` gives no control over the dash — every browser picks
+  its own length and gap from the width — and there is no way at all to express
+  a round-capped dot. A `<circle>` with `stroke-dasharray` states both, which is
+  why **Dash** and **Dash gap** can be settings rather than something a merchant
+  has to accept from their browser.
+
+  Dotted is the one style whose spacing is *not* a setting. A dot and the space
+  beside it are one proportion, not two numbers — which is exactly why CSS gives
+  no control over a dotted border either — so the pitch is twice the thickness
+  and Dash gap stays hidden.
+
+  ## The old frame settings still render
+
+  `blocks/badge-highlight.liquid` used to carry `icon_frame_*`: a style, a size,
+  a px width, a *percentage* radius, a colour and a background — one control
+  doing the work of a Shape and a Ring together. Those ids are read here as the
+  fallback beneath the new ones, so a tile saved against the old vocabulary
+  draws the mark it always drew: the frame becomes a Shape with a Ring at zero
+  offset, which is the same picture by a different name.
+
+  Nothing else in the theme has those keys, so for every other caller the
+  translation resolves to nil and costs a comparison.
+
+  @param {object} block - The block's settings hash (`block.settings`)
+  @param {boolean} [declarations] - Return the custom properties rather than the ring
+
+  @example
+    {%- capture mark -%}{% render 'icon-mark', block: s, declarations: true %}{%- endcapture -%}
+    <span class="utility-item__icon icon-mark" style="{{ mark }}">
+      {% render 'icon-mark', block: s %}
+      {% render 'icon', icon: s.icon, size: icon_size %}
+    </span>
+{% enddoc %}
+
+{%- liquid
+  assign m = block
+
+  comment
+    ---- the frame the old vocabulary drew ----
+
+    Read first and only ever used as a fallback. 50% of a square box is a circle
+    and anything under it is a rounded square: that is what the old percentage
+    radius meant, so it is what decides the Shape.
+  endcomment
+  assign frame_style = m.icon_frame_style | default: 'none'
+  assign frame_size = m.icon_frame_size | default: 56 | plus: 0
+  assign frame_radius_pct = m.icon_frame_radius | default: 50 | plus: 0
+
+  assign frame_shape = ''
+  if frame_style != 'none'
+    if frame_radius_pct >= 50
+      assign frame_shape = 'circle'
+    else
+      assign frame_shape = 'square'
+    endif
+  endif
+  assign frame_radius_px = frame_size | times: frame_radius_pct | divided_by: 100
+
+  comment
+    ---- the shape ----
+
+    `none` is the default in every schema that offers this panel except the
+    Feature icon's, whose own design is a circle. That is the one deviation
+    between those panels and it is deliberate: a default is the only part of a
+    setting that paints something before anybody touches it, so a block that
+    already draws its own mark defaults to None and keeps drawing it.
+
+    None means this snippet emits no size, no radius and no fill, and the
+    caller's stylesheet is still the whole answer.
+  endcomment
+  assign shape = m.shape | default: 'none'
+
+  comment
+    A Highlight tile saved against `icon_frame_style`. Its Shape reads None
+    because that is the schema's default and it was never answered — but the old
+    frame says otherwise, and the old frame is what is on the page.
+
+    It is a branch and not a chain of `| default:` filters, and that matters.
+    Every new setting now carries the Feature icon's own default — 86px, 11px of
+    offset, a 2px ring — so `m.shape_size | default: frame_size` never reaches
+    the frame: 86 is not nil. A tile translated field by field would have kept
+    its frame's *style* and taken the feature card's *measurements*, which is a
+    56px badge redrawn at 86 with a ring floating 11px off it.
+
+    So the two vocabularies are read whole, one or the other, and `from_frame`
+    is which.
+  endcomment
+  assign from_frame = false
+  if shape == 'none' and frame_shape != ''
+    assign from_frame = true
+    assign shape = frame_shape
+  endif
+
+  assign shape_chosen = false
+  if shape != 'none'
+    assign shape_chosen = true
+  endif
+
+  if from_frame
+    assign shape_size = frame_size
+    assign shape_size_mobile = frame_size
+  else
+    assign shape_size = m.shape_size | default: 86 | plus: 0
+    assign shape_size_mobile = m.shape_size_mobile | default: shape_size | plus: 0
+  endif
+
+  comment
+    A circle is half its own box at every size, so the radius is derived rather
+    than asked for — which is why Corner radius belongs to Square and is hidden
+    on Circle.
+  endcomment
+  if shape == 'circle'
+    assign shape_radius = shape_size
+  elsif from_frame
+    assign shape_radius = frame_radius_px
+  else
+    assign shape_radius = m.shape_radius | default: 16 | plus: 0
+  endif
+
+  comment
+    ---- the ring ----
+
+    Offset is the clear space between the shape and the ring, and it is taken
+    *inward*. The ring is drawn on the mark's own edge and the filled shape
+    shrinks by the offset to make the gap, so Shape size is the whole outer
+    measurement and nothing ever paints outside it.
+
+    The other direction — the ring growing past the box — is what this used to
+    do, and it put an 8px dotted ring over an accordion row's own border. A mark
+    that changes the layout around it when a ring is switched on is a mark that
+    cannot be dropped into anything.
+
+    A frame drew a line *on* the shape's edge, which is an offset of nothing —
+    so a translated tile takes zero here whatever the slider's default says, and
+    keeps the thickness the frame was given.
+  endcomment
+  assign ring_style = m.ring_style | default: 'none'
+  if from_frame
+    assign ring_style = frame_style
+  endif
+
+  assign has_ring = false
+  if ring_style != 'none' and shape != 'none'
+    assign has_ring = true
+  endif
+
+  if from_frame
+    assign ring_width = m.icon_frame_width | default: 1 | plus: 0
+    assign ring_offset = 0
+  else
+    assign ring_width = m.ring_width | default: 2 | plus: 0
+    assign ring_offset = m.ring_offset | default: 11 | plus: 0
+  endif
+
+  comment
+    The ring's box is the mark's box, at both breakpoints. Drawn at the desktop
+    size with a matching viewBox and stretched by the stylesheet to whatever box
+    it lands in, so the dash scales with the ring on a phone rather than the
+    desktop dash being wrapped around a smaller circle.
+  endcomment
+  assign ring_size = shape_size
+
+  comment
+    The stroke is centred on the path, so the radius is inset by half the width
+    or the ring is clipped by its own viewBox on both sides.
+  endcomment
+  assign ring_half = ring_size | divided_by: 2.0
+  assign ring_radius = ring_size | minus: ring_width | divided_by: 2.0
+  assign ring_inset = ring_width | divided_by: 2.0
+  assign ring_box = ring_size | minus: ring_width
+
+  comment
+    One code path for all three styles, so switching between them cannot change
+    anything but the dash. Solid states no pattern at all; dotted is a dash of
+    no length under a round cap, which a browser draws as a circle the width of
+    the stroke.
+  endcomment
+  assign ring_dash = ''
+  assign ring_cap = 'butt'
+  if ring_style == 'dashed'
+    assign dash_on = m.ring_dash | default: 2 | plus: 0
+    assign dash_off = m.ring_dash_gap | default: 8 | plus: 0
+    assign ring_dash = dash_on | append: ' ' | append: dash_off
+  elsif ring_style == 'dotted'
+    assign dash_off = ring_width | times: 2
+    assign ring_dash = '0.01 ' | append: dash_off
+    assign ring_cap = 'round'
+  endif
+
+  assign ring_spin = m.ring_spin | default: 0 | plus: 0
+  if from_frame
+    comment
+      A frame never turned, so a translated tile does not start turning because
+      the new slider ships at 180.
+    endcomment
+    assign ring_spin = 0
+  endif
+
+  comment
+    ---- the colours ----
+
+    Each falls back to the frame value it replaces and each is emitted only when
+    it holds something, so a mark that never picked a fill keeps whatever its
+    own stylesheet paints rather than a colour nobody chose.
+  endcomment
+  if from_frame
+    assign fill_paint = m.icon_frame_background
+    assign fill_hover_paint = ''
+    assign ring_paint = m.icon_frame_color
+    assign ring_hover_paint = ''
+  else
+    assign fill_paint = m.fill_color
+    assign fill_hover_paint = m.fill_hover_color
+    assign ring_paint = m.ring_color
+    assign ring_hover_paint = m.ring_hover_color
+  endif
+-%}
+
+{%- if declarations -%}
+  {%- comment -%}
+    Two names per size, resolved into one by `base.css` at the breakpoint.
+    Writing the mobile value into the same property is not an option:
+    `--x: var(--x-mobile, var(--x))` is a self-reference, which resolves to the
+    guaranteed-invalid value and takes the declaration down with it.
+
+    The size, the radius and the fill are gated on the merchant having chosen a
+    Shape. Without that the caller is still drawing its own box, and handing it
+    a 56px default would resize a mark nobody asked to resize.
+  {%- endcomment -%}
+  {%- if shape_chosen and shape != 'none' -%}
+    --icon-mark-size-desktop:{{ shape_size }}px;
+    --icon-mark-size-mobile:{{ shape_size_mobile }}px;
+    --icon-mark-radius:{{ shape_radius }}px;
+    {%- if fill_paint != blank -%}--icon-mark-fill:{{ fill_paint }};{%- endif -%}
+    {%- if fill_hover_paint != blank -%}--icon-mark-fill-hover:{{ fill_hover_paint }};{%- endif -%}
+  {%- endif -%}
+  {%- if m.icon_color != blank -%}--icon-mark-color:{{ m.icon_color }};{%- endif -%}
+  {%- if m.icon_hover_color != blank -%}--icon-mark-color-hover:{{ m.icon_hover_color }};{%- endif -%}
+  {%- if has_ring -%}
+    {%- if ring_paint != blank -%}--icon-mark-ring-color:{{ ring_paint }};{%- endif -%}
+    {%- if ring_hover_paint != blank -%}--icon-mark-ring-color-hover:{{ ring_hover_paint }};{%- endif -%}
+    {%- if ring_spin != 0 -%}--icon-mark-ring-spin:{{ ring_spin }}deg;{%- endif -%}
+  {%- endif -%}
+  {%- comment -%}
+    How far the filled shape is pulled in from the ring. Emitted only when there
+    is a ring and a gap to hold open, so a mark with neither keeps its fill
+    flush to its own edge.
+  {%- endcomment -%}
+  {%- if has_ring and ring_offset > 0 -%}--icon-mark-inset:{{ ring_offset }}px;{%- endif -%}
+{%- elsif has_ring -%}
+  {%- comment -%}
+    Drawn at the desktop size with a matching viewBox, so at that width the dash
+    is exactly the length the merchant asked for. The stylesheet stretches it to
+    whatever box it is in, so at a smaller size the dash scales with the ring
+    rather than the desktop dash being wrapped around a smaller circle.
+  {%- endcomment -%}
+  <svg
+    class="icon-mark__ring"
+    width="{{ ring_size }}"
+    height="{{ ring_size }}"
+    viewBox="0 0 {{ ring_size }} {{ ring_size }}"
+    fill="none"
+    aria-hidden="true"
+    focusable="false"
+  >
+    {%- if shape == 'square' -%}
+      <rect
+        x="{{ ring_inset }}"
+        y="{{ ring_inset }}"
+        width="{{ ring_box }}"
+        height="{{ ring_box }}"
+        rx="{{ shape_radius }}"
+        stroke="currentColor"
+        stroke-width="{{ ring_width }}"
+        stroke-linecap="{{ ring_cap }}"
+        {% if ring_dash != blank %}stroke-dasharray="{{ ring_dash }}"{% endif %}
+      />
+    {%- else -%}
+      <circle
+        cx="{{ ring_half }}"
+        cy="{{ ring_half }}"
+        r="{{ ring_radius }}"
+        stroke="currentColor"
+        stroke-width="{{ ring_width }}"
+        stroke-linecap="{{ ring_cap }}"
+        {% if ring_dash != blank %}stroke-dasharray="{{ ring_dash }}"{% endif %}
+      />
+    {%- endif -%}
+  </svg>
+{%- endif -%}
