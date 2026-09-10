@@ -3,12 +3,46 @@
 
   One trust badge: an icon, an optional pill, a heading and some text.
 
-  ## The icon has three sources, in order
+  ## The icon is the Feature icon's, control for control
 
-  Custom SVG code, then an uploaded image, then the theme's icon set. The SVG
-  field exists because merchants are given brand icons as SVG and pasting them
-  is the only way to use them without an upload losing the ability to inherit
-  colour.
+  The glyph, the shape behind it and the ring around that are the same three
+  groups `blocks/_feature-icon.liquid` offers, with the same setting ids, the
+  same labels and the same meanings — Icon / Shape / Ring. A merchant who has
+  styled a feature card already knows this panel, and a designer specifying one
+  mark specifies both.
+
+  What is deliberately *not* copied is the connectors. Those are the feature
+  card's spine, tying a title and a paragraph into one column; a badge is a tile
+  with its words beside the mark, and there is nothing above or below for a
+  hairline to join.
+
+  Two additions the shared vocabulary needed:
+
+    Dotted ring   the badge's old frame offered it and tiles in the theme use
+                  it. `stroke-dasharray` with round caps draws it, so it is one
+                  more dash pattern rather than a second code path.
+
+    Gradient fill **Fill color** is a `color_background`, because the design's
+                  mark is a green gradient squircle. The Feature icon's is a
+                  flat `color`; a gradient is a superset and nothing about a
+                  flat colour changes.
+
+  ### The old frame settings still render
+
+  Before this the icon sat in `icon_frame_*` — a style, a size, a px width, a
+  *percentage* radius, a colour and a background. Those ids are gone from the
+  panel but every one of them is still read, as the fallback beneath the new
+  setting, so a badge saved against the old vocabulary draws exactly the mark it
+  drew before: the frame becomes a Shape with a Ring at zero offset, which is
+  the same picture by a different name. The moment a merchant touches the new
+  controls their value wins and the legacy read is over.
+
+  ## The custom SVG is a source, not a race
+
+  Custom SVG, an upload and the theme set used to be tried in that order, and a
+  merchant discovered which had won by clearing fields until the right mark
+  appeared. **Icon** now states the source and only its own field is shown —
+  the same rule `blocks/subheading.liquid` keeps.
 
   Pasted SVG is not escaped — it cannot be, or the field is useless — and that is
   the merchant's own input from their own admin, the same trust boundary
@@ -29,6 +63,40 @@
   assign has_link = false
   if s.link != blank
     assign has_link = true
+  endif
+
+  comment
+    ---- where the mark comes from ----
+
+    Stated, not raced. `icon_source` is the new control; a badge saved before it
+    existed has nothing in it, and for those the old order — pasted SVG, then an
+    upload, then the theme set — is reproduced here so the mark they are showing
+    is the mark they keep.
+  endcomment
+  assign icon_source = s.icon_source
+  if icon_source == blank
+    if s.custom_svg != blank
+      assign icon_source = 'svg'
+    elsif s.icon_image != blank
+      assign icon_source = 'image'
+    else
+      assign icon_source = 'icon'
+    endif
+  endif
+
+  comment
+    The field belonging to the source has to actually hold something. A merchant
+    who picks Image and has not uploaded one yet gets the words on their own
+    rather than an empty box holding a gap open — the same rule
+    `blocks/subheading.liquid` and `blocks/_feature-icon.liquid` both keep.
+  endcomment
+  assign has_icon = false
+  if icon_source == 'icon' and s.icon != blank and s.icon != 'none'
+    assign has_icon = true
+  elsif icon_source == 'image' and s.icon_image != blank
+    assign has_icon = true
+  elsif icon_source == 'svg' and s.custom_svg != blank
+    assign has_icon = true
   endif
 
   capture icon_px
@@ -69,25 +137,150 @@
   assign box_height = s.height | default: 0 | plus: 0
 
   comment
-    ---- the ring round the icon ----
+    ---- the frame the old vocabulary drew ----
 
-    A frame the icon sits inside, which is what turns a bare glyph into a mark.
-    `none` is the default, so every badge already in a theme is untouched.
+    Read first, and only ever used as a fallback below. `icon_frame_style` was
+    one control doing the work of two — a shape *and* a line around it — with a
+    radius stated as a percentage of its own size. The new vocabulary splits
+    those apart, so a saved frame is translated once, here, rather than tested
+    for in six places further down.
 
-    The frame has its own size because it is not the icon's: the ring in the
-    design is 56px around a 20px glyph, and tying the two together would mean
-    growing the icon to grow the ring.
+    50% of a square box is a circle and anything under it is a rounded square:
+    that is what the old radius meant, so it is what decides the Shape.
   endcomment
   assign frame_style = s.icon_frame_style | default: 'none'
   assign frame_size = s.icon_frame_size | default: 56 | plus: 0
-  assign frame_width = s.icon_frame_width | default: 1 | plus: 0
+  assign frame_radius_pct = s.icon_frame_radius | default: 50 | plus: 0
+
+  assign frame_shape = 'none'
+  if frame_style != 'none'
+    if frame_radius_pct >= 50
+      assign frame_shape = 'circle'
+    else
+      assign frame_shape = 'square'
+    endif
+  endif
+  assign frame_radius_px = frame_size | times: frame_radius_pct | divided_by: 100
 
   comment
-    A percentage, so 50 is a circle at any frame size and everything below it is
-    a rounded square that stays in proportion when the frame grows. A px radius
-    would have to be re-picked every time the size slider moved.
+    ---- the shape behind the glyph ----
+
+    `blocks/_feature-icon.liquid`'s three values and its meanings: None leaves
+    the glyph on its own and hides the fill, the size and the radius with it,
+    because there is no box for any of them to describe.
+
+    No `default` in the schema, deliberately. A select with one resolves to its
+    default the moment it is read, which cannot be told apart from a merchant
+    choosing that value — and the difference is exactly what decides whether a
+    badge saved against `icon_frame_style` keeps its frame. Nil means "never
+    answered", so the old frame answers; anything else is the merchant's own.
   endcomment
-  assign frame_radius = s.icon_frame_radius | default: 50 | plus: 0
+  assign shape = s.shape
+  if shape == blank
+    assign shape = frame_shape
+  endif
+
+  assign shape_size = s.shape_size | default: frame_size | plus: 0
+  assign shape_size_mobile = s.shape_size_mobile | default: shape_size | plus: 0
+
+  comment
+    A circle is a radius of half the box at every size, so it is derived rather
+    than asked for — the Corner radius slider belongs to Square and is hidden
+    on Circle for the same reason Fill is hidden on None.
+  endcomment
+  if shape == 'circle'
+    assign shape_radius = shape_size
+  else
+    assign shape_radius = s.shape_radius | default: frame_radius_px | plus: 0
+  endif
+
+  comment
+    ---- the ring ----
+
+    Offset is the clear space between the shape and the ring, so the ring's own
+    size is derived rather than asked for twice — the same arrangement, and the
+    same reasoning, as the Feature icon's.
+
+    It defaults to 0 here rather than to the feature card's 11. At zero the ring
+    is drawn on the shape's own edge, which is a border — and a border is what
+    the frame this replaces always drew, so a translated badge lands exactly
+    where it was.
+  endcomment
+  assign ring_style = s.ring_style | default: frame_style
+  assign has_ring = false
+  if ring_style != 'none' and shape != 'none'
+    assign has_ring = true
+  endif
+
+  assign ring_width = s.ring_width | default: s.icon_frame_width | default: 1 | plus: 0
+  assign ring_offset = s.ring_offset | default: 0 | plus: 0
+  assign ring_size = shape_size | plus: ring_offset | plus: ring_offset
+  assign ring_size_mobile = shape_size_mobile | plus: ring_offset | plus: ring_offset
+
+  comment
+    The stroke is centred on the path, so the radius is inset by half the width
+    or the ring is clipped by its own viewBox on both sides.
+  endcomment
+  assign ring_half = ring_size | divided_by: 2.0
+  assign ring_radius = ring_size | minus: ring_width | divided_by: 2.0
+  assign ring_inset = ring_width | divided_by: 2.0
+  assign ring_box = ring_size | minus: ring_width
+
+  comment
+    With no ring there is no clear space to hold open, so the shape's box is the
+    shape; with no shape either, the box is the glyph. Both matter to the
+    stylesheet, which sizes the outer box from one property whatever is in it.
+  endcomment
+  unless has_ring
+    assign ring_size = shape_size
+    assign ring_size_mobile = shape_size_mobile
+  endunless
+  if shape == 'none'
+    assign ring_size = icon_size
+    assign ring_size_mobile = icon_size
+  endif
+
+  comment
+    One code path for all three styles, so switching between them cannot change
+    anything but the dash. Solid states no pattern at all. Dotted is a dash of
+    no length with a round cap, which a browser draws as a circle the width of
+    the stroke — the only way to get a true dot out of `stroke-dasharray`, and
+    the reason the gap is stated relative to the width rather than asked for.
+  endcomment
+  assign ring_dash = ''
+  assign ring_cap = 'butt'
+  if ring_style == 'dashed'
+    assign dash_on = s.ring_dash | default: 2 | plus: 0
+    assign dash_off = s.ring_dash_gap | default: 8 | plus: 0
+    assign ring_dash = dash_on | append: ' ' | append: dash_off
+  elsif ring_style == 'dotted'
+    comment
+      The pitch is derived from the thickness rather than asked for, which is
+      what dotted means everywhere else: CSS gives no control over a dotted
+      border's spacing either, because a dot and the space beside it are one
+      proportion and not two numbers. Twice the width is the spacing a browser
+      draws, so a frame translated from the old vocabulary keeps the rhythm it
+      had. Dash gap stays hidden here for the same reason.
+    endcomment
+    assign dash_off = ring_width | times: 2
+    assign ring_dash = '0.01 ' | append: dash_off
+    assign ring_cap = 'round'
+  endif
+
+  assign ring_spin = s.ring_spin | default: 0 | plus: 0
+
+  comment
+    ---- the colours ----
+
+    Each falls back to the frame value it replaces, and every one of them is
+    emitted only when it holds something — so a badge that never picked a fill
+    still gets `transparent` from the stylesheet rather than a colour nobody
+    chose.
+  endcomment
+  assign fill_paint = s.fill_color | default: s.icon_frame_background
+  assign fill_hover_paint = s.fill_hover_color
+  assign ring_paint = s.ring_color | default: s.icon_frame_color
+  assign ring_hover_paint = s.ring_hover_color
 
   comment
     Frosted, for a tile read against a photograph. Same property, same rule
@@ -126,8 +319,8 @@
   if s.hover != 'none'
     assign classes = classes | append: ' badge-highlight--hover-' | append: s.hover
   endif
-  if frame_style != 'none'
-    assign classes = classes | append: ' badge-highlight--framed'
+  if shape != 'none'
+    assign classes = classes | append: ' badge-highlight--shape-' | append: shape
   endif
   if border_is_gradient
     assign classes = classes | append: ' badge-highlight--gradient-border'
@@ -198,13 +391,27 @@
   {%- if box_width > 0 -%}--badge-width: {{ box_width }}px;{%- endif -%}
   {%- if box_height > 0 -%}--badge-height: {{ box_height }}px;{%- endif -%}
   {%- if backdrop_blur > 0 -%}--badge-backdrop-blur: {{ backdrop_blur }}px;{%- endif -%}
-  {%- if frame_style != 'none' -%}
-    --badge-frame-size: {{ frame_size }}px;
-    --badge-frame-style: {{ frame_style }};
-    --badge-frame-width: {{ frame_width }}px;
-    --badge-frame-radius: {{ frame_radius }}%;
-    {%- if s.icon_frame_color != blank -%}--badge-frame-color: {{ s.icon_frame_color }};{%- endif -%}
-    {%- if s.icon_frame_background != blank -%}--badge-frame-background: {{ s.icon_frame_background }};{%- endif -%}
+  {%- comment -%}
+    Two names per size, one resolved by `base.css` at the breakpoint. Writing
+    the mobile value into the same property is not an option:
+    `--x: var(--x-mobile, var(--x))` is a self-reference, which resolves to the
+    guaranteed-invalid value and takes the declaration down with it. Same pair,
+    same reason, as the Feature icon's.
+  {%- endcomment -%}
+  --badge-ring-size-desktop: {{ ring_size }}px;
+  --badge-ring-size-mobile: {{ ring_size_mobile }}px;
+  {%- if s.icon_hover_color != blank -%}--badge-icon-color-hover: {{ s.icon_hover_color }};{%- endif -%}
+  {%- if shape != 'none' -%}
+    --badge-shape-size-desktop: {{ shape_size }}px;
+    --badge-shape-size-mobile: {{ shape_size_mobile }}px;
+    --badge-shape-radius: {{ shape_radius }}px;
+    {%- if fill_paint != blank -%}--badge-fill: {{ fill_paint }};{%- endif -%}
+    {%- if fill_hover_paint != blank -%}--badge-fill-hover: {{ fill_hover_paint }};{%- endif -%}
+  {%- endif -%}
+  {%- if has_ring -%}
+    {%- if ring_paint != blank -%}--badge-ring-color: {{ ring_paint }};{%- endif -%}
+    {%- if ring_hover_paint != blank -%}--badge-ring-color-hover: {{ ring_hover_paint }};{%- endif -%}
+    {%- if ring_spin != 0 -%}--badge-ring-spin: {{ ring_spin }}deg;{%- endif -%}
   {%- endif -%}
 {%- endcapture -%}
 
@@ -214,19 +421,79 @@
   style="{{ badge_style | strip_newlines | strip }}"
   {{ block.shopify_attributes }}
 >
-  <div class="badge-highlight__icon">
-    {%- if s.custom_svg != blank -%}
-      <span class="badge-highlight__svg" aria-hidden="true">{{ s.custom_svg }}</span>
-    {%- elsif s.icon_image != blank -%}
-      {% render 'image',
-         image: s.icon_image,
-         alt: '',
-         ratio: 'square',
-         sizes: '64px' %}
-    {%- elsif s.icon != 'none' -%}
-      {% render 'icon', icon: s.icon, size: icon_size %}
-    {%- endif -%}
-  </div>
+  {%- comment -%}
+    The box is only rendered when there is a mark to put in it. It carries a
+    size of its own, so an empty one is a hole in the row holding a gap open
+    beside words that have nothing to sit next to.
+  {%- endcomment -%}
+  {%- if has_icon or shape != 'none' -%}
+    <div class="badge-highlight__icon">
+      {%- if has_ring -%}
+        {%- comment -%}
+          Drawn at the desktop size with a matching viewBox, so at that width the
+          dash is exactly the length the merchant asked for. The stylesheet
+          stretches it to whatever box it is in, so at the mobile size the dash
+          scales with the ring rather than the desktop dash being wrapped around
+          a smaller circle.
+
+          A `border` cannot do this. Every browser picks its own dash length and
+          gap from the width, so "2px dash, 8px gap" is not something CSS can be
+          asked for — and Dotted needs a round cap on a zero-length dash, which
+          a border has no way to express at all.
+        {%- endcomment -%}
+        <svg
+          class="badge-highlight__ring"
+          width="{{ ring_size }}"
+          height="{{ ring_size }}"
+          viewBox="0 0 {{ ring_size }} {{ ring_size }}"
+          fill="none"
+          aria-hidden="true"
+          focusable="false"
+        >
+          {%- if shape == 'square' -%}
+            <rect
+              x="{{ ring_inset }}"
+              y="{{ ring_inset }}"
+              width="{{ ring_box }}"
+              height="{{ ring_box }}"
+              rx="{{ shape_radius | plus: ring_offset }}"
+              stroke="currentColor"
+              stroke-width="{{ ring_width }}"
+              stroke-linecap="{{ ring_cap }}"
+              {% if ring_dash != blank %}stroke-dasharray="{{ ring_dash }}"{% endif %}
+            />
+          {%- else -%}
+            <circle
+              cx="{{ ring_half }}"
+              cy="{{ ring_half }}"
+              r="{{ ring_radius }}"
+              stroke="currentColor"
+              stroke-width="{{ ring_width }}"
+              stroke-linecap="{{ ring_cap }}"
+              {% if ring_dash != blank %}stroke-dasharray="{{ ring_dash }}"{% endif %}
+            />
+          {%- endif -%}
+        </svg>
+      {%- endif -%}
+
+      <span class="badge-highlight__disc">
+        {%- if icon_source == 'svg' and s.custom_svg != blank -%}
+          <span class="badge-highlight__svg" aria-hidden="true">{{ s.custom_svg }}</span>
+        {%- elsif icon_source == 'image' and s.icon_image != blank -%}
+          <img
+            class="badge-highlight__image"
+            src="{{ s.icon_image | image_url: width: 160 }}"
+            alt="{{ s.icon_image_alt | default: '' | escape }}"
+            width="{{ icon_size }}"
+            height="{{ icon_size }}"
+            loading="lazy"
+          >
+        {%- elsif has_icon -%}
+          {% render 'icon', icon: s.icon, size: icon_size, class: 'badge-highlight__glyph' %}
+        {%- endif -%}
+      </span>
+    </div>
+  {%- endif -%}
 
   <div class="badge-highlight__body">
     {%- if s.pill != blank -%}
@@ -265,22 +532,68 @@
     { "type": "header", "content": "t:blocks.badge_highlight.headers.icon" },
     { "type": "paragraph", "content": "t:blocks.badge_highlight.paragraph" },
     {
-      "type": "select", "id": "icon", "label": "t:blocks.icon_with_text.settings.icon.label",
+      "type": "select",
+      "id": "icon_source",
+      "label": "t:blocks.subheading.settings.icon_source.label",
       "options": [
-        { "value": "none", "label": "t:settings_schema.typography.options.case_default" },
-        { "value": "truck", "label": "t:blocks.icon_with_text.settings.icon.options__1.label" },
-        { "value": "shield", "label": "t:blocks.icon_with_text.settings.icon.options__2.label" },
-        { "value": "refresh", "label": "t:blocks.icon_with_text.settings.icon.options__3.label" },
-        { "value": "check", "label": "t:blocks.icon_with_text.settings.icon.options__4.label" },
-        { "value": "star", "label": "t:blocks.icon_with_text.settings.icon.options__5.label" },
-        { "value": "info", "label": "t:blocks.icon_with_text.settings.icon.options__6.label" }
+        { "value": "none", "label": "t:blocks.subheading.settings.icon_source.options__1.label" },
+        { "value": "icon", "label": "t:blocks.subheading.settings.icon_source.options__2.label" },
+        { "value": "image", "label": "t:blocks.subheading.settings.icon_source.options__3.label" },
+        { "value": "svg", "label": "t:blocks.badge_highlight.settings.icon_source.options__4.label" }
       ],
-      "default": "truck"
+      "default": "icon"
     },
-    { "type": "image_picker", "id": "icon_image", "label": "t:blocks.badge_highlight.settings.icon_image.label", "info": "t:blocks.badge_highlight.settings.icon_image.info" },
-    { "type": "html", "id": "custom_svg", "label": "t:blocks.badge_highlight.settings.custom_svg.label", "info": "t:blocks.badge_highlight.settings.custom_svg.info" },
     {
-      "type": "select", "id": "icon_size", "label": "t:blocks.badge_highlight.settings.icon_size.label",
+      "type": "select",
+      "id": "icon",
+      "label": "t:blocks.subheading.settings.icon.label",
+      "options": [
+        { "value": "star", "label": "t:blocks.subheading.settings.icon.options__1.label" },
+        { "value": "check", "label": "t:blocks.subheading.settings.icon.options__2.label" },
+        { "value": "heart", "label": "t:blocks.subheading.settings.icon.options__3.label" },
+        { "value": "tag", "label": "t:blocks.subheading.settings.icon.options__4.label" },
+        { "value": "truck", "label": "t:blocks.subheading.settings.icon.options__5.label" },
+        { "value": "refresh", "label": "t:blocks.subheading.settings.icon.options__6.label" },
+        { "value": "lock", "label": "t:blocks.subheading.settings.icon.options__7.label" },
+        { "value": "clock", "label": "t:blocks.subheading.settings.icon.options__8.label" },
+        { "value": "location", "label": "t:blocks.subheading.settings.icon.options__9.label" },
+        { "value": "mail", "label": "t:blocks.subheading.settings.icon.options__10.label" },
+        { "value": "note", "label": "t:blocks.subheading.settings.icon.options__11.label" },
+        { "value": "info", "label": "t:blocks.subheading.settings.icon.options__12.label" },
+        { "value": "chat", "label": "t:blocks.feature_icon.settings.icon.options__13.label" },
+        { "value": "phone", "label": "t:blocks.feature_icon.settings.icon.options__14.label" },
+        { "value": "share", "label": "t:blocks.feature_icon.settings.icon.options__15.label" },
+        { "value": "grid", "label": "t:blocks.feature_icon.settings.icon.options__16.label" },
+        { "value": "shield", "label": "t:blocks.icon_with_text.settings.icon.options__2.label" }
+      ],
+      "default": "truck",
+      "visible_if": "{{ block.settings.icon_source == 'icon' }}"
+    },
+    {
+      "type": "image_picker",
+      "id": "icon_image",
+      "label": "t:blocks.subheading.settings.icon_image.label",
+      "info": "t:blocks.subheading.settings.icon_image.info",
+      "visible_if": "{{ block.settings.icon_source == 'image' }}"
+    },
+    {
+      "type": "text",
+      "id": "icon_image_alt",
+      "label": "t:blocks.subheading.settings.icon_image_alt.label",
+      "info": "t:blocks.subheading.settings.icon_image_alt.info",
+      "visible_if": "{{ block.settings.icon_source == 'image' }}"
+    },
+    {
+      "type": "html",
+      "id": "custom_svg",
+      "label": "t:blocks.badge_highlight.settings.custom_svg.label",
+      "info": "t:blocks.badge_highlight.settings.custom_svg.info",
+      "visible_if": "{{ block.settings.icon_source == 'svg' }}"
+    },
+    {
+      "type": "select",
+      "id": "icon_size",
+      "label": "t:shared.icon_size.label",
       "options": [
         { "value": "extra_small", "label": "t:shared.icon_size.options__1.label" },
         { "value": "small", "label": "t:shared.icon_size.options__2.label" },
@@ -292,60 +605,135 @@
       "default": "medium"
     },
     {
-      "type": "range", "id": "icon_size_custom", "label": "t:shared.icon_size.custom.label",
+      "type": "range",
+      "id": "icon_size_custom",
+      "label": "t:shared.icon_size.custom.label",
       "info": "t:shared.icon_size.custom.info",
-      "min": 16, "max": 96, "step": 4, "unit": "px", "default": 32,
+      "min": 12, "max": 96, "step": 2, "unit": "px", "default": 32,
       "visible_if": "{{ block.settings.icon_size == 'custom' }}"
     },
-    { "type": "color", "id": "icon_color", "label": "t:blocks.badge_highlight.settings.icon_color.label" },
-    {
-      "type": "select",
-      "id": "icon_frame_style",
-      "label": "t:blocks.badge_highlight.settings.icon_frame_style.label",
-      "info": "t:blocks.badge_highlight.settings.icon_frame_style.info",
-      "options": [
-        { "value": "none", "label": "t:blocks.badge_highlight.settings.icon_frame_style.options__1.label" },
-        { "value": "solid", "label": "t:blocks.badge_highlight.settings.icon_frame_style.options__2.label" },
-        { "value": "dashed", "label": "t:blocks.badge_highlight.settings.icon_frame_style.options__3.label" },
-        { "value": "dotted", "label": "t:blocks.badge_highlight.settings.icon_frame_style.options__4.label" }
-      ],
-      "default": "none"
-    },
-    {
-      "type": "range",
-      "id": "icon_frame_size",
-      "label": "t:blocks.badge_highlight.settings.icon_frame_size.label",
-      "min": 24, "max": 120, "step": 2, "unit": "px", "default": 56,
-      "visible_if": "{{ block.settings.icon_frame_style != 'none' }}"
-    },
-    {
-      "type": "range",
-      "id": "icon_frame_width",
-      "label": "t:blocks.badge_highlight.settings.icon_frame_width.label",
-      "min": 0, "max": 6, "step": 1, "unit": "px", "default": 1,
-      "visible_if": "{{ block.settings.icon_frame_style != 'none' }}"
-    },
-    {
-      "type": "range",
-      "id": "icon_frame_radius",
-      "label": "t:blocks.badge_highlight.settings.icon_frame_radius.label",
-      "info": "t:blocks.badge_highlight.settings.icon_frame_radius.info",
-      "min": 0, "max": 50, "step": 2, "unit": "%", "default": 50,
-      "visible_if": "{{ block.settings.icon_frame_style != 'none' }}"
-    },
+    { "type": "color", "id": "icon_color", "label": "t:blocks.feature_icon.settings.icon_color.label" },
     {
       "type": "color",
-      "id": "icon_frame_color",
-      "label": "t:blocks.badge_highlight.settings.icon_frame_color.label",
-      "visible_if": "{{ block.settings.icon_frame_style != 'none' }}"
+      "id": "icon_hover_color",
+      "label": "t:blocks.feature_icon.settings.icon_hover_color.label",
+      "info": "t:blocks.feature_icon.settings.icon_hover_color.info"
+    },
+
+    { "type": "header", "content": "t:blocks.feature_icon.headers.shape" },
+    {
+      "type": "select",
+      "id": "shape",
+      "label": "t:blocks.feature_icon.settings.shape.label",
+      "info": "t:blocks.feature_icon.settings.shape.info",
+      "options": [
+        { "value": "none", "label": "t:shared.options.none" },
+        { "value": "circle", "label": "t:shared.carousel.nav_shape.options__2.label" },
+        { "value": "square", "label": "t:shared.carousel.nav_shape.options__3.label" }
+      ]
+    },
+    {
+      "type": "range",
+      "id": "shape_size",
+      "label": "t:blocks.feature_icon.settings.shape_size.label",
+      "min": 24, "max": 160, "step": 2, "unit": "px", "default": 56,
+      "visible_if": "{{ block.settings.shape != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "shape_size_mobile",
+      "label": "t:blocks.feature_icon.settings.shape_size_mobile.label",
+      "info": "t:blocks.feature_icon.settings.shape_size_mobile.info",
+      "min": 24, "max": 160, "step": 2, "unit": "px", "default": 56,
+      "visible_if": "{{ block.settings.shape != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "shape_radius",
+      "label": "t:shared.corners.radius.label",
+      "min": 0, "max": 48, "step": 2, "unit": "px", "default": 16,
+      "visible_if": "{{ block.settings.shape == 'square' }}"
     },
     {
       "type": "color_background",
-      "id": "icon_frame_background",
-      "label": "t:blocks.badge_highlight.settings.icon_frame_background.label",
-      "info": "t:blocks.badge_highlight.settings.icon_frame_background.info",
-      "visible_if": "{{ block.settings.icon_frame_style != 'none' }}"
+      "id": "fill_color",
+      "label": "t:blocks.feature_icon.settings.fill_color.label",
+      "info": "t:blocks.badge_highlight.settings.fill_color.info",
+      "visible_if": "{{ block.settings.shape != 'none' }}"
     },
+    {
+      "type": "color_background",
+      "id": "fill_hover_color",
+      "label": "t:blocks.feature_icon.settings.fill_hover_color.label",
+      "info": "t:blocks.feature_icon.settings.fill_hover_color.info",
+      "visible_if": "{{ block.settings.shape != 'none' }}"
+    },
+
+    { "type": "header", "content": "t:blocks.feature_icon.headers.ring" },
+    { "type": "paragraph", "content": "t:blocks.feature_icon.paragraphs.ring" },
+    {
+      "type": "select",
+      "id": "ring_style",
+      "label": "t:shared.border.style.label",
+      "options": [
+        { "value": "none", "label": "t:shared.options.none" },
+        { "value": "solid", "label": "t:shared.options.solid" },
+        { "value": "dashed", "label": "t:shared.options.dashed" },
+        { "value": "dotted", "label": "t:shared.options.dotted" }
+      ],
+      "visible_if": "{{ block.settings.shape != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "ring_offset",
+      "label": "t:blocks.feature_icon.settings.ring_offset.label",
+      "info": "t:blocks.badge_highlight.settings.ring_offset.info",
+      "min": 0, "max": 40, "step": 1, "unit": "px", "default": 0,
+      "visible_if": "{{ block.settings.ring_style != 'none' and block.settings.shape != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "ring_width",
+      "label": "t:shared.border.thickness.label",
+      "min": 1, "max": 8, "step": 1, "unit": "px", "default": 1,
+      "visible_if": "{{ block.settings.ring_style != 'none' and block.settings.shape != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "ring_dash",
+      "label": "t:blocks.feature_icon.settings.ring_dash.label",
+      "info": "t:blocks.feature_icon.settings.ring_dash.info",
+      "min": 1, "max": 20, "step": 1, "unit": "px", "default": 2,
+      "visible_if": "{{ block.settings.ring_style == 'dashed' and block.settings.shape != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "ring_dash_gap",
+      "label": "t:blocks.feature_icon.settings.ring_dash_gap.label",
+      "min": 1, "max": 24, "step": 1, "unit": "px", "default": 8,
+      "visible_if": "{{ block.settings.ring_style == 'dashed' and block.settings.shape != 'none' }}"
+    },
+    {
+      "type": "color",
+      "id": "ring_color",
+      "label": "t:shared.border.color.label",
+      "visible_if": "{{ block.settings.ring_style != 'none' and block.settings.shape != 'none' }}"
+    },
+    {
+      "type": "color",
+      "id": "ring_hover_color",
+      "label": "t:blocks.feature_icon.settings.ring_hover_color.label",
+      "visible_if": "{{ block.settings.ring_style != 'none' and block.settings.shape != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "ring_spin",
+      "label": "t:blocks.feature_icon.settings.ring_spin.label",
+      "info": "t:blocks.badge_highlight.settings.ring_spin.info",
+      "min": 0, "max": 360, "step": 15, "unit": "°", "default": 0,
+      "visible_if": "{{ block.settings.ring_style != 'none' and block.settings.shape != 'none' }}"
+    },
+
     { "type": "header", "content": "t:blocks.badge_highlight.headers.content" },
     { "type": "text", "id": "pill", "label": "t:blocks.badge_highlight.settings.pill.label" },
     { "type": "color", "id": "pill_background", "label": "t:blocks.badge_highlight.settings.pill_background.label" },
