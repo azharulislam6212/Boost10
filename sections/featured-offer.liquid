@@ -145,15 +145,37 @@
   endif
 
   comment
-    ---- corners and margins ----
+    ---- corners ----
 
-    A phone gets its own radius because the same number does not read the same
-    at both widths — 40px is a soft lift across 1400px and a heavy scoop out of
-    a 390px screen. `| default: radius` rather than a constant, so a section
-    saved before the mobile slider existed keeps one shape at every width.
+    Four corners, twice — one set per device, behind the same Desktop/Mobile
+    switch the padding and the gaps already use.
+
+    The top pair ships at 40 and the bottom pair at 0, because a section is a
+    band that lifts away from what is above it and sits flush on what is below:
+    a rounded bottom edge leaves two slivers of the page showing through under
+    it. They are four sliders rather than one number and a rule, so a merchant
+    who wants a fully rounded card can still have one.
+
+    They reach CSS as a single border-radius shorthand, in the order that
+    property takes — top-left, top-right, bottom-right, bottom-left. Nothing in
+    the stylesheet reads them as a bare number, which is what makes sending a
+    shorthand safe.
+
+    A phone gets its own four because the same number does not read the same at
+    both widths: 40px is a soft lift across 1400px and a heavy scoop out of a
+    390px screen. Each mobile corner falls back to its desktop value when the
+    setting is missing entirely, so a section saved before these existed keeps
+    one shape at every width.
   endcomment
-  assign radius = s.border_radius | default: 40 | plus: 0
-  assign radius_mobile = s.border_radius_mobile | default: radius | plus: 0
+  assign r_tl = s.border_radius_top_left | default: 40 | plus: 0
+  assign r_tr = s.border_radius_top_right | default: 40 | plus: 0
+  assign r_bl = s.border_radius_bottom_left | default: 0 | plus: 0
+  assign r_br = s.border_radius_bottom_right | default: 0 | plus: 0
+
+  assign r_tl_m = s.border_radius_top_left_mobile | default: r_tl | plus: 0
+  assign r_tr_m = s.border_radius_top_right_mobile | default: r_tr | plus: 0
+  assign r_bl_m = s.border_radius_bottom_left_mobile | default: r_bl | plus: 0
+  assign r_br_m = s.border_radius_bottom_right_mobile | default: r_br | plus: 0
   assign margin_top = s.margin_top | default: 0 | plus: 0
   assign margin_bottom = s.margin_bottom | default: 0 | plus: 0
 
@@ -305,8 +327,8 @@
 
 {%- capture section_style -%}
   {%- render 'spacing', section: s, declarations: true -%}
-  --featured-offer-radius: {{ radius }}px;
-  --featured-offer-radius-mobile: {{ radius_mobile }}px;
+  --featured-offer-radius: {{ r_tl }}px {{ r_tr }}px {{ r_br }}px {{ r_bl }}px;
+  --featured-offer-radius-mobile: {{ r_tl_m }}px {{ r_tr_m }}px {{ r_br_m }}px {{ r_bl_m }}px;
   --featured-offer-margin-block-start: {{ margin_top }}px;
   --featured-offer-margin-block-end: {{ margin_bottom }}px;
   --featured-offer-min-height: {{ min_height }}px;
@@ -894,24 +916,109 @@
       "content": "t:shared.corners.header"
     },
     {
-      "type": "range",
-      "id": "border_radius",
-      "label": "t:shared.corners.radius.label",
-      "min": 0,
-      "max": 80,
-      "step": 2,
-      "unit": "px",
-      "default": 40
+      "type": "select",
+      "id": "radius_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        {
+          "value": "desktop",
+          "label": "t:shared.spacing.devices.options__1.label"
+        },
+        {
+          "value": "mobile",
+          "label": "t:shared.spacing.devices.options__2.label"
+        }
+      ],
+      "default": "desktop"
     },
     {
       "type": "range",
-      "id": "border_radius_mobile",
-      "label": "t:shared.corners.radius_mobile.label",
+      "id": "border_radius_top_left",
+      "label": "t:shared.corners.top_left.label",
+      "info": "t:shared.corners.paragraph",
       "min": 0,
       "max": 80,
       "step": 2,
       "unit": "px",
-      "default": 24
+      "default": 40,
+      "visible_if": "{{ section.settings.radius_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_top_right",
+      "label": "t:shared.corners.top_right.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 40,
+      "visible_if": "{{ section.settings.radius_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_bottom_left",
+      "label": "t:shared.corners.bottom_left.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.radius_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_bottom_right",
+      "label": "t:shared.corners.bottom_right.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.radius_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_top_left_mobile",
+      "label": "t:shared.corners.top_left.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 24,
+      "visible_if": "{{ section.settings.radius_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_top_right_mobile",
+      "label": "t:shared.corners.top_right.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 24,
+      "visible_if": "{{ section.settings.radius_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_bottom_left_mobile",
+      "label": "t:shared.corners.bottom_left.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.radius_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_bottom_right_mobile",
+      "label": "t:shared.corners.bottom_right.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.radius_device == 'mobile' }}"
     },
     {
       "type": "header",
@@ -1096,8 +1203,14 @@
         "overlay_gradient": "linear-gradient(90deg, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.4) 45%, rgba(0, 0, 0, 0) 100%)",
         "overlay_opacity": 100,
         "border_style": "none",
-        "border_radius": 40,
-        "border_radius_mobile": 24,
+        "border_radius_top_left": 40,
+        "border_radius_top_right": 40,
+        "border_radius_bottom_left": 0,
+        "border_radius_bottom_right": 0,
+        "border_radius_top_left_mobile": 24,
+        "border_radius_top_right_mobile": 24,
+        "border_radius_bottom_left_mobile": 0,
+        "border_radius_bottom_right_mobile": 0,
         "animation_text": "inherit",
         "animation_duration": 1000,
         "animation_stagger": 80,

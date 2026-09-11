@@ -1,0 +1,545 @@
+{% comment %}
+  blocks/_expert-quote-feature.liquid
+
+  The picture directly under the expert, with the offset outline behind it.
+
+  ## Why it is its own block and not part of the lead
+
+  It is a different kind of thing. The lead is a claim — words and the person
+  who made them — and this is a product. A merchant swapping which product the
+  endorsement points at should not be opening the block that holds the quote,
+  and a merchant rewriting the quote should not be scrolling past image
+  settings to reach it.
+
+  `sections/expert-quote.liquid` renders it with `content_for 'block'`, so it is
+  editable but cannot be dragged out of the centre column or deleted by
+  accident — the same treatment the lead gets, and the same mechanism
+  `sections/testimonials.liquid` uses for its intro panel.
+
+  ## The frame behind it
+
+  A second outline, the picture's own size, nudged off it — the detail that
+  stops the centre column reading as a plain stack. It is a pseudo-element on
+  the same box translated by two offsets, so it is always exactly the picture's
+  size and follows the corner radius without either being restated. At an offset
+  of 0/0 it becomes a plain outline around the picture, which is a reasonable
+  thing for a merchant to want.
+
+  ## It is never an empty box
+
+  With no upload, `snippets/image.liquid` draws a placeholder. A merchant
+  arranging this section should be looking at the shape of the picture while
+  they decide which one it is, not at a gap they have to imagine around.
+
+  ## The loop is the same vocabulary the scattered pictures use
+
+  Four styles, one set of keyframes in `assets/base.css`, shared by this block
+  and `blocks/_expert-quote-image.liquid`. The distance and the speed come from
+  the section so all the pictures move to one rhythm; the style and the offset
+  into the cycle are per-picture, because pictures rising and falling in unison
+  is a lift rather than a drift.
+{% endcomment %}
+
+{%- liquid
+  assign b = block.settings
+
+  assign width = b.width | default: 232 | plus: 0
+  assign width_mobile = b.width_mobile | default: width | plus: 0
+  assign radius = b.radius | default: 0 | plus: 0
+  assign radius_mobile = b.radius_mobile | default: radius | plus: 0
+
+  comment
+    ---- the outline ----
+
+    Its own style, colour and offsets rather than the section's frame settings,
+    because the two are different marks: the frame is around the whole section
+    and this is a deliberate off-register echo of one photograph. A merchant
+    turning the section's frame off should not lose this.
+
+    Drawn only when it has both a style and a width — an outline 0px wide with a
+    colour on it is three declarations that paint nothing. Opacity goes into the
+    colour rather than onto the element, so the picture is not faded along with
+    its outline; `currentColor` cannot take an alpha channel from the colour
+    filters, so `color-mix` does the same fade in the browser instead.
+  endcomment
+  assign outline_style = b.outline_style | default: 'none'
+  assign outline_width = b.outline_width | default: 0 | plus: 0
+
+  assign has_outline = false
+  if outline_style != 'none' and outline_width > 0
+    assign has_outline = true
+  endif
+
+  if has_outline
+    assign outline_percent = b.outline_opacity | default: 100 | plus: 0
+    if b.outline_color == blank
+      assign outline_paint = 'color-mix(in srgb, currentColor ' | append: outline_percent | append: '%, transparent)'
+    else
+      assign outline_alpha = outline_percent | divided_by: 100.0
+      assign outline_paint = b.outline_color | color_modify: 'alpha', outline_alpha
+    endif
+  endif
+
+  comment
+    ---- the loop ----
+
+    The style is a class so one keyframe set in the stylesheet serves every
+    picture in the section; the offset is a custom property, written negative so
+    the picture starts that far into the cycle rather than standing still for
+    that long first.
+  endcomment
+  assign motion = b.motion_style | default: 'none'
+
+  comment
+    The picture is never wider than the column it sits in, so the `sizes` hint
+    is the slider rather than a viewport fraction. The browser is told the one
+    number that is actually true about the box, and stops fetching a 1600px
+    variant for a 232px frame.
+  endcomment
+  assign sizes = width_mobile | append: 'px'
+  assign sizes = '(min-width: 750px) ' | append: width | append: 'px, ' | append: sizes
+
+  assign classes = 'expert-quote-pic expert-quote-pic--feature'
+  if motion != 'none'
+    assign classes = classes | append: ' expert-quote-pic--' | append: motion
+  endif
+  if has_outline
+    assign classes = classes | append: ' expert-quote-pic--outlined'
+  endif
+-%}
+
+{%- capture block_style -%}
+  {%- render 'spacing', block: b, declarations: true -%}
+  --eqp-width: {{ width }}px;
+  --eqp-width-mobile: {{ width_mobile }}px;
+  --eqp-radius: {{ radius }}px;
+  --eqp-radius-mobile: {{ radius_mobile }}px;
+  --eqp-space: {{ b.space | default: 0 | plus: 0 }}px;
+  {%- comment -%}
+    The featured picture is not tilted, but the keyframes are shared with the
+    scattered ones that are — and the sway style rotates *around* whatever tilt
+    a picture already carries. Publishing 0 here rather than leaving it unset
+    means one set of keyframes works for both without a second copy that
+    differs only in its resting angle.
+  {%- endcomment -%}
+  --eqp-rotate: 0deg;
+  --eqp-motion-delay: -{{ b.motion_delay | default: 0 | plus: 0 }}ms;
+  {%- if has_outline -%}
+    --eqp-outline-width: {{ outline_width }}px;
+    --eqp-outline-style: {{ outline_style }};
+    --eqp-outline-color: {{ outline_paint }};
+    --eqp-outline-x: {{ b.outline_offset_x | default: 0 | plus: 0 }}px;
+    --eqp-outline-y: {{ b.outline_offset_y | default: 0 | plus: 0 }}px;
+  {%- endif -%}
+{%- endcapture -%}
+
+<motion-effect
+  class="{{ classes }}"
+  data-block-spacing
+  style="{{ block_style | strip_newlines | strip }}"
+  {% render 'motion-attrs', kind: 'image', block: b, target: '.expert-quote-pic__frame' %}
+  {{ block.shopify_attributes }}
+>
+  <div class="expert-quote-pic__frame">
+    {% render 'image',
+       image: b.image,
+       ratio: b.ratio,
+       sizes: sizes,
+       placeholder: 'hero-apparel-1',
+       wrapper_class: 'expert-quote-pic__media' %}
+  </div>
+</motion-effect>
+
+{% schema %}
+{
+  "name": "t:blocks.expert_quote_feature.name",
+  "tag": null,
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "t:blocks.expert_quote_feature.paragraphs.image"
+    },
+    {
+      "type": "image_picker",
+      "id": "image",
+      "label": "t:shared.image.label"
+    },
+    {
+      "type": "select",
+      "id": "ratio",
+      "label": "t:blocks.image.settings.ratio.label",
+      "options": [
+        {
+          "value": "adapt",
+          "label": "t:blocks.image.settings.ratio.options__1.label"
+        },
+        {
+          "value": "square",
+          "label": "t:blocks.image.settings.ratio.options__2.label"
+        },
+        {
+          "value": "portrait",
+          "label": "t:blocks.image.settings.ratio.options__3.label"
+        },
+        {
+          "value": "landscape",
+          "label": "t:blocks.image.settings.ratio.options__4.label"
+        },
+        {
+          "value": "tall",
+          "label": "t:blocks.image.settings.ratio.options__6.label"
+        }
+      ],
+      "default": "portrait"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.layout.header"
+    },
+    {
+      "type": "range",
+      "id": "space",
+      "label": "t:sections.expert_quote.settings.feature_space.label",
+      "min": 0,
+      "max": 120,
+      "step": 2,
+      "unit": "px",
+      "default": 28
+    },
+    {
+      "type": "range",
+      "id": "width",
+      "label": "t:shared.layout.width.label",
+      "min": 120,
+      "max": 480,
+      "step": 4,
+      "unit": "px",
+      "default": 232
+    },
+    {
+      "type": "range",
+      "id": "width_mobile",
+      "label": "t:shared.layout.width_mobile.label",
+      "info": "t:sections.expert_quote.settings.feature_width_mobile.info",
+      "min": 100,
+      "max": 400,
+      "step": 4,
+      "unit": "px",
+      "default": 200
+    },
+    {
+      "type": "header",
+      "content": "t:shared.corners.header"
+    },
+    {
+      "type": "range",
+      "id": "radius",
+      "label": "t:shared.corners.radius.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 24
+    },
+    {
+      "type": "range",
+      "id": "radius_mobile",
+      "label": "t:shared.corners.radius_mobile.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 18
+    },
+    {
+      "type": "header",
+      "content": "t:shared.border.header"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:blocks.expert_quote_image.paragraphs.outline"
+    },
+    {
+      "type": "select",
+      "id": "outline_style",
+      "label": "t:sections.expert_quote.settings.feature_outline_style.label",
+      "info": "t:sections.expert_quote.settings.feature_outline_style.info",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.options.none"
+        },
+        {
+          "value": "solid",
+          "label": "t:shared.options.solid"
+        },
+        {
+          "value": "dashed",
+          "label": "t:shared.options.dashed"
+        },
+        {
+          "value": "dotted",
+          "label": "t:shared.options.dotted"
+        }
+      ],
+      "default": "dashed"
+    },
+    {
+      "type": "range",
+      "id": "outline_width",
+      "label": "t:shared.border.thickness.label",
+      "min": 0,
+      "max": 6,
+      "step": 1,
+      "unit": "px",
+      "default": 1,
+      "visible_if": "{{ block.settings.outline_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "outline_offset_x",
+      "label": "t:blocks.expert_quote_image.settings.outline_offset_x.label",
+      "min": -60,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 22,
+      "visible_if": "{{ block.settings.outline_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "outline_offset_y",
+      "label": "t:blocks.expert_quote_image.settings.outline_offset_y.label",
+      "min": -60,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 18,
+      "visible_if": "{{ block.settings.outline_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "outline_opacity",
+      "label": "t:shared.border.opacity.label",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 100,
+      "visible_if": "{{ block.settings.outline_style != 'none' }}"
+    },
+    {
+      "type": "color",
+      "id": "outline_color",
+      "label": "t:shared.border.color.label",
+      "info": "t:shared.border.color.info",
+      "default": "#0F2E2F",
+      "visible_if": "{{ block.settings.outline_style != 'none' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:sections.expert_quote.headers.drift"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:blocks.expert_quote_image.paragraphs.motion"
+    },
+    {
+      "type": "select",
+      "id": "motion_style",
+      "label": "t:blocks.expert_quote_image.settings.motion_style.label",
+      "info": "t:blocks.expert_quote_image.settings.motion_style.info",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.options.none"
+        },
+        {
+          "value": "float",
+          "label": "t:blocks.expert_quote_image.settings.motion_style.options__2.label"
+        },
+        {
+          "value": "sway",
+          "label": "t:blocks.expert_quote_image.settings.motion_style.options__3.label"
+        },
+        {
+          "value": "zoom",
+          "label": "t:blocks.expert_quote_image.settings.motion_style.options__4.label"
+        },
+        {
+          "value": "orbit",
+          "label": "t:blocks.expert_quote_image.settings.motion_style.options__5.label"
+        }
+      ],
+      "default": "zoom"
+    },
+    {
+      "type": "range",
+      "id": "motion_delay",
+      "label": "t:blocks.expert_quote_image.settings.motion_delay.label",
+      "info": "t:blocks.expert_quote_image.settings.motion_delay.info",
+      "min": 0,
+      "max": 6000,
+      "step": 100,
+      "unit": "ms",
+      "default": 1600,
+      "visible_if": "{{ block.settings.motion_style != 'none' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.animation.header"
+    },
+    {
+      "type": "select",
+      "id": "animation_image",
+      "label": "t:shared.animation.animation_image.label",
+      "options": [
+        {
+          "value": "inherit",
+          "label": "t:shared.animation.animation_image.options__1.label"
+        },
+        {
+          "value": "none",
+          "label": "t:shared.animation.animation_image.options__2.label"
+        },
+        {
+          "value": "fade-in",
+          "label": "t:shared.animation.animation_image.options__3.label"
+        },
+        {
+          "value": "fade-up",
+          "label": "t:shared.animation.animation_image.options__4.label"
+        },
+        {
+          "value": "zoom-in",
+          "label": "t:shared.animation.animation_image.options__7.label"
+        },
+        {
+          "value": "reveal-up",
+          "label": "t:shared.animation.animation_image.options__11.label"
+        }
+      ],
+      "default": "inherit"
+    },
+    {
+      "type": "range",
+      "id": "animation_delay",
+      "label": "t:shared.animation.animation_delay.label",
+      "info": "t:shared.animation.animation_delay.info",
+      "min": 0,
+      "max": 1000,
+      "step": 50,
+      "unit": "ms",
+      "default": 150
+    },
+    {
+      "type": "header",
+      "content": "t:shared.spacing.block_header"
+    },
+    {
+      "type": "select",
+      "id": "padding_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        {
+          "value": "desktop",
+          "label": "t:shared.spacing.devices.options__1.label"
+        },
+        {
+          "value": "mobile",
+          "label": "t:shared.spacing.devices.options__2.label"
+        }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left_mobile",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right_mobile",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    }
+  ]
+}
+{% endschema %}

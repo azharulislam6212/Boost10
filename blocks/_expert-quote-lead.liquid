@@ -1,0 +1,856 @@
+{% comment %}
+  blocks/_expert-quote-lead.liquid
+
+  The words and the person who said them: a quotation mark, the quote, a line
+  drawn down from it, and a portrait with a name and a role under it.
+
+  ## One block, because it is one sentence
+
+  The quote and the attribution were separate settings on the section before
+  this, and separating them further into two blocks would have been worse than
+  either. The connector line belongs to neither on its own — it exists only to
+  carry the eye from the last word to the face — and a merchant who deletes
+  "the expert" and is left with a section quoting nobody has been handed a way
+  to break their own page. They are one claim, so they are one block.
+
+  `sections/expert-quote.liquid` renders it with `content_for 'block'` rather
+  than through `content_for 'blocks'`, so it is editable but cannot be dragged
+  into the row of scattered pictures or deleted by accident. Same mechanism,
+  same reason, as `sections/testimonials.liquid`'s intro panel.
+
+  ## The mark is the theme's icon system, not a drawing kept here
+
+  `snippets/icon.liquid` gained a `quote` glyph — the one from the design, at
+  the proportions it was drawn with — so this block picks an icon the way every
+  other block in the theme does: a source (none / icon / image), a name, a size
+  off the shared ladder. A merchant who wants a star, a chat bubble or their own
+  uploaded mark gets it without a code change, and a store that restyles its
+  icons moves this one with them.
+
+  ## The portrait is never an empty box
+
+  With no upload, `snippets/image.liquid` draws a placeholder rather than
+  leaving a hole where a face goes. The section is an endorsement; a merchant
+  arranging one should be looking at the shape of a portrait while they decide
+  whose it is.
+
+  ## Two loops, and why they are on two different elements
+
+  The ring turns and the portrait breathes. They are separate animations on
+  separate elements on purpose: `rotate` on the ring and `scale` on the
+  portrait would fight if they shared a box, and splitting them also means the
+  dotted ring can spin while the face stays upright, which is the only version
+  of this that does not look like a broken carousel.
+
+  Both are decorative, both are `aria-hidden`, and both stop dead under
+  `prefers-reduced-motion` — see the note in `assets/base.css` on why that is
+  `animation: none` and not a shorter duration.
+{% endcomment %}
+
+{%- liquid
+  assign b = block.settings
+
+  comment
+    ---- the mark ----
+
+    The shared icon vocabulary: a source, a name off the theme's list, a size
+    off the shared ladder. `icon-size` resolves the keyword against the theme's
+    own icon settings, so Small here is the Small every other block means.
+  endcomment
+  capture icon_px
+    render 'icon-size', size: b.icon_size, custom: b.icon_size_custom
+  endcapture
+  assign icon_size = icon_px | plus: 0
+
+  assign icon_source = b.icon_source | default: 'icon'
+
+  assign has_mark = false
+  if icon_source == 'icon' and b.icon != blank and b.icon != 'none'
+    assign has_mark = true
+  elsif icon_source == 'image' and b.icon_image != blank
+    assign has_mark = true
+  endif
+
+  comment
+    ---- the person ----
+
+    The ring is drawn at whatever size the portrait is, so only the portrait has
+    a slider: the ring's own number is the gap between the two, which is the
+    part a merchant can actually see and judge.
+
+    `ring_span` is the outer diameter the layout has to reserve. It is computed
+    here rather than in CSS because the stroke sits on the circle's edge and
+    half of it falls outside — a ring drawn at exactly the reserved size would
+    be clipped in half all the way round.
+  endcomment
+  assign avatar_size = b.avatar_size | default: 46 | plus: 0
+  assign ring_style = b.ring_style | default: 'none'
+  assign ring_width = b.ring_width | default: 0 | plus: 0
+  assign ring_gap = b.ring_gap | default: 0 | plus: 0
+
+  assign has_ring = false
+  if ring_style != 'none' and ring_width > 0
+    assign has_ring = true
+  endif
+
+  assign ring_pad = ring_gap
+  if has_ring
+    assign ring_pad = ring_gap | plus: ring_width
+  endif
+  assign ring_span = avatar_size | plus: ring_pad | plus: ring_pad
+
+  comment
+    The circle is drawn in a viewBox measured in the same pixels the ring is
+    rendered at, so one user unit is one CSS pixel and every number below is the
+    number a merchant set. That is what keeps the dash pattern the same at every
+    portrait size — in a normalised viewBox the dashes would stretch with the
+    circle and a large portrait would come out with long dashes nobody asked
+    for.
+
+    The radius is the stroke's centre line, not its outer edge: half the stroke
+    falls outside it, which is exactly the half the box has room for.
+  endcomment
+  assign ring_center = ring_span | divided_by: 2
+  assign ring_radius = avatar_size | divided_by: 2 | plus: ring_gap
+
+  case ring_style
+    when 'dashed'
+      assign ring_dash = '6 8'
+    when 'dotted'
+      assign ring_dash = '2 8'
+    else
+      assign ring_dash = 'none'
+  endcase
+
+  comment
+    ---- the two loops ----
+
+    The ring turns only when there is a ring to turn, and only when the merchant
+    asked. A spin setting on a block whose ring is switched off is a control
+    that does nothing, which is why this is an `and` and not two separate
+    checkboxes the merchant has to keep in agreement.
+  endcomment
+  assign ring_spin = false
+  if has_ring and b.ring_spin and b.ring_spin_duration > 0
+    assign ring_spin = true
+  endif
+
+  assign avatar_zoom = false
+  if b.avatar_zoom and b.avatar_zoom_scale > 0 and b.avatar_zoom_duration > 0
+    assign avatar_zoom = true
+  endif
+
+  comment
+    The zoom is a percentage in the editor because "grow by 6%" is a thing a
+    merchant can picture and "scale to 1.06" is not. It reaches CSS as the
+    multiplier `scale` actually takes.
+  endcomment
+  assign zoom_percent = b.avatar_zoom_scale | default: 0 | plus: 0
+  assign zoom_to = zoom_percent | plus: 100 | divided_by: 100.0
+
+  assign connector_height = b.connector_height | default: 0 | plus: 0
+  assign has_connector = false
+  if b.show_connector and connector_height > 0
+    assign has_connector = true
+  endif
+
+  comment
+    The portrait is never wider than the box it sits in, so the `sizes` hint is
+    that number rather than a viewport fraction — the browser is told the one
+    thing that is actually true about the box.
+  endcomment
+  assign avatar_sizes = avatar_size | append: 'px'
+
+  assign has_person = false
+  if b.avatar != blank or b.name != blank or b.role != blank or b.show_avatar
+    assign has_person = true
+  endif
+
+  assign classes = 'expert-quote-lead'
+  if ring_spin
+    assign classes = classes | append: ' expert-quote-lead--spin'
+  endif
+  if avatar_zoom
+    assign classes = classes | append: ' expert-quote-lead--zoom'
+  endif
+-%}
+
+{%- capture block_style -%}
+  {%- render 'spacing', block: b, declarations: true -%}
+  --eql-measure: {{ b.quote_width | default: 880 }}px;
+  --eql-quote-size: {{ b.quote_size | default: 28 }}px;
+  --eql-quote-size-mobile: {{ b.quote_size_mobile | default: 20 }}px;
+  --eql-mark-size: {{ icon_size }}px;
+  --eql-mark-space: {{ b.icon_space | default: 0 | plus: 0 }}px;
+  --eql-lead-space: {{ b.lead_space | default: 0 | plus: 0 }}px;
+  --eql-connector-height: {{ connector_height }}px;
+  --eql-connector-width: {{ b.connector_width | default: 1 }}px;
+  --eql-avatar-size: {{ avatar_size }}px;
+  --eql-ring-span: {{ ring_span }}px;
+  --eql-name-size: {{ b.name_size | default: 20 }}px;
+  --eql-role-size: {{ b.role_size | default: 13 }}px;
+  {%- if b.icon_color != blank -%}
+    --eql-mark-color: {{ b.icon_color }};
+  {%- endif -%}
+  {%- if b.connector_color != blank -%}
+    --eql-connector-color: {{ b.connector_color }};
+  {%- endif -%}
+  {%- if ring_spin -%}
+    --eql-spin-duration: {{ b.ring_spin_duration }}ms;
+  {%- endif -%}
+  {%- if avatar_zoom -%}
+    --eql-zoom-to: {{ zoom_to }};
+    --eql-zoom-duration: {{ b.avatar_zoom_duration }}ms;
+  {%- endif -%}
+{%- endcapture -%}
+
+<motion-effect
+  class="{{ classes }}"
+  data-block-spacing
+  style="{{ block_style | strip_newlines | strip }}"
+  {% render 'motion-attrs', kind: 'text', block: b, children: true %}
+  {{ block.shopify_attributes }}
+>
+  {%- if has_mark -%}
+    {%- comment -%}
+      Decorative. The quote underneath is the content, and a screen reader
+      announcing "quotation mark" before reading a quotation is one wasting its
+      user's time.
+    {%- endcomment -%}
+    <span class="expert-quote-lead__mark" aria-hidden="true">
+      {%- if icon_source == 'image' -%}
+        {% render 'image',
+           image: b.icon_image,
+           alt: '',
+           ratio: 'adapt',
+           sizes: '64px',
+           wrapper_class: 'expert-quote-lead__mark-image' %}
+      {%- else -%}
+        {% render 'icon', icon: b.icon, size: icon_size, class: 'expert-quote-lead__mark-icon' %}
+      {%- endif -%}
+    </span>
+  {%- endif -%}
+
+  {%- if b.quote != blank -%}
+    <blockquote class="expert-quote-lead__quote rte">{{ b.quote }}</blockquote>
+  {%- endif -%}
+
+  {%- if has_person -%}
+    <div class="expert-quote-lead__person">
+      {%- if has_connector -%}
+        <span class="expert-quote-lead__connector" aria-hidden="true"></span>
+      {%- endif -%}
+
+      {%- if b.show_avatar -%}
+        {%- comment -%}
+          The portrait is announced by the name under it, so its own alt text is
+          empty — "photo of Dr Adrian Sterling, Dr Adrian Sterling, Holistic
+          Health Expert" is what the alternative sounds like. Same reasoning as
+          `blocks/team-member.liquid`.
+
+          `placeholder` so an unfilled block is a portrait-shaped box rather
+          than a gap the merchant has to imagine the layout around.
+        {%- endcomment -%}
+        <span class="expert-quote-lead__portrait">
+          {%- if has_ring -%}
+            <span class="expert-quote-lead__ring" aria-hidden="true">
+              <svg viewBox="0 0 {{ ring_span }} {{ ring_span }}" fill="none" focusable="false">
+                <circle
+                  cx="{{ ring_center }}"
+                  cy="{{ ring_center }}"
+                  r="{{ ring_radius }}"
+                  stroke="{{ b.ring_color | default: 'currentColor' }}"
+                  stroke-width="{{ ring_width }}"
+                  {% if ring_dash != 'none' %}stroke-dasharray="{{ ring_dash }}"{% endif %}
+                  stroke-linecap="round"
+                />
+              </svg>
+            </span>
+          {%- endif -%}
+
+          {% render 'image',
+             image: b.avatar,
+             alt: '',
+             ratio: 'square',
+             sizes: avatar_sizes,
+             placeholder: 'hero-apparel-1',
+             wrapper_class: 'expert-quote-lead__avatar' %}
+        </span>
+      {%- endif -%}
+
+      {%- if b.name != blank -%}
+        <cite class="expert-quote-lead__name">{{ b.name }}</cite>
+      {%- endif -%}
+
+      {%- if b.role != blank -%}
+        <span class="expert-quote-lead__role">{{ b.role }}</span>
+      {%- endif -%}
+    </div>
+  {%- endif -%}
+</motion-effect>
+
+{% schema %}
+{
+  "name": "t:blocks.expert_quote_lead.name",
+  "tag": null,
+  "settings": [
+    {
+      "type": "header",
+      "content": "t:blocks.expert_quote_lead.headers.quote"
+    },
+    {
+      "type": "richtext",
+      "id": "quote",
+      "label": "t:sections.expert_quote.settings.quote.label",
+      "default": "<p>Real beauty goes beyond the mirror—it is about feeling confident in your own skin. At Venora, we design every formula to elevate your natural glow and inner confidence.</p>"
+    },
+    {
+      "type": "range",
+      "id": "quote_size",
+      "label": "t:shared.typography.font_size.label",
+      "min": 14,
+      "max": 48,
+      "step": 1,
+      "unit": "px",
+      "default": 28
+    },
+    {
+      "type": "range",
+      "id": "quote_size_mobile",
+      "label": "t:shared.typography.font_size_mobile.label",
+      "min": 12,
+      "max": 36,
+      "step": 1,
+      "unit": "px",
+      "default": 20
+    },
+    {
+      "type": "range",
+      "id": "quote_width",
+      "label": "t:sections.expert_quote.settings.quote_width.label",
+      "info": "t:sections.expert_quote.settings.quote_width.info",
+      "min": 320,
+      "max": 1200,
+      "step": 20,
+      "unit": "px",
+      "default": 880
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.subheading.headers.icon"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:blocks.expert_quote_lead.paragraphs.icon"
+    },
+    {
+      "type": "select",
+      "id": "icon_source",
+      "label": "t:blocks.subheading.settings.icon_source.label",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.options.none"
+        },
+        {
+          "value": "icon",
+          "label": "t:blocks.subheading.settings.icon_source.options__2.label"
+        },
+        {
+          "value": "image",
+          "label": "t:blocks.subheading.settings.icon_source.options__3.label"
+        }
+      ],
+      "default": "icon"
+    },
+    {
+      "type": "select",
+      "id": "icon",
+      "label": "t:blocks.subheading.settings.icon.label",
+      "options": [
+        {
+          "value": "quote",
+          "label": "t:blocks.expert_quote_lead.settings.icon.options__1.label"
+        },
+        {
+          "value": "chat",
+          "label": "t:blocks.expert_quote_lead.settings.icon.options__2.label"
+        },
+        {
+          "value": "star",
+          "label": "t:blocks.subheading.settings.icon.options__1"
+        },
+        {
+          "value": "check",
+          "label": "t:blocks.subheading.settings.icon.options__2"
+        },
+        {
+          "value": "heart",
+          "label": "t:blocks.subheading.settings.icon.options__3"
+        },
+        {
+          "value": "shield",
+          "label": "t:blocks.expert_quote_lead.settings.icon.options__6.label"
+        }
+      ],
+      "default": "quote",
+      "visible_if": "{{ block.settings.icon_source == 'icon' }}"
+    },
+    {
+      "type": "image_picker",
+      "id": "icon_image",
+      "label": "t:blocks.subheading.settings.icon_image.label",
+      "info": "t:blocks.subheading.settings.icon_image.info",
+      "visible_if": "{{ block.settings.icon_source == 'image' }}"
+    },
+    {
+      "type": "select",
+      "id": "icon_size",
+      "label": "t:shared.icon_size.label",
+      "options": [
+        {
+          "value": "small",
+          "label": "t:shared.icon_size.options__2.label"
+        },
+        {
+          "value": "medium",
+          "label": "t:shared.icon_size.options__3.label"
+        },
+        {
+          "value": "large",
+          "label": "t:shared.icon_size.options__4.label"
+        },
+        {
+          "value": "extra_large",
+          "label": "t:shared.icon_size.options__5.label"
+        },
+        {
+          "value": "custom",
+          "label": "t:shared.icon_size.options__6.label"
+        }
+      ],
+      "default": "custom",
+      "visible_if": "{{ block.settings.icon_source != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "icon_size_custom",
+      "label": "t:shared.icon_size.custom.label",
+      "info": "t:shared.icon_size.custom.info",
+      "min": 16,
+      "max": 120,
+      "step": 2,
+      "unit": "px",
+      "default": 64,
+      "visible_if": "{{ block.settings.icon_source != 'none' and block.settings.icon_size == 'custom' }}"
+    },
+    {
+      "type": "color",
+      "id": "icon_color",
+      "label": "t:sections.expert_quote.settings.quote_mark_color.label",
+      "info": "t:sections.expert_quote.settings.quote_mark_color.info",
+      "visible_if": "{{ block.settings.icon_source != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "icon_space",
+      "label": "t:sections.expert_quote.settings.quote_mark_space.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 18,
+      "visible_if": "{{ block.settings.icon_source != 'none' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:sections.expert_quote.headers.expert"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:sections.expert_quote.paragraphs.expert"
+    },
+    {
+      "type": "range",
+      "id": "lead_space",
+      "label": "t:sections.expert_quote.settings.lead_space.label",
+      "min": 0,
+      "max": 120,
+      "step": 2,
+      "unit": "px",
+      "default": 26
+    },
+    {
+      "type": "checkbox",
+      "id": "show_connector",
+      "label": "t:sections.expert_quote.settings.show_connector.label",
+      "info": "t:sections.expert_quote.settings.show_connector.info",
+      "default": true
+    },
+    {
+      "type": "range",
+      "id": "connector_height",
+      "label": "t:sections.expert_quote.settings.connector_height.label",
+      "min": 0,
+      "max": 160,
+      "step": 2,
+      "unit": "px",
+      "default": 48,
+      "visible_if": "{{ block.settings.show_connector }}"
+    },
+    {
+      "type": "range",
+      "id": "connector_width",
+      "label": "t:sections.expert_quote.settings.connector_width.label",
+      "min": 1,
+      "max": 8,
+      "step": 1,
+      "unit": "px",
+      "default": 1,
+      "visible_if": "{{ block.settings.show_connector }}"
+    },
+    {
+      "type": "color",
+      "id": "connector_color",
+      "label": "t:sections.expert_quote.settings.connector_color.label",
+      "info": "t:sections.expert_quote.settings.connector_color.info",
+      "default": "#03D26F",
+      "visible_if": "{{ block.settings.show_connector }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_avatar",
+      "label": "t:blocks.expert_quote_lead.settings.show_avatar.label",
+      "info": "t:blocks.expert_quote_lead.settings.show_avatar.info",
+      "default": true
+    },
+    {
+      "type": "image_picker",
+      "id": "avatar",
+      "label": "t:sections.expert_quote.settings.avatar.label",
+      "info": "t:blocks.expert_quote_lead.settings.avatar.info",
+      "visible_if": "{{ block.settings.show_avatar }}"
+    },
+    {
+      "type": "range",
+      "id": "avatar_size",
+      "label": "t:sections.expert_quote.settings.avatar_size.label",
+      "min": 24,
+      "max": 160,
+      "step": 2,
+      "unit": "px",
+      "default": 46,
+      "visible_if": "{{ block.settings.show_avatar }}"
+    },
+    {
+      "type": "text",
+      "id": "name",
+      "label": "t:sections.expert_quote.settings.name.label",
+      "default": "Dr. Adrian Sterling"
+    },
+    {
+      "type": "range",
+      "id": "name_size",
+      "label": "t:sections.expert_quote.settings.name_size.label",
+      "min": 12,
+      "max": 40,
+      "step": 1,
+      "unit": "px",
+      "default": 20
+    },
+    {
+      "type": "text",
+      "id": "role",
+      "label": "t:blocks.testimonial.settings.role.label",
+      "default": "Holistic Health Expert"
+    },
+    {
+      "type": "range",
+      "id": "role_size",
+      "label": "t:sections.expert_quote.settings.role_size.label",
+      "min": 10,
+      "max": 28,
+      "step": 1,
+      "unit": "px",
+      "default": 13
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.expert_quote_lead.headers.ring"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:blocks.expert_quote_lead.paragraphs.ring"
+    },
+    {
+      "type": "select",
+      "id": "ring_style",
+      "label": "t:sections.expert_quote.settings.ring_style.label",
+      "info": "t:sections.expert_quote.settings.ring_style.info",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.options.none"
+        },
+        {
+          "value": "solid",
+          "label": "t:shared.options.solid"
+        },
+        {
+          "value": "dashed",
+          "label": "t:shared.options.dashed"
+        },
+        {
+          "value": "dotted",
+          "label": "t:shared.options.dotted"
+        }
+      ],
+      "default": "dotted",
+      "visible_if": "{{ block.settings.show_avatar }}"
+    },
+    {
+      "type": "range",
+      "id": "ring_width",
+      "label": "t:shared.border.thickness.label",
+      "min": 0,
+      "max": 6,
+      "step": 1,
+      "unit": "px",
+      "default": 2,
+      "visible_if": "{{ block.settings.show_avatar and block.settings.ring_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "ring_gap",
+      "label": "t:sections.expert_quote.settings.ring_gap.label",
+      "info": "t:sections.expert_quote.settings.ring_gap.info",
+      "min": 0,
+      "max": 40,
+      "step": 1,
+      "unit": "px",
+      "default": 11,
+      "visible_if": "{{ block.settings.show_avatar and block.settings.ring_style != 'none' }}"
+    },
+    {
+      "type": "color",
+      "id": "ring_color",
+      "label": "t:sections.expert_quote.settings.ring_color.label",
+      "default": "#03D26F",
+      "visible_if": "{{ block.settings.show_avatar and block.settings.ring_style != 'none' }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "ring_spin",
+      "label": "t:blocks.expert_quote_lead.settings.ring_spin.label",
+      "info": "t:blocks.expert_quote_lead.settings.ring_spin.info",
+      "default": true,
+      "visible_if": "{{ block.settings.show_avatar and block.settings.ring_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "ring_spin_duration",
+      "label": "t:blocks.expert_quote_lead.settings.ring_spin_duration.label",
+      "info": "t:blocks.expert_quote_lead.settings.ring_spin_duration.info",
+      "min": 2000,
+      "max": 9000,
+      "step": 500,
+      "unit": "ms",
+      "default": 6000,
+      "visible_if": "{{ block.settings.show_avatar and block.settings.ring_style != 'none' and block.settings.ring_spin }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "avatar_zoom",
+      "label": "t:blocks.expert_quote_lead.settings.avatar_zoom.label",
+      "info": "t:blocks.expert_quote_lead.settings.avatar_zoom.info",
+      "default": true,
+      "visible_if": "{{ block.settings.show_avatar }}"
+    },
+    {
+      "type": "range",
+      "id": "avatar_zoom_scale",
+      "label": "t:blocks.expert_quote_lead.settings.avatar_zoom_scale.label",
+      "info": "t:blocks.expert_quote_lead.settings.avatar_zoom_scale.info",
+      "min": 0,
+      "max": 30,
+      "step": 1,
+      "unit": "%",
+      "default": 8,
+      "visible_if": "{{ block.settings.show_avatar and block.settings.avatar_zoom }}"
+    },
+    {
+      "type": "range",
+      "id": "avatar_zoom_duration",
+      "label": "t:blocks.expert_quote_lead.settings.avatar_zoom_duration.label",
+      "min": 1000,
+      "max": 9000,
+      "step": 500,
+      "unit": "ms",
+      "default": 3000,
+      "visible_if": "{{ block.settings.show_avatar and block.settings.avatar_zoom }}"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.animation.header"
+    },
+    {
+      "type": "select",
+      "id": "animation_text",
+      "label": "t:shared.animation.animation_text.label",
+      "options": [
+        {
+          "value": "inherit",
+          "label": "t:shared.animation.animation_text.options__1.label"
+        },
+        {
+          "value": "none",
+          "label": "t:shared.animation.animation_text.options__2.label"
+        },
+        {
+          "value": "fade-in",
+          "label": "t:shared.animation.animation_text.options__3.label"
+        },
+        {
+          "value": "fade-up",
+          "label": "t:shared.animation.animation_text.options__4.label"
+        },
+        {
+          "value": "slide-up",
+          "label": "t:shared.animation.animation_text.options__5.label"
+        }
+      ],
+      "default": "inherit"
+    },
+    {
+      "type": "range",
+      "id": "animation_delay",
+      "label": "t:shared.animation.animation_delay.label",
+      "info": "t:shared.animation.animation_delay.info",
+      "min": 0,
+      "max": 1000,
+      "step": 50,
+      "unit": "ms",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "animation_stagger",
+      "label": "t:shared.animation.animation_stagger.label",
+      "info": "t:shared.animation.animation_stagger.info",
+      "min": 0,
+      "max": 300,
+      "step": 10,
+      "unit": "ms",
+      "default": 90
+    },
+    {
+      "type": "header",
+      "content": "t:shared.spacing.block_header"
+    },
+    {
+      "type": "select",
+      "id": "padding_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        {
+          "value": "desktop",
+          "label": "t:shared.spacing.devices.options__1.label"
+        },
+        {
+          "value": "mobile",
+          "label": "t:shared.spacing.devices.options__2.label"
+        }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left_mobile",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right_mobile",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    }
+  ]
+}
+{% endschema %}

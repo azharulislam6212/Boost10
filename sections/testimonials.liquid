@@ -174,8 +174,38 @@
     endif
   endif
 
-  assign radius = s.border_radius | default: 0 | plus: 0
-  assign radius_mobile = s.border_radius_mobile | default: radius | plus: 0
+  comment
+    ---- corners ----
+
+    Four corners, twice — one set per device, behind the same Desktop/Mobile
+    switch the padding and the gaps already use.
+
+    The top pair ships at 40 and the bottom pair at 0, because a section is a
+    band that lifts away from what is above it and sits flush on what is below:
+    a rounded bottom edge leaves two slivers of the page showing through under
+    it. They are four sliders rather than one number and a rule, so a merchant
+    who wants a fully rounded card can still have one.
+
+    They reach CSS as a single border-radius shorthand, in the order that
+    property takes — top-left, top-right, bottom-right, bottom-left. Nothing in
+    the stylesheet reads them as a bare number, which is what makes sending a
+    shorthand safe.
+
+    A phone gets its own four because the same number does not read the same at
+    both widths: 40px is a soft lift across 1400px and a heavy scoop out of a
+    390px screen. Each mobile corner falls back to its desktop value when the
+    setting is missing entirely, so a section saved before these existed keeps
+    one shape at every width.
+  endcomment
+  assign r_tl = s.border_radius_top_left | default: 40 | plus: 0
+  assign r_tr = s.border_radius_top_right | default: 40 | plus: 0
+  assign r_bl = s.border_radius_bottom_left | default: 0 | plus: 0
+  assign r_br = s.border_radius_bottom_right | default: 0 | plus: 0
+
+  assign r_tl_m = s.border_radius_top_left_mobile | default: r_tl | plus: 0
+  assign r_tr_m = s.border_radius_top_right_mobile | default: r_tr | plus: 0
+  assign r_bl_m = s.border_radius_bottom_left_mobile | default: r_bl | plus: 0
+  assign r_br_m = s.border_radius_bottom_right_mobile | default: r_br | plus: 0
   assign margin_top = s.margin_top | default: 0 | plus: 0
   assign margin_bottom = s.margin_bottom | default: 0 | plus: 0
 
@@ -392,8 +422,8 @@
   --tc-gap-x-mobile: {{ gap_x_mobile }}px;
   --tc-gap-y-mobile: {{ gap_y_mobile }}px;
   --tc-row-gap: {{ row_gap }}px;
-  --testimonials-radius: {{ radius }}px;
-  --testimonials-radius-mobile: {{ radius_mobile }}px;
+  --testimonials-radius: {{ r_tl }}px {{ r_tr }}px {{ r_br }}px {{ r_bl }}px;
+  --testimonials-radius-mobile: {{ r_tl_m }}px {{ r_tr_m }}px {{ r_br_m }}px {{ r_bl_m }}px;
   --testimonials-margin-block-start: {{ margin_top }}px;
   --testimonials-margin-block-end: {{ margin_bottom }}px;
   --testimonials-controls-gap: {{ s.carousel_controls_gap | default: 40 | plus: 0 }}px;
@@ -1066,24 +1096,109 @@
       "content": "t:shared.corners.header"
     },
     {
-      "type": "range",
-      "id": "border_radius",
-      "label": "t:shared.corners.radius.label",
-      "min": 0,
-      "max": 60,
-      "step": 2,
-      "unit": "px",
-      "default": 40
+      "type": "select",
+      "id": "radius_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        {
+          "value": "desktop",
+          "label": "t:shared.spacing.devices.options__1.label"
+        },
+        {
+          "value": "mobile",
+          "label": "t:shared.spacing.devices.options__2.label"
+        }
+      ],
+      "default": "desktop"
     },
     {
       "type": "range",
-      "id": "border_radius_mobile",
-      "label": "t:shared.corners.radius_mobile.label",
+      "id": "border_radius_top_left",
+      "label": "t:shared.corners.top_left.label",
+      "info": "t:shared.corners.paragraph",
       "min": 0,
       "max": 60,
       "step": 2,
       "unit": "px",
-      "default": 24
+      "default": 40,
+      "visible_if": "{{ section.settings.radius_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_top_right",
+      "label": "t:shared.corners.top_right.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 40,
+      "visible_if": "{{ section.settings.radius_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_bottom_left",
+      "label": "t:shared.corners.bottom_left.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.radius_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_bottom_right",
+      "label": "t:shared.corners.bottom_right.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.radius_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_top_left_mobile",
+      "label": "t:shared.corners.top_left.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 24,
+      "visible_if": "{{ section.settings.radius_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_top_right_mobile",
+      "label": "t:shared.corners.top_right.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 24,
+      "visible_if": "{{ section.settings.radius_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_bottom_left_mobile",
+      "label": "t:shared.corners.bottom_left.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.radius_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_bottom_right_mobile",
+      "label": "t:shared.corners.bottom_right.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.radius_device == 'mobile' }}"
     },
     {
       "type": "header",
@@ -1684,8 +1799,14 @@
         "color_scheme": "scheme-1",
         "accent_color": "#03D26F",
         "border_style": "none",
-        "border_radius": 0,
-        "border_radius_mobile": 0,
+        "border_radius_top_left": 0,
+        "border_radius_top_right": 0,
+        "border_radius_bottom_left": 0,
+        "border_radius_bottom_right": 0,
+        "border_radius_top_left_mobile": 0,
+        "border_radius_top_right_mobile": 0,
+        "border_radius_bottom_left_mobile": 0,
+        "border_radius_bottom_right_mobile": 0,
         "carousel_peek_mobile": 25,
         "carousel_navigation": true,
         "carousel_nav_icon": "arrow",

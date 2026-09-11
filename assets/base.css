@@ -5409,6 +5409,8 @@
      merchant set it, so a section that touches none of these settings renders
      exactly as it did before any of them existed. */
   .faq {
+    /* Four corners, each its own section setting. Liquid assembles the
+       shorthand, so nothing here can treat this as a single number. */
     border-radius: var(--faq-radius, 0);
 
     /* Longhands, not the `border` shorthand: the width is four values now — one
@@ -8577,7 +8579,7 @@ sticky-header[data-transparent] .header__logo-image--transparent { opacity: 1; }
   display: block;
 }
 
-.carousel-shell__pagination--locked { display: none; }
+.carousel-shell__pagination--locked { display: none !important; }
 
 /* ---- bullets ---- */
 
@@ -10777,6 +10779,8 @@ swiper-carousel {
 
 @layer components {
   .featured-blog {
+    /* Four corners, each its own section setting. Liquid assembles the
+       shorthand, so nothing here can treat this as a single number. */
     border-radius: var(--featured-blog-radius, 0);
 
     /* Longhands, not the `border` shorthand: the width is four values now — one
@@ -11390,6 +11394,8 @@ swiper-carousel {
 
 @layer components {
   .feature-cards {
+    /* Four corners, each its own section setting. Liquid assembles the
+       shorthand, so nothing here can treat this as a single number. */
     border-radius: var(--feature-cards-radius, 0);
 
     /* Longhands, not the `border` shorthand: the width is four values — one per
@@ -12245,6 +12251,8 @@ swiper-carousel {
 
   position: relative;
 
+  /* Four corners, each its own section setting. Liquid assembles the
+     shorthand, so nothing here can treat this as a single number. */
   border-radius: var(--testimonials-radius, 0);
 
   /* All four sides in one shorthand-safe trio. Emitted only when a side is
@@ -13171,6 +13179,8 @@ testimonial-product[data-open] .testimonial-card__info {
     display: flex;
     flex-direction: column;
 
+    /* Four corners, each its own section setting. Liquid assembles the
+       shorthand, so nothing here can treat this as a single number. */
     border-radius: var(--featured-offer-radius, 0);
 
     /* Longhands, not the `border` shorthand: the width is four values — one per
@@ -13315,6 +13325,560 @@ testimonial-product[data-open] .testimonial-card__info {
       flex-direction: column;
       justify-content: var(--featured-offer-block, start);
       align-items: var(--featured-offer-align, var(--featured-offer-inline, start));
+    }
+  }
+}
+
+
+/* ==========================================================================
+   Expert quote
+   ==========================================================================
+   `sections/expert-quote.liquid` — one endorsement, a named person under it,
+   and the products it is about scattered either side of them.
+
+   Three blocks and a frame:
+
+     .expert-quote            the section — border, corners, background
+     .expert-quote__stage     the row the pictures lay out on
+     .expert-quote-lead       `blocks/_expert-quote-lead.liquid`
+     .expert-quote-pic        both picture blocks, feature and scattered
+
+   The frame is `.featured-offer`'s, property for property, because the
+   section's settings are `sections/featured-offer.liquid`'s: the same four
+   border widths, the same two radii, the same margins, the same gap pair behind
+   a Desktop/Mobile switch, resolved by the same Liquid.
+
+   `.expert-quote-pic` is one component used by two blocks rather than two
+   components that would drift apart. The featured picture and a scattered one
+   differ in exactly two things — where they sit on the row, and whether they
+   are tilted — so those are the modifiers and everything else is shared,
+   including all four motion loops.
+   -------------------------------------------------------------------------- */
+
+@layer components {
+  .expert-quote {
+    /* A flex column, the same shape as `.featured-offer`, so the inner box can
+       be told to fill whatever height the section ends up with. */
+    display: flex;
+    flex-direction: column;
+
+    /* Four corners, each its own section setting. Liquid assembles the
+       shorthand, so nothing here can treat this as a single number. */
+    border-radius: var(--expert-quote-radius, 0);
+
+    /* Longhands, not the `border` shorthand: the width is four values — one per
+       side — and `border` accepts only a single width. Same split as
+       `.featured-offer`, `.faq`, `.featured-blog` and `.footer`.
+
+       `transparent` rather than `currentColor` so a width of 0 cannot paint a
+       hairline, and the style is a custom property so Dashed is one declaration
+       from Liquid rather than a modifier class per value. */
+    border-width: var(--expert-quote-border-width, 0px);
+    border-style: var(--expert-quote-border-style, solid);
+    border-color: var(--expert-quote-border-color, transparent);
+
+    margin-block-start: var(--expert-quote-margin-block-start, 0px);
+    margin-block-end: var(--expert-quote-margin-block-end, 0px);
+  }
+
+  /* The phone's own corner. Liquid resolves an unset mobile radius to the
+     desktop one, so this only ever differs when the merchant said it should. */
+  @media screen and (max-width: 749px) {
+    .expert-quote {
+      border-radius: var(--expert-quote-radius-mobile, var(--expert-quote-radius, 0));
+    }
+  }
+
+  /* Clipping only where a background picture has to stay inside the corners. An
+     unconditional `overflow: hidden` here would cut the focus ring off anything
+     the merchant puts in the section, and would clip a scattered picture the
+     moment it was lifted up beside the expert — which the preset does.
+
+     `.has-background-media` already supplies `position: relative` and the
+     isolated stacking context, so `z-index: 1` is all the content needs. */
+  .expert-quote.has-background-media { overflow: hidden; }
+
+  .expert-quote.has-background-media > :not(.background-media) {
+    position: relative;
+    z-index: 1;
+  }
+
+  .expert-quote__inner {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+  }
+
+  /* `figure` carries a 40px inline margin from the UA stylesheet, which would
+     put the quote off centre inside a container that has already centred it. */
+  .expert-quote__figure {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    inline-size: 100%;
+  }
+
+  /* ==== the lead block ====================================================
+     `blocks/_expert-quote-lead.liquid` — the quotation mark, the quote, the
+     connector, the portrait, the name and the role.
+
+     Centred as a column rather than with `text-align` alone, because the
+     quotation mark and the portrait are elements and not glyphs — text
+     alignment has no say over where a block-level span sits. The text is
+     centred too, for the lines inside the paragraph. */
+  .expert-quote-lead {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    inline-size: 100%;
+    text-align: center;
+  }
+
+  .expert-quote-lead__mark {
+    display: block;
+    margin-block-end: var(--eql-mark-space, 0px);
+    color: var(--eql-mark-color, var(--color-heading));
+  }
+
+  /* The icon comes from `snippets/icon.liquid`, which sizes itself from
+     `--icon-size`. The mark is a decoration rather than a glyph in a line of
+     text, so it is `display: block` and carries no line box of its own. */
+  .expert-quote-lead__mark-icon {
+    display: block;
+  }
+
+  .expert-quote-lead__mark-image {
+    inline-size: var(--eql-mark-size, 64px);
+  }
+
+  /* The measure is a ceiling, not a width the text has to fill — but it has to
+     be paired with `inline-size: 100%` rather than left on its own.
+
+     The column above centres its children, which sizes each of them to its own
+     content in the cross axis, and a paragraph's content is as wide as the
+     paragraph would be on one line. With only a maximum, nothing told the
+     blockquote to take the width it was offered, so on a phone it sized itself
+     to the sentence and ran off the side of the screen. `100%` capped at the
+     measure is the same ceiling with a floor under it.
+
+     `.rte` already zeroes the outer margins of the paragraphs inside. */
+  .expert-quote-lead__quote {
+    margin: 0;
+    inline-size: 100%;
+    max-inline-size: var(--eql-measure, 880px);
+    font-family: var(--font-h2-family, var(--font-heading-family));
+    font-size: var(--eql-quote-size-mobile, 20px);
+    line-height: 1.35;
+    color: var(--color-heading);
+  }
+
+  @media screen and (min-width: 750px) {
+    .expert-quote-lead__quote {
+      font-size: var(--eql-quote-size, 28px);
+    }
+  }
+
+  .expert-quote-lead__person {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-block-start: var(--eql-lead-space, 0px);
+  }
+
+  /* The line from the words to the face. It fades in from nothing at the top so
+     it reads as a thread rather than as a rule, which is also why it is a
+     gradient and not a border. */
+  .expert-quote-lead__connector {
+    display: block;
+    inline-size: var(--eql-connector-width, 1px);
+    block-size: var(--eql-connector-height, 0px);
+    background-image: linear-gradient(
+      to bottom,
+      transparent,
+      var(--eql-connector-color, currentColor)
+    );
+  }
+
+  /* The portrait and the ring around it share one box, sized by Liquid to the
+     portrait plus the gap plus the stroke — so the ring is drawn inside space
+     the column has already reserved and nothing below it moves when the
+     merchant switches the ring on. */
+  .expert-quote-lead__portrait {
+    position: relative;
+    display: grid;
+    place-items: center;
+    inline-size: var(--eql-ring-span, 72px);
+    block-size: var(--eql-ring-span, 72px);
+  }
+
+  /* The ring is a `<span>` wrapping the `<svg>` rather than the svg itself,
+     because the spin below rotates the wrapper. Rotating the SVG element works
+     too, right up until a browser decides to rasterise it once and spin the
+     bitmap — the wrapper keeps the vector crisp at every angle. */
+  .expert-quote-lead__ring {
+    position: absolute;
+    inset: 0;
+    display: block;
+    pointer-events: none;
+  }
+
+  .expert-quote-lead__ring svg {
+    display: block;
+    inline-size: 100%;
+    block-size: 100%;
+  }
+
+  .expert-quote-lead__avatar {
+    inline-size: var(--eql-avatar-size, 46px);
+    block-size: var(--eql-avatar-size, 46px);
+    border-radius: 50%;
+  }
+
+  /* `cite` is italic in every UA stylesheet, and this is a name, not a work. */
+  .expert-quote-lead__name {
+    display: block;
+    font-style: normal;
+    font-family: var(--font-h3-family, var(--font-heading-family));
+    font-size: var(--eql-name-size, 20px);
+    line-height: 1.3;
+    color: var(--color-heading);
+  }
+
+  .expert-quote-lead__role {
+    display: block;
+    font-size: var(--eql-role-size, 13px);
+    font-weight: 600;
+    line-height: 1.4;
+    color: var(--color-heading);
+  }
+
+  /* ---- the ring turns, the portrait breathes -----------------------------
+     Two loops on two elements on purpose. `rotate` on the ring and `scale` on
+     the portrait would be fighting for the same property if they shared a box,
+     and keeping them apart is also what lets the dots travel while the face
+     stays upright — the only version of this that does not look like a broken
+     carousel.
+
+     `linear` on the spin, because a ring that eases is a ring that appears to
+     stop twice per turn. The breath eases, because that is what a breath does. */
+  @keyframes expert-quote-spin {
+    to {
+      rotate: 360deg;
+    }
+  }
+
+  @keyframes expert-quote-breathe {
+    from {
+      scale: 1;
+    }
+    to {
+      scale: var(--eql-zoom-to, 1);
+    }
+  }
+
+  .expert-quote-lead--spin .expert-quote-lead__ring {
+    animation: expert-quote-spin var(--eql-spin-duration, 6000ms) linear infinite;
+  }
+
+  .expert-quote-lead--zoom .expert-quote-lead__avatar {
+    animation: expert-quote-breathe var(--eql-zoom-duration, 3000ms)
+      var(--ease-in-out-sine, cubic-bezier(0.37, 0, 0.63, 1)) infinite alternate;
+  }
+
+  /* ==== the stage =========================================================
+     Three kinds of child on one flex row — a picture before the featured one,
+     the featured one, a picture after it — and which side a scattered picture
+     lands on is `order`, set by its block from its own Placement setting.
+
+     `align-items: flex-start` because the pictures are staggered: they hang
+     from the top of the row by a margin each, and any other alignment would
+     re-centre them against each other and undo the stagger.
+
+     `flex-wrap` is on so a row that cannot fit its pictures drops them onto a
+     second line rather than squeezing the featured one between them. */
+  .expert-quote__stage {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: center;
+    inline-size: 100%;
+    gap: var(--expert-quote-gap-y, var(--space-6)) var(--expert-quote-gap-x, var(--space-6));
+  }
+
+  /* ==== a picture =========================================================
+     `blocks/_expert-quote-feature.liquid` and
+     `blocks/_expert-quote-image.liquid`. The outer box stays square to the row;
+     the frame inside it is what tilts and what moves, so the corners follow the
+     tilt and the gap between two pictures stays even.
+
+     `margin-block-start` and not a translate for the stagger: a translated box
+     still occupies its untranslated space, so the row would size itself to
+     where the picture is not. In flow, a negative one lifts the picture up
+     beside the expert — which is the arrangement the drawing has — and a
+     positive one makes the row taller to hold it. */
+  .expert-quote-pic {
+    order: var(--eqp-order, 2);
+    display: flex;
+    justify-content: center;
+    min-inline-size: 0;
+  }
+
+  /* The featured picture sits in the middle and does not grow: it is as wide as
+     its own slider, and the scattered pictures either side share what is left.
+     Its offset from the expert above it is `--eqp-space` rather than the
+     scatter's `--eqp-offset`, because it is a gap under the name and not a
+     stagger against a row. */
+  .expert-quote-pic--feature {
+    order: 2;
+    flex: 0 0 auto;
+    margin-block-start: var(--eqp-space, 0px);
+  }
+
+  .expert-quote-pic--scatter {
+    flex: 1 1 var(--eqp-width, 260px);
+    margin-block-start: var(--eqp-offset, 0px);
+  }
+
+  /* Definite width, then a cap — deliberately not the one `min(100%, …)` that
+     says the same thing in a single declaration.
+
+     The row sizes some of these from their contents, and during that
+     measurement a percentage has no containing block to resolve against — so
+     Chrome drops the whole `min()` and takes the picture's *intrinsic* width
+     instead. A 1600px upload made the centre column 1600px wide, which pushed
+     the scattered pictures onto lines of their own and turned the row into a
+     stack. Two declarations do not have that problem: the width is a definite
+     number during measurement, and the cap applies afterwards, when there is a
+     containing block for it to be a percentage of.
+
+     `isolation: isolate` is load-bearing too, not a tidy-up. The outline below
+     is a pseudo-element at `z-index: -1` so the picture covers the half of it
+     that overlaps; without a stacking context here that negative index is
+     resolved against whichever ancestor happens to make one, and the outline
+     disappears behind the section's own background. */
+  .expert-quote-pic__frame {
+    position: relative;
+    isolation: isolate;
+    inline-size: var(--eqp-width, 260px);
+    max-inline-size: 100%;
+    rotate: var(--eqp-rotate, 0deg);
+    --radius-media: var(--eqp-radius, 0px);
+  }
+
+  /* The off-register echo. `inset: 0` plus a translate rather than four offsets,
+     so it is always exactly the picture's size however the picture is sized —
+     and at 0/0 it is a plain outline around it, which is a reasonable thing for
+     a merchant to want. */
+  .expert-quote-pic--outlined .expert-quote-pic__frame::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    translate: var(--eqp-outline-x, 0px) var(--eqp-outline-y, 0px);
+    border: var(--eqp-outline-width, 1px) var(--eqp-outline-style, dashed)
+      var(--eqp-outline-color, currentColor);
+    border-radius: var(--eqp-radius, 0px);
+    pointer-events: none;
+  }
+
+  /* ---- the four loops ----------------------------------------------------
+     Every picture in the section can keep moving after it arrives. It is a loop
+     rather than an entrance, so it is `@keyframes` here and not a preset in
+     `assets/motion-engine.js`: the engine's continuous effects (parallax,
+     marquee) take the place of an element's reveal, and these pictures want
+     both — to arrive, and then to keep moving.
+
+     None of them animates `transform`, and that is what makes them compose. The
+     reveal writes `transform`; these write `translate`, `rotate` and `scale`,
+     which the browser applies in that fixed order before it. One shared
+     `transform` string could not have been written by two different places at
+     once.
+
+       Float   rises and falls. `translate` is the outermost of the three, so a
+               tilted picture still moves straight up and down rather than 12°
+               off vertical.
+       Sway    tips around whatever tilt the picture already carries, which is
+               why the keyframes are `calc()` on `--eqp-rotate` and not two
+               fixed angles. A picture at rest at -12° swings about -12°.
+       Zoom    breathes. The distance is read as a percentage of 200px so one
+               slider drives all four styles — 18px of travel becomes a 9%
+               change of scale, which reads as about the same amount of movement
+               on a 260px picture.
+       Orbit   traces a small circle, the only one of the four that moves on
+               both axes. `alternate` would retrace the same arc backwards, so
+               this one runs forwards on a full 0–100% cycle instead.
+
+     Half the distance either side of rest on the two that translate, so the
+     slider is the full travel and the picture sits in the middle of it rather
+     than hanging below where it was placed. */
+  @keyframes expert-quote-float {
+    from {
+      translate: 0 calc(var(--expert-quote-motion-distance, 0px) / -2);
+    }
+    to {
+      translate: 0 calc(var(--expert-quote-motion-distance, 0px) / 2);
+    }
+  }
+
+  /* The angle and the multiplier are the section's distance slider converted by
+     Liquid, not by `calc()`. A rotation cannot be derived from a length in CSS
+     without dividing one length by another to strip the unit, and mixing the
+     two types outright — `calc(0deg - 18px * 0.12)` — makes the whole
+     expression invalid at computed-value time, which silently left `rotate` at
+     `none` and Sway doing nothing. See the note in the section. */
+  @keyframes expert-quote-sway {
+    from {
+      rotate: calc(var(--eqp-rotate, 0deg) - var(--expert-quote-motion-angle, 0deg));
+    }
+    to {
+      rotate: calc(var(--eqp-rotate, 0deg) + var(--expert-quote-motion-angle, 0deg));
+    }
+  }
+
+  @keyframes expert-quote-zoom {
+    from {
+      scale: 1;
+    }
+    to {
+      scale: var(--expert-quote-motion-scale, 1);
+    }
+  }
+
+  /* Eight stops rather than four. Keyframes interpolate in straight lines, so
+     the four-stop version traced a diamond — the picture visibly cornered at
+     the top, bottom and sides instead of curving. The diagonals are the same
+     radius at 45°, which is 0.354 of the full travel rather than half of it. */
+  @keyframes expert-quote-orbit {
+    0% {
+      translate: 0 calc(var(--expert-quote-motion-distance, 0px) / -2);
+    }
+    12.5% {
+      translate: calc(var(--expert-quote-motion-distance, 0px) * 0.354)
+        calc(var(--expert-quote-motion-distance, 0px) * -0.354);
+    }
+    25% {
+      translate: calc(var(--expert-quote-motion-distance, 0px) / 2) 0;
+    }
+    37.5% {
+      translate: calc(var(--expert-quote-motion-distance, 0px) * 0.354)
+        calc(var(--expert-quote-motion-distance, 0px) * 0.354);
+    }
+    50% {
+      translate: 0 calc(var(--expert-quote-motion-distance, 0px) / 2);
+    }
+    62.5% {
+      translate: calc(var(--expert-quote-motion-distance, 0px) * -0.354)
+        calc(var(--expert-quote-motion-distance, 0px) * 0.354);
+    }
+    75% {
+      translate: calc(var(--expert-quote-motion-distance, 0px) / -2) 0;
+    }
+    87.5% {
+      translate: calc(var(--expert-quote-motion-distance, 0px) * -0.354)
+        calc(var(--expert-quote-motion-distance, 0px) * -0.354);
+    }
+    100% {
+      translate: 0 calc(var(--expert-quote-motion-distance, 0px) / -2);
+    }
+  }
+
+  /* The distance and the duration inherit from the section, so every picture
+     shares one rhythm; only the delay is per-picture, and it arrives already
+     negative from the block. A positive delay would hold a picture still for
+     that long first, so the section would open with one picture moving and the
+     others waiting their turn. */
+  .expert-quote-pic--float .expert-quote-pic__frame,
+  .expert-quote-pic--sway .expert-quote-pic__frame,
+  .expert-quote-pic--zoom .expert-quote-pic__frame,
+  .expert-quote-pic--orbit .expert-quote-pic__frame {
+    animation-duration: var(--expert-quote-motion-duration, 4000ms);
+    animation-delay: var(--eqp-motion-delay, 0ms);
+    animation-iteration-count: infinite;
+    animation-timing-function: var(--ease-in-out-sine, cubic-bezier(0.37, 0, 0.63, 1));
+  }
+
+  .expert-quote-pic--float .expert-quote-pic__frame {
+    animation-name: expert-quote-float;
+    animation-direction: alternate;
+  }
+
+  .expert-quote-pic--sway .expert-quote-pic__frame {
+    animation-name: expert-quote-sway;
+    animation-direction: alternate;
+  }
+
+  .expert-quote-pic--zoom .expert-quote-pic__frame {
+    animation-name: expert-quote-zoom;
+    animation-direction: alternate;
+  }
+
+  /* Orbit is a closed circle: `alternate` would send it back round the same arc
+     it just came along, which reads as a wobble rather than an orbit. It runs
+     forwards, and its own keyframes return it to the start. */
+  .expert-quote-pic--orbit .expert-quote-pic__frame {
+    animation-name: expert-quote-orbit;
+    animation-direction: normal;
+    animation-timing-function: linear;
+  }
+
+  /* `animation: none`, not a shorter duration. The global reduced-motion rule
+     in @layer reset caps every animation at 0.01ms, which for an `alternate`
+     loop means landing on its *end* frame — every picture pinned at the far end
+     of its travel, tilted, or scaled up. Naming no animation at all is the only
+     version of this that rests where the layout put it. */
+  @media (prefers-reduced-motion: reduce) {
+    .expert-quote-lead__ring,
+    .expert-quote-lead__avatar,
+    .expert-quote-pic__frame {
+      animation: none;
+    }
+  }
+
+  /* ---- the phone ---------------------------------------------------------
+     A 260px picture either side of a 232px featured one is three columns inside
+     390px, so the row becomes the featured picture first and the scattered ones
+     under it, two across.
+
+     `order: 0` on the featured picture rather than re-ordering the others: they
+     keep the 1 and 3 their Placement setting gave them, so a merchant who
+     arranged the desktop scatter still gets the left-hand ones first on a
+     phone.
+
+     The desktop stagger is replaced rather than scaled. It is a composition
+     across a 1400px row — and, in the preset, a negative lift up beside the
+     expert. A picture 96px above its neighbour in a two-across grid is a hole,
+     not a stagger, so the mobile offset is its own setting and defaults to 0. */
+  @media screen and (max-width: 749px) {
+    .expert-quote__stage {
+      gap: var(--expert-quote-gap-y-mobile, var(--expert-quote-gap-y, var(--space-6)))
+        var(--expert-quote-gap-x-mobile, var(--expert-quote-gap-x, var(--space-6)));
+    }
+
+    .expert-quote-pic--feature {
+      order: 0;
+      flex: 1 1 100%;
+    }
+
+    .expert-quote-pic--scatter {
+      flex: 0 1 auto;
+      margin-block-start: var(--eqp-offset-mobile, 0px);
+    }
+
+    .expert-quote-pic__frame {
+      inline-size: var(--eqp-width-mobile, var(--eqp-width, 260px));
+      --radius-media: var(--eqp-radius-mobile, var(--eqp-radius, 0px));
+    }
+
+    .expert-quote-pic--outlined .expert-quote-pic__frame::after {
+      border-radius: var(--eqp-radius-mobile, var(--eqp-radius, 0px));
+    }
+
+    /* The scatter is decoration. A merchant whose products are the point can
+       keep it; one whose phone layout is already long can drop it without
+       deleting the blocks and losing what is set on them. */
+    .expert-quote__stage--no-scatter-mobile .expert-quote-pic--scatter {
+      display: none;
     }
   }
 }

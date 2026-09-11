@@ -14,7 +14,7 @@
  * @module @theme/lenis
  */
 
-//#region package.json
+//#region package.json  
 var version = "1.3.25";
 //#endregion
 //#region packages/core/src/maths.ts

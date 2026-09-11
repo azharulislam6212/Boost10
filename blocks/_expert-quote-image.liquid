@@ -1,0 +1,621 @@
+{% comment %}
+  blocks/_expert-quote-image.liquid
+
+  One of the photographs scattered either side of the expert in
+  `sections/expert-quote.liquid`.
+
+  ## Why it is a block and not two image pickers on the section
+
+  The drawing has exactly two, so two image pickers would have been the shorter
+  route. It would also have been a section that can never show three products,
+  can never show one, and needs a code change either way. A block costs the
+  merchant one click and buys them the whole range.
+
+  ## Placement is `order`, not source position
+
+  `start` and `end` become an `order` in `assets/base.css` — 1 before the centre
+  column, 3 after it. Nothing here moves in the markup, which matters because
+  the source order is what a screen reader announces and what the Tab key
+  follows. A merchant dragging a picture from one side to the other should not
+  be rewriting the order the page is read in.
+
+  `start` and `end` rather than "left" and "right" for the same reason every
+  other layout setting in the theme is spelled that way: they follow the text
+  direction, so an Arabic storefront gets the arrangement mirrored rather than
+  the arrangement broken.
+
+  ## The drop is margin, not translate
+
+  A `translate` would have been tidier to write and would have let the picture
+  hang out of the bottom of the section, because a translated box still takes up
+  its untranslated space and the row would size itself to where the picture is
+  not. `margin-block-start` is in flow, so a picture dropped 120px makes the row
+  120px taller and the section grows to hold it.
+
+  Negative values are allowed, and are how a picture is lifted up beside the
+  expert rather than sitting below it — the arrangement the drawing has.
+
+  ## The loop is a class, not a bundle of numbers
+
+  Four styles, shared with `blocks/_expert-quote-feature.liquid` and defined
+  once in `assets/base.css`:
+
+    Float   rises and falls. The quietest, and the one that reads as floating.
+    Sway    tips around whatever tilt the picture already has.
+    Zoom    breathes in and out.
+    Orbit   traces a small circle. The most visible of the four.
+
+  The distance and the speed come from the section, so every picture in it moves
+  to one rhythm and a merchant tunes the whole composition from one place. The
+  style and the offset into the cycle are per-picture, because pictures rising
+  and falling in unison is a lift rather than a drift.
+
+  Each style animates a different property — `translate`, `rotate`, `scale` —
+  and never `transform`, which is what lets the reveal keep using `transform`
+  and lets Sway rotate around the picture's own resting tilt instead of
+  replacing it.
+{% endcomment %}
+
+{%- liquid
+  assign b = block.settings
+
+  assign placement = b.placement | default: 'start'
+  if placement == 'end'
+    assign order = 3
+  else
+    assign order = 1
+  endif
+
+  assign width = b.width | default: 260 | plus: 0
+  assign width_mobile = b.width_mobile | default: width | plus: 0
+  assign radius = b.radius | default: 0 | plus: 0
+  assign radius_mobile = b.radius_mobile | default: radius | plus: 0
+
+  comment
+    `plus: 0` after `default`, and `default` not used to supply a fallback for
+    the mobile drop: 0 is a value a merchant chooses here — it is the picture
+    sitting level with the top of the row — and `default` would replace it with
+    the desktop stagger, which is the one arrangement a phone cannot use.
+
+    So the desktop drop falls back to 0 and the mobile one falls back to the
+    desktop value only when the setting does not exist at all, which is a block
+    saved before the mobile slider existed.
+  endcomment
+  assign offset = b.offset | default: 0 | plus: 0
+  assign offset_mobile = b.offset_mobile | default: offset | plus: 0
+
+  assign rotate = b.rotate | default: 0 | plus: 0
+
+  comment
+    ---- the outline ----
+
+    The same off-register echo the featured picture carries, offered here too so
+    a merchant can use it on any of the pictures rather than only the one the
+    drawing happened to put it on. Drawn only when it has both a style and a
+    width — an outline 0px wide with a colour on it is three declarations that
+    paint nothing.
+  endcomment
+  assign outline_style = b.outline_style | default: 'none'
+  assign outline_width = b.outline_width | default: 0 | plus: 0
+
+  assign has_outline = false
+  if outline_style != 'none' and outline_width > 0
+    assign has_outline = true
+  endif
+
+  if has_outline
+    assign outline_percent = b.outline_opacity | default: 100 | plus: 0
+    if b.outline_color == blank
+      assign outline_paint = 'color-mix(in srgb, currentColor ' | append: outline_percent | append: '%, transparent)'
+    else
+      assign outline_alpha = outline_percent | divided_by: 100.0
+      assign outline_paint = b.outline_color | color_modify: 'alpha', outline_alpha
+    endif
+  endif
+
+  assign motion = b.motion_style | default: 'none'
+
+  comment
+    The picture is never wider than its own slider, so the `sizes` hint is that
+    number rather than a viewport fraction. The browser is told the one thing
+    that is actually true about the box, and stops fetching a 1600px variant for
+    a 260px frame.
+  endcomment
+  assign sizes = width_mobile | append: 'px'
+  assign sizes = '(min-width: 750px) ' | append: width | append: 'px, ' | append: sizes
+
+  assign classes = 'expert-quote-pic expert-quote-pic--scatter expert-quote-pic--' | append: placement
+  if motion != 'none'
+    assign classes = classes | append: ' expert-quote-pic--' | append: motion
+  endif
+  if has_outline
+    assign classes = classes | append: ' expert-quote-pic--outlined'
+  endif
+-%}
+
+{%- capture block_style -%}
+  {%- render 'spacing', block: b, declarations: true -%}
+  --eqp-order: {{ order }};
+  --eqp-width: {{ width }}px;
+  --eqp-width-mobile: {{ width_mobile }}px;
+  --eqp-offset: {{ offset }}px;
+  --eqp-offset-mobile: {{ offset_mobile }}px;
+  --eqp-rotate: {{ rotate }}deg;
+  --eqp-radius: {{ radius }}px;
+  --eqp-radius-mobile: {{ radius_mobile }}px;
+  {%- comment -%}
+    The picture's offset into the loop, written negative so it starts already
+    that far in rather than standing still for that long first. The section owns
+    the distance and the speed; this is the only part of the cycle each picture
+    decides for itself.
+  {%- endcomment -%}
+  --eqp-motion-delay: -{{ b.motion_delay | default: 0 | plus: 0 }}ms;
+  {%- if has_outline -%}
+    --eqp-outline-width: {{ outline_width }}px;
+    --eqp-outline-style: {{ outline_style }};
+    --eqp-outline-color: {{ outline_paint }};
+    --eqp-outline-x: {{ b.outline_offset_x | default: 0 | plus: 0 }}px;
+    --eqp-outline-y: {{ b.outline_offset_y | default: 0 | plus: 0 }}px;
+  {%- endif -%}
+{%- endcapture -%}
+
+<motion-effect
+  class="{{ classes }}"
+  data-block-spacing
+  style="{{ block_style | strip_newlines | strip }}"
+  {% render 'motion-attrs', kind: 'image', block: b, target: '.expert-quote-pic__frame' %}
+  {{ block.shopify_attributes }}
+>
+  <div class="expert-quote-pic__frame">
+    {%- comment -%}
+      `placeholder` so the block is a picture-shaped box the moment it is added
+      rather than an empty gap the merchant has to imagine the layout around —
+      the same reason `sections/featured-offer.liquid` asks its background for
+      one.
+    {%- endcomment -%}
+    {% render 'image',
+       image: b.image,
+       ratio: b.ratio,
+       sizes: sizes,
+       placeholder: 'product-apparel-1',
+       wrapper_class: 'expert-quote-pic__media' %}
+  </div>
+</motion-effect>
+
+{% schema %}
+{
+  "name": "t:blocks.expert_quote_image.name",
+  "tag": null,
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "t:blocks.expert_quote_feature.paragraphs.image"
+    },
+    {
+      "type": "image_picker",
+      "id": "image",
+      "label": "t:shared.image.label"
+    },
+    {
+      "type": "select",
+      "id": "ratio",
+      "label": "t:blocks.image.settings.ratio.label",
+      "options": [
+        {
+          "value": "adapt",
+          "label": "t:blocks.image.settings.ratio.options__1.label"
+        },
+        {
+          "value": "square",
+          "label": "t:blocks.image.settings.ratio.options__2.label"
+        },
+        {
+          "value": "portrait",
+          "label": "t:blocks.image.settings.ratio.options__3.label"
+        },
+        {
+          "value": "landscape",
+          "label": "t:blocks.image.settings.ratio.options__4.label"
+        },
+        {
+          "value": "tall",
+          "label": "t:blocks.image.settings.ratio.options__6.label"
+        }
+      ],
+      "default": "portrait"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.expert_quote_image.headers.placement"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:blocks.expert_quote_image.paragraphs.placement"
+    },
+    {
+      "type": "select",
+      "id": "placement",
+      "label": "t:blocks.expert_quote_image.settings.placement.label",
+      "options": [
+        {
+          "value": "start",
+          "label": "t:blocks.expert_quote_image.settings.placement.options__1.label"
+        },
+        {
+          "value": "end",
+          "label": "t:blocks.expert_quote_image.settings.placement.options__2.label"
+        }
+      ],
+      "default": "start"
+    },
+    {
+      "type": "range",
+      "id": "offset",
+      "label": "t:blocks.expert_quote_image.settings.offset.label",
+      "info": "t:blocks.expert_quote_image.settings.offset.info",
+      "min": -160,
+      "max": 240,
+      "step": 4,
+      "unit": "px",
+      "default": -96
+    },
+    {
+      "type": "range",
+      "id": "offset_mobile",
+      "label": "t:blocks.expert_quote_image.settings.offset_mobile.label",
+      "min": -80,
+      "max": 200,
+      "step": 4,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "rotate",
+      "label": "t:blocks.expert_quote_image.settings.rotate.label",
+      "info": "t:blocks.expert_quote_image.settings.rotate.info",
+      "min": -20,
+      "max": 20,
+      "step": 1,
+      "unit": "°",
+      "default": -12
+    },
+    {
+      "type": "header",
+      "content": "t:shared.layout.header"
+    },
+    {
+      "type": "range",
+      "id": "width",
+      "label": "t:shared.layout.width.label",
+      "min": 80,
+      "max": 480,
+      "step": 4,
+      "unit": "px",
+      "default": 260
+    },
+    {
+      "type": "range",
+      "id": "width_mobile",
+      "label": "t:shared.layout.width_mobile.label",
+      "min": 80,
+      "max": 400,
+      "step": 4,
+      "unit": "px",
+      "default": 160
+    },
+    {
+      "type": "header",
+      "content": "t:shared.corners.header"
+    },
+    {
+      "type": "range",
+      "id": "radius",
+      "label": "t:shared.corners.radius.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 32
+    },
+    {
+      "type": "range",
+      "id": "radius_mobile",
+      "label": "t:shared.corners.radius_mobile.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 20
+    },
+    {
+      "type": "header",
+      "content": "t:shared.border.header"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:blocks.expert_quote_image.paragraphs.outline"
+    },
+    {
+      "type": "select",
+      "id": "outline_style",
+      "label": "t:sections.expert_quote.settings.feature_outline_style.label",
+      "info": "t:sections.expert_quote.settings.feature_outline_style.info",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.options.none"
+        },
+        {
+          "value": "solid",
+          "label": "t:shared.options.solid"
+        },
+        {
+          "value": "dashed",
+          "label": "t:shared.options.dashed"
+        },
+        {
+          "value": "dotted",
+          "label": "t:shared.options.dotted"
+        }
+      ],
+      "default": "none"
+    },
+    {
+      "type": "range",
+      "id": "outline_width",
+      "label": "t:shared.border.thickness.label",
+      "min": 0,
+      "max": 6,
+      "step": 1,
+      "unit": "px",
+      "default": 1,
+      "visible_if": "{{ block.settings.outline_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "outline_offset_x",
+      "label": "t:blocks.expert_quote_image.settings.outline_offset_x.label",
+      "min": -60,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 22,
+      "visible_if": "{{ block.settings.outline_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "outline_offset_y",
+      "label": "t:blocks.expert_quote_image.settings.outline_offset_y.label",
+      "min": -60,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 18,
+      "visible_if": "{{ block.settings.outline_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "outline_opacity",
+      "label": "t:shared.border.opacity.label",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 100,
+      "visible_if": "{{ block.settings.outline_style != 'none' }}"
+    },
+    {
+      "type": "color",
+      "id": "outline_color",
+      "label": "t:shared.border.color.label",
+      "info": "t:shared.border.color.info",
+      "visible_if": "{{ block.settings.outline_style != 'none' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:sections.expert_quote.headers.drift"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:blocks.expert_quote_image.paragraphs.motion"
+    },
+    {
+      "type": "select",
+      "id": "motion_style",
+      "label": "t:blocks.expert_quote_image.settings.motion_style.label",
+      "info": "t:blocks.expert_quote_image.settings.motion_style.info",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.options.none"
+        },
+        {
+          "value": "float",
+          "label": "t:blocks.expert_quote_image.settings.motion_style.options__2.label"
+        },
+        {
+          "value": "sway",
+          "label": "t:blocks.expert_quote_image.settings.motion_style.options__3.label"
+        },
+        {
+          "value": "zoom",
+          "label": "t:blocks.expert_quote_image.settings.motion_style.options__4.label"
+        },
+        {
+          "value": "orbit",
+          "label": "t:blocks.expert_quote_image.settings.motion_style.options__5.label"
+        }
+      ],
+      "default": "float"
+    },
+    {
+      "type": "range",
+      "id": "motion_delay",
+      "label": "t:blocks.expert_quote_image.settings.motion_delay.label",
+      "info": "t:blocks.expert_quote_image.settings.motion_delay.info",
+      "min": 0,
+      "max": 6000,
+      "step": 100,
+      "unit": "ms",
+      "default": 0,
+      "visible_if": "{{ block.settings.motion_style != 'none' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.animation.header"
+    },
+    {
+      "type": "select",
+      "id": "animation_image",
+      "label": "t:shared.animation.animation_image.label",
+      "options": [
+        {
+          "value": "inherit",
+          "label": "t:shared.animation.animation_image.options__1.label"
+        },
+        {
+          "value": "none",
+          "label": "t:shared.animation.animation_image.options__2.label"
+        },
+        {
+          "value": "fade-in",
+          "label": "t:shared.animation.animation_image.options__3.label"
+        },
+        {
+          "value": "fade-up",
+          "label": "t:shared.animation.animation_image.options__4.label"
+        },
+        {
+          "value": "zoom-in",
+          "label": "t:shared.animation.animation_image.options__7.label"
+        },
+        {
+          "value": "reveal-up",
+          "label": "t:shared.animation.animation_image.options__11.label"
+        }
+      ],
+      "default": "inherit"
+    },
+    {
+      "type": "range",
+      "id": "animation_delay",
+      "label": "t:shared.animation.animation_delay.label",
+      "info": "t:shared.animation.animation_delay.info",
+      "min": 0,
+      "max": 1000,
+      "step": 50,
+      "unit": "ms",
+      "default": 0
+    },
+    {
+      "type": "header",
+      "content": "t:shared.spacing.block_header"
+    },
+    {
+      "type": "select",
+      "id": "padding_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        {
+          "value": "desktop",
+          "label": "t:shared.spacing.devices.options__1.label"
+        },
+        {
+          "value": "mobile",
+          "label": "t:shared.spacing.devices.options__2.label"
+        }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left_mobile",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right_mobile",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    }
+  ]
+}
+{% endschema %}
