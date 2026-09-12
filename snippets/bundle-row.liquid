@@ -82,6 +82,42 @@
   endif
 
   assign quantity_max = max_per_product | default: section.settings.max_per_product | default: 4 | plus: 0
+
+  comment
+    ---- the card's own colour scheme ----
+
+    A card is a surface inside a surface — a pale tile on a dark section, or the
+    reverse — and until now the only way to say so was **Card background**, one
+    colour that changed the tile and nothing on it. The title stayed the
+    section's text colour, the prices stayed its heading colour and the add
+    button stayed its outline, so a dark card was a dark card with black type on
+    it.
+
+    The scheme is the theme's own answer to that, and it is the Group block's
+    idiom exactly: a checkbox that means "the one around me", and a picker that
+    is only asked about when the checkbox is off. `snippets/group.liquid` writes
+    the same two classes from the same pair of settings, so a merchant who has
+    coloured a Group already knows this control.
+
+    `color-scheme-container` is what makes it work on the card rather than only
+    under it: the class redefines every `--color-*` token *on this element*, so
+    everything inside resolves against the card's scheme instead of the
+    section's — including `--color-secondary-background`, which is what the card
+    is painted with when no explicit background is set.
+
+    Read from `section.settings` rather than passed in, for the reason the row
+    count and the rating switch already are: it is one decision about the whole
+    picker, and threading it through two call sites in
+    `blocks/_product-bundle-category.liquid` would be the same value written
+    twice.
+
+    Inherit is the default, so every card in every store that already has this
+    section is painted exactly as it was.
+  endcomment
+  assign card_scheme_classes = ''
+  if section.settings.card_inherit_color_scheme == false and section.settings.card_color_scheme != blank
+    assign card_scheme_classes = ' color-scheme-container color-' | append: section.settings.card_color_scheme
+  endif
 -%}
 
 {%- if is_placeholder -%}
@@ -99,7 +135,7 @@
     assign qty_id = prefix | append: '-placeholder-' | append: position | append: '-qty'
   -%}
 
-  <li class="bundle-row carousel-shell__item" data-bundle-row-placeholder>
+  <li class="bundle-row carousel-shell__item{{ card_scheme_classes }}" data-bundle-row-placeholder>
     <div class="bundle-row__media">
       {{ placeholder_image | placeholder_svg_tag: 'bundle-row__image placeholder-svg' }}
     </div>
@@ -184,7 +220,7 @@
   -%}
 
   <li
-    class="bundle-row carousel-shell__item"
+    class="bundle-row carousel-shell__item{{ card_scheme_classes }}"
     data-bundle-row
     data-product-id="{{ product.id }}"
     data-variant-id="{{ variant.id }}"

@@ -972,6 +972,38 @@ export function parseJSONScript(source, selector, fallback = null) {
 }
 
 /**
+ * Read JSON out of an *attribute* rather than out of an element's text.
+ *
+ * The two look interchangeable and are not, and `parseJSONScript` being the
+ * only one that existed is how `<shipping-calculator>` came to parse the word
+ * "---" as JSON on every cart page. Shopify's `country_option_tags` puts each
+ * country's province list in `data-provinces` on the `<option>` itself, and
+ * that option's *text* is a country name — or, for the divider it emits under
+ * the shop's own country, three hyphens. Handing that element to a function
+ * that reads `textContent` is a parse error on the first load and no provinces
+ * ever.
+ *
+ * An absent attribute is the fallback rather than a warning: a country with no
+ * provinces legitimately has none, and there is nothing to report.
+ *
+ * @param {Element|null|undefined} element
+ * @param {string} attribute
+ * @param {*} [fallback=null]
+ * @returns {*}
+ */
+export function parseJSONAttribute(element, attribute, fallback = null) {
+  const raw = element?.getAttribute?.(attribute);
+  if (raw == null || raw === '') return fallback;
+
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    console.warn(`[Boost10] Could not parse JSON from the "${attribute}" attribute.`, error);
+    return fallback;
+  }
+}
+
+/**
  * @param {string} name Custom property name, with or without the leading dashes.
  * @param {string|number} value
  * @param {HTMLElement} [target=document.documentElement]

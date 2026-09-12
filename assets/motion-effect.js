@@ -67,6 +67,18 @@ import { reveal, parallax, marquee, unsplitText, getPreset, motionEnabled, EASIN
 const CONTINUOUS = new Set(['parallax', 'marquee']);
 
 export class MotionEffect extends BaseComponent {
+  /**
+   * A decorator, not an owner. This element wraps whatever content a section or
+   * a block hands it and animates it — it never reads `this.refs`, so it must
+   * not stop a ref inside it from reaching the component around it.
+   *
+   * That matters most for a **Group**: `snippets/group.liquid` renders one as a
+   * `<motion-effect>` whenever its animation is left on, which is the default,
+   * so every ref a merchant arranges inside a Group sits behind one of these.
+   * @type {boolean}
+   */
+  static refBoundary = false;
+
   /** @type {(() => void)|null} */
   #cancelReveal = null;
 
@@ -331,6 +343,9 @@ defineComponent('motion-effect', MotionEffect);
  *   </parallax-media>
  */
 export class ParallaxMedia extends BaseComponent {
+  /** Transparent to refs for the same reason `MotionEffect` is. @type {boolean} */
+  static refBoundary = false;
+
   /** @type {number|null} */
   #frame = null;
 

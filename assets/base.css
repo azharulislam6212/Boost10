@@ -14265,6 +14265,23 @@ testimonial-product[data-open] .testimonial-card__info {
     align-items: flex-start;
     gap: var(--bundle-tab-gap, 1rem);
     min-inline-size: 0;
+
+    /* The panel's entrance happens inside the strip's own box. Rise moves the
+       list 14px and Slide moves it 28px across, and a transform paints wherever
+       it lands however tall the element is measured to be — so without this the
+       travel is a fortnight of overflow at the bottom of the section and a
+       horizontal scrollbar that appears and disappears on every tab press.
+
+       `clip` rather than `hidden`, because `hidden` establishes a scroll
+       container: the pills would become scrollable and a focus ring on one past
+       the edge would silently scroll the strip. `clip` cannot scroll, so this
+       only changes what is painted.
+
+       The margin is the slack a focus ring needs — the pill's outline is 2px at
+       a 2px offset, so 8px leaves it whole — and a card's shadow with it. It
+       costs nothing at rest. */
+    overflow: clip;
+    overflow-clip-margin: 8px;
   }
 
   /* The line under the strip, as its own full-width item between the pills and
@@ -14294,12 +14311,41 @@ testimonial-product[data-open] .testimonial-card__info {
   /* Every panel on its own full-width line under the strip, and only the open
      one displayed. `--bundle-tabs-gap` is the space between the strip and the
      products; the row gap is subtracted for the same reason as above. */
+  /* ---- the panel, and the movement it arrives with ----------------------
+
+     The same beat `blocks/tabs.liquid` has had since it shipped, where it is
+     `.tabs__panel:not([hidden])` and `@keyframes tab-panel-rise`. One state
+     along here — `hidden` is what hides a panel there, `display: none` is what
+     hides one here — and that difference is what lets this work with no script
+     at all.
+
+     The animation is declared on every panel, open or not, rather than on the
+     two rules below that open one. A `display: none` element generates no box,
+     so its animation does not run; the moment CSS stops hiding it the animation
+     starts from its first frame. That is the trigger, it is the browser's own,
+     and it fires again on every category change with nothing to reset — and it
+     is one declaration instead of the same three lines copied into both of the
+     selectors that reveal a panel.
+
+     The movement is a custom property holding an `animation-name` rather than a
+     class per option, so there is one rule here for every choice a merchant can
+     make and a new one is a keyframe below plus an option in
+     `blocks/product-bundle-tabs.liquid`. `none` is a real `animation-name`, so
+     Off needs no second selector either.
+
+     `both` holds the opening frame, so there is no flash of the finished
+     position before the animation takes over. The travel is deliberately small:
+     a list this wide sliding a long way reads as the panel falling into place
+     rather than as an answer to the tap. */
   .product-bundle__panel {
     order: 3;
     flex: 1 0 100%;
     min-inline-size: 0;
     margin-block-start: calc(var(--bundle-tabs-gap, 2.4rem) - var(--bundle-tab-gap, 1rem));
     display: none;
+    animation: var(--bundle-panel-animation, bundle-panel-rise)
+      var(--bundle-motion-speed, 420ms)
+      var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)) both;
   }
 
   .product-bundle__cat:has(> .product-bundle__pill-input:checked) > .product-bundle__panel {
@@ -14312,6 +14358,60 @@ testimonial-product[data-open] .testimonial-card__info {
     > .product-bundle__cat:first-child
     > .product-bundle__panel {
     display: block;
+  }
+
+  @keyframes bundle-panel-fade {
+    from {
+      opacity: 0;
+    }
+
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes bundle-panel-rise {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  /* The distance is a custom property rather than a number in the keyframe,
+     because a keyframe cannot be written twice for two reading directions and
+     `translate` is a physical axis whatever the writing mode. A store reading
+     right to left flips the sign below, so the products arrive from the side
+     the customer reads towards in both — the same trick every other directional
+     offset in this file uses, one property and one override. */
+  @keyframes bundle-panel-slide {
+    from {
+      opacity: 0;
+      translate: var(--bundle-panel-slide-from, 28px) 0;
+    }
+
+    to {
+      opacity: 1;
+      translate: none;
+    }
+  }
+
+  [dir='rtl'] .product-bundle__panel {
+    --bundle-panel-slide-from: -28px;
+  }
+
+  /* The movement goes and the reveal stays. `animation: none` would leave a
+     panel that CSS has just stopped hiding sitting at the keyframe's opening
+     opacity of 0 — an open category showing an empty rectangle — so the
+     duration is what is taken away instead, and the final frame lands at once. */
+  @media (prefers-reduced-motion: reduce) {
+    .product-bundle__panel {
+      animation-duration: 0.01ms;
+    }
   }
 
   /* The radio is hidden and still focusable. `display: none` would take it out
@@ -14387,7 +14487,15 @@ testimonial-product[data-open] .testimonial-card__info {
     border-style: var(--bundle-tab-border-style, solid);
     border-color: var(--bundle-tab-border, var(--color-border));
     border-radius: var(--bundle-tab-radius, 999px);
-    background: var(--bundle-tab-background, var(--color-background));
+
+    /* The resting fill, named once. Segmented redefines the property rather
+       than the `background` below, because two rules stating a background is
+       how the Grow rule further down ends up painting a plain strip's white
+       over a segmented strip's track: it can restore *the* resting colour only
+       if there is one name for it. */
+    --bundle-tab-rest-background: var(--bundle-tab-background, var(--color-background));
+
+    background: var(--bundle-tab-rest-background);
     color: var(--bundle-tab-color, var(--color-heading));
     font-size: var(--bundle-tab-font-size, 1.4rem);
     font-weight: var(--bundle-tab-font-weight, 500);
@@ -14395,8 +14503,107 @@ testimonial-product[data-open] .testimonial-card__info {
     white-space: nowrap;
     cursor: pointer;
     user-select: none;
-    transition: background-color var(--transition-fast), color var(--transition-fast),
-      border-color var(--transition-fast);
+
+    /* The strip's own speed, and a slower curve than `--transition-fast`'s
+       150ms. The colours are half of what a customer sees when they press a
+       category — the other half is the list under it — and 150ms against the
+       panel's 420 read as the pill snapping and the products following, which
+       is two events rather than one gesture.
+
+       `--bundle-tab-speed` is `0ms` when the merchant has switched the movement
+       off, so this is the same one declaration either way rather than a
+       `transition` that is sometimes here and sometimes not. */
+    transition: background-color var(--bundle-tab-speed, 300ms)
+        var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+      color var(--bundle-tab-speed, 300ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+      border-color var(--bundle-tab-speed, 300ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+  }
+
+  /* ---- the fill growing into place -------------------------------------
+
+     `blocks/tabs.liquid` marks its selected tab with a marker element that
+     `assets/tabs.js` measures and slides between the names. That is not
+     available here and cannot be made available: the pills are drawn by four
+     different Category blocks and laid out by `order`, so there is no strip
+     element for a marker to be positioned inside — and a marker travelling
+     *behind* three opaque capsules on its way across would read as a bug rather
+     than as a transition. The note at the top of
+     `blocks/product-bundle-tabs.liquid` has the whole of it.
+
+     So each pill animates its own fill instead, and nothing has to know where
+     its neighbours are. The layer carries the selected background and grows
+     from 82% to full as the radio is checked; the pill's own `background`
+     stays the resting colour underneath, so the two cross-fade rather than one
+     replacing the other.
+
+     `inset: 0` is the padding box, which is what an absolutely positioned child
+     resolves against — so the border ring stays visible and keeps transitioning
+     its own colour on the element above.
+
+     `z-index: -1` paints the layer after the pill's background and border and
+     before its contents, which is exactly where a fill belongs; `isolation` is
+     what keeps that negative index inside the pill rather than letting it fall
+     behind whatever the section is painted on. */
+  .product-bundle__tabs--tab-fill .product-bundle__pill {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .product-bundle__tabs--tab-fill .product-bundle__pill::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: var(
+      --bundle-tab-active-background,
+      var(--color-secondary-button-background, var(--color-heading))
+    );
+    opacity: 0;
+    transform: scale(0.82);
+    transition: opacity var(--bundle-tab-speed, 300ms)
+        var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+      transform var(--bundle-tab-speed, 300ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+  }
+
+  /* Checked, and the first Category before anyone has chosen — the same pair of
+     selectors the filled state below uses, so the layer and the colours are
+     never two different categories. */
+  .product-bundle__tabs--tab-fill .product-bundle__pill-input:checked + .product-bundle__pill::before,
+  .product-bundle__tabs--tab-fill
+    .product-bundle__panels:not(:has(.product-bundle__pill-input:checked))
+    > .product-bundle__cat:first-child
+    > .product-bundle__pill::before {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  /* The selected pill keeps its *resting* background while Grow is on, so the
+     layer above is the only thing that paints the fill.
+
+     Without this both happen at once: the filled rule below fades the whole
+     capsule to the active colour over the same duration the layer is growing
+     across it, so the capsule is already the finished colour before the layer
+     has gone anywhere and there is nothing left to see grow. One declaration
+     rather than switching the filled rule off, because the border colour and
+     the text colour it also sets are both still wanted. */
+  .product-bundle__tabs--tab-fill .product-bundle__pill-input:checked + .product-bundle__pill,
+  .product-bundle__tabs--tab-fill
+    .product-bundle__panels:not(:has(.product-bundle__pill-input:checked))
+    > .product-bundle__cat:first-child
+    > .product-bundle__pill {
+    background: var(--bundle-tab-rest-background);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .product-bundle__pill,
+    .product-bundle__pill::before {
+      transition-duration: 0.01ms;
+    }
+
+    .product-bundle__tabs--tab-fill .product-bundle__pill::before {
+      transform: none;
+    }
   }
 
   .product-bundle__pill:hover {
@@ -14487,7 +14694,12 @@ testimonial-product[data-open] .testimonial-card__info {
     flex: 1 1 0%;
     border-radius: 0;
     border-inline-width: 0;
-    background: var(
+
+    /* The track colour *is* the resting fill here — see the note at the top —
+       so it is the shared property that changes rather than the `background`
+       declaration, and every rule that restores a resting pill restores this
+       one without knowing which strip style it is on. */
+    --bundle-tab-rest-background: var(
       --bundle-tab-background,
       var(--bundle-tabs-track-background, color-mix(in srgb, var(--color-heading) 8%, transparent))
     );
@@ -14607,9 +14819,19 @@ testimonial-product[data-open] .testimonial-card__info {
 
   /* An inset ring, so a chosen card does not grow by two pixels and shunt the
      one below it. Inside the radius for the same reason it is inset — a ring
-     drawn outside a 24px corner is a rectangle with rounded content in it. */
+     drawn outside a 24px corner is a rectangle with rounded content in it.
+
+     The colour is the merchant's own with the section's accent behind it, which
+     is what it has always been drawn in. The card's background and text for the
+     same state are with the card's box outside the layer — see the note there
+     for why those two cannot live here.
+
+     `--bundle-card-ink` is the last fallback rather than `--color-heading`, so a
+     ring on a card that has been given a foreground of its own is still drawn
+     in a colour that belongs to that card. */
   .bundle-row[data-in-bundle] {
-    box-shadow: inset 0 0 0 2px var(--product-bundle-accent, var(--color-heading));
+    box-shadow: inset 0 0 0 2px
+      var(--product-bundle-card-active-border, var(--product-bundle-accent, var(--bundle-card-ink)));
   }
 
   /* Sold out stays visible and stays readable. Hiding it tells a customer
@@ -14742,7 +14964,7 @@ testimonial-product[data-open] .testimonial-card__info {
        preorder — keeps the store's own colours, which is right: only the saving
        is the section's to colour. */
     --color-badge-sale-bg: var(--product-bundle-accent, var(--color-badge-sale-bg));
-    --color-badge-sale-text: var(--product-bundle-card-badge-text, var(--color-heading));
+    --color-badge-sale-text: var(--product-bundle-card-badge-text, var(--bundle-card-ink));
 
     /* The capsule, through the same door. `.badge`'s own radius declaration is
        unlayered too, so `border-radius: 999px` written here would have been
@@ -14813,8 +15035,12 @@ testimonial-product[data-open] .testimonial-card__info {
     color: color-mix(in srgb, var(--product-bundle-accent, var(--color-heading)) 25%, transparent);
   }
 
+  /* The count beside the stars is body copy, not accent — but it follows the
+     card's own foreground when there is one, or a merchant who darkens a card
+     is left with one grey line on it that the scheme still owns. Unset, it is
+     the muted body colour it has always been. */
   .bundle-row__rating .rating__count {
-    color: var(--color-text-subtle, var(--color-text));
+    color: var(--product-bundle-card-foreground, var(--color-text-subtle, var(--color-text)));
   }
 
   /* The rule and the row under it.
@@ -14838,7 +15064,7 @@ testimonial-product[data-open] .testimonial-card__info {
     padding-block-start: 1rem;
     padding-inline-end: var(--bundle-foot-inset, var(--space-4));
     border-block-start: 1px dotted var(--color-border);
-    border-block-start-color: color-mix(in srgb, var(--color-heading) 20%, transparent);
+    border-block-start-color: color-mix(in srgb, var(--bundle-card-ink) 20%, transparent);
   }
 
   /* Pushed to the end, taking the add control with it: the stepper holds the
@@ -14871,7 +15097,7 @@ testimonial-product[data-open] .testimonial-card__info {
      kinds of text rather than as one price and the price it replaced. */
   .bundle-row__price .price__compare {
     order: -1;
-    color: var(--color-heading);
+    color: var(--bundle-card-ink);
     font-size: 1.3rem;
     font-weight: 400;
     opacity: 0.8;
@@ -14886,7 +15112,7 @@ testimonial-product[data-open] .testimonial-card__info {
      replaced. */
   .bundle-row__price .price__sale,
   .bundle-row__price .price__regular {
-    color: var(--color-heading);
+    color: var(--bundle-card-ink);
     font-size: var(--font-size-md, 1.6rem);
     font-weight: 700;
   }
@@ -14905,10 +15131,10 @@ testimonial-product[data-open] .testimonial-card__info {
     inline-size: 3.2rem;
     block-size: 3.2rem;
     padding: 0;
-    border: 1px dashed var(--color-heading);
+    border: 1px dashed var(--bundle-card-ink);
     border-radius: 999px;
     background: transparent;
-    color: var(--color-heading);
+    color: var(--bundle-card-ink);
     cursor: pointer;
     transition: background-color var(--transition-fast), color var(--transition-fast),
       border-color var(--transition-fast);
@@ -14916,7 +15142,7 @@ testimonial-product[data-open] .testimonial-card__info {
 
   .bundle-row__add:hover:not(:disabled) {
     border-style: solid;
-    border-color: var(--color-heading);
+    border-color: var(--bundle-card-ink);
   }
 
   .bundle-row__add:disabled {
@@ -14931,9 +15157,14 @@ testimonial-product[data-open] .testimonial-card__info {
 
   .bundle-row__add[aria-pressed='true'] {
     border-style: solid;
-    background: var(--color-heading);
-    border-color: var(--color-heading);
-    color: var(--color-background);
+    background: var(--bundle-card-ink);
+    border-color: var(--bundle-card-ink);
+
+    /* The glyph is punched out of the filled circle in whatever the card is
+       actually made of — including the selected background, which this rule
+       could not otherwise know. `--bundle-card-surface` is that value, and a
+       card in the bundle has already redefined it. */
+    color: var(--bundle-card-surface, var(--color-background));
   }
 
   .bundle-row__add[aria-pressed='true'] .bundle-row__add-plus { display: none; }
@@ -15361,6 +15592,33 @@ testimonial-product[data-open] .testimonial-card__info {
     var(--bundle-row-size, 14.5rem) - 2 * var(--bundle-card-padding-block, 1.75rem)
   );
 
+  /* ---- the card's three colours, named once ----------------------------
+
+     Everything painted on this card resolves through one of these, and each
+     falls back to the token it read before the settings existed — so an
+     untouched card is the card it always was, and a merchant who sets one
+     colour does not then have to hunt down the four rules that also needed it.
+
+     `--bundle-card-ink` is `--color-heading`'s stand-in: both prices, the
+     dotted rule, the add control's outline and the saving badge's text all read
+     the heading colour, and all of them are the same decision.
+     `--bundle-card-text` is `--color-text`'s, which is what the title inherits.
+     They are two properties rather than one because the scheme separates them
+     and this should not be the one card in the theme that flattens the pair.
+
+     `--bundle-card-surface` exists so the add control's check glyph can be
+     punched out of its filled circle in whatever the card is actually made of,
+     including when that is the selected colour — a value the pressed rule
+     cannot otherwise know.
+
+     Which colour scheme's tokens these fall back to is the card's own, when the
+     merchant has given it one: `snippets/bundle-row.liquid` puts
+     `color-scheme-container` on this element, so every `--color-*` below is
+     resolved here rather than inherited from the section. */
+  --bundle-card-ink: var(--product-bundle-card-foreground, var(--color-heading));
+  --bundle-card-text: var(--product-bundle-card-foreground, var(--color-text));
+  --bundle-card-surface: var(--product-bundle-card-background, var(--color-secondary-background));
+
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: start;
@@ -15370,7 +15628,33 @@ testimonial-product[data-open] .testimonial-card__info {
   padding-inline: var(--bundle-card-padding-start, var(--space-4))
     var(--bundle-card-padding-end, var(--space-6));
   border-radius: var(--product-bundle-card-radius, 2.4rem);
-  background: var(--product-bundle-card-background, var(--color-secondary-background));
+  background: var(--bundle-card-surface);
+  color: var(--bundle-card-text);
+}
+
+/* ---- a card that is in the bundle ---------------------------------------
+
+   Out here with the card's box rather than in the layer with the ring, because
+   the background it overrides is the unlayered declaration above and an
+   unlayered rule is the only thing that can beat one.
+
+   Selected used to be the ring alone, which is legible on a pale card and
+   invisible on a dark one — the whole reason this pair exists. Each half falls
+   back to the resting colour, so a merchant who wants only a ring still gets
+   only a ring, and one who sets just the background keeps the card's text. */
+.product-bundle .bundle-row[data-in-bundle] {
+  --bundle-card-ink: var(
+    --product-bundle-card-active-foreground,
+    var(--product-bundle-card-foreground, var(--color-heading))
+  );
+  --bundle-card-text: var(
+    --product-bundle-card-active-foreground,
+    var(--product-bundle-card-foreground, var(--color-text))
+  );
+  --bundle-card-surface: var(
+    --product-bundle-card-active-background,
+    var(--product-bundle-card-background, var(--color-secondary-background))
+  );
 }
 
 /* ==========================================================================

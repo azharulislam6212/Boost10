@@ -68,6 +68,25 @@ export class BaseComponent extends HTMLElement {
    */
   static requiredRefs = [];
 
+  /**
+   * Whether this element stops a `[data-ref]` inside it from belonging to a
+   * component further up. True for anything that reads `this.refs`, which is
+   * almost everything — a `<product-form>` must not claim the refs of a
+   * `<quantity-selector>` nested in it.
+   *
+   * It is false for the handful of elements that wrap arbitrary content without
+   * ever reading a ref: `<motion-effect>` is the one that matters, because
+   * `snippets/group.liquid` renders a **Group** as one whenever the merchant
+   * has left its animation on — which is the default. Any component whose
+   * markup is Group-shaped therefore had every ref inside it silently dropped
+   * and disabled itself, and only *sometimes*: the check asks
+   * `customElements.get()`, so whether the wrapper counted at all depended on
+   * whether its module had finished loading first.
+   *
+   * @type {boolean}
+   */
+  static refBoundary = true;
+
   /** @type {AbortController|null} */
   #controller = null;
 
@@ -263,10 +282,20 @@ export class BaseComponent extends HTMLElement {
   /* --------------------------------------------------------------- refs -- */
 
   /**
-   * A `[data-ref]` node belongs to this component only if no other registered
+   * A `[data-ref]` node belongs to this component only if no other ref-reading
    * custom element sits between it and us. Without this check, a
    * `<product-form>` would happily claim the refs of a nested
    * `<quantity-selector>`.
+   *
+   * "Ref-reading" and not "registered", which is what this used to ask. A
+   * wrapper that never looks at `this.refs` is not competing for anything, and
+   * treating it as a boundary loses refs rather than protecting them — see
+   * `refBoundary` above for the case that made this visible.
+   *
+   * An unregistered tag is still not a boundary, as before: a component whose
+   * module has not loaded cannot be reading refs either. What changes is that
+   * the answer no longer depends on load order for the wrappers, because they
+   * are not boundaries in either state.
    *
    * @param {Element} node
    * @returns {boolean}
@@ -276,7 +305,12 @@ export class BaseComponent extends HTMLElement {
 
     while (parent && parent !== this) {
       const tag = parent.tagName.toLowerCase();
-      if (tag.includes('-') && customElements.get(tag)) return false;
+
+      if (tag.includes('-')) {
+        const constructor = /** @type {typeof BaseComponent|undefined} */ (customElements.get(tag));
+        if (constructor && constructor.refBoundary !== false) return false;
+      }
+
       parent = parent.parentElement;
     }
 

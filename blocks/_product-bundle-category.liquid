@@ -213,21 +213,42 @@
   assign rows_mobile = section.settings.rows_per_view_mobile | default: 2 | plus: 0
 
   comment
-    How many rows the empty state draws: the merchant's own row count, so the
-    panel they are looking at is the height the real one will be. A three-row
-    picker that previews as a one-line "choose a collection" message moves
-    everything under it the moment a collection is chosen.
+    How many cards the empty state draws: **Products to show**, which is the
+    same number that decides how many the filled state draws.
+
+    It was **Rows on screen** — the carousel's height — so the empty category
+    previewed as a list with nothing below the fold however many products the
+    merchant had asked for. Picking a collection then grew the list from three
+    cards to twelve, and the scrollbar, the dots and the arrows all appeared at
+    once: the onboarding state was a different list from the one it stood in
+    for, and the one number a merchant had actually set was the one it ignored.
+
+    The rows on screen are untouched by this. They are still the section's
+    `rows_per_view`, still passed to the carousel as `columns_*` below, and a
+    placeholder list is still the same height as a real one — what changes is
+    only how far it scrolls, which is exactly what **Products to show** means.
+
+    Real products are already capped at `limit` by the `for` loop's own
+    `limit:`, so both states now count the same way and cannot drift.
   endcomment
-  assign placeholder_rows = rows | at_least: 1
+  assign placeholder_rows = limit | at_least: 1
 
   assign has_products = false
   if collection != blank and collection.products.size > 0
     assign has_products = true
   endif
 
+  comment
+    The slide count is what the list actually holds, and for a real collection
+    that is the smaller of what it has and what the merchant asked for — the
+    `for` loop below stops at `limit`, so a collection of forty behind a limit
+    of six is six slides. It was `collection.products.size`, which handed
+    `carousel-options` forty and let it decide a loop was safe on a track with
+    six things on it.
+  endcomment
   assign slide_count = placeholder_rows
   if has_products
-    assign slide_count = collection.products.size
+    assign slide_count = collection.products.size | at_most: limit
   endif
 -%}
 

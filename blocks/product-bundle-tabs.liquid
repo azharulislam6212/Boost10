@@ -168,6 +168,73 @@
   unless underline_applies
     assign underline_style = 'none'
   endunless
+
+  comment
+    ---- the motion ----
+
+    Two movements, and they are two settings because they are two things the
+    customer sees: the pill filling as it is chosen, and the products arriving
+    under it. `blocks/tabs.liquid` has had both since it shipped — a marker that
+    slides between the names and `tab-panel-rise` on the panel that is no longer
+    hidden — and this strip had neither. Pressing a category swapped one flat
+    colour for another and replaced the whole list in the same frame, which
+    reads as the page reloading rather than as a response to the tap.
+
+    Neither can be the FAQ strip's implementation, and the reason is the one the
+    note at the top of this file keeps running into: there is no strip element
+    and there are no tab buttons this block drew. A marker is an element
+    measured against the tab it sits behind, so it needs both — a box to be
+    absolutely positioned inside, and a script that can read every tab's
+    rectangle. Here the pills are drawn by four different blocks and laid out by
+    `order`, so a marker would have to slide *behind* three opaque capsules on
+    its way across, which looks like a bug rather than a transition.
+
+    So the same two beats, drawn where they can be drawn:
+
+      the pill    its selected fill is a layer inside the capsule that grows
+                  into place, rather than a background colour that is simply
+                  a different colour on the next frame. `assets/base.css` has
+                  the layer; each pill animates its own, so nothing has to know
+                  where its neighbours are.
+
+      the panel   a keyframe on the panel CSS has just stopped hiding — which
+                  is exactly `tabs__panel:not([hidden])`, one state along. Going
+                  from `display: none` restarts a CSS animation, so the reveal
+                  is the trigger and there is nothing to reset.
+
+    The panel's movement is a custom property holding a keyframe *name* rather
+    than a class per option, so `base.css` has one rule for every choice and
+    the option list can grow here without a second edit there. `none` is a real
+    `animation-name` value, so switching it off needs no special case either.
+  endcomment
+  assign tab_motion = s.tab_animation | default: 'fill'
+  assign panel_motion = s.panel_animation | default: 'rise'
+
+  assign classes = classes | append: ' product-bundle__tabs--tab-' | append: tab_motion
+
+  assign panel_keyframes = 'none'
+  unless panel_motion == 'none'
+    assign panel_keyframes = 'bundle-panel-' | append: panel_motion
+  endunless
+
+  comment
+    One slider for both, because they are one gesture: the pill fills and the
+    products arrive, and a strip where those are set to different lengths reads
+    as two things happening rather than one. The pill takes the shorter share of
+    it in `assets/base.css` — a fill that is still spreading after the list has
+    settled is the selection lagging behind its own result.
+
+    Zero rather than the slider when the pill's movement is off, so it still has
+    one `transition` declaration and that declaration simply takes no time. A
+    property that is sometimes absent and sometimes present is two code paths
+    for one control.
+  endcomment
+  assign motion_speed = s.motion_speed | default: 420 | plus: 0
+
+  assign tab_speed_source = motion_speed
+  if tab_motion == 'none'
+    assign tab_speed_source = 0
+  endif
 -%}
 
 {%- capture tabs_style -%}
@@ -175,6 +242,23 @@
 
   --bundle-tabs-gap: {{ s.gap | default: 24 | plus: 0 }}px;
   --bundle-tabs-rail-width: {{ s.rail_width | default: 260 | plus: 0 }}px;
+
+  {%- comment -%}
+    ---- the motion ----
+
+    Three properties and no second element. `--bundle-panel-animation` carries
+    an `animation-name`, so `assets/base.css` has one rule for every option and
+    a new movement is a keyframe there plus an option here — there is no class
+    to add in two files. `none` is a valid `animation-name`, so Off is not a
+    special case anywhere.
+
+    The pill takes 70% of the slider: the fill is the smaller of the two
+    movements and finishing first is what makes it read as the cause of the
+    list arriving rather than as a second event beside it.
+  {%- endcomment -%}
+  --bundle-motion-speed: {{ motion_speed }}ms;
+  --bundle-tab-speed: calc({{ tab_speed_source }}ms * 0.7);
+  --bundle-panel-animation: {{ panel_keyframes }};
 
   {%- comment -%}
     ---- the line under the strip, and the space above it ----
@@ -663,6 +747,46 @@
         { "value": "700", "label": "t:sections.product_bundle.settings.tab_font_weight.options__4.label" }
       ],
       "default": "500"
+    },
+
+    { "type": "header", "content": "t:blocks.product_bundle_tabs.headers.motion" },
+    { "type": "paragraph", "content": "t:blocks.product_bundle_tabs.paragraphs.motion" },
+    {
+      "type": "select",
+      "id": "tab_animation",
+      "label": "t:blocks.product_bundle_tabs.settings.tab_animation.label",
+      "info": "t:blocks.product_bundle_tabs.settings.tab_animation.info",
+      "options": [
+        { "value": "none", "label": "t:shared.options.none" },
+        { "value": "fade", "label": "t:blocks.product_bundle_tabs.settings.tab_animation.options__2.label" },
+        { "value": "fill", "label": "t:blocks.product_bundle_tabs.settings.tab_animation.options__3.label" }
+      ],
+      "default": "fill"
+    },
+    {
+      "type": "select",
+      "id": "panel_animation",
+      "label": "t:blocks.product_bundle_tabs.settings.panel_animation.label",
+      "info": "t:blocks.product_bundle_tabs.settings.panel_animation.info",
+      "options": [
+        { "value": "none", "label": "t:shared.options.none" },
+        { "value": "fade", "label": "t:blocks.product_bundle_tabs.settings.panel_animation.options__2.label" },
+        { "value": "rise", "label": "t:blocks.product_bundle_tabs.settings.panel_animation.options__3.label" },
+        { "value": "slide", "label": "t:blocks.product_bundle_tabs.settings.panel_animation.options__4.label" }
+      ],
+      "default": "rise"
+    },
+    {
+      "type": "range",
+      "id": "motion_speed",
+      "label": "t:blocks.product_bundle_tabs.settings.motion_speed.label",
+      "info": "t:blocks.product_bundle_tabs.settings.motion_speed.info",
+      "min": 0,
+      "max": 1200,
+      "step": 20,
+      "unit": "ms",
+      "default": 420,
+      "visible_if": "{{ block.settings.tab_animation != 'none' or block.settings.panel_animation != 'none' }}"
     },
 
     { "type": "header", "content": "t:shared.animation.header" },

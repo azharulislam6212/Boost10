@@ -53,11 +53,21 @@ function nearestAccordion(element) {
  * Markup:
  *
  *   <accordion-element data-single>
- *     <details data-ref="item[]">
+ *     <details>
  *       <summary>Question</summary>
- *       <div data-ref="panel[]">Answer</div>
+ *       <div>Answer</div>
  *     </details>
  *   </accordion-element>
+ *
+ * No `data-ref` anywhere, and the block above used to show two — written as
+ * `data-ref="item[]"`, a repeated-ref syntax this theme does not have.
+ * `#collectRefs` takes the attribute's value verbatim and builds an array when
+ * a name appears more than once, so `item[]` would only ever produce a ref
+ * called `item[]`. This element has never read one: `#items()` finds its
+ * disclosures with `querySelectorAll` and `nearestAccordion()`, which is what
+ * lets a Menu inside a Group inside a Column still be part of the group.
+ * `<tabs-element>` below carried the same fiction and did require the ref, so
+ * there it disabled the component outright.
  *
  * Height is animated by measuring the panel and running a WAAPI animation on
  * the `<details>` element, rather than by animating `max-height` to an arbitrary
@@ -729,19 +739,38 @@ defineComponent('footer-columns', FooterColumns);
  * Markup:
  *
  *   <tabs-element>
- *     <div role="tablist" data-ref="tablist">
- *       <button role="tab" id="tab-1" aria-controls="panel-1" data-ref="tab[]">One</button>
+ *     <div role="tablist">
+ *       <button role="tab" id="tab-1" aria-controls="panel-1">One</button>
  *     </div>
- *     <div role="tabpanel" id="panel-1" aria-labelledby="tab-1" data-ref="panel[]">…</div>
+ *     <div role="tabpanel" id="panel-1" aria-labelledby="tab-1">…</div>
  *   </tabs-element>
  *
  * Keyboard support: arrow keys move between tabs and activate them, Home and End
  * jump to the ends. Only the selected tab is in the tab order, so Tab moves past
  * the whole group in one press rather than through every tab in it.
+ *
+ * ## The roles are the contract, and nothing else is
+ *
+ * This used to require `data-ref="tab"`, and it asked for it in a syntax that
+ * does not exist — the block above read `data-ref="tab[]"`, and `#collectRefs`
+ * takes the attribute verbatim, so that would have produced a ref named `tab[]`
+ * and never one named `tab`. No caller could have satisfied it. The cart
+ * drawer, the only thing in the theme that uses this element, wrote correct
+ * ARIA and no refs at all, so every drawer logged *"missing required refs: tab.
+ * Component disabled"* and the notes, discount and shipping tabs did nothing a
+ * pointer or a keyboard could see.
+ *
+ * Reading the roles instead is also what `<tab-group>` in `assets/tabs.js`
+ * already does — "deliberately generic: it reads `role="tab"` and
+ * `role="tabpanel"` and nothing else" — so the two tab components in this theme
+ * now ask for the same thing. A tab strip cannot omit these roles and still be
+ * a tab strip, which is what makes them the right contract: there is no valid
+ * markup left that this element refuses to drive.
+ *
+ * Tabs are collected from inside the `[role="tablist"]` rather than from the
+ * whole element, so a tab group nested inside one of the panels keeps its own.
  */
 export class TabsElement extends BaseComponent {
-  static requiredRefs = ['tab'];
-
   setup() {
     const tabs = this.#tabs();
     if (tabs.length === 0) return;
@@ -794,17 +823,26 @@ export class TabsElement extends BaseComponent {
    * @private
    */
   #tabs() {
-    const refs = this.refs.tab;
-    return Array.isArray(refs) ? refs : refs ? [refs] : [];
+    const list = this.querySelector('[role="tablist"]') ?? this;
+    return /** @type {HTMLElement[]} */ ([...list.querySelectorAll('[role="tab"]')]);
   }
 
   /**
+   * The panels, in document order, which is the order their tabs are in — the
+   * two are paired by index in `select()`.
+   *
+   * That holds because a tab strip is rendered as one list followed by one
+   * panel per entry, from the same loop or the same set of conditions; the cart
+   * drawer's three are each behind the same `if` as their tab. Pairing on
+   * `aria-controls` instead would survive a caller that emitted them in
+   * different orders, at the cost of a lookup on every keystroke for a shape
+   * nothing in the theme produces.
+   *
    * @returns {HTMLElement[]}
    * @private
    */
   #panels() {
-    const refs = this.refs.panel;
-    return Array.isArray(refs) ? refs : refs ? [refs] : [];
+    return /** @type {HTMLElement[]} */ ([...this.querySelectorAll('[role="tabpanel"]')]);
   }
 
   /**
