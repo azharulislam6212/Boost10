@@ -33,7 +33,25 @@
     columns_mobile / columns_tablet / columns_desktop (number)
     peek_mobile / peek_desktop (number)
     space_between (number)  px. Omit to inherit the grid's own `--grid-gap-x`.
+    gap_css (string)        A CSS length or `var()` for `--carousel-gap`, for a
+                            caller whose spacing steps at a breakpoint and so
+                            cannot be one number. Wins over `space_between`.
 
+  ## `gap_css`, and why a number is not always enough
+
+  `space_between` is a px value that goes into `data-options` as well, which is
+  what most callers want: one number, agreed between CSS and Swiper.
+
+  A carousel whose gap changes at a breakpoint cannot use it. `data-options`
+  carries one `spaceBetween` and Swiper reads it once, so a section that sets
+  48px on desktop and 24px on a phone would have CSS and Swiper disagreeing
+  below 750px. Passing `gap_css` instead — `var(--something)` that a media query
+  redefines — and omitting `space_between` puts the answer entirely in CSS,
+  which is where the breakpoint already lives: `#gap()` in `assets/carousel.js`
+  measures the used value and `#syncGap()` re-measures it whenever the element
+  changes width, so Swiper follows the media query rather than predating it.
+
+  @param {string} [gap_css]
   @param {string} [columns_desktop]
   @param {string} [columns_mobile]
   @param {string} [columns_tablet]
@@ -82,7 +100,9 @@
   # value here. Unset, the gap falls through to the grid's own spacing, which is
   # the same number `carousel.js` measures for Swiper's `spaceBetween` — so the
   # slides do not resize when it mounts.
-  if gap >= 0
+  if gap_css != blank
+    assign gap_value = gap_css
+  elsif gap >= 0
     assign gap_value = gap | append: 'px'
   else
     assign gap_value = 'var(--grid-gap-x, 0rem)'

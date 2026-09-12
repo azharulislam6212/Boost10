@@ -76,6 +76,13 @@ const LAZY_MODULES = [
   { specifier: '@theme/free-shipping-bar', tags: ['free-shipping-bar'] },
 
   { specifier: '@theme/product-form', tags: ['product-form', 'sticky-add-to-cart', 'bundle-builder'] },
+
+  // The bundle tray, and the one component the quick add drawer needs that
+  // Liquid cannot supply. `<quick-add-summary>` arrives inside a fetched
+  // section rather than with the page, which is exactly what `loadModulesFor()`
+  // is re-run for after every section render.
+  { specifier: '@theme/product-bundle', tags: ['product-bundle'] },
+  { specifier: '@theme/quick-add', tags: ['quick-add-summary'] },
   {
     specifier: '@theme/variant-picker',
     tags: ['variant-picker', 'variant-swatches', 'back-in-stock-form', 'inventory-status']

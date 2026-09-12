@@ -1,0 +1,123 @@
+{% comment %}
+  blocks/product-bundle-total.liquid — the bottom of the tray.
+
+  The progress bar, the total, the saving, the add-to-cart button, the error line
+  and the small print. Everything a customer reads *after* the boxes are filled.
+
+  ## Why it is not part of "Build your own bundle"
+
+  Because the slots go between them. The drawing reads heading → message →
+  slots → total → button, and a single tray block could not produce that order
+  with the slot box as a sibling — it would have had to own the slots too, which
+  is the arrangement this refactor exists to take apart.
+
+  Three blocks, in the order the drawing has them, and a merchant who wants the
+  total above the boxes now simply drags it there.
+
+  ## The disclaimer is not optional in spirit
+
+  The field is, and the fallback is a translated sentence rather than nothing.
+  The tray shows a discount the cart does not have yet — the money comes off at
+  checkout through the merchant's own automatic discounts. Saying where it comes
+  off is the difference between a discount and a surprise.
+
+  ## Refs
+
+  `progressTrack`, `originalTotal`, `total`, `discount`, `submit` and `error` are
+  all found by `assets/product-bundle.js`. The button starts `disabled`: an empty
+  bundle has nothing to add, and a control that looks ready and then refuses is
+  worse than one that waits.
+{% endcomment %}
+
+{%- liquid
+  assign s = section.settings
+  assign slots = s.bundle_size | default: 6 | plus: 0
+-%}
+
+<div
+  class="bundle-tray__foot"
+  {% render 'spacing', block: block.settings %}
+  {{ block.shopify_attributes }}
+>
+  {%- comment -%}
+    The progress bar is the tier ladder said a second way, for the tray style
+    that has no per-slot badges to say it with. `role="progressbar"` on the track
+    and the sentence in the message bar above it, so it is not a bar with no
+    words attached.
+  {%- endcomment -%}
+  {%- if s.show_progress -%}
+    <div
+      class="bundle-tray__progress"
+      data-ref="progressTrack"
+      role="progressbar"
+      aria-valuemin="0"
+      aria-valuemax="{{ slots }}"
+      aria-valuenow="0"
+    >
+      <span class="bundle-tray__progress-fill"></span>
+    </div>
+  {%- endif -%}
+
+  <dl class="bundle-tray__totals">
+    <div class="bundle-tray__row bundle-tray__row--total">
+      <dt>{{ 'products.bundle.total' | t }}</dt>
+      <dd>
+        <s class="bundle-tray__original" data-ref="originalTotal" hidden></s>
+        <span data-ref="total">{{ 0 | money }}</span>
+      </dd>
+    </div>
+
+    <div class="bundle-tray__row bundle-tray__row--discount">
+      <dt class="visually-hidden">{{ 'products.bundle.total_saved' | t: amount: '' | strip }}</dt>
+      <dd data-ref="discount" hidden></dd>
+    </div>
+  </dl>
+
+  <button
+    type="button"
+    class="button button--primary bundle-tray__submit"
+    data-ref="submit"
+    disabled
+  >
+    {{ 'products.bundle.add_to_cart' | t }}
+  </button>
+
+  <p class="bundle-tray__error" data-ref="error" role="alert" hidden></p>
+
+  <p class="bundle-tray__notice">
+    {{- s.disclaimer | default: 'products.bundle.applied_at_checkout' | t -}}
+  </p>
+</div>
+
+{% schema %}
+{
+  "name": "t:blocks.product_bundle_total.name",
+  "tag": null,
+  "settings": [
+    { "type": "paragraph", "content": "t:blocks.product_bundle_total.paragraph" },
+
+    { "type": "header", "content": "t:shared.spacing.block_header" },
+    {
+      "type": "select",
+      "id": "padding_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        { "value": "desktop", "label": "t:shared.spacing.devices.options__1.label" },
+        { "value": "mobile", "label": "t:shared.spacing.devices.options__2.label" }
+      ],
+      "default": "desktop"
+    },
+    { "type": "range", "id": "padding_top", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 120, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'desktop' }}" },
+    { "type": "range", "id": "padding_bottom", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 120, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'desktop' }}" },
+    { "type": "range", "id": "padding_left", "label": "t:shared.spacing.padding_left.label", "min": 0, "max": 120, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'desktop' }}" },
+    { "type": "range", "id": "padding_right", "label": "t:shared.spacing.padding_right.label", "min": 0, "max": 120, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'desktop' }}" },
+    { "type": "range", "id": "padding_top_mobile", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 120, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'mobile' }}" },
+    { "type": "range", "id": "padding_bottom_mobile", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 120, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'mobile' }}" },
+    { "type": "range", "id": "padding_left_mobile", "label": "t:shared.spacing.padding_left.label", "min": 0, "max": 120, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'mobile' }}" },
+    { "type": "range", "id": "padding_right_mobile", "label": "t:shared.spacing.padding_right.label", "min": 0, "max": 120, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'mobile' }}" }
+  ],
+  "presets": [
+    { "name": "t:blocks.product_bundle_total.name" }
+  ]
+}
+{% endschema %}

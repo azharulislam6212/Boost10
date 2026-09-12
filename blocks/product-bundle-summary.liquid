@@ -1,0 +1,95 @@
+{% comment %}
+  blocks/product-bundle-summary.liquid — "Build your own bundle".
+
+  The top of the tray: the mark, the heading, the line under it, and the message
+  bar that tells a customer what happens if they keep going.
+
+  ## Why the message bar is here and not in the total block
+
+  It is a sentence about what the *next* thing the customer does is worth —
+  "Add 2 more to unlock 20% off" — and `assets/product-bundle.js` rewrites it
+  every time the tray changes. In the drawing it sits under the heading, above
+  the slots, because that is where a customer reads it before deciding: the
+  total below the boxes is the answer, and this is the invitation.
+
+  The static text is rendered by Liquid rather than written on mount, so it is on
+  screen before any script runs, and so it is what a customer sees when the tray
+  is empty and there is no next tier to talk about yet.
+
+  ## Its text comes from the section
+
+  `tray_heading`, `tray_subheading`, `tray_note` and the two icons are still
+  `section.settings`. They were there before this was a block, and moving them
+  would have emptied the heading on every store already running the section in
+  exchange for a tree that renders exactly the same.
+
+  ## `data-ref="note"` and `data-ref="noteText"` are a contract
+
+  `product-bundle.js` finds both by ref. The paragraph carries `role="status"`,
+  so a change is announced; the span inside is what actually gets rewritten, so
+  the icon beside it survives.
+{% endcomment %}
+
+{%- liquid
+  assign s = section.settings
+-%}
+
+<div
+  class="bundle-tray__summary"
+  {% render 'spacing', block: block.settings %}
+  {{ block.shopify_attributes }}
+>
+  {%- if s.tray_icon != 'none' -%}
+    <span class="bundle-tray__mark" aria-hidden="true">
+      {% render 'icon', icon: s.tray_icon, size: 24 %}
+    </span>
+  {%- endif -%}
+
+  <h2 class="bundle-tray__title">{{ s.tray_heading }}</h2>
+
+  {%- if s.tray_subheading != blank -%}
+    <p class="bundle-tray__subtitle">{{ s.tray_subheading }}</p>
+  {%- endif -%}
+
+  {%- if s.tray_note != blank -%}
+    <p class="bundle-tray__note" data-ref="note" role="status">
+      {%- if s.tray_note_icon != 'none' -%}
+        {% render 'icon', icon: s.tray_note_icon, size: 16 %}
+      {%- endif -%}
+      <span data-ref="noteText">{{ s.tray_note }}</span>
+    </p>
+  {%- endif -%}
+</div>
+
+{% schema %}
+{
+  "name": "t:blocks.product_bundle_summary.name",
+  "tag": null,
+  "settings": [
+    { "type": "paragraph", "content": "t:blocks.product_bundle_summary.paragraph" },
+
+    { "type": "header", "content": "t:shared.spacing.block_header" },
+    {
+      "type": "select",
+      "id": "padding_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        { "value": "desktop", "label": "t:shared.spacing.devices.options__1.label" },
+        { "value": "mobile", "label": "t:shared.spacing.devices.options__2.label" }
+      ],
+      "default": "desktop"
+    },
+    { "type": "range", "id": "padding_top", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 120, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'desktop' }}" },
+    { "type": "range", "id": "padding_bottom", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 120, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'desktop' }}" },
+    { "type": "range", "id": "padding_left", "label": "t:shared.spacing.padding_left.label", "min": 0, "max": 120, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'desktop' }}" },
+    { "type": "range", "id": "padding_right", "label": "t:shared.spacing.padding_right.label", "min": 0, "max": 120, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'desktop' }}" },
+    { "type": "range", "id": "padding_top_mobile", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 120, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'mobile' }}" },
+    { "type": "range", "id": "padding_bottom_mobile", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 120, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'mobile' }}" },
+    { "type": "range", "id": "padding_left_mobile", "label": "t:shared.spacing.padding_left.label", "min": 0, "max": 120, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'mobile' }}" },
+    { "type": "range", "id": "padding_right_mobile", "label": "t:shared.spacing.padding_right.label", "min": 0, "max": 120, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'mobile' }}" }
+  ],
+  "presets": [
+    { "name": "t:blocks.product_bundle_summary.name" }
+  ]
+}
+{% endschema %}

@@ -13,8 +13,8 @@
       the entire card contents as one enormous link name.
     - The second image is rendered as a real `<img>`, not a background, so it is
       lazy-loaded and never downloaded on devices that cannot hover.
-    - Quick add and quick view are buttons that open something, not links. They
-      carry the product URL as data, and `<quick-option-drawer>` fetches it.
+    - Quick add and quick add are buttons that open something, not links. They
+      carry the product URL as data, and `<quick-add-modal>` fetches it.
     - The image ratio comes from theme settings, so an entire grid keeps its
       rhythm even when uploads are inconsistent.
 
@@ -66,6 +66,18 @@
   assign quick_add_icon_only = false
   if quick_add_style == 'icon' or quick_add_position == 'corner'
     assign quick_add_icon_only = true
+  endif
+
+  comment
+    The bar spans the image, so its button is full width; the corner control is a
+    40px circle and must not be. This was passing `quick_add_position` itself,
+    which is a non-empty string in both cases and therefore always truthy — so
+    the corner control was stretched across the card it was meant to sit in the
+    corner of.
+  endcomment
+  assign quick_add_full = true
+  if quick_add_position == 'corner'
+    assign quick_add_full = false
   endif
 
   comment
@@ -248,19 +260,68 @@
 
     {%- if quick_add_style != 'none' and product.available -%}
       <div class="product-card__actions" data-quick-add-position="{{ quick_add_position }}">
-        {%- if product.variants.size == 1 and settings.enable_quick_view == false -%}
+        {%- liquid
+          comment
+            Does this product need a choice made before it can be added?
+
+            This used to be `product.variants.size == 1 and
+            settings.enable_quick_add == false`, which read the setting the wrong
+            way round: with quick add switched on, a product with exactly one
+            variant — nothing to choose, one price, one SKU — still opened a
+            modal containing a variant picker with a single disabled option in
+            it. The setting turns the modal *on*, not the direct add off.
+
+            What is left is the test the bundle picker's rows already use, said
+            the same way: a product has something to ask only when it has real
+            options *and* more than one variant behind them. Shopify gives a
+            product with no options a single "Default Title" variant, so both
+            halves are needed — one catches the product that was never given
+            options, the other the product whose one option has one value.
+          endcomment
+          assign needs_options = true
+          if product.has_only_default_variant or product.variants.size == 1
+            assign needs_options = false
+          endif
+        -%}
+
+        {%- if needs_options == false -%}
           {%- comment -%}
-            A single-variant product can be added straight from the grid. Anything
-            with options must open the drawer: silently adding the first variant
-            is how customers end up returning the wrong size.
+            Nothing to choose, so it goes straight into the cart. Anything with
+            options must open the modal: silently adding the first variant is how
+            customers end up returning the wrong size.
           {%- endcomment -%}
           <form action="{{ routes.cart_add_url }}" method="post" data-quick-add-form>
             <input type="hidden" name="id" value="{{ product.selected_or_first_available_variant.id }}">
             <input type="hidden" name="quantity" value="1">
-            {% render 'button', label: 'products.product.add_to_cart', type: 'submit', variant: 'primary', size: 'small', full: quick_add_position, icon_only: quick_add_icon_only, icon: 'plus' %}
+            {%- assign add_to_cart_label = 'products.product.add_to_cart' | t -%}
+            {% render 'button', label: add_to_cart_label, type: 'submit', variant: 'primary', size: 'small', full: quick_add_full, icon_only: quick_add_icon_only, icon: 'plus' %}
           </form>
         {%- else -%}
-          {% render 'button', label: 'products.product.choose_options', variant: 'primary', size: 'small', full: quick_add_position, icon_only: quick_add_icon_only, icon: 'plus', attributes: 'data-overlay-open="QuickOptions" data-product-url="', append: '" data-section-id="quick-view"' %}
+          {%- comment -%}
+            `attributes` is one string, built here, and the product URL is part
+            of it. It was previously split across `attributes:` and a second
+            `append:` parameter, which the button snippet does not read — so
+            every card in the theme shipped `data-product-url=""` and the modal
+            opened with nothing to fetch.
+
+            `label` takes a translation key through `| t` for the same reason:
+            the snippet renders the label verbatim, so a bare key is what a
+            customer read.
+          {%- endcomment -%}
+          {%- assign choose_options_label = 'products.product.choose_options' | t -%}
+          {%- comment -%}
+            With quick add switched off in Theme settings there is no
+            `<quick-add-modal>` on the page for `data-overlay-open` to find, and
+            a button that does nothing is worse than one that goes somewhere. So
+            the control is a link to the product page in that case — the same
+            place the modal's own "View full details" link points.
+          {%- endcomment -%}
+          {%- if settings.enable_quick_add -%}
+            {%- assign quick_add_attributes = 'data-overlay-open="QuickAdd" data-product-url="' | append: product.url | append: '" data-section-id="quick-add"' -%}
+            {% render 'button', label: choose_options_label, variant: 'primary', size: 'small', full: quick_add_full, icon_only: quick_add_icon_only, icon: 'plus', attributes: quick_add_attributes %}
+          {%- else -%}
+            {% render 'button', label: choose_options_label, href: product.url, variant: 'primary', size: 'small', full: quick_add_full, icon_only: quick_add_icon_only, icon: 'plus' %}
+          {%- endif -%}
         {%- endif -%}
       </div>
     {%- endif -%}
@@ -397,10 +458,10 @@ Changes:
                  full: quick_add_position != 'corner',
                  icon_only: quick_add_icon_only,
                  icon: 'plus',
-                 attributes: 'data-overlay-open="QuickOptions" data-product-url="' | append: product.url | append: '" data-section-id="quick-view"' %}
+                 attributes: 'data-overlay-open="QuickAdd" data-product-url="' | append: product.url | append: '" data-section-id="quick-add"' %}
   to: '{% render ''button'', label: ''products.product.choose_options'', variant:
     ''primary'', size: ''small'', full: quick_add_position, icon_only: quick_add_icon_only,
-    icon: ''plus'', attributes: ''data-overlay-open="QuickOptions" data-product-url="'',
-    append: ''" data-section-id="quick-view"'' %}'
+    icon: ''plus'', attributes: ''data-overlay-open="QuickAdd" data-product-url="'',
+    append: ''" data-section-id="quick-add"'' %}'
   position: 10419..10698
 {% endcomment %}

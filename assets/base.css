@@ -2045,9 +2045,20 @@
 
   /* ---- icon ------------------------------------------------------------ */
 
+  /* `stroke-width` is a presentation attribute on the `<svg>` — `1.5`, written
+     by `snippets/icon.liquid` — and a presentation attribute is the weakest
+     thing in the cascade, so this rule replaces it rather than fighting it.
+     What that buys is a property: a component whose reference drawing uses a
+     finer or heavier line can set `--icon-stroke` on its own container and
+     every glyph inside follows, the same way `--icon-size` already works and
+     the same way `currentColor` already carries the colour.
+
+     The alternative was a second copy of the icon set drawn at another weight,
+     which is how a theme ends up with two plus signs that are subtly different. */
   .icon {
     inline-size: var(--icon-size, 1.6rem);
     block-size: var(--icon-size, 1.6rem);
+    stroke-width: var(--icon-stroke, 1.5);
     flex: 0 0 auto;
   }
 
@@ -2559,8 +2570,14 @@
     max-block-size: 85vh;
   }
 
+  /* `--modal-width` rather than a width every modal has to override. A size
+     guide and a quick add are not the same width and never were; before this
+     the only way to say so was to restate `inline-size` on the panel, which
+     meant restating `min(…, 100%)` with it and losing the phone case the first
+     time somebody forgot. One property, set on the modal element, and the
+     clamp against the viewport stays here where it belongs. */
   .modal__panel {
-    inline-size: min(80rem, 100%);
+    inline-size: min(var(--modal-width, 80rem), 100%);
     max-block-size: 90vh;
     border-radius: var(--radius-card);
   }
@@ -2627,7 +2644,7 @@
   .close-search-drawer,
   .close-cart-drawer,
   .close-filters-drawer,
-  .close-quick-view,
+  .close-quick-add,
   .close-compare-drawer,
   .close-size-chart,
   .close-page-popup {
@@ -3700,8 +3717,6 @@
   .selling-plans__option:has(input:checked) { border-color: var(--color-heading); }
   .selling-plans__option[data-unavailable] { opacity: 0.5; }
   .selling-plans__option input { inline-size: auto; }
-
-  .quick-view { display: grid; gap: var(--space-5); }
 
   /* ---- collection and search layouts ----------------------------------- */
 
@@ -7151,16 +7166,13 @@
   .main-product__media { position: relative; }
   .main-product__complementary { margin-block-start: var(--space-9); }
 
-  .quick-view__info > * + * { margin-block-start: var(--space-4); }
-  .quick-view__title { font-size: var(--font-size-h3); }
-  .quick-view__title a { text-decoration: none; }
-  .quick-view__vendor { font-size: var(--font-size-sm); color: var(--color-accent-text); }
-  .quick-view__full { display: inline-block; font-size: var(--font-size-sm); }
-  .quick-view__loading { text-align: center; color: var(--color-accent-text); }
-
-  @media screen and (min-width: 750px) {
-    .quick-view { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-6); }
-  }
+  /* `.quick-add__loading` is the paragraph `sections/overlays.liquid` renders
+     into the modal body before anything has been fetched. The rest of what was
+     here — `__info`, `__vendor`, `__full`, a two-column grid on `.quick-add`
+     itself — belonged to a quick view that was laid out on the page and is
+     gone. `.quick-add` is the modal element now, so a bare `display: grid` on
+     it was a layout applied to a `<dialog>`'s parent. */
+  .quick-add__loading { text-align: center; color: var(--color-accent-text); }
 
   .main-collection__count,
   .main-search__count { font-size: var(--font-size-sm); color: var(--color-accent-text); }
@@ -7697,9 +7709,21 @@
    was deliberately chosen.
    -------------------------------------------------------------------------- */
 
+/* The fallback is not decoration.
+
+   This rule is unlayered, so it beats the `.icon` rule in `@layer components`
+   however specific that one is. Without a fallback, an icon that has no
+   `--icon-size` set on it resolves `var(--icon-size)` to nothing — which is
+   invalid at computed-value time, so the property falls back to `auto` and the
+   SVG stretches to fill whatever contains it. A 16px glyph came out 700px wide.
+
+   `snippets/icon.liquid` writes `--icon-size` inline on everything it renders,
+   which is why this stayed hidden: it only fires on an `svg.icon` written by
+   hand, or on one whose custom property did not survive a copy. The fallback is
+   the same 1.6rem the layered rule uses, so the two agree. */
 svg.icon:not([width]) {
-  inline-size: var(--icon-size);
-  block-size: var(--icon-size);
+  inline-size: var(--icon-size, 1.6rem);
+  block-size: var(--icon-size, 1.6rem);
 }
 
 .icon--sm { --icon-size: var(--icon-size-sm); }
@@ -7717,7 +7741,7 @@ svg.icon:not([width]) {
    `base.css:993` sets `display: flex` on `.drawer__dialog` / `.modal__dialog`.
    An author `display` rule beats the UA stylesheet's `dialog:not([open])
    { display: none }`, so every drawer and modal rendered visible on load —
-   the menu drawer, the cart drawer, search, facets, compare and quick view,
+   the menu drawer, the cart drawer, search, facets, compare and quick add,
    all at once.
 
    The better long-term edit is to move `display: flex` onto a `[open]`
@@ -7739,7 +7763,7 @@ svg.icon:not([width]) {
    between first paint and module load. */
 modal-dialog:not(:defined),
 drawer-component:not(:defined),
-quick-option-drawer:not(:defined) {
+quick-add-modal:not(:defined) {
   display: none;
 }
 
@@ -8037,6 +8061,14 @@ sticky-header[data-transparent] .header__logo-image--transparent { opacity: 1; }
     --carousel-nav-gutter: calc(var(--carousel-nav-size, 44px) + var(--space-3));
 
     padding-inline: var(--carousel-nav-gutter);
+  }
+
+  /* "Outside" means beside the track, and a vertical carousel's track has no
+     beside — its arrows go above and below it, or nowhere. Reserving a 56px
+     gutter down each side of one takes that much off every slide's width in
+     exchange for room nothing is ever placed in. */
+  .carousel-shell--nav-outside[data-direction='vertical'] {
+    padding-inline: 0;
   }
 }
 
@@ -9367,7 +9399,7 @@ announcement-bar[data-dismissed] { display: none; }
 
 
 /* --------------------------------------------------------------------------
-   3. Quick view trigger
+   3. Quick add trigger
    --------------------------------------------------------------------------
    Four modes. `icon-mobile` is the one worth explaining: an icon on small
    screens where a text button would crowd a two-column grid, and the full text
@@ -9377,22 +9409,22 @@ announcement-bar[data-dismissed] { display: none; }
    would put two controls for one action in the tab order.
    -------------------------------------------------------------------------- */
 
-.product-card__quick-view[data-style='none'] { display: none; }
+.product-card__quick-add[data-style='none'] { display: none; }
 
-.product-card__quick-view .quick-view__icon,
-.product-card__quick-view .quick-view__label {
+.product-card__quick-add .quick-add__icon,
+.product-card__quick-add .quick-add__label {
   display: none;
 }
 
-.product-card__quick-view[data-style='icon'] .quick-view__icon { display: block; }
-.product-card__quick-view[data-style='text'] .quick-view__label { display: block; }
+.product-card__quick-add[data-style='icon'] .quick-add__icon { display: block; }
+.product-card__quick-add[data-style='text'] .quick-add__label { display: block; }
 
 @media screen and (max-width: 749px) {
-  .product-card__quick-view[data-style='icon-mobile'] .quick-view__icon { display: block; }
+  .product-card__quick-add[data-style='icon-mobile'] .quick-add__icon { display: block; }
 }
 
 @media screen and (min-width: 750px) {
-  .product-card__quick-view[data-style='icon-mobile'] .quick-view__label { display: block; }
+  .product-card__quick-add[data-style='icon-mobile'] .quick-add__label { display: block; }
 }
 
 
@@ -9703,6 +9735,97 @@ announcement-bar[data-dismissed] { display: none; }
   color: var(--color-accent-text);
 }
 
+/* ---- compact ----
+   The stepper in the bundle picker's rows, drawn to the reference: a 29px
+   dashed capsule holding two 24px round buttons and the number between them.
+
+   It breaks the 44px pointer target the default deliberately keeps, and that is
+   a decision rather than an oversight. The control sits on the same line as a
+   rating inside a 110px row — at 44px it is taller than the line it is on and
+   pushes the price out of the row. The compact size is used only where the
+   larger one cannot fit, the buttons are still 24px round targets with 8px of
+   capsule around them, and the row's own add button next to it is 32px.
+
+   Colours are the scheme's, not the reference's hexes: the drawing's dashed
+   outline is the heading at 30% and its `#E5F1EE` button fill is the scheme's
+   secondary background. A flat value precedes each `color-mix()` for browsers
+   without it. */
+.quantity-selector--compact {
+  --quantity-button-size: 2.4rem;
+
+  /* The reference strokes its minus and plus at 1.2 in a 16-unit box, which is
+     1.8 in the 24-unit box the theme's icons are drawn in. Set here rather than
+     by drawing a second pair of glyphs. */
+  --icon-stroke: 1.8;
+
+  display: inline-grid;
+  gap: 0;
+}
+
+/* 105 × 29, measured off the reference and added up rather than declared: a
+   24px button, 11.5 of padding at each end and 1.5 above and below, 32 between
+   the two buttons for the number, and the 1px capsule itself.
+
+     1 + 11.5 + 24 + 32 + 24 + 11.5 + 1 = 105
+     1 +  1.5 + 24 +  1.5 + 1          =  29
+
+   Given a width instead, a two-digit quantity or a larger glyph would overflow
+   the capsule rather than widen it. */
+.quantity-selector--compact .quantity-selector__control {
+  align-items: center;
+  gap: 0;
+  padding-block: 0.15rem;
+  padding-inline: 1.15rem;
+  border: 1px dashed var(--color-border);
+  border-color: color-mix(in srgb, var(--color-heading) 30%, transparent);
+  border-radius: 999px;
+  overflow: visible;
+}
+
+/* Transparent, which is what the reference draws: its button circles are filled
+   with the card's own colour, so what a customer sees is the dashed capsule,
+   the minus, the number and the plus — the circles are the target, not a mark.
+   Stated as `transparent` rather than as that colour, so the control keeps
+   reading the same way on a card whose colour a merchant has changed. */
+.quantity-selector--compact .quantity-selector__button {
+  inline-size: var(--quantity-button-size);
+  block-size: var(--quantity-button-size);
+  border-radius: 50%;
+  background-color: transparent;
+  color: var(--color-heading);
+}
+
+/* The hover fill is the one place a tint appears, because it has to: a control
+   with no resting mark needs something to say the pointer is on it. */
+.quantity-selector--compact .quantity-selector__button:hover:not([disabled]) {
+  background-color: var(--color-border);
+  background-color: color-mix(in srgb, var(--color-heading) 12%, transparent);
+}
+
+/* No dividing rules. The default draws them because its buttons sit flush
+   against the input inside one bordered box; here the buttons are separate
+   circles and a pair of vertical lines between them would be a second frame
+   inside the capsule. */
+.quantity-selector--compact .quantity-selector__input {
+  /* The reset gives every text-like input `--input-height: var(--height-input,
+     46px)`, and a number input is one of them — so the capsule came out 51 tall
+     instead of 29 and pushed the add button 9px down the row with it.
+
+     `--input-height` and `--input-padding-inline` are the two properties that
+     rule is built on, and its own comment says a field that wants a different
+     height should set one rather than restate the lot. So that is what this
+     does: the input is the button's height, and its side padding goes, because
+     16px of it either side of a 32px box leaves nowhere for the number. */
+  --input-height: var(--quantity-button-size);
+  --input-padding-inline: 0px;
+
+  inline-size: 3.2rem;
+  border-inline: 0;
+  color: var(--color-heading);
+  font-size: var(--font-size-sm, 1.4rem);
+  font-weight: 500;
+}
+
 
 /* --------------------------------------------------------------------------
    3. Share
@@ -9754,7 +9877,7 @@ announcement-bar[data-dismissed] { display: none; }
 
 
 /* --------------------------------------------------------------------------
-   4. Quick view layout
+   4. Quick add layout
    --------------------------------------------------------------------------
    Blocks arrive in a flat list from `{% content_for 'blocks' %}`, so the split
    layout is produced by placing the gallery in the first column and letting
@@ -9762,14 +9885,14 @@ announcement-bar[data-dismissed] { display: none; }
    have to understand.
    -------------------------------------------------------------------------- */
 
-.quick-view__layout {
+.quick-add__layout {
   display: grid;
   gap: var(--space-6);
   align-content: start;
 }
 
 @media screen and (min-width: 750px) {
-  .quick-view__layout--split {
+  .quick-add__layout--split {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     align-items: start;
   }
@@ -9777,27 +9900,27 @@ announcement-bar[data-dismissed] { display: none; }
   /* The gallery holds column one and every row; the rest flow down column two.
      If the merchant removes the gallery block the remaining blocks fall back
      to a single column on their own. */
-  .quick-view__layout--split > .quick-view-gallery {
+  .quick-add__layout--split > .quick-add-gallery {
     grid-column: 1;
     grid-row: 1 / -1;
     position: sticky;
     inset-block-start: var(--space-4);
   }
 
-  .quick-view__layout--split > *:not(.quick-view-gallery) {
+  .quick-add__layout--split > *:not(.quick-add-gallery) {
     grid-column: 2;
   }
 
-  .quick-view__layout--split:not(:has(.quick-view-gallery)) {
+  .quick-add__layout--split:not(:has(.quick-add-gallery)) {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .quick-view__layout--split:not(:has(.quick-view-gallery)) > * {
+  .quick-add__layout--split:not(:has(.quick-add-gallery)) > * {
     grid-column: 1;
   }
 }
 
-.quick-view__error {
+.quick-add__error {
   padding: var(--space-8);
   text-align: center;
   color: var(--color-accent-text);
@@ -10016,6 +10139,65 @@ swiper-carousel {
 @media screen and (min-width: 750px) {
   swiper-carousel[data-layout='grid']:not(.swiper-initialized) {
     overflow: visible;
+  }
+}
+
+/* ==========================================================================
+   Vertical carousels
+   ==========================================================================
+   `direction: 'vertical'` in `data-options`, `data-direction="vertical"` on the
+   element. Everything above still applies — the slide count per breakpoint, the
+   gap, the pre-init flex basis and the arithmetic that produces it are the same
+   numbers in both axes. Three things are not, and they are all that is here.
+
+   **The element needs a height.** Vertical Swiper has no equivalent of a width
+   in percent: `updateSlides()` divides the container's *height* by
+   `slidesPerView` and writes the result onto every slide, so a container with
+   no height is a carousel whose slides are all zero tall. A horizontal carousel
+   gets its width from the page and never has to be told.
+
+   That height is built from `--carousel-row-size` — one row — and the two
+   properties the architecture already writes: `--carousel-slides`, stepped per
+   breakpoint above from what `carousel-vars` emitted, and `--carousel-gap`. A
+   caller therefore sets one property and the count it already had to choose.
+
+   **The gap is on the block axis.** `#gap()` in `assets/carousel.js` reads
+   `row-gap` rather than `column-gap` when the element says it is vertical, so
+   the property is set here for it to find — the same trick, the same reason,
+   the other axis.
+
+   **The track runs down.** `flex-direction: column` and a full height, which is
+   what makes the shared `flex: 0 0 calc(…)` above resolve against the height
+   instead of the width. Once Swiper mounts, `.swiper-vertical > .swiper-wrapper`
+   in `swiper.css` does the same thing and this stops mattering.
+   -------------------------------------------------------------------------- */
+
+swiper-carousel[data-direction='vertical'] {
+  block-size: calc(
+    var(--carousel-slides, 1) * var(--carousel-row-size, 11rem) +
+    (var(--carousel-slides, 1) - 1) * var(--carousel-gap, 0px)
+  );
+  row-gap: var(--carousel-gap, 0px);
+  overflow: hidden;
+}
+
+swiper-carousel[data-direction='vertical'] > [data-ref~='track'] {
+  flex-direction: column;
+  block-size: 100%;
+}
+
+/* A vertical grid breakpoint is a contradiction — a grid has no axis of travel
+   and nothing to be told the height of — so the height comes off with the
+   carousel, the same way the clip does. */
+@media screen and (max-width: 749px) {
+  swiper-carousel[data-direction='vertical'][data-layout-mobile='grid']:not(.swiper-initialized) {
+    block-size: auto;
+  }
+}
+
+@media screen and (min-width: 750px) {
+  swiper-carousel[data-direction='vertical'][data-layout='grid']:not(.swiper-initialized) {
+    block-size: auto;
   }
 }
 
@@ -13880,5 +14062,1725 @@ testimonial-product[data-open] .testimonial-card__info {
     .expert-quote__stage--no-scatter-mobile .expert-quote-pic--scatter {
       display: none;
     }
+  }
+}
+
+/* ==========================================================================
+   sections/product-bundle.liquid — the tray and the picker
+   --------------------------------------------------------------------------
+   A category-filtered list of product rows on one side, a tray of slots on the
+   other.
+
+     .product-bundle          the section frame, property for property the same
+                              shape as `.expert-quote` and `.featured-offer`
+     .product-bundle__layout  the two columns
+     .product-bundle__pill    one category in the tab strip
+     .bundle-row              one product, as a wide row
+     .bundle-tray             the panel
+     .bundle-slot             one box in it
+
+   ## Two tray styles, one set of slots
+
+   `.bundle-tray--ladder` gives each slot the tier it unlocks; `--quantity`
+   gives each filled slot a stepper. Both draw the same `.bundle-slot` and both
+   fill it the same way — only what sits above and below the thumbnail differs,
+   so there is one box to keep square and one grid to keep aligned.
+
+   ## Why the slots are `aspect-ratio` and not a height
+
+   The grid is three across at any tray width, and the tray width is a slider. A
+   fixed height therefore produces boxes that are square at 420px and letterboxed
+   at 560px. `aspect-ratio: 1` keeps the drawing's proportion at every setting,
+   and `min-inline-size: 0` on the grid items is what lets them actually shrink —
+   a grid item's default `min-width: auto` is the reason a row of three refuses
+   to narrow past its content and overflows the panel.
+   ========================================================================== */
+
+@layer components {
+  .product-bundle {
+    /* The card's height and the distance between two of them, in one place.
+
+       Four things are built from the pair and all four have to agree or the
+       carousel lands half a card off: the height of the carousel viewport, the
+       height of each card, the pre-init `gap` on the track, and the
+       `slidesPerView` and measured `spaceBetween` that
+       `blocks/_product-bundle-category.liquid` hands the shared carousel
+       component. Both reach it as lengths — `--carousel-row-size` and
+       `--carousel-gap` — so there is one source and no number is restated.
+
+       145 and 13 are `Bundle-Porduct-Card.svg` and the two page drawings: the
+       card is 145 tall, and the cards repeat every 158 down the picker.
+
+       The image is not a third number. It is what is left of the card's height
+       once the padding above and below is taken off — 145 − 2 × 17.5 = 110,
+       which is the drawing — so a merchant who makes the card taller gets a
+       bigger picture rather than a bigger gap above one that stayed put. */
+    --bundle-row-size: var(--product-bundle-row-size, 14.5rem);
+    --bundle-row-gap: var(--product-bundle-row-gap, 1.3rem);
+    --bundle-card-padding-block: var(--product-bundle-card-padding-block, 1.75rem);
+
+    /* 16 from the left edge to the image, 24 from the image to the copy, 24
+       from the copy to the right edge: 16 + 110 + 24 = 150, and 536 − 24 = 512,
+       which are the two columns every measurement in the card is taken from. */
+    --bundle-card-padding-start: var(--space-4);
+    --bundle-card-padding-end: var(--space-6);
+    --bundle-card-gap: var(--space-6);
+
+    position: relative;
+    margin-block-start: var(--product-bundle-margin-block-start, 0px);
+    margin-block-end: var(--product-bundle-margin-block-end, 0px);
+    border-radius: var(--product-bundle-radius, 0);
+
+    /* Emitted only when at least one side is drawn — see the section. The
+       fallbacks keep the three properties valid when it is not. */
+    border-width: var(--product-bundle-border-width, 0px);
+    border-style: var(--product-bundle-border-style, solid);
+    border-color: var(--product-bundle-border-color, transparent);
+  }
+
+  .product-bundle__inner {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-8);
+  }
+
+  /* A flex row, and nothing else.
+
+     It was a two-column grid whose second column was a Tray width slider, with
+     a second rule that swapped the columns for a Tray side select. Both are
+     gone: the section's children are Groups now, and a Group already carries a
+     width, a direction, a background, a radius, padding and Sticky on desktop.
+     Two settings that did the same job from further away are two settings that
+     could disagree with the ones actually applying.
+
+     `flex-wrap` rather than a media query, so a tray that cannot fit beside the
+     picker at the merchant's chosen width drops under it on its own. Which of
+     them comes first is block order — including on a phone, where a merchant
+     who wants the tray on top simply puts it there. */
+  .product-bundle__layout {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    column-gap: var(--product-bundle-gap-x, var(--space-8));
+    row-gap: var(--product-bundle-gap-y, var(--space-4));
+  }
+
+  /* ---- the category strip --------------------------------------------- */
+
+  /* ======================================================================
+     The strip is a row in a layout, not an element
+     ======================================================================
+
+     There used to be a `role="tablist"` div here that Liquid rendered empty and
+     `assets/collection-tabs.js` filled: every Category published its pill as
+     inert markup beside its panel and the module copied it into the strip,
+     because `block.blocks` does not exist in Liquid and the Tabs block
+     therefore cannot read its children's settings or draw their buttons.
+
+     That constraint is real. The conclusion drawn from it was not. Every route
+     the module had into that element ran through a copy of the pill's markup —
+     cloning child nodes, re-parsing `innerHTML`, moving nodes — and a copy that
+     comes back short has nothing to say so. The label survived every attempt,
+     because the module could rebuild that from `data-label` on its own; the
+     icon has no second source and never appeared once. That is one bug with
+     three implementations, and the only way to stop writing it was to stop
+     copying.
+
+     A block cannot draw its children's pills. It can draw its own. So each
+     Category renders its complete pill where it stands, in Liquid, with the
+     theme's `<svg>` inside it — and these rules put that pill in the strip
+     without anything moving it.
+
+     ## How the pills get onto one line
+
+     `.product-bundle__cat` — the Category block's root — is `display: contents`,
+     so it has no box of its own and its three children are laid out by
+     `.product-bundle__panels` instead. That container is a wrapping flex row,
+     and `order` sorts what lands where:
+
+       order 1   every pill            auto width, so they sit side by side
+       order 2   the container's ::after   full width: the line under the strip
+       order 3   every panel           full width, so each starts a new line
+
+     Flex `order` is per-container, and every pill in every Category is a child
+     of the same container, so all of them collect on the first line(s) whatever
+     order their blocks are in the DOM. That is the whole trick, and it needs no
+     script, no second element and no ids to match up.
+
+     ## Which category is open
+
+     A radio group. Each Category renders a `visually-hidden`
+     `<input type="radio">` with one shared `name` and its `<label>` is the
+     pill, so clicking a pill checks its radio — that is the browser's own
+     behaviour, not a handler. `:has(> :checked)` then shows that Category's
+     panel.
+
+     Native radios also give exactly the keyboard behaviour the ARIA tab pattern
+     asks for, which `collection-tabs.js` was hand-rolling as a roving tabindex:
+     one tab stop into the group, arrow keys between the options, and each one
+     announced with its position. There is nothing left to keep in step.
+
+     A block cannot know whether it is the first one — `forloop` does not reach
+     inside `content_for 'blocks'` — so no radio is rendered `checked`. The
+     `:not(:has(…:checked))` rules below make the first Category the open one
+     until a customer chooses, which is also exactly the right first paint.
+     ====================================================================== */
+
+  /* The block is a flex item of whatever Group it sits in, so Fill and Fit are
+     `flex` and `inline-size` together — `flex` alone means nothing outside a
+     flex container, and a plain container is not one. `blocks/product-bundle-tabs.liquid`
+     writes both onto the motion wrapper, which is the element the Group lays
+     out; the strip inside it is always 100% of that. */
+  .product-bundle__tabs-motion {
+    display: block;
+    flex: var(--bundle-tabs-flex, 1 1 0%);
+    inline-size: var(--bundle-tabs-width, 100%);
+    min-inline-size: 0;
+  }
+
+  .product-bundle__tabs {
+    display: block;
+  }
+
+  /* The Category block's root, transparent to layout. Its pill, its radio and
+     its panel become items of `.product-bundle__panels` below.
+
+     `display: contents` is what makes a pill able to sit in the strip while its
+     own panel sits under it, without either being moved. The element still
+     exists for `:has()` to ask questions about — "is this Category's radio
+     checked" is a question about this element, and that is the one thing a
+     flat list of siblings could not answer. */
+  .product-bundle__cat {
+    display: contents;
+  }
+
+  /* The strip and the panels, one wrapping row. `column-gap` is the space
+     between two pills; `row-gap` is the space between two rows of them when
+     they wrap. One number for both, because it is one number in the drawing. */
+  .product-bundle__panels {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: var(--bundle-tab-gap, 1rem);
+    min-inline-size: 0;
+  }
+
+  /* The line under the strip, as its own full-width item between the pills and
+     the panels. It cannot be a border on the strip any more, because there is
+     no strip element to put one on — and it should never have been one on a
+     `role="tablist"`, which is how the theme-wide underlined tab bar leaked in
+     here with no space above it and no setting able to move it.
+
+     `margin-block-start` is the merchant's **Space under the tabs** less the
+     row gap the flex container has already put there, so the number in the
+     panel is the distance they actually see. It goes negative when the space is
+     smaller than the gap between pills, which is correct and what a negative
+     margin is for.
+
+     Width 0 by default, so nothing is drawn until a merchant asks for a line. */
+  .product-bundle__panels::after {
+    content: '';
+    order: 2;
+    flex: 1 0 100%;
+    block-size: 0;
+    margin-block-start: calc(var(--bundle-strip-underline-gap, 0px) - var(--bundle-tab-gap, 1rem));
+    border-block-start: var(--bundle-strip-border-width, 0px)
+      var(--bundle-strip-border-style, solid)
+      var(--bundle-strip-border-color, var(--color-border));
+  }
+
+  /* Every panel on its own full-width line under the strip, and only the open
+     one displayed. `--bundle-tabs-gap` is the space between the strip and the
+     products; the row gap is subtracted for the same reason as above. */
+  .product-bundle__panel {
+    order: 3;
+    flex: 1 0 100%;
+    min-inline-size: 0;
+    margin-block-start: calc(var(--bundle-tabs-gap, 2.4rem) - var(--bundle-tab-gap, 1rem));
+    display: none;
+  }
+
+  .product-bundle__cat:has(> .product-bundle__pill-input:checked) > .product-bundle__panel {
+    display: block;
+  }
+
+  /* Nothing chosen yet — which is every first paint, because a block cannot
+     know it is the first one and so cannot render itself `checked`. */
+  .product-bundle__panels:not(:has(.product-bundle__pill-input:checked))
+    > .product-bundle__cat:first-child
+    > .product-bundle__panel {
+    display: block;
+  }
+
+  /* The radio is hidden and still focusable. `display: none` would take it out
+     of the tab order, and a strip a keyboard cannot reach is worse than one
+     that looks slightly different. It is the `<label>` that is seen and
+     clicked; this only ever carries the state and the focus. */
+  .product-bundle__pill-input {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+    appearance: none;
+  }
+
+  /* A strip with one pill in it is a label the customer cannot act on. The
+     Category is still rendered — it is the only panel, and it has to be on
+     screen — so the pill alone is hidden. */
+  .product-bundle__panels:has(> .product-bundle__cat:only-child) .product-bundle__pill {
+    display: none;
+  }
+
+  /* The drawing's pill is 36px tall with a 18px radius, which is a capsule
+     rather than a rounded rectangle — so the height is set and the radius left
+     at 999px, and the padding no longer has to add up to it. A pill with an
+     icon and a pill without one are then the same height, which they were not
+     when the block size came from `padding + line-height` and the icon was
+     two pixels taller than the text.
+
+     ## The resting pill is a white capsule with a hairline, not a ghost
+
+     It was `background: transparent` with the heading colour at 20% for the
+     border — a mix that computes to about `#cfcfcf` on this theme's schemes,
+     which is *darker* than the hairline in the drawing, not lighter. Two things
+     came out wrong from that: a strip over a tinted panel or a background image
+     showed the tint through every unselected pill, where the drawing has them
+     solid white; and the outline read as a grey box rather than a faint edge.
+
+     Both are the colour scheme's own tokens now — `--color-background` for the
+     fill and `--color-border` (`#e5e5e5`) for the line, which is the hairline
+     the drawing uses to the pixel.
+
+     ## Four colours, three levels
+
+     Every paint resolves through a custom property with the scheme's own value
+     as the fallback, so the cascade does the choosing and no rule has to know
+     which level won:
+
+       the pill's own   `style="--bundle-tab-background: …"` from the Category
+       the strip's      the same property on the Tabs block
+       the scheme's     the fallback written into each `var()` below
+
+     A colour the merchant has not set is never emitted, so an unset level
+     simply is not there and the next one applies. That is why an unset colour
+     is absent rather than `transparent`: a property that exists but is empty
+     invalidates the whole declaration and the pill would lose its background
+     instead of inheriting one. */
+  .product-bundle__pill {
+    order: 1;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--bundle-tab-icon-gap, 0.6rem);
+    min-block-size: var(--bundle-tab-height, 3.7rem);
+    padding-block: 0;
+    padding-inline: var(--bundle-tab-padding-inline, var(--space-4));
+    border-width: var(--bundle-tab-border-width, 1px);
+    border-style: var(--bundle-tab-border-style, solid);
+    border-color: var(--bundle-tab-border, var(--color-border));
+    border-radius: var(--bundle-tab-radius, 999px);
+    background: var(--bundle-tab-background, var(--color-background));
+    color: var(--bundle-tab-color, var(--color-heading));
+    font-size: var(--bundle-tab-font-size, 1.4rem);
+    font-weight: var(--bundle-tab-font-weight, 500);
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    transition: background-color var(--transition-fast), color var(--transition-fast),
+      border-color var(--transition-fast);
+  }
+
+  .product-bundle__pill:hover {
+    border-color: var(
+      --bundle-tab-active-background,
+      var(--color-secondary-button-background, var(--color-heading))
+    );
+  }
+
+  /* The focus ring belongs on the pill, because the radio that actually has
+     focus is a hidden 1px box and a ring around that is a ring around nothing. */
+  .product-bundle__pill-input:focus-visible + .product-bundle__pill {
+    outline: 2px solid var(--color-heading);
+    outline-offset: 2px;
+  }
+
+  /* The selected pill is filled, which is the drawing.
+     `.product-bundle__pill-input:checked + .product-bundle__pill` is the
+     browser's own state — the radio the label is `for` — so there is no class
+     to keep in step with it and a pill that looks selected while its category
+     is closed cannot happen.
+
+     The second selector is the first Category before anyone has chosen, which
+     matches the panel rule above so the open panel and the filled pill are
+     never two different categories.
+
+     ## The fill is the scheme's secondary button, not its heading colour
+
+     It was `var(--color-heading)`, which is `#111` in every scheme this theme
+     ships — so an untouched strip selected a category by turning the pill
+     black. The drawing fills it with the brand's dark green, and that colour
+     already exists in the colour scheme: `secondary_button_background`
+     (`#0d2f26`) with `secondary_button_text` (`#ffffff`) on it. That is the
+     pair the theme already uses wherever something is filled dark on a light
+     page, so the strip matches the buttons beside it, follows a scheme change,
+     and needs no colour set on the block to look right. The heading colour
+     stays as the last fallback, for a scheme with no secondary button colours.
+
+     The active pair is the strip's only: a per-pill override would mean the
+     strip changed colour as the customer moved through it. */
+  .product-bundle__pill-input:checked + .product-bundle__pill,
+  .product-bundle__panels:not(:has(.product-bundle__pill-input:checked))
+    > .product-bundle__cat:first-child
+    > .product-bundle__pill {
+    background: var(
+      --bundle-tab-active-background,
+      var(--color-secondary-button-background, var(--color-heading))
+    );
+    border-color: var(
+      --bundle-tab-active-background,
+      var(--color-secondary-button-background, var(--color-heading))
+    );
+    color: var(--bundle-tab-active-color, var(--color-secondary-button-text, var(--color-background)));
+  }
+
+  /* The glyph is `currentColor`, so it follows the pill's text colour through
+     all three levels without a fourth setting. The span exists to keep the icon
+     from stretching when the label wraps. */
+  .product-bundle__pill-icon {
+    display: inline-flex;
+    flex: 0 0 auto;
+  }
+
+  .product-bundle__pill .icon {
+    flex: 0 0 auto;
+  }
+
+  /* ---- Segmented ------------------------------------------------------- */
+
+  /* The pill chooser drawn as a switch: one filled track with the options
+     sharing its width.
+
+     There is no track element, for the same reason there is no strip element —
+     nothing can wrap the pills, because they are drawn by four different
+     blocks. So the track is drawn *by* the pills: they sit flush against each
+     other with the track colour behind each one, and only the two on the ends
+     are rounded. A row of touching segments with rounded ends is what a
+     segmented control is; the merchant cannot tell the difference, and this
+     version cannot be left empty by a script that failed.
+
+     `**Track padding**` no longer has anything to pad and is hidden in the
+     panel; the radius is the ends' radius. */
+  .product-bundle__tabs--segmented .product-bundle__panels {
+    column-gap: 0;
+  }
+
+  .product-bundle__tabs--segmented .product-bundle__pill {
+    flex: 1 1 0%;
+    border-radius: 0;
+    border-inline-width: 0;
+    background: var(
+      --bundle-tab-background,
+      var(--bundle-tabs-track-background, color-mix(in srgb, var(--color-heading) 8%, transparent))
+    );
+  }
+
+  .product-bundle__tabs--segmented .product-bundle__cat:first-child .product-bundle__pill {
+    border-start-start-radius: var(--bundle-tabs-track-radius, 5rem);
+    border-end-start-radius: var(--bundle-tabs-track-radius, 5rem);
+    border-inline-start-width: var(--bundle-tab-border-width, 1px);
+  }
+
+  .product-bundle__tabs--segmented .product-bundle__cat:last-child .product-bundle__pill {
+    border-start-end-radius: var(--bundle-tabs-track-radius, 5rem);
+    border-end-end-radius: var(--bundle-tabs-track-radius, 5rem);
+    border-inline-end-width: var(--bundle-tab-border-width, 1px);
+  }
+
+  /* ---- Vertical -------------------------------------------------------- */
+
+  /* The names in a rail down the side, the products beside them.
+
+     Floats rather than flex or grid, and deliberately. The pills and the panels
+     are siblings in one container with no element around either group, so a
+     two-column layout has to come from the items themselves: a float with
+     `clear` stacks the pills into a column of its own, and the panel clears
+     the rail with a margin rather than by being placed in a track. Grid cannot
+     do it — the panel would have to span every pill's row, and nothing here
+     knows how many categories there are: not CSS, and not the Tabs block,
+     which cannot read its children at all.
+
+     `display: flow-root` on the container so the floats are contained and the
+     block ends below the taller of the two columns.
+
+     Below 990px this reverts to the row, in the narrow block at the end of the
+     file: a rail down the side of a phone is most of the screen spent on four
+     category names. */
+  .product-bundle__tabs--vertical .product-bundle__panels {
+    display: flow-root;
+  }
+
+  .product-bundle__tabs--vertical .product-bundle__pill {
+    display: flex;
+    float: inline-start;
+    clear: inline-start;
+    inline-size: var(--bundle-tabs-rail-width, 26rem);
+    justify-content: flex-start;
+    margin-block-end: var(--bundle-tab-gap, 1rem);
+  }
+
+  .product-bundle__tabs--vertical .product-bundle__panel {
+    margin-block-start: 0;
+    margin-inline-start: calc(var(--bundle-tabs-rail-width, 26rem) + var(--bundle-tabs-gap, 2.4rem));
+  }
+
+  /* No rule under a rail — it would be a line across the middle of the section
+     rather than under the names. The Tabs block already refuses to write the
+     properties for a vertical strip; this is the layout half of the same
+     decision. */
+  .product-bundle__tabs--vertical .product-bundle__panels::after {
+    display: none;
+  }
+
+  /* The carousel's two measurements, handed to the shared component under the
+     names it already reads.
+
+     `--carousel-row-size` is one row; `--carousel-slides` is the row count the
+     architecture steps per breakpoint from what `carousel-vars` wrote; and
+     `--carousel-gap` is the space between two rows, passed as `gap_css` from
+     the block so the value can be a `var()` that a media query redefines rather
+     than the single number `data-options` could carry. The height of the
+     element is then built from the three in the vertical-carousel rules at the
+     bottom of this file, not here — this section supplies numbers, the
+     component owns the layout. */
+  .product-bundle__carousel {
+    --carousel-row-size: var(--bundle-row-size, 11rem);
+  }
+
+  /* The track is `carousel-shell__track` as well, so its flex direction, its
+     height and its gap are the component's. What is left is the list reset —
+     `<ul>` is the track's tag, chosen so each row can be an `<li>`. */
+  .product-bundle__list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  /* The empty state is a panel of placeholder rows, not a message: see
+     `snippets/bundle-row.liquid`. What is dimmed is the part a customer could
+     otherwise try to use — the merchant needs to see the shape and the
+     proportions at full strength, and the controls need to read as inert. */
+  .product-bundle__panel--placeholder .bundle-row__add,
+  .product-bundle__panel--placeholder .bundle-row__quantity {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+
+  /* ---- one product card ------------------------------------------------ */
+
+  /* `Bundle-Porduct-Card.svg`, measured. The card is 536 × 145 with a 24px
+     radius; the image is 110 square with a 14px radius, inset 16 from the left
+     and 17.5 from the top and bottom; the copy column runs from 150 to 512,
+     which is 24 clear of the image and 24 in from the right edge.
+
+     Those numbers are not written out one by one below. The card's height is
+     the setting, the vertical padding is the setting, and the image is what is
+     left between them — so a merchant who makes the card taller gets a bigger
+     picture rather than a bigger gap above a picture that stayed put, and the
+     three can never disagree.
+
+     `align-items: start` rather than `center`: the copy column is shorter than
+     the image, so centring it would float the title away from the top of the
+     picture it belongs to. The drawing lines the two up at the top and lets the
+     column end where it ends. */
+  /* The card's box lives at the bottom of this file, outside the layer, because
+     `swiper.css` gives every slide `display: block` and beats a layer whatever
+     the specificity. What is left here is everything swiper.css does not name. */
+
+  /* An inset ring, so a chosen card does not grow by two pixels and shunt the
+     one below it. Inside the radius for the same reason it is inset — a ring
+     drawn outside a 24px corner is a rectangle with rounded content in it. */
+  .bundle-row[data-in-bundle] {
+    box-shadow: inset 0 0 0 2px var(--product-bundle-accent, var(--color-heading));
+  }
+
+  /* Sold out stays visible and stays readable. Hiding it tells a customer
+     nothing; fading it to the point of illegibility tells them the page is
+     broken. The control is what is disabled. */
+  .bundle-row[data-unavailable] .bundle-row__media,
+  .bundle-row[data-unavailable] .bundle-row__price {
+    opacity: 0.55;
+  }
+
+  /* Square, 14px radius, and exactly as tall as the padded box it sits in — so
+     the card's height is the only number anyone has to set.
+
+     Both axes stated rather than one and an `aspect-ratio`: the media sits in
+     an `auto` grid column, and a column sized from an item whose width exists
+     only as a ratio against its height is the kind of intrinsic sizing that
+     resolves to zero in one engine and 110px in the next. */
+  .bundle-row__media {
+    inline-size: var(--bundle-media-size);
+    block-size: var(--bundle-media-size);
+    flex: 0 0 auto;
+    border-radius: var(--product-bundle-media-radius, 1.4rem);
+    background-color: var(--color-background);
+    overflow: hidden;
+  }
+
+  /* The placeholder's `placeholder_svg_tag` comes out at its intrinsic size —
+     there is no shared `.placeholder-svg` rule in this theme, every caller
+     sizes its own, which is why the empty state rendered a blank square. Both
+     axes, so the drawing fits the box it is standing in for; the fill is the
+     theme's placeholder ink, the same `collection-card__placeholder-svg` uses. */
+  .bundle-row__media .placeholder-svg {
+    inline-size: 100%;
+    block-size: 100%;
+    fill: var(--color-border);
+  }
+
+  /* `responsive-image` is a block element with its own `aspect-ratio`, so it
+     fills the width and squares itself off. The height is named anyway: a
+     product image that is not square would otherwise leave a strip of the
+     media's background below it rather than being cropped to the box. */
+  .bundle-row__media responsive-image {
+    block-size: 100%;
+  }
+
+  /* The copy column runs from the top of the card down, and stops where it
+     stops — it is 101.5 tall against the image's 110 in the drawing, and the
+     rhythm below is what produces that:
+
+       title      18px / 1.2   = 21.6
+       + 6
+       rating     14px / 1.2   = 16.8
+       + 14, rule 1, + 10
+       foot       the 32px button
+                               = 101.4 from the top of the padding
+
+     So none of it is positioned. Each gap is the margin above the thing it
+     precedes, and the total falls out. A card whose height the merchant has
+     raised gets more space under the foot, not a stretched column. */
+  .bundle-row__body {
+    display: flex;
+    flex-direction: column;
+    min-inline-size: 0;
+    min-block-size: 0;
+  }
+
+  .bundle-row__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
+  /* One line, then an ellipsis. The card is a fixed height with a rule and a
+     price under the title, so a second line does not wrap — it pushes the foot
+     out of the bottom of the card. The drawing's titles are one line.
+
+     `-webkit-line-clamp` rather than `text-overflow: ellipsis`, because the
+     title is an `<h3>` wrapping an `<a>` and the ellipsis property only reaches
+     a single inline formatting context; the clamp works on the block and takes
+     the link with it. */
+  .bundle-row__title {
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin: 0;
+    font-size: var(--font-size-h6, 1.8rem);
+    line-height: 1.2;
+    min-inline-size: 0;
+  }
+
+  .bundle-row__link {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .bundle-row__link:hover {
+    text-decoration: underline;
+  }
+
+  /* `snippets/badge.liquid`, in a row rather than over an image.
+
+     The badge component is the theme's only place that decides what a saving
+     says — percentage, amount or plain text, from the merchant's Badges
+     settings, and only when the variant genuinely has a `compare_at_price`
+     above its price. This row used to compute its own percentage, which meant
+     the picker could disagree with the same product's card three sections up
+     the page.
+
+     What that component assumes is a media box to sit on: `.badges` is
+     `position: absolute` with `pointer-events: none`, pinned to a corner. Here
+     it is a flex item in the title's row, so those three are undone and nothing
+     else is. The corner classes are still emitted and are simply inert, which
+     is what keeps this an override of one component rather than a fork of it. */
+  .bundle-row__badges {
+    /* The accent reaches the badge as the badge's own tokens, not as a rule
+       that outranks it.
+
+       `.badge--sale` is unlayered — it sits in the component-tokens block near
+       the top of this file, so it beats anything in `@layer components` however
+       specific. A `.bundle-row__badges .badge--sale { background-color: … }`
+       therefore did nothing, and the card showed the store's default sale
+       colour instead of the section's accent.
+
+       Setting the two custom properties it reads works from inside its own
+       contract: they inherit down to the badge, the component keeps deciding
+       which badge gets which pair, and nothing here has to know that "sale" is
+       the variant with a background. Every other badge on the card — sold out,
+       preorder — keeps the store's own colours, which is right: only the saving
+       is the section's to colour. */
+    --color-badge-sale-bg: var(--product-bundle-accent, var(--color-badge-sale-bg));
+    --color-badge-sale-text: var(--product-bundle-card-badge-text, var(--color-heading));
+
+    /* The capsule, through the same door. `.badge`'s own radius declaration is
+       unlayered too, so `border-radius: 999px` written here would have been
+       thrown away exactly as the colours were. */
+    --badge-radius: 999px;
+
+    position: static;
+    flex: 0 0 auto;
+    flex-direction: row;
+    gap: var(--space-1);
+    pointer-events: auto;
+  }
+
+  /* The drawing's badge is an 18px capsule in the accent, which is the section's
+     `--product-bundle-accent` — the same green as the stars and the filled add
+     button. Only the sale badge takes it: a "Sold out" or "Only 2 left" painted
+     in the saving colour would be saying the wrong thing in the right ink. */
+  /* An 18px capsule, which is the drawing. The height is set and the radius
+     left at 999px for the same reason the category pills are: a capsule's
+     radius is half its height, and stating both means they disagree the first
+     time one of them changes. */
+  .bundle-row__badges .badge {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: 1.8rem;
+    padding-block: 0;
+    padding-inline: var(--space-2);
+    font-size: 1.1rem;
+    font-weight: 600;
+    line-height: 1;
+  }
+
+
+  /* The rating's own line, 6px under the title. Only the rating is on it — the
+     stepper moved down to the foot, which is where the drawing has it. */
+  .bundle-row__aside {
+    display: flex;
+    align-items: center;
+    margin-block-start: 0.6rem;
+  }
+
+  /* The stars are the accent, which is the drawing — the same green as the
+     saving badge above them and the filled add button below. `.rating` paints
+     its own stars from `currentColor`, so one declaration on the wrapper is the
+     whole of it, and the review count keeps the body colour by naming it. */
+  .bundle-row__rating {
+    color: var(--product-bundle-accent, var(--color-heading));
+    font-size: var(--font-size-sm, 1.4rem);
+    line-height: 1.2;
+  }
+
+  /* `.rating__star--full` and `--empty` set `color` on the star itself, so a
+     colour on the wrapper never reaches them — a value set directly on an
+     element beats one inherited into it, whatever the specificity. Only the
+     half star had no rule of its own, which is why the card rendered four black
+     stars and one green one.
+     
+     Both are named here instead. `--empty` keeps a faded accent rather than the
+     border colour: on this card an empty star in grey next to four in green
+     reads as a missing glyph rather than as the rest of the scale. */
+  .bundle-row__rating .rating__star--full,
+  .bundle-row__rating .rating__star--half {
+    color: var(--product-bundle-accent, var(--color-heading));
+  }
+
+  .bundle-row__rating .rating__star--empty {
+    color: var(--color-border);
+    color: color-mix(in srgb, var(--product-bundle-accent, var(--color-heading)) 25%, transparent);
+  }
+
+  .bundle-row__rating .rating__count {
+    color: var(--color-text-subtle, var(--color-text));
+  }
+
+  /* The rule and the row under it.
+
+     The rule is dotted at 20% of the heading colour, which is the drawing's
+     1px-on-2px-off hairline — `dashed` at that width renders roughly 3 on 3
+     off and reads as a line rather than as the texture the card actually has.
+     It is a border on the foot rather than an element of its own, so there is
+     nothing to remove when the rating above it is switched off.
+
+     `padding-inline-end` is the drawing's own inset: the badge and the rule run
+     to the card's inner edge at 512, and the add control stops 16 short of it.
+     Stated as a property so it is visibly a decision, and one number to change
+     if it turns out to have been a nudge. */
+  .bundle-row__foot {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 1.8rem;
+    margin-block-start: 1.4rem;
+    padding-block-start: 1rem;
+    padding-inline-end: var(--bundle-foot-inset, var(--space-4));
+    border-block-start: 1px dotted var(--color-border);
+    border-block-start-color: color-mix(in srgb, var(--color-heading) 20%, transparent);
+  }
+
+  /* Pushed to the end, taking the add control with it: the stepper holds the
+     start of the row and these two sit together at the other end. */
+  .bundle-row__price {
+    flex: 0 0 auto;
+    margin-inline-start: auto;
+    font-weight: 600;
+  }
+
+  /* The compare-at price comes first in the drawing and second in the markup.
+
+     `snippets/price.liquid` emits the sale price, then the struck compare-at,
+     each preceded by its own visually hidden label — which is the right reading
+     order and is shared by every price in the theme. Reordering that file would
+     move the price on every product card in the store to match one card here.
+
+     So the order is swapped visually only, and the labels travel with their
+     values, so what a screen reader reads is unchanged. */
+  .bundle-row__price .price {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+  }
+
+  /* Struck, smaller, and the heading colour at 80% — which is how the reference
+     draws it, and not `--color-accent-text`, the grey `.price__compare` gets
+     everywhere else. On this card the two prices sit side by side rather than
+     one above the other, and a grey next to a near-black reads as two different
+     kinds of text rather than as one price and the price it replaced. */
+  .bundle-row__price .price__compare {
+    order: -1;
+    color: var(--color-heading);
+    font-size: 1.3rem;
+    font-weight: 400;
+    opacity: 0.8;
+  }
+
+  /* Not the sale colour. `.price--on-sale .price__sale` paints the current
+     price in `--color-sale-price` across the theme, which is right over a
+     product image where the saving is the message. Here the accent is already
+     carrying the badge and the stars, and a third green on the same card turns
+     the price — the thing the customer is actually reading — into decoration.
+     The reference has it in the heading colour, a step larger than the price it
+     replaced. */
+  .bundle-row__price .price__sale,
+  .bundle-row__price .price__regular {
+    color: var(--color-heading);
+    font-size: var(--font-size-md, 1.6rem);
+    font-weight: 700;
+  }
+
+  /* 32px, dashed, with a fine plus in it — the reference's control, at the
+     reference's line weight. The drawing strokes its glyph at 1.2 in a 16-unit
+     box; the theme's icons are drawn in a 24-unit box, so the same weight on
+     the same screen is 1.8. `--icon-stroke` is what carries that, rather than a
+     second plus icon drawn at another weight. */
+  .bundle-row__add {
+    --icon-stroke: 1.8;
+
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    inline-size: 3.2rem;
+    block-size: 3.2rem;
+    padding: 0;
+    border: 1px dashed var(--color-heading);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--color-heading);
+    cursor: pointer;
+    transition: background-color var(--transition-fast), color var(--transition-fast),
+      border-color var(--transition-fast);
+  }
+
+  .bundle-row__add:hover:not(:disabled) {
+    border-style: solid;
+    border-color: var(--color-heading);
+  }
+
+  .bundle-row__add:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  /* Both glyphs are in the markup and one is shown, rather than the icon being
+     swapped in JavaScript: swapping means the module owns a piece of the
+     drawing, and a failed module then leaves a button with no glyph in it. */
+  .bundle-row__add-check { display: none; }
+
+  .bundle-row__add[aria-pressed='true'] {
+    border-style: solid;
+    background: var(--color-heading);
+    border-color: var(--color-heading);
+    color: var(--color-background);
+  }
+
+  .bundle-row__add[aria-pressed='true'] .bundle-row__add-plus { display: none; }
+  .bundle-row__add[aria-pressed='true'] .bundle-row__add-check { display: block; }
+
+  /* ---- the tray -------------------------------------------------------- */
+
+  /* There is no `.bundle-tray` any more.
+
+     The panel it drew — the column, the padding, the background, the corner
+     radius, and Sticky on desktop — is a **Group**, which offers every one of
+     those as a setting and offers them to every other block in the theme too.
+     A tray-shaped copy of a Group was five settings that could disagree with
+     the five actually applying.
+
+     What is left is the three blocks that go in it. Each centres its own
+     contents rather than inheriting `text-align` from a wrapper, because in a
+     block tree there may not be a wrapper: a merchant is free to put the
+     summary in one Group and the total in another, and a block whose alignment
+     depended on its parent would quietly change when they did. */
+  .bundle-tray__summary,
+  .bundle-tray__foot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-4);
+    inline-size: 100%;
+    text-align: center;
+  }
+
+  .bundle-tray__mark,
+  .bundle-tray__note .icon {
+    flex: 0 0 auto;
+  }
+
+  .bundle-tray__mark {
+    display: grid;
+    place-items: center;
+    inline-size: 5.6rem;
+    block-size: 5.6rem;
+    border-radius: 999px;
+    background: var(--color-heading);
+    color: var(--color-background);
+  }
+
+  .bundle-tray__title {
+    margin: 0;
+    font-size: var(--font-size-h4, 2.4rem);
+    line-height: 1.2;
+  }
+
+  .bundle-tray__subtitle {
+    margin: 0;
+    color: var(--color-text-subtle, var(--color-text));
+  }
+
+  .bundle-tray__note {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    inline-size: 100%;
+    margin: 0;
+    padding: var(--space-2) var(--space-4);
+    border-radius: 999px;
+    background: var(--color-background);
+    font-size: var(--font-size-sm, 1.4rem);
+  }
+
+  .bundle-tray__slots {
+    display: grid;
+    grid-template-columns: repeat(var(--product-bundle-slot-columns, 3), minmax(0, 1fr));
+    gap: var(--space-3);
+    inline-size: 100%;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .bundle-slot {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    /* See the note at the top on why this is a ratio and not a height. */
+    aspect-ratio: 1;
+    min-inline-size: 0;
+    padding: var(--space-2);
+    border: 1px dashed var(--color-border);
+    border-radius: var(--radius-card, 16px);
+    background: var(--color-background);
+  }
+
+  .bundle-slot[data-state='filled'] {
+    border-style: solid;
+  }
+
+  /* The tier badge. Its words never change — what changes is whether the tray
+     has reached it, because "25% Off" on an empty slot is a promise and on a
+     filled one is a fact, and the customer has to be able to tell which. */
+  .bundle-slot__tier {
+    flex: 0 0 auto;
+    font-size: 1.2rem;
+    font-weight: 600;
+    line-height: 1.4;
+    color: var(--color-text-subtle, var(--color-text));
+    opacity: 0.5;
+    transition: opacity var(--transition-fast), color var(--transition-fast);
+  }
+
+  .bundle-slot__tier[data-reached] {
+    opacity: 1;
+    color: var(--color-heading);
+  }
+
+  .bundle-slot__fill {
+    display: grid;
+    place-items: center;
+    flex: 1 1 auto;
+    inline-size: 100%;
+    min-block-size: 0;
+    padding: 0;
+    border: 0;
+    border-radius: inherit;
+    background: transparent;
+    color: var(--color-text-subtle, var(--color-text));
+    cursor: pointer;
+  }
+
+  .bundle-slot__filled {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    inline-size: 100%;
+    flex: 1 1 auto;
+    min-block-size: 0;
+  }
+
+  .bundle-slot__image {
+    inline-size: auto;
+    max-inline-size: 100%;
+    /* The thumbnail is whatever is left after the badge and the stepper have
+       taken their rows, so it is bounded rather than sized. `object-fit:
+       contain` keeps a tall bottle whole inside a square slot. */
+    max-block-size: 100%;
+    min-block-size: 0;
+    flex: 1 1 auto;
+    object-fit: contain;
+  }
+
+  /* Bottom corner, over the thumbnail, as drawn. The top corner is where the
+     tier badge is — a remove control there overlaps the one piece of text the
+     slot has. */
+  .bundle-slot__remove {
+    position: absolute;
+    inset-block-end: 0;
+    inset-inline-end: 0;
+    display: grid;
+    place-items: center;
+    inline-size: 2.2rem;
+    block-size: 2.2rem;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: var(--color-heading);
+    color: var(--color-background);
+    cursor: pointer;
+  }
+
+  .bundle-slot__quantity {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-1);
+    inline-size: 100%;
+    flex: 0 0 auto;
+    padding: 0.2rem;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+  }
+
+  .bundle-slot__step {
+    display: grid;
+    place-items: center;
+    inline-size: 2rem;
+    block-size: 2rem;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+  }
+
+  .bundle-slot__count {
+    font-size: 1.2rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .bundle-tray__progress {
+    inline-size: 100%;
+    block-size: 0.6rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--color-heading) 12%, transparent);
+    overflow: hidden;
+  }
+
+  .bundle-tray__progress-fill {
+    display: block;
+    block-size: 100%;
+    /* `scaleX` rather than `width`, so the bar animates on the compositor and a
+       tray that fills quickly does not relayout the panel on every press. */
+    transform: scaleX(var(--bundle-progress, 0));
+    transform-origin: left center;
+    background: var(--product-bundle-accent, var(--color-heading));
+    transition: transform var(--transition-base);
+  }
+
+  .bundle-tray__totals {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    inline-size: 100%;
+    margin: 0;
+  }
+
+  .bundle-tray__row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+    margin: 0;
+  }
+
+  .bundle-tray__row dt,
+  .bundle-tray__row dd {
+    margin: 0;
+  }
+
+  .bundle-tray__row--total {
+    font-size: var(--font-size-h6, 1.8rem);
+    font-weight: 600;
+  }
+
+  .bundle-tray__original {
+    margin-inline-end: var(--space-2);
+    font-weight: 400;
+    opacity: 0.6;
+  }
+
+  .bundle-tray__row--discount {
+    font-size: var(--font-size-sm, 1.4rem);
+    color: var(--product-bundle-accent, var(--color-success));
+  }
+
+  .bundle-tray__submit {
+    inline-size: 100%;
+  }
+
+  .bundle-tray__error {
+    margin: 0;
+    color: var(--color-error);
+    font-size: var(--font-size-sm, 1.4rem);
+  }
+
+  .bundle-tray__notice {
+    margin: 0;
+    font-size: 1.2rem;
+    color: var(--color-text-subtle, var(--color-text));
+  }
+
+  /* ---- narrow ---------------------------------------------------------- */
+
+  @media screen and (max-width: 989px) {
+    .product-bundle {
+      border-radius: var(--product-bundle-radius-mobile, var(--product-bundle-radius, 0));
+    }
+
+    .product-bundle__inner {
+      gap: var(--space-6);
+    }
+
+    .product-bundle__layout {
+      column-gap: var(--product-bundle-gap-x-mobile, var(--product-bundle-gap-x, var(--space-4)));
+      row-gap: var(--product-bundle-gap-y-mobile, var(--product-bundle-gap-y, var(--space-4)));
+    }
+
+  }
+
+  @media screen and (max-width: 749px) {
+    /* Shorter rows and less air between them, which is the whole of the phone
+       layout: the picker is under the tray there, so the list starts further
+       down the page and every row that fits above the fold is one the customer
+       does not have to scroll to. The mobile row count on the carousel does the
+       rest — both come from the section's own Mobile settings, and both are
+       read here so the carousel's height and the row inside it cannot disagree
+       about which breakpoint they are at. */
+    .product-bundle {
+      --bundle-row-size: var(--product-bundle-row-size-mobile, 12.4rem);
+      --bundle-row-gap: var(--product-bundle-row-gap-mobile, 1.2rem);
+      /* The same padding setting, not a second one. The card height has its own
+         mobile value because the whole card has to shrink; the padding inside
+         it is a proportion the merchant chose once, and the image follows it
+         down on its own — 124 less twice 17.5 is an 89px picture. */
+      --bundle-card-padding-block: var(--product-bundle-card-padding-block, 1.75rem);
+      --bundle-card-padding-start: var(--space-3);
+      --bundle-card-padding-end: var(--space-4);
+      --bundle-card-gap: var(--space-4);
+    }
+
+    /* The drawing's 16px inset on the foot goes: at this width the card has
+       12px of padding to give and the add control needs the full edge. */
+    .bundle-row {
+      --bundle-foot-inset: 0px;
+    }
+
+    .bundle-row__foot {
+      gap: var(--space-3);
+    }
+
+    /* The review count goes. At this width the stars and the stepper already
+       fill the line, and "(124)" is the part of a rating a customer can do
+       without — the stars carry the same meaning and the full sentence is still
+       in the visually hidden text a screen reader reads. */
+    .bundle-row__rating .rating__count {
+      display: none;
+    }
+
+    /* The pills wrap on a phone rather than scrolling sideways.
+
+       They used to be their own element with `overflow-x: auto` on it, bled out
+       to the screen edge so the last pill scrolled to the edge it was heading
+       for. There is no such element any more — the pills are items of the same
+       flex container as the panels, and a container cannot scroll one of its
+       lines and lay the rest out normally. So eight categories become two or
+       three wrapped rows instead of one scrolling row.
+
+       `row-gap` is already the pill gap, so a wrapped strip is spaced the way
+       the drawing spaces two rows of pills, which is the case the desktop rules
+       were written for too. */
+    .product-bundle__panel {
+      margin-block-start: calc(var(--bundle-tabs-gap, 2.4rem) - var(--bundle-tab-gap, 1rem));
+    }
+
+    .product-bundle__panels::after {
+      margin-block-start: calc(
+        var(--bundle-strip-underline-gap-mobile, var(--bundle-strip-underline-gap, 0px)) -
+          var(--bundle-tab-gap, 1rem)
+      );
+    }
+
+    /* A rail down the side of a phone is most of the screen spent on four
+       category names, so Vertical becomes the same wrapping row Horizontal
+       already is. The float and the rail width go with it — both are desktop
+       measurements, and leaving them on would hold each pill at 260px of a
+       390px screen. */
+    .product-bundle__tabs--vertical .product-bundle__panels {
+      display: flex;
+    }
+
+    .product-bundle__tabs--vertical .product-bundle__pill {
+      float: none;
+      clear: none;
+      inline-size: auto;
+      justify-content: center;
+      margin-block-end: 0;
+    }
+
+    .product-bundle__tabs--vertical .product-bundle__panel {
+      margin-inline-start: 0;
+      margin-block-start: calc(var(--bundle-tabs-gap, 2.4rem) - var(--bundle-tab-gap, 1rem));
+    }
+
+    /* Sharing the width is what Segmented *is*, on a phone as much as
+       anywhere: two or three options across one track, not a row that
+       scrolls. */
+    .product-bundle__tabs--segmented .product-bundle__pill {
+      flex: 1 1 0%;
+    }
+  }
+}
+
+/* ==========================================================================
+   The product card's box — outside the layer, because swiper.css is
+   --------------------------------------------------------------------------
+   `assets/swiper.css` is unlayered, and an unlayered rule beats every rule in
+   `@layer components` however specific it is. One of its rules lands squarely
+   on this card:
+
+     .swiper-slide { display: block; flex-shrink: 0; height: 100%;
+                     position: relative; transition-property: transform;
+                     width: 100% }
+
+   The card *is* a slide — `assets/carousel.js` puts `swiper-slide` on every
+   direct child of the track when Swiper mounts — so `display: grid` written in
+   the layer never applied. The image stopped being a column and became a block
+   with the copy stacked under it, the foot ran past the bottom of a card that
+   is a fixed height, and `overflow: hidden` took the price and the add button
+   off the screen entirely.
+
+   That is the same hazard the theme already documents for the track in
+   `snippets/carousel-shell.liquid` — "swiper.css is unlayered and its
+   `.swiper-wrapper { display: flex }` would beat the `display: grid`" — met at
+   the other end, on the slide rather than on the wrapper. The answer is the
+   same: the declarations swiper.css names live out here next to it, and only
+   those. Everything about the card that swiper.css says nothing about stays in
+   the layer with the rest of the section.
+
+   `height` is not restated. Swiper writes an inline height onto every slide of
+   a vertical carousel, computed from the container's height divided by the
+   rows on screen — which is the same number `--bundle-row-size` produced in the
+   first place — and an inline style beats both of us. `block-size` is here for
+   the two moments there is no inline height to override it: before the module
+   loads, and in a category holding one product, where `#init()` declines to
+   mount and the class is never added.
+   ========================================================================== */
+
+.product-bundle .bundle-row {
+  --bundle-media-size: calc(
+    var(--bundle-row-size, 14.5rem) - 2 * var(--bundle-card-padding-block, 1.75rem)
+  );
+
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--bundle-card-gap, var(--space-6));
+  block-size: var(--bundle-row-size, 14.5rem);
+  padding-block: var(--bundle-card-padding-block, 1.75rem);
+  padding-inline: var(--bundle-card-padding-start, var(--space-4))
+    var(--bundle-card-padding-end, var(--space-6));
+  border-radius: var(--product-bundle-card-radius, 2.4rem);
+  background: var(--product-bundle-card-background, var(--color-secondary-background));
+}
+
+/* ==========================================================================
+   The picker's carousel controls
+   --------------------------------------------------------------------------
+   The carousel itself is `snippets/carousel-shell.liquid` with
+   `direction: 'vertical'` — the theme's own component, the theme's own
+   `data-options`, the theme's own arrows, dots, numbers, bar and pause button.
+   There is no picker-specific slider here and there must not be one: the
+   merchant's Navigation, Pagination and Control bar settings are the same
+   controls in this section as in every other, and a second implementation is a
+   second set of bugs and a second set of settings that do not apply.
+
+   What is here is the arrangement and the ink. The shell clips to its own
+   height, so the controls are rendered `detached` — outside the element, with
+   `data-carousel-for` pointing back at it — and this is the row they sit in.
+
+   ## Why these rules are not in `@layer components`
+
+   `assets/swiper.css` is unlayered and beats every layer regardless of
+   specificity. Two of its rules land on a vertical carousel's pagination:
+
+     .swiper-pagination-bullets                    { width: 100%; bottom: 8px }
+     .swiper-pagination-vertical.swiper-pagination-bullets
+                                                   { transform: translate3d(0,-50%,0) }
+
+   Swiper adds `swiper-pagination-vertical` because the carousel's direction is
+   vertical, and swiper.css then stands the dots up the right-hand edge. The
+   offsets are inert on a statically positioned element; the transform is not —
+   left alone it lifts the dots half their own height into the list above them.
+   ========================================================================== */
+
+/* The space above the controls is on the children, not on the row.
+
+   On the row it would be 32px of dead air whenever every control inside is
+   hidden — which is a real state, not a hypothetical one: Swiper renders
+   nothing into a pagination element until it mounts, and `watchOverflow` locks
+   the pagination outright for a category holding fewer products than fit on
+   screen. A flex row whose children are all `display: none` still has its own
+   margin. Its children do not. */
+.product-bundle__controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+
+  /* The height the row will have, held from first paint.
+
+     Swiper renders nothing into a pagination element until it mounts, and the
+     module is lazily loaded — so the row was 0 tall on arrival and 44 once the
+     dots appeared, shunting everything below the picker down by that much a
+     moment after the page settled. The row is only rendered at all when the
+     merchant has turned a control on, so the space is never reserved for
+     nothing: 32 of margin above a 12px dot. */
+  min-block-size: 4.4rem;
+}
+
+.product-bundle__controls > * {
+  margin-block-start: 3.2rem;
+}
+
+/* `.carousel-shell__dots` and its siblings are `display: none` until they are
+   inside an initialised `.carousel-shell`. Detached, they never will be, so
+   this row shows them itself — the same thing `.feature-cards__controls` does,
+   for the same reason. */
+.product-bundle__controls .carousel-shell__counter,
+.product-bundle__controls .carousel-shell__progress {
+  display: block;
+  margin-block-start: 3.2rem;
+}
+
+/* The swiper.css overrides. See the note above for why they are compound
+   rather than a single class: swiper.css loads after `base.css`
+   (`snippets/stylesheets.liquid`), so a tie on specificity is a loss. */
+.product-bundle .carousel-shell__dots.swiper-pagination-bullets,
+.product-bundle .carousel-shell__dots.swiper-pagination-vertical {
+  position: static;
+  inset: auto;
+  inline-size: auto;
+  transform: none;
+}
+
+/* 12px, 34px apart, which is the drawing — the theme's dot, at the picker's
+   size. `--carousel-dot-size` is the property `.carousel-shell__dot` already
+   reads, so the size is set rather than the rule replaced; the spacing is the
+   one part that has to be, because the shared dot spaces itself with
+   `margin-inline` and a row that starts flush to the left edge cannot carry a
+   leading margin. */
+.product-bundle .carousel-shell__dots {
+  --carousel-dot-size: 1.2rem;
+
+  display: flex;
+  align-items: center;
+  gap: 2.2rem;
+}
+
+/* Nothing in it yet. Swiper renders the bullets on mount, and until then an
+   empty flex box under the list is a 32px gap with no reason for it. Also the
+   locked state: `watchOverflow` stands the pagination down for a category
+   holding fewer products than fit on screen, and a carousel that cannot move
+   has no pages to show. */
+.product-bundle__controls .carousel-shell__dots:empty,
+.product-bundle__controls .carousel-shell__counter:empty,
+.product-bundle__controls .carousel-shell__progress:empty {
+  display: none;
+}
+
+.product-bundle .carousel-shell__dot {
+  position: relative;
+  flex: 0 0 auto;
+  margin-inline: 0;
+  background-color: var(--color-border);
+  background-color: color-mix(in srgb, var(--color-heading) 20%, transparent);
+}
+
+/* No `scale(1.3)`. The drawing marks the current page with a ring rather than a
+   bigger dot, and a dot that is both is two marks for one state. */
+.product-bundle .carousel-shell__dot--active {
+  background-color: var(--color-heading);
+  transform: none;
+}
+
+/* The dashed ring. A pseudo-element rather than an `outline`:
+   `outline-style: dashed` is drawn with the platform's own dash pattern, which
+   is two long strokes on a 24px circle in Chrome and a solid ring in Safari,
+   and the drawing's is a fine even dot. A border on a box six pixels outside
+   the dot is the same shape everywhere. */
+.product-bundle .carousel-shell__dot--active::after {
+  content: '';
+  position: absolute;
+  inset: -0.6rem;
+  border: 1px dashed var(--color-heading);
+  border-radius: 50%;
+}
+
+/* ==========================================================================
+   sections/quick-add.liquid — the quick add modal
+   --------------------------------------------------------------------------
+   The chrome is `.modal`'s, shared with the size guide, the zoom and the
+   back-in-stock form. Everything here is what goes inside the body, plus the
+   one measurement a quick add needs that a size guide does not: a width.
+
+   `--modal-width` is the property `.modal__panel` already sizes itself from, so
+   the panel is widened by setting it rather than by overriding the panel — the
+   max-height, the radius, the entrance and the backdrop all stay the modal's.
+
+   The header row is the exception. Its title is `visually-hidden` — the visible
+   heading is the product's own, which only exists once the fetch has landed —
+   so the row has nothing to be spaced apart from and `space-between` would
+   leave the close button at the start.
+   ========================================================================== */
+
+@layer components {
+  .quick-add {
+    --modal-width: 88rem;
+  }
+
+  .quick-add .modal__header {
+    justify-content: flex-end;
+    padding-block-end: 0;
+  }
+
+  .quick-add .modal__body {
+    padding-block-start: var(--space-3);
+  }
+
+  .quick-add__content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+  }
+
+  .quick-add__heading {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .quick-add__title {
+    margin: 0;
+    font-size: var(--font-size-h4, 2.4rem);
+    line-height: 1.2;
+  }
+
+  .quick-add__title a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .quick-add__summary {
+    margin: 0;
+    color: var(--color-text-subtle, var(--color-text));
+  }
+
+  .quick-add__rule {
+    inline-size: 100%;
+    margin: 0;
+    border: 0;
+    border-block-start: 1px dashed var(--color-border);
+  }
+
+  /* ---- purchase options, as cards -------------------------------------- */
+
+  .selling-plans--cards .selling-plans__options {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .selling-plans__card {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: start;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card, 16px);
+    cursor: pointer;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  }
+
+  /* `:has()` on the label, so the whole card reacts to its own radio rather
+     than to a class something has to remember to write. */
+  .selling-plans__card:has(input:checked) {
+    border-color: var(--product-bundle-accent, var(--color-success));
+    box-shadow: inset 0 0 0 1px var(--product-bundle-accent, var(--color-success));
+  }
+
+  /* A subscription that this variant has no allocation for. The component marks
+     it and disables the radio; this is what that looks like. */
+  .selling-plans__card[data-unavailable] {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .selling-plans__card-main {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    min-inline-size: 0;
+  }
+
+  .selling-plans__card-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+    font-weight: 600;
+  }
+
+  .selling-plans__card-badge {
+    padding: 0.1rem var(--space-2);
+    border-radius: var(--radius-badge, 999px);
+    background: var(--product-bundle-accent, var(--color-success));
+    color: var(--color-badge-sale-text, #0F2E2F);
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .selling-plans__card-note {
+    font-size: var(--font-size-sm, 1.4rem);
+    color: var(--color-text-subtle, var(--color-text));
+  }
+
+  .selling-plans__card-price {
+    text-align: end;
+    white-space: nowrap;
+    font-weight: 600;
+  }
+
+  .selling-plans__interval {
+    inline-size: 100%;
+    max-inline-size: 24rem;
+  }
+
+  .selling-plans__benefits {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    font-size: var(--font-size-sm, 1.4rem);
+  }
+
+  .selling-plans__benefit {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .selling-plans__benefit .icon {
+    flex: 0 0 auto;
+    color: var(--product-bundle-accent, var(--color-success));
+  }
+
+  /* ---- quantity and add ------------------------------------------------ */
+
+  .quick-add__form {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+  }
+
+  .quick-add__submit {
+    flex: 1 1 auto;
+    min-inline-size: 0;
+  }
+
+  .quick-add__error {
+    flex: 1 0 100%;
+    margin: 0;
+    color: var(--color-error);
+    font-size: var(--font-size-sm, 1.4rem);
+  }
+
+  .quick-add__footer {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+    font-size: var(--font-size-sm, 1.4rem);
+    color: var(--color-text-subtle, var(--color-text));
+  }
+
+  .quick-add__details {
+    color: inherit;
+    font-weight: 600;
+  }
+
+  /* The separator is drawn rather than typed, so it is not read out as a word
+     between two phrases that are already separate. */
+  .quick-add__footnote::before {
+    content: '\2022';
+    margin-inline-end: var(--space-3);
+  }
+
+  .quick-add__loading {
+    margin: 0;
+    color: var(--color-text-subtle, var(--color-text));
+  }
+
+  @media screen and (max-width: 749px) {
+    .selling-plans__card {
+      grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    /* The price drops under the copy rather than squeezing it to two words a
+       line. It stays out of the radio's column so it still lines up with the
+       title above it. */
+    .selling-plans__card-price {
+      grid-column: 2;
+      text-align: start;
+    }
+  }
+}
+
+/* ==========================================================================
+   The arrow badge on the two bundle call-to-action buttons
+   --------------------------------------------------------------------------
+   Both drawings end their add button with a dark circle and an arrow in it.
+
+   It is `::after` rather than an icon in the markup, and that is not a
+   shortcut. `product-form.js` writes the quick add drawer's button label with
+   `button.textContent = …` on every variant change — which replaces every child
+   the button has. An icon element inside it survives until the first time a
+   customer changes a flavour and then silently disappears.
+
+   A pseudo-element is not a child, so nothing `textContent` does can reach it.
+   The bundle tray's own button has no such writer, but it gets the same
+   treatment so the two buttons are one thing with one rule behind them.
+
+   The arrow is a character rather than an SVG or a mask: it needs no request,
+   it flips with `direction` in a right-to-left locale, and `aria-hidden` is
+   implicit — generated content is not in the accessibility tree, so the button
+   is announced as its label and nothing else.
+   ========================================================================== */
+
+@layer components {
+  .bundle-tray__submit,
+  .quick-add__submit {
+    position: relative;
+    /* Room for the badge, plus the same gap on the other side so the label
+       stays optically centred rather than being pushed off by it. */
+    padding-inline: calc(var(--space-9) + var(--space-2));
+  }
+
+  .bundle-tray__submit::after,
+  .quick-add__submit::after {
+    content: '\2192';
+    position: absolute;
+    inset-inline-end: var(--space-1);
+    inset-block: var(--space-1);
+    display: grid;
+    place-items: center;
+    aspect-ratio: 1;
+    border-radius: 999px;
+    background: var(--color-heading);
+    color: var(--color-background);
+    font-size: 1.4rem;
+    line-height: 1;
+  }
+
+  /* Disabled is the empty tray and the sold-out variant. The badge is an
+     invitation, so it goes quiet with the rest of the button rather than
+     staying bright on a control that cannot be pressed. */
+  .bundle-tray__submit:disabled::after,
+  .quick-add__submit:disabled::after {
+    opacity: 0.5;
   }
 }

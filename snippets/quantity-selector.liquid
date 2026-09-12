@@ -1,0 +1,153 @@
+{% doc %}
+  The `<quantity-selector>` stepper: minus, a real number input, plus.
+
+  ## Why this exists
+
+  The same twenty lines were written out three times — in
+  `blocks/product-quantity.liquid`, in `sections/quick-add.liquid` and again for
+  the bundle picker's rows. Three copies of a control whose `aria-controls`,
+  `aria-label`, `data-ref` names and `form` attribute all have to be exactly
+  right for `assets/quantity-selector.js` to find them, and which the component's
+  own module comment documents as one markup contract. The fourth copy is the
+  one that would have got a `data-ref` wrong.
+
+  So the markup lives here and the callers pass what actually differs: the id,
+  the rules, and whether the label is visible.
+
+  ## The input is real
+
+  `name="quantity"`, `min`, `max` and `step` are on the element itself rather
+  than only in the component's state, so add to cart works with JavaScript
+  disabled and Shopify's own validation applies as a second line of defence.
+  `form` lets the control sit outside the `<form>` it submits with, which is
+  what the product page's sticky bar needs.
+
+  ## Sizes
+
+  `size` picks the stepper's dimensions from `assets/base.css` rather than
+  passing pixels: `default` is the product page's, and `compact` is the pill in
+  the bundle picker's rows — 24px round buttons in a dashed capsule, which is
+  the size a control has to be when it sits on the same line as a rating.
+
+  @param {string} id - The input's id. Must be unique on the page; `aria-controls` and the label both point at it.
+  @param {number} [min] - Default 1.
+  @param {number} [max] - Omitted means no maximum.
+  @param {number} [step] - Default 1.
+  @param {number} [value] - Starting value. Defaults to `min`.
+  @param {string} [name] - The input's name. Default `quantity`.
+  @param {string} [product_title] - Named in the buttons' accessible labels.
+  @param {boolean} [show_label] - Render the label visibly. It is always rendered; this decides whether it is `visually-hidden`.
+  @param {string} [form] - Id of the form this input submits with, when it sits outside it.
+  @param {string} [size] - default | compact
+  @param {string} [class] - Extra classes for the element.
+  @param {string} [attributes] - Extra attributes for the element.
+  @param {string} [rule] - The quantity-rule sentence, when there is one to show.
+  @param {number} [icon_size] - Glyph size in px. Default 14, or 12 when compact.
+
+  @example
+    {% render 'quantity-selector',
+       id: input_id,
+       min: min,
+       step: step,
+       max: max,
+       product_title: product.title,
+       form: product_form_id %}
+{% enddoc %}
+
+{%- liquid
+  assign qty_min = min | default: 1 | plus: 0
+  assign qty_step = step | default: 1 | plus: 0
+  assign qty_value = value | default: qty_min | plus: 0
+  assign qty_name = name | default: 'quantity'
+
+  assign variant_class = size | default: 'default'
+  assign glyph = icon_size
+  if glyph == nil
+    if variant_class == 'compact'
+      assign glyph = 12
+    else
+      assign glyph = 14
+    endif
+  endif
+
+  assign label_class = 'quantity-selector__label'
+  unless show_label
+    assign label_class = 'visually-hidden'
+  endunless
+
+  comment
+    The buttons say which product they belong to, because a bundle picker puts
+    eight of these on one screen and "Increase quantity" eight times over tells
+    a screen reader user nothing about which row they are on.
+
+    With no title passed there is a second pair of strings rather than the first
+    pair with an empty interpolation: "Decrease quantity for " with nothing
+    after it is what a screen reader would read out, and a translator cannot fix
+    a sentence whose subject was removed after it was written.
+  endcomment
+  if product_title != blank
+    assign decrease_label = 'products.product.quantity_decrease' | t: product: product_title
+    assign increase_label = 'products.product.quantity_increase' | t: product: product_title
+  else
+    assign decrease_label = 'products.product.quantity_decrease_plain' | t
+    assign increase_label = 'products.product.quantity_increase_plain' | t
+  endif
+-%}
+
+<quantity-selector
+  class="quantity-selector quantity-selector--{{ variant_class }} {{ class }}"
+  data-min="{{ qty_min }}"
+  data-step="{{ qty_step }}"
+  {% if max %}data-max="{{ max }}"{% endif %}
+  {{ attributes }}
+>
+  <label class="{{ label_class }}" for="{{ id }}">
+    {{ 'products.product.quantity' | t }}
+  </label>
+
+  <div class="quantity-selector__control">
+    <button
+      type="button"
+      class="quantity-selector__button"
+      data-ref="decrease"
+      aria-controls="{{ id }}"
+      aria-label="{{ decrease_label | strip | escape }}"
+    >
+      {% render 'icon', icon: 'minus', size: glyph %}
+    </button>
+
+    <input
+      id="{{ id }}"
+      class="quantity-selector__input"
+      data-ref="input"
+      type="number"
+      name="{{ qty_name }}"
+      value="{{ qty_value }}"
+      min="{{ qty_min }}"
+      step="{{ qty_step }}"
+      {% if max %}max="{{ max }}"{% endif %}
+      inputmode="numeric"
+      autocomplete="off"
+      aria-live="polite"
+      {% if form != blank %}form="{{ form }}"{% endif %}
+    >
+
+    <button
+      type="button"
+      class="quantity-selector__button"
+      data-ref="increase"
+      aria-controls="{{ id }}"
+      aria-label="{{ increase_label | strip | escape }}"
+    >
+      {% render 'icon', icon: 'plus', size: glyph %}
+    </button>
+  </div>
+
+  {%- comment -%}
+    Quantity rules are a merchant setting the customer cannot discover by
+    trying — a step of 6 looks like a broken plus button otherwise.
+  {%- endcomment -%}
+  {%- if rule != blank -%}
+    <p class="quantity-selector__rule">{{ rule }}</p>
+  {%- endif -%}
+</quantity-selector>

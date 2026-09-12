@@ -31,6 +31,24 @@
   carousel that stops dead at the last slide with a merchant setting that says
   otherwise. Pass `count` and this refuses the setting up front instead.
 
+  ## Direction
+
+  `direction: 'vertical'` turns the same configuration on its side. Everything
+  else keeps its meaning — `columns_*` is then how many slides are on screen
+  down the column rather than across the row, which is what `slidesPerView`
+  means in both axes and why no second set of parameters was added for it.
+
+  Two things follow, and both are handled here so no caller has to know:
+
+  A vertical carousel **must** advance a whole screen at a time. Horizontally a
+  customer can see the row move under a half-slide of peek; vertically there is
+  no peek, and a one-slide step reads as a list that scrolled by itself. So
+  `slidesPerGroup` is pinned to the whole slide count at each breakpoint.
+
+  And `spaceBetween` measured from `column-gap` would be the wrong axis, so
+  `assets/carousel.js` reads `row-gap` instead when the element says it is
+  vertical. That is the only place in the component that has to know.
+
   @param {object} settings - Section or block settings
   @param {number} [count] - Slide count. Enables the loop guard. columns_desktop / columns_tablet / columns_mobile (number)
   @param {string} [pagination] - none | dots | numbers | progress | controls
@@ -43,9 +61,13 @@
   @param {string} [columns_tablet]
   @param {string} [peek_desktop]
   @param {string} [peek_mobile]
+  @param {string} [direction] - horizontal | vertical. Default horizontal.
 
   @example
     <swiper-carousel data-options="{% render 'carousel-options', settings: section.settings, count: 5 %}">
+
+  @example
+    {% render 'carousel-options', settings: section.settings, direction: 'vertical', columns_desktop: 3 %}
 {% enddoc %}
 
 {%- comment -%}
@@ -152,9 +174,37 @@
   own. `join: ','` supplies every comma exactly once.
 {%- endcomment -%}
 
-{%- capture fragment_slides -%}
+{%- comment -%}
+  Vertical adds `slidesPerGroup` at every breakpoint and nothing else — the
+  slide counts are the same numbers in both axes. It is emitted as part of this
+  fragment rather than as a separate one because `breakpoints` is a single
+  object: a second fragment carrying its own `"breakpoints"` key would be valid
+  JSON whose later copy silently replaced the first.
+
+  `ceil` because `slidesPerGroup` must be a whole number and a vertical carousel
+  never peeks, so the only way a fraction reaches here is a peek setting left
+  over from when the section was horizontal.
+{%- endcomment -%}
+{%- liquid
+  assign is_vertical = false
+  if direction == 'vertical'
+    assign is_vertical = true
+  endif
+
+  assign group_mobile = spv_mobile | plus: 0 | ceil | at_least: 1
+  assign group_tablet = spv_tablet | plus: 0 | ceil | at_least: 1
+  assign group_desktop = spv_desktop | plus: 0 | ceil | at_least: 1
+-%}
+
+{%- if is_vertical -%}
+  {%- capture fragment_slides -%}
+"direction":"vertical","slidesPerView":{{ spv_mobile }},"slidesPerGroup":{{ group_mobile }},"breakpoints":{"750":{"slidesPerView":{{ spv_tablet }},"slidesPerGroup":{{ group_tablet }}},"990":{"slidesPerView":{{ spv_desktop }},"slidesPerGroup":{{ group_desktop }}}}
+  {%- endcapture -%}
+{%- else -%}
+  {%- capture fragment_slides -%}
 "slidesPerView":{{ spv_mobile }},"breakpoints":{"750":{"slidesPerView":{{ spv_tablet }}},"990":{"slidesPerView":{{ spv_desktop }}}}
-{%- endcapture -%}
+  {%- endcapture -%}
+{%- endif -%}
 
 {%- capture fragment_motion -%}
 "speed":{{ speed }},"loop":{{ use_loop | default: false | json }},"rewind":{{ use_rewind | json }}

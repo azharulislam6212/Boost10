@@ -12,24 +12,49 @@
 
 {% render 'toast-notification' %}
 
-{%- if settings.enable_quick_view -%}
-  <quick-option-drawer
-    id="QuickOptions"
-    class="quick-view drawer"
-    data-placement="end"
-    data-overlay-type="quick-view"
+{%- comment -%}
+  Quick add is a modal, not a drawer.
+
+  It used to be `<quick-option-drawer class="quick-view drawer" data-placement="end">`
+  and it is neither of those things. A drawer is somewhere a customer goes and
+  comes back from — the cart, the menu, the filters — and sliding the page aside
+  to ask which flavour they want turns one inline choice into a navigation. Quick
+  add interrupts the page the customer is reading and hands it straight back, so
+  it takes the centre of the screen and the modal's own entrance.
+
+  The markup is `<modal-dialog>`'s, class for class: `.modal`, `.modal__dialog`,
+  `.modal__panel`. Nothing here is a quick-add-shaped copy of a modal — the
+  overlay behaviour, the backdrop, the entrance and the close button placement
+  are the ones `assets/base.css` already gives every modal in the theme, and
+  `.quick-add` adds only the width and the body's scroll.
+{%- endcomment -%}
+{%- if settings.enable_quick_add -%}
+  <quick-add-modal
+    id="QuickAdd"
+    class="quick-add modal"
+    data-overlay-type="quick-add"
   >
-    <dialog class="drawer__dialog" data-ref="dialog" aria-label="{{ 'sections.quick_view.title' | t }}">
-      <div class="drawer__panel" data-ref="panel">
-        <header class="drawer__header">
-          <h2 class="drawer__title">{{ 'sections.quick_view.title' | t }}</h2>
+    <dialog class="modal__dialog" data-ref="dialog" aria-label="{{ 'sections.quick_add.title' | t }}">
+      <div class="modal__panel" data-ref="panel">
+        <header class="modal__header">
+          {%- comment -%}
+            Visually hidden, and still here.
+
+            The modal's visible heading is the product's own name, written by
+            `sections/quick-add.liquid` into the body — which is what a customer
+            needs to read, and which cannot be known until the fetch lands. This
+            one stays because it is the heading a screen reader meets on entering
+            the dialog, before the fetched content has been reached, and because
+            removing it would leave the dialog's heading level empty.
+          {%- endcomment -%}
+          <h2 class="modal__title visually-hidden">{{ 'sections.quick_add.title' | t }}</h2>
           {%- liquid
-            assign quick_view_close_label = 'sections.quick_view.close' | t
+            assign quick_add_close_label = 'sections.quick_add.close' | t
           -%}
           {% render 'button',
-             label: quick_view_close_label,
-             id: 'QuickViewClose',
-             class: 'close-quick-view',
+             label: quick_add_close_label,
+             id: 'QuickAddClose',
+             class: 'close-quick-add',
              icon: 'close',
              variant: 'primary',
              size: 'small',
@@ -37,12 +62,12 @@
              attributes: 'data-overlay-close' %}
         </header>
 
-        <div class="drawer__body" data-ref="body" data-lenis-prevent>
-          <p class="quick-view__loading">{{ 'sections.quick_view.loading' | t }}</p>
+        <div class="modal__body" data-ref="body" data-lenis-prevent>
+          <p class="quick-add__loading">{{ 'sections.quick_add.loading' | t }}</p>
         </div>
       </div>
     </dialog>
-  </quick-option-drawer>
+  </quick-add-modal>
 {%- endif -%}
 
 {%- if settings.enable_image_zoom -%}

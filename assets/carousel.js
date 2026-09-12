@@ -293,6 +293,28 @@ export class SwiperCarousel extends BaseComponent {
    * @returns {boolean}
    */
   get #shouldRun() {
+    return this.#layoutIsCarousel;
+  }
+
+  /**
+   * Which way this carousel runs.
+   *
+   * `data-direction` is written by `snippets/carousel-shell.liquid` alongside
+   * the `"direction"` it puts in `data-options`, because three things need the
+   * answer and only one of them can read JSON: Swiper gets it from the options,
+   * `assets/base.css` switches the pre-init slide sizing on the attribute, and
+   * this reads the attribute rather than re-parsing the options — the options
+   * are the merchant's to override, and a carousel whose CSS and JavaScript
+   * disagreed about its own axis would be very hard to see.
+   *
+   * @returns {boolean}
+   */
+  get #vertical() {
+    return this.dataset.direction === 'vertical';
+  }
+
+  /** @returns {boolean} @private */
+  get #layoutIsCarousel() {
     const desktop = this.#desktop?.matches ?? true;
     const layout = desktop
       ? this.dataset.layout || 'carousel'

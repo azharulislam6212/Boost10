@@ -929,19 +929,44 @@ export function escapeHtml(value) {
 /**
  * Reads a `<script type="application/json">` payload rendered by Liquid.
  *
- * @param {ParentNode} container
- * @param {string} selector
+ * Takes either the script element itself, or a container and a selector to find
+ * it inside.
+ *
+ * ## Why both forms
+ *
+ * The two-argument form was the only one, and **every caller in the theme used
+ * the one-argument form** — `parseJSONScript(this.querySelector('[data-variants]'))`
+ * and four more like it. With no selector, `container.querySelector(undefined)`
+ * searched for an element named `undefined`, found nothing, and returned the
+ * fallback. Silently, every time, because a missing payload is a legitimate
+ * state for this function and had nothing to warn about.
+ *
+ * What that cost:
+ *
+ *   `<variant-picker>`           `#variants` was always `[]`, so no combination
+ *                                ever matched and every option change announced
+ *                                "unavailable" — the picker looked alive and
+ *                                selected nothing.
+ *   `<selling-plan-selector>`    no allocations, so no frequencies and no
+ *                                subscription prices.
+ *   `<shipping-calculator>`      no provinces.
+ *
+ * Accepting the element is the fix rather than editing five call sites, because
+ * the call sites were reading the more obvious of the two signatures.
+ *
+ * @param {ParentNode|Element|null} source The script element, or a container to search.
+ * @param {string} [selector] Required only when `source` is a container.
  * @param {*} [fallback=null]
  * @returns {*}
  */
-export function parseJSONScript(container, selector, fallback = null) {
-  const script = container?.querySelector(selector);
-  if (!script) return fallback;
+export function parseJSONScript(source, selector, fallback = null) {
+  const script = selector ? source?.querySelector(selector) : source;
+  if (!script || typeof script.textContent !== 'string') return fallback;
 
   try {
     return JSON.parse(script.textContent || '');
   } catch (error) {
-    console.warn(`[Boost10] Could not parse JSON from "${selector}".`, error);
+    console.warn(`[Boost10] Could not parse JSON from "${selector || script.nodeName}".`, error);
     return fallback;
   }
 }
@@ -971,7 +996,7 @@ export function getCssVar(name, target = document.documentElement) {
 /* ========================================================================== */
 
 /**
- * Reference count, so nested overlays (a quick view opening the cart drawer)
+ * Reference count, so nested overlays (a quick add opening the cart drawer)
  * only release the page when the last one closes.
  * @type {number}
  */

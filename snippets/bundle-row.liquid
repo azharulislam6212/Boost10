@@ -1,0 +1,274 @@
+{% doc %}
+  One product in the bundle picker, as a wide row — the product tile the drawing
+  calls for, and the slide `snippets/carousel-shell.liquid` pages through.
+
+  ## One file, two states
+
+  `placeholder: true` renders the same row with nothing behind it, for a
+  category block whose collection has not been chosen yet.
+
+  It is the same file rather than a second `bundle-row-placeholder.liquid`
+  because there is no reason for it not to be: the row is a `for` loop's output,
+  not a tree of theme blocks, so nothing stops the placeholder walking the same
+  markup. `snippets/article-card-placeholder.liquid` is a separate file only
+  because its real card is built from blocks and `{% content_for 'blocks' %}`
+  takes no parameters — it had no choice, and its own comment says so.
+
+  Every class name, every wrapper and every gap is therefore literally the same
+  in both states, and cannot drift, because there is only one of each.
+
+  What the placeholder does not have is data: no `data-product-id`, no
+  `data-variant-id`, no price the customer could act on. So its add button is
+  `disabled` and its title is not a link. An onboarding card that adds a product
+  that does not exist is worse than one that plainly does nothing.
+
+  ## The saving badge is `snippets/badge.liquid`
+
+  Not a percentage computed here. The badge component already knows the rules —
+  sold out beats preorder beats sale, the merchant's choice of percentage,
+  amount or plain text, and the custom tag badges — and it shows a saving only
+  when the variant genuinely has a `compare_at_price` above its price, which is
+  a discount configured in Shopify admin and nothing else.
+
+  This row used to do its own `compare_at_price | minus: price | times: 100`,
+  which meant the picker could disagree with the same product's card three
+  sections up the page: a different label, a different threshold, and a number
+  that kept being calculated after a merchant had set the badge to show an
+  amount instead.
+
+  ## The quantity stepper
+
+  `snippets/quantity-selector.liquid` at its compact size, at the start of the
+  foot row — exactly where the size line used to be. It replaces it: "850g",
+  from a metafield, is what the product page and the grid card are for, and a
+  row in a bundle picker is a thing being *taken*, so how many is the question
+  the customer actually has on it.
+
+  `<product-bundle>` reads the input when the row is added, so the stepper is a
+  real number input the component looks up rather than a display of one.
+
+  @param {product} [product] - Omit with `placeholder: true`.
+  @param {boolean} [placeholder] - Draw the empty state.
+  @param {number} [index] - Position in the list. Picks the placeholder picture.
+  @param {boolean} [show_rating] - Default from `settings.show_rating`.
+  @param {boolean} [show_quantity] - Default true.
+  @param {number} [max_per_product] - The stepper's maximum.
+  @param {string} [id_prefix] - Namespaces the quantity input's id. Required when two categories can render the same product.
+
+  @example
+    {% render 'bundle-row', product: product, index: forloop.index0, id_prefix: panel_id %}
+
+  @example
+    {% render 'bundle-row', placeholder: true, index: i, id_prefix: panel_id %}
+{% enddoc %}
+
+{%- liquid
+  assign is_placeholder = false
+  if placeholder or product == blank
+    assign is_placeholder = true
+  endif
+
+  assign position = index | default: 0 | plus: 0
+  assign prefix = id_prefix | default: 'bundle'
+
+  assign with_rating = show_rating
+  if with_rating == nil
+    assign with_rating = section.settings.show_rating
+  endif
+
+  assign with_quantity = show_quantity
+  if with_quantity == nil
+    assign with_quantity = true
+  endif
+
+  assign quantity_max = max_per_product | default: section.settings.max_per_product | default: 4 | plus: 0
+-%}
+
+{%- if is_placeholder -%}
+  {%- liquid
+    comment
+      Shopify ships `product-apparel-1` through `-3`. Cycling them means three
+      placeholder rows are three different photographs rather than the same one
+      repeated, which is what makes the empty state read as "your products go
+      here" instead of as a bug. A fourth row starts the cycle again, which is
+      the same compromise `article-card-placeholder` makes and for the same
+      reason: a repeated photograph is better than a row with no picture.
+    endcomment
+    assign art = position | modulo: 3 | plus: 1
+    assign placeholder_image = 'product-apparel-' | append: art
+    assign qty_id = prefix | append: '-placeholder-' | append: position | append: '-qty'
+  -%}
+
+  <li class="bundle-row carousel-shell__item" data-bundle-row-placeholder>
+    <div class="bundle-row__media">
+      {{ placeholder_image | placeholder_svg_tag: 'bundle-row__image placeholder-svg' }}
+    </div>
+
+    <div class="bundle-row__body">
+      <div class="bundle-row__head">
+        <h3 class="bundle-row__title">{{ 'products.bundle.placeholder_title' | t }}</h3>
+
+        {%- comment -%}
+          The badge is drawn rather than rendered, because `badge.liquid` reads a
+          real variant and there is not one. It is the same element and the same
+          class, so it inherits the real badge's shape, colour and position — the
+          empty state shows the merchant where a saving will appear, which is
+          most of what the empty state is for.
+        {%- endcomment -%}
+        <div class="badges badges--{{ settings.badge_position }} bundle-row__badges">
+          <span class="badge badge--sale">{{ 'products.bundle.placeholder_badge' | t }}</span>
+        </div>
+      </div>
+
+      {%- if with_rating -%}
+        <div class="bundle-row__aside">
+          {% render 'rating', value: 4.5, count: 24, class: 'bundle-row__rating' %}
+        </div>
+      {%- endif -%}
+
+      <div class="bundle-row__foot">
+        {%- if with_quantity -%}
+          {% render 'quantity-selector',
+             id: qty_id,
+             min: 1,
+             step: 1,
+             max: quantity_max,
+             size: 'compact',
+             class: 'bundle-row__quantity',
+             attributes: 'data-bundle-quantity' %}
+        {%- endif -%}
+
+        {%- comment -%}
+          The same two elements `snippets/price.liquid` emits for a product on
+          sale, in the same order, so the placeholder inherits the card's price
+          rules — including the one that puts the struck compare-at price first.
+          A `<s>` rather than a span with a line through it, because that is
+          what the real one is.
+        {%- endcomment -%}
+        <span class="bundle-row__price">
+          <span class="price">
+            <span class="price__sale">{{ 2500 | money }}</span>
+            <s class="price__compare">{{ 3200 | money }}</s>
+          </span>
+        </span>
+
+        <button
+          type="button"
+          class="bundle-row__add"
+          aria-pressed="false"
+          disabled
+          aria-label="{{ 'products.bundle.add' | t }}"
+        >
+          <span class="bundle-row__add-plus">{% render 'icon', icon: 'plus', size: 16 %}</span>
+          <span class="bundle-row__add-check">{% render 'icon', icon: 'check', size: 16 %}</span>
+        </button>
+      </div>
+    </div>
+  </li>
+{%- else -%}
+  {%- liquid
+    assign variant = product.selected_or_first_available_variant
+
+    comment
+      A product with real options cannot be dropped into a slot from the row —
+      picking one silently is how a customer ends up with a flavour they did not
+      choose. Those open the quick add modal instead, and the modal reports the
+      chosen variant back to the tray.
+    endcomment
+    assign needs_options = false
+    if product.has_only_default_variant == false and product.variants.size > 1
+      assign needs_options = true
+    endif
+
+    assign qty_id = prefix | append: '-' | append: product.id | append: '-qty'
+  -%}
+
+  <li
+    class="bundle-row carousel-shell__item"
+    data-bundle-row
+    data-product-id="{{ product.id }}"
+    data-variant-id="{{ variant.id }}"
+    data-product-url="{{ product.url }}"
+    data-needs-options="{{ needs_options }}"
+    data-price="{{ variant.price }}"
+    data-compare-at-price="{{ variant.compare_at_price | default: 0 }}"
+    data-title="{{ product.title | escape }}"
+    data-image="{{ product.featured_image | image_url: width: 160 }}"
+    {% unless variant.available %}data-unavailable{% endunless %}
+  >
+    <div class="bundle-row__media">
+      {% render 'image',
+         image: product.featured_image,
+         alt: '',
+         ratio: 'square',
+         sizes: '(min-width: 750px) 120px, 96px',
+         class: 'bundle-row__image' %}
+    </div>
+
+    <div class="bundle-row__body">
+      <div class="bundle-row__head">
+        <h3 class="bundle-row__title">
+          <a class="bundle-row__link" href="{{ product.url }}">{{ product.title | escape }}</a>
+        </h3>
+
+        {% render 'badge', product: product, variant: variant, class: 'bundle-row__badges' %}
+      </div>
+
+      {%- comment -%}
+        The rating's own line, and only the rating on it. The stepper used to
+        share it; `Bundle-Porduct-Card.svg` puts the stepper below the rule, at
+        the start of the foot — where the size line used to be — with the price
+        and the add control at the other end.
+
+        Wrapped in the `if` rather than left as an empty row, because the card
+        is a fixed height: an empty 17px line between the title and the rule
+        would be 17px the foot no longer has.
+      {%- endcomment -%}
+      {%- if with_rating -%}
+        <div class="bundle-row__aside">
+          {% render 'rating', product: product, class: 'bundle-row__rating' %}
+        </div>
+      {%- endif -%}
+
+      <div class="bundle-row__foot">
+        {%- if with_quantity -%}
+          {% render 'quantity-selector',
+             id: qty_id,
+             min: 1,
+             step: 1,
+             max: quantity_max,
+             size: 'compact',
+             class: 'bundle-row__quantity',
+             product_title: product.title,
+             attributes: 'data-bundle-quantity' %}
+        {%- endif -%}
+
+        <span class="bundle-row__price">
+          {% render 'price', variant: variant, context: 'card' %}
+        </span>
+
+        {%- comment -%}
+          One control, three states, and the state is written by
+          `assets/product-bundle.js` rather than by Liquid: a row is only "in the
+          bundle" relative to a tray that exists on the client.
+
+          It is a real `<button>` with `aria-pressed`, so a screen reader is told
+          the row is a toggle and told which way it is currently set — which is
+          the whole of the "a product already in a slot cannot be added again"
+          rule, said out loud.
+        {%- endcomment -%}
+        <button
+          type="button"
+          class="bundle-row__add"
+          data-bundle-add
+          aria-pressed="false"
+          {% unless variant.available %}disabled{% endunless %}
+          aria-label="{{ 'products.bundle.add' | t }}: {{ product.title | escape }}"
+        >
+          <span class="bundle-row__add-plus">{% render 'icon', icon: 'plus', size: 16 %}</span>
+          <span class="bundle-row__add-check">{% render 'icon', icon: 'check', size: 16 %}</span>
+        </button>
+      </div>
+    </div>
+  </li>
+{%- endif -%}

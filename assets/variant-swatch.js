@@ -9,7 +9,7 @@
  * not add anything to a cart. Those are different enough jobs that sharing one
  * element would mean an element that behaves differently depending on where it
  * sits, which is the kind of thing that looks fine until someone puts a card
- * inside a quick view.
+ * inside a quick add.
  *
  * ## What it does
  *

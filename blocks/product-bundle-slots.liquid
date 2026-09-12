@@ -1,0 +1,176 @@
+{% comment %}
+  blocks/product-bundle-slots.liquid — the slot box.
+
+  The row of boxes a customer drops products into. It was part of the tray
+  `sections/product-bundle.liquid` drew in one piece; it is a block now so a
+  merchant can put the heading above it, the total below it, and a Text block or
+  an Image between any two of them if that is what the page needs.
+
+  ## The empty slots are Liquid's, not JavaScript's
+
+  The tray is the largest thing in the section and it is empty on arrival, so a
+  tray drawn on the client is a hole in the layout until the module lands — and
+  on a slow connection that hole is what the customer measures the page by.
+  These are the real boxes, in the real grid, at the real size; filling one swaps
+  its contents.
+
+  The tier badge is Liquid's too, because which slot unlocks which tier is a
+  merchant setting and does not depend on what is in the tray. Whether it has
+  been *reached* does, and that is the component's.
+
+  ## How many boxes, and what is in them, is the section's
+
+  `bundle_size` stays on the section because `<product-bundle>` publishes it as
+  `data-size` and the whole component is built around it — a slot count set on
+  this block would be a second source for a number the element already carries,
+  and the two would disagree the first time someone added a second slot box.
+
+  The same goes for the tier ladder and for Ladder vs Quantity: they are what the
+  bundle *is*, not how this block looks.
+
+  ## `data-ref="slots"` has to stay exactly here
+
+  `assets/product-bundle.js` finds this `<ol>` by ref and fills it. `BaseComponent`
+  collects refs from anywhere inside the component, so it does not matter which
+  block renders it — but it does matter that there is exactly one.
+{% endcomment %}
+
+{%- liquid
+  assign s = section.settings
+  assign slots = s.bundle_size | default: 6 | plus: 0
+  assign tray_style = s.tray_style | default: 'ladder'
+
+  assign columns = block.settings.slot_columns | default: s.slot_columns | default: 3 | plus: 0
+-%}
+
+{%- capture slots_style -%}
+  {%- render 'spacing', block: block.settings, declarations: true -%}
+  --product-bundle-slot-columns: {{ columns }};
+{%- endcapture -%}
+
+<ol
+  class="bundle-tray__slots"
+  data-ref="slots"
+  role="list"
+  style="{{ slots_style | strip_newlines | strip }}"
+  {{ block.shopify_attributes }}
+>
+  {%- for i in (1..slots) -%}
+    {%- liquid
+      assign enable_key = 'tier_' | append: i | append: '_enable'
+      assign percent_key = 'tier_' | append: i | append: '_percent'
+      assign has_tier = false
+      if tray_style == 'ladder' and s[enable_key]
+        assign has_tier = true
+      endif
+    -%}
+    <li
+      class="bundle-slot"
+      data-bundle-slot
+      data-index="{{ i }}"
+      data-state="empty"
+    >
+      {%- if has_tier -%}
+        <span class="bundle-slot__tier" data-slot-tier>
+          {{- 'products.bundle.tier_unlocked_html' | t: percent: s[percent_key] -}}
+        </span>
+      {%- endif -%}
+
+      <button
+        type="button"
+        class="bundle-slot__fill"
+        data-slot-fill
+        aria-label="{{ 'products.bundle.slot_empty' | t: index: i | escape }}"
+      >
+        {% render 'icon', icon: 'plus', size: 20 %}
+      </button>
+
+      <span class="bundle-slot__filled" data-slot-filled hidden>
+        <img class="bundle-slot__image" data-slot-image alt="" width="72" height="72" loading="lazy">
+
+        <button
+          type="button"
+          class="bundle-slot__remove"
+          data-slot-remove
+          aria-label="{{ 'products.bundle.remove' | t | escape }}"
+        >
+          {% render 'icon', icon: 'close', size: 12 %}
+        </button>
+
+        <span class="visually-hidden" data-slot-title></span>
+
+        {%- if tray_style == 'quantity' -%}
+          {%- comment -%}
+            The stepper from the second drawing. It is how a customer takes two
+            of the same product without the product being addable to a second
+            slot — which is the rule this section keeps: one slot per product,
+            quantity inside the slot.
+          {%- endcomment -%}
+          <span class="bundle-slot__quantity">
+            <button
+              type="button"
+              class="bundle-slot__step"
+              data-slot-decrease
+              aria-label="{{ 'products.product.quantity_decrease' | t: product: '' | strip | escape }}"
+            >
+              {% render 'icon', icon: 'minus', size: 12 %}
+            </button>
+
+            <span class="bundle-slot__count" data-slot-count aria-live="polite">01</span>
+
+            <button
+              type="button"
+              class="bundle-slot__step"
+              data-slot-increase
+              aria-label="{{ 'products.product.quantity_increase' | t: product: '' | strip | escape }}"
+            >
+              {% render 'icon', icon: 'plus', size: 12 %}
+            </button>
+          </span>
+        {%- endif -%}
+      </span>
+    </li>
+  {%- endfor -%}
+</ol>
+
+{% schema %}
+{
+  "name": "t:blocks.product_bundle_slots.name",
+  "tag": null,
+  "settings": [
+    { "type": "paragraph", "content": "t:blocks.product_bundle_slots.paragraph" },
+    {
+      "type": "range",
+      "id": "slot_columns",
+      "label": "t:sections.product_bundle.settings.slot_columns.label",
+      "min": 2,
+      "max": 6,
+      "step": 1,
+      "default": 3
+    },
+
+    { "type": "header", "content": "t:shared.spacing.block_header" },
+    {
+      "type": "select",
+      "id": "padding_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        { "value": "desktop", "label": "t:shared.spacing.devices.options__1.label" },
+        { "value": "mobile", "label": "t:shared.spacing.devices.options__2.label" }
+      ],
+      "default": "desktop"
+    },
+    { "type": "range", "id": "padding_top", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 120, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'desktop' }}" },
+    { "type": "range", "id": "padding_bottom", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 120, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'desktop' }}" },
+    { "type": "range", "id": "padding_left", "label": "t:shared.spacing.padding_left.label", "min": 0, "max": 120, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'desktop' }}" },
+    { "type": "range", "id": "padding_right", "label": "t:shared.spacing.padding_right.label", "min": 0, "max": 120, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'desktop' }}" },
+    { "type": "range", "id": "padding_top_mobile", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 120, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'mobile' }}" },
+    { "type": "range", "id": "padding_bottom_mobile", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 120, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'mobile' }}" },
+    { "type": "range", "id": "padding_left_mobile", "label": "t:shared.spacing.padding_left.label", "min": 0, "max": 120, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'mobile' }}" },
+    { "type": "range", "id": "padding_right_mobile", "label": "t:shared.spacing.padding_right.label", "min": 0, "max": 120, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'mobile' }}" }
+  ],
+  "presets": [
+    { "name": "t:blocks.product_bundle_slots.name" }
+  ]
+}
+{% endschema %}

@@ -163,8 +163,35 @@ export class VariantPicker extends BaseComponent {
     const variant = this.#findVariant(this.selectedOptions);
 
     this.#markAvailability();
+    this.#syncSelectedLabels();
     this.#commit(variant);
   };
+
+  /**
+   * Echo each option's chosen value beside its own heading — the
+   * "Choose Flavour :  Fresh Watermelon" line.
+   *
+   * `snippets/variant-picker.liquid` has always rendered `[data-selected-value]`
+   * with the value Liquid knew at render time, and nothing ever updated it. So
+   * the label was right until the customer touched the picker and wrong from
+   * then on, which is worse than not showing it at all — and on a swatch row,
+   * where the value is a colour chip rather than a word, it is the only place
+   * the name of the chosen colour appears.
+   *
+   * @private
+   */
+  #syncSelectedLabels() {
+    const chosen = this.selectedOptions;
+
+    for (const fieldset of this.querySelectorAll('[data-option-index]')) {
+      const target = fieldset.querySelector('[data-selected-value]');
+      if (!(target instanceof HTMLElement)) continue;
+
+      // `data-option-index` is Shopify's `option.position`, which is 1-based.
+      const value = chosen[Number(fieldset.dataset.optionIndex) - 1];
+      if (typeof value === 'string') target.textContent = value;
+    }
+  }
 
   /**
    * @param {Object|null|undefined} variant

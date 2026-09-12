@@ -1,0 +1,745 @@
+{% comment %}
+  blocks/_product-bundle-category.liquid — private.
+
+  One category pill in `sections/product-bundle.liquid`, and the list of products
+  behind it.
+
+  ## Why the products live in the block and not in the section
+
+  The section could have taken one collection and one set of filters, and the
+  pills would then be tags or metafield values read off that collection. That is
+  fewer settings and it is the wrong shape for this section: the drawing's
+  categories are Gut, Sleep, Skin + Hair, Recovery, Perform, Essentials, Focus
+  and Immunity — merchandising groups a merchant curates, not facets that happen
+  to exist in the data. A merchant wants to put three specific products under
+  Sleep and reorder them, which a tag cannot express.
+
+  So each pill is a block with its own collection, its own label and its own
+  icon, and reordering the pills is reordering the blocks.
+
+  ## Private, and rendered through `content_for 'blocks'`
+
+  The leading underscore keeps it out of every other section's block picker. It
+  is a repeatable block rather than a static one, because the number of
+  categories is the merchant's to choose — unlike the header, which there is
+  exactly one of and which `sections/product-bundle.liquid` renders through
+  `content_for 'block'` for that reason.
+
+  ## It renders a panel, not a pill
+
+  The pill is drawn by the section, because the whole strip has to be one
+  `role="tablist"` with one tab stop through it — `assets/collection-tabs.js`
+  owns the roving tabindex, and a tab that renders itself cannot know its index
+  in the strip. The block renders the `role="tabpanel"` and the rows inside it,
+  and publishes the pill's label, icon, icon size and colours to the section
+  through `block.settings`.
+
+  That split is why the section reads `section.blocks` for the strip and then
+  calls `content_for 'blocks'` for the panels: two passes over the same blocks,
+  one for each half of the pattern.
+
+  ## The label does not fall back to the collection
+
+  It used to be `s.label | default: collection.title`, which put "Skin and hair
+  care supplements" on a pill built for "Skin + Hair" — a collection title is
+  written for a collection page and is the wrong length for a capsule in a rail.
+  Worse, it moved: picking a different collection silently renamed the tab.
+
+  So the pill's name is the merchant's field and nothing else, and an empty one
+  falls back to a translated placeholder rather than to data. That is the rule
+  `blocks/_tab.liquid` already follows, where the default is the word "Tab".
+
+  ## The icon is the theme's icon architecture
+
+  `icon_source` / `icon` / `icon_size` / `icon_size_custom`, resolved through
+  `snippets/icon-size.liquid` and drawn by `snippets/icon.liquid` — the same
+  four settings, the same names and the same option list every other block in
+  the theme that carries an icon uses. It was a bespoke twelve-value select with
+  no size control and no "none" that matched nothing else in the editor.
+
+  ## The list is the theme's carousel, vertical
+
+  `snippets/carousel-shell.liquid` with `direction: 'vertical'` — the same
+  component, the same `data-options`, and the same Navigation, Pagination,
+  Control bar, motion and colour settings every other carousel in the theme
+  reads, turned on its side. There is no picker-specific slider and there must
+  not be one.
+
+  The controls are rendered `detached`, in the panel's own row below the track,
+  because a vertical carousel clips to its own height: arrows placed outside the
+  track and a row of dots below it would both be drawn where there is nothing to
+  see them.
+{% endcomment %}
+
+{%- liquid
+  assign s = block.settings
+  assign collection = s.collection
+  assign limit = s.products_limit | default: 6 | plus: 0
+
+  comment
+    `section` is a global in Shopify Liquid, so a block can read the settings of
+    the section it is inside without them being threaded through — which is what
+    is wanted here. How many rows are on screen, whether ratings show and how
+    high a row's stepper can go are decisions about the whole list, so they are
+    set once on the section rather than repeated on every category.
+  endcomment
+  assign show_rating = section.settings.show_rating
+  assign show_quantity = section.settings.show_row_quantity
+  assign max_per_product = section.settings.max_per_product | default: 4 | plus: 0
+
+  comment
+    The pill's name. No collection fallback — see the note above.
+  endcomment
+  assign label = s.label
+  if label == blank
+    assign label = 'products.bundle.category_placeholder' | t
+  endif
+
+  assign panel_id = 'bundle-panel-' | append: block.id
+  assign carousel_id = 'bundle-carousel-' | append: block.id
+  assign tab_id = 'bundle-tab-' | append: block.id
+
+  comment
+    ---- the tab this panel belongs to ----
+
+    Drawn here and moved into the strip by `assets/collection-tabs.js`, because
+    `block.blocks` does not exist in Liquid: the Tabs block cannot read its
+    children's settings, so it cannot draw their buttons. The same constraint
+    `blocks/tabs.liquid` and `assets/tabs.js` were built around, met again.
+
+    A `<template>` rather than a label on a data attribute, because the button
+    has an icon in it — an SVG escaped into an attribute is markup no formatter
+    indents and no checker validates, and `snippets/icon.liquid` could not have
+    produced it. `data-label` stays as the fallback and as the accessible name
+    if the template holds nothing but decoration.
+
+    The theme's icon architecture, not a select of its own: `icon_source`
+    decides whether there is one at all, `icon_size` and `icon_size_custom`
+    resolve through `icon-size` to the same five steps every other block offers,
+    and `icon.liquid` draws it in `currentColor` so the tab's own colour reaches
+    it.
+
+    ## One question decides it, and it is `icon_source`
+
+    There is an icon unless the merchant has switched it off. Not "unless every
+    icon setting reads true", which is what this was and why no tab has ever
+    shown one.
+
+    Two stored states were being read as "no icon" when neither means that:
+
+    **No value at all.** A Category saved before `icon_source` existed has none,
+    and Shopify does not re-default a setting into a block that is already
+    saved. So a strict `icon_source == 'icon'` failed on every tab a merchant
+    had already added.
+
+    **`icon` stored as the string `none`.** This block's first version put None
+    *in the icon list*, before presence became `icon_source`'s job, and a
+    merchant who picked it then still has it saved. The option is not offered
+    any more, so it cannot mean "no icon" — it means the icon was never really
+    chosen, and the default applies. `icon_source: none` is how a merchant says
+    they want none now, and it is the only thing that switches one off.
+
+    `at_least: 10` on the size for the same reason: a stored `icon_size` from a
+    schema that no longer offers it resolves through `icon-size`'s own fallback,
+    and a `--icon-size: 0px` is an icon that is present, correct and invisible —
+    the hardest kind to find.
+  endcomment
+  comment
+    ## An icon name this block does not offer draws nothing at all
+
+    This is the reason the pills have been shipping without glyphs, and the
+    reason it looked like the icon settings simply did not work.
+
+    `snippets/icon.liquid` is a `case` over names, and its `else` branch renders
+    *nothing* — deliberately, so an unknown name never puts a placeholder glyph
+    in front of a customer. The cost of that policy is that a wrong name fails
+    invisibly: the `<svg>` is still written, still sized, still in the DOM, and
+    still has not one path in it. Nothing in the editor or the markup says so.
+    A pill with its name and no glyph is exactly what that looks like, which is
+    why the failure kept being read as the copy into the strip dropping the
+    icon.
+
+    A name gets to be wrong the ordinary way. This block's icon list was a
+    bespoke twelve-value select before it was the theme's own, and Shopify keeps
+    a stored setting value whether or not the schema still offers it — so a
+    Category saved against the old list still holds the old name, the editor
+    shows the select with nothing matching it, and `icon.liquid` draws a blank.
+
+    So the stored name is checked against the list this block actually offers,
+    and anything else falls back to the default rather than to an empty square.
+    The check is a substring test over one string with the separators kept on
+    both sides, so `art` cannot match `heart` and `grid` cannot match `grid-2`.
+
+    `icon.liquid` keeps its policy: it is right for a theme-wide snippet that
+    cannot know what its callers will pass. The guard belongs at the call site,
+    which is the only place that knows which names are real.
+  endcomment
+  assign pill_icon_allowed = 'star,check,heart,tag,truck,refresh,lock,clock,location,mail,note,info,shield,grid,moon,leaf,droplet,bolt,brain,pulse,sun,sparkle'
+  assign pill_icon_haystack = ',' | append: pill_icon_allowed | append: ','
+  assign pill_icon_needle = ',' | append: s.icon | append: ','
+
+  assign pill_icon = s.icon
+  unless pill_icon_haystack contains pill_icon_needle
+    assign pill_icon = 'heart'
+  endunless
+
+  assign has_pill_icon = true
+  if s.icon_source == 'none'
+    assign has_pill_icon = false
+  endif
+
+  capture pill_icon_px
+    render 'icon-size', size: s.icon_size, custom: s.icon_size_custom
+  endcapture
+  assign pill_icon_size = pill_icon_px | plus: 0 | at_least: 10
+
+  comment
+    ---- the carousel ----
+
+    How many rows are on screen at once. It is the section's setting, not the
+    block's: a strip of pills where one category shows three rows and the next
+    shows five is a list that changes height every time a pill is pressed, and
+    the tray beside it moves with it.
+
+    `columns_*` is what `carousel-options` and `carousel-vars` both call the
+    slide count, in either axis — so the row count is passed under that name
+    rather than as a second set of parameters meaning the same thing sideways.
+
+    The tablet value is the desktop one. The picker is a column beside the tray
+    on a laptop and a full-width block below it on a tablet, and in both cases
+    what is being chosen is the height of the list, not its width.
+  endcomment
+  assign rows = section.settings.rows_per_view | default: 3 | plus: 0
+  assign rows_mobile = section.settings.rows_per_view_mobile | default: 2 | plus: 0
+
+  comment
+    How many rows the empty state draws: the merchant's own row count, so the
+    panel they are looking at is the height the real one will be. A three-row
+    picker that previews as a one-line "choose a collection" message moves
+    everything under it the moment a collection is chosen.
+  endcomment
+  assign placeholder_rows = rows | at_least: 1
+
+  assign has_products = false
+  if collection != blank and collection.products.size > 0
+    assign has_products = true
+  endif
+
+  assign slide_count = placeholder_rows
+  if has_products
+    assign slide_count = collection.products.size
+  endif
+-%}
+
+{%- comment -%}
+  The rows, captured, because `carousel-shell` takes its slides as a string.
+
+  That is the shell's normal calling convention and it works here — the rows are
+  a `for` loop's output, not theme blocks — so this panel uses the whole
+  component rather than the `carousel-shell-attrs` / `carousel-shell-tail` pair,
+  which exists only for sections whose slides *are* blocks and therefore cannot
+  be captured.
+{%- endcomment -%}
+{%- capture rows_markup -%}
+  {%- if has_products -%}
+    {%- for product in collection.products limit: limit -%}
+      {% render 'bundle-row',
+         product: product,
+         index: forloop.index0,
+         show_rating: show_rating,
+         show_quantity: show_quantity,
+         max_per_product: max_per_product,
+         id_prefix: panel_id %}
+    {%- endfor -%}
+  {%- else -%}
+    {%- comment -%}
+      No collection chosen, or one with nothing in it. The panel draws the
+      product tile it will draw when there is one — the same snippet, the same
+      markup, the same spacing and typography, with placeholder pictures and
+      placeholder copy — rather than a sentence where the list goes.
+
+      The merchant is told what to do in the editor, through this block's own
+      `paragraph` setting, which is where an instruction belongs. The storefront
+      shows the shape.
+    {%- endcomment -%}
+    {%- for i in (1..placeholder_rows) -%}
+      {% render 'bundle-row',
+         placeholder: true,
+         index: forloop.index0,
+         show_rating: show_rating,
+         show_quantity: show_quantity,
+         max_per_product: max_per_product,
+         id_prefix: panel_id %}
+    {%- endfor -%}
+  {%- endif -%}
+{%- endcapture -%}
+
+{%- comment -%}
+  Per-tab colours override the strip's, and the strip's override the scheme's —
+  all four, resting and selected, because a strip where one category is the
+  brand's colour and the rest are the scheme's is a real thing to want and the
+  selected state is half of it.
+
+  They ride on the source element's own `style` attribute and are copied onto
+  the button: a cloned fragment carries the classes and styles of the nodes
+  inside it, but these four belong on the button itself, which is the one thing
+  that cannot travel by being cloned.
+
+  Each is a custom property rather than a declaration, so an unset colour falls
+  through to the next level instead of painting `background: ;` over it.
+{%- endcomment -%}
+{%- capture pill_style -%}
+  {%- if s.tab_background != blank -%}--bundle-tab-background: {{ s.tab_background }};{%- endif -%}
+  {%- if s.tab_color != blank -%}--bundle-tab-color: {{ s.tab_color }};{%- endif -%}
+  {%- if s.tab_active_background != blank -%}--bundle-tab-active-background: {{ s.tab_active_background }};{%- endif -%}
+  {%- if s.tab_active_color != blank -%}--bundle-tab-active-color: {{ s.tab_active_color }};{%- endif -%}
+{%- endcapture -%}
+
+{%- comment -%}
+  ================================================================
+  The pill is drawn here, by Liquid, where it stands
+  ================================================================
+
+  It used to be published beside the panel as inert markup for
+  `assets/collection-tabs.js` to put in the strip, and that is the whole reason
+  the icon has never appeared. Every route the module had into the strip ran
+  through a copy — cloning child nodes, then re-reading `innerHTML`, then moving
+  nodes — and a copy that comes back short has nothing to say so. The label
+  survived every time because the module could rebuild that from `data-label` on
+  its own; the icon had no second source, so "name, no glyph" is precisely what
+  each of those failures looked like.
+
+  So nothing is handed to JavaScript any more. The `<label>` below *is* the
+  pill: rendered by Liquid, in the panel's own block, with the theme's `<svg>`
+  inside it, present in the HTML the server sends. There is no step between
+  rendering it and seeing it, which is the only version of this that cannot lose
+  the icon.
+
+  ## Then how does it get into the strip?
+
+  It does not have to. `assets/base.css` lays the pills out as a strip without
+  moving them: `.product-bundle__cat` is `display: contents`, so this block's
+  two children are laid out by `.product-bundle__panels` rather than by this
+  wrapper, and `order` puts every pill on the first line and every panel below.
+  The strip is a row in a layout, not an element — which is what it had to
+  become, because the element it used to be could only ever be filled by script.
+
+  A block cannot read its children's settings in Liquid: there is no
+  `block.blocks`, which is why the Tabs block could not draw these buttons and
+  why the module existed at all. A block *can* draw its own, and that is the one
+  thing the constraint never ruled out.
+
+  ## The radio is the tab state, and CSS reads it
+
+  `<input type="radio">` with one `name` across the strip, and the panel shown
+  by `:has(> :checked)`. No script decides which category is open.
+
+  Native radios also give the keyboard behaviour the ARIA tab pattern asks for —
+  one tab stop into the group, arrow keys between the options, the chosen one
+  announced as "2 of 4" — which `collection-tabs.js` was hand-rolling as a
+  roving tabindex. It is the same interaction with nothing to keep in step, and
+  it works before any script loads and if none ever does.
+
+  The input is `visually-hidden` rather than `display: none`, because a hidden
+  radio cannot be focused and a strip nobody can tab into is worse than one that
+  looks slightly different. The `<label>` is what is seen and what is clicked.
+
+  No `checked` in the markup: a block does not know whether it is the first one,
+  and `forloop` does not reach inside `content_for 'blocks'`. So the first
+  Category is styled open by CSS until a customer chooses — see the
+  `:not(:has(:checked))` rule in `assets/base.css`.
+{%- endcomment -%}
+{%- comment -%}
+  `block.shopify_attributes` is on the panel below, not on this wrapper.
+
+  This element is `display: contents` — it has no box — and the Theme Editor
+  outlines the block it is told about and scrolls to it. A block whose root
+  generates no box is a block the editor cannot draw a rectangle around. The
+  panel is the half of a Category that is visible when it is open, and it is
+  what the editor was effectively highlighting before, so it keeps the
+  attributes. `assets/collection-tabs.js` walks up to this wrapper from
+  whatever the editor selects.
+{%- endcomment -%}
+<div class="product-bundle__cat" data-bundle-category>
+  {%- comment -%}
+    Not `.visually-hidden`: that utility is `position: static` again on
+    `:focus-within`, which is right for a skip link and wrong for this — the
+    radio would become a real radio button on the page the moment a keyboard
+    reached it. `.product-bundle__pill-input` in `assets/base.css` hides it the
+    same way and stays hidden when focused; the focus ring is drawn on the pill
+    instead, which is the thing the customer is actually looking at.
+  {%- endcomment -%}
+  <input
+    class="product-bundle__pill-input"
+    type="radio"
+    name="bundle-strip-{{ section.id }}"
+    id="{{ tab_id }}"
+    aria-controls="{{ panel_id }}"
+  >
+
+  {%- comment -%}
+    The four `--bundle-tab-*` colours ride on the pill itself, so one category
+    can be the brand's colour while the rest are the scheme's. Each is emitted
+    only when the merchant set it, so an unset one falls through to the strip's
+    and then to the scheme's instead of painting `background: ;` over both.
+  {%- endcomment -%}
+  <label
+    class="product-bundle__pill"
+    id="{{ tab_id }}-label"
+    for="{{ tab_id }}"
+    style="{{ pill_style | strip_newlines | strip }}"
+  >
+    {%- if has_pill_icon -%}
+      <span class="product-bundle__pill-icon">{% render 'icon', icon: pill_icon, size: pill_icon_size %}</span>
+    {%- endif -%}
+    <span class="product-bundle__pill-label">{{ label }}</span>
+  </label>
+
+<div
+  class="product-bundle__panel{% unless has_products %} product-bundle__panel--placeholder{% endunless %}"
+  id="{{ panel_id }}"
+  role="region"
+  aria-labelledby="{{ tab_id }}-label"
+  data-bundle-panel
+  data-block-id="{{ block.id }}"
+  data-label="{{ label | escape }}"
+  {% render 'spacing', block: s %}
+  {{ block.shopify_attributes }}
+>
+
+  {%- comment -%}
+    `gap_css` rather than `space_between`: the rows sit 48px apart on a desktop
+    and 24px apart on a phone, and `data-options` carries one `spaceBetween`
+    that Swiper reads once. Handing the property instead puts the breakpoint
+    entirely in CSS, where it already lives — `carousel.js` measures the used
+    `row-gap` and re-measures it on every resize, so Swiper follows the media
+    query rather than predating it.
+
+    `count` is the real number of slides, so `carousel-options` can refuse a
+    loop the slide count cannot support rather than letting Swiper turn it off
+    itself and leave the merchant with a ticked box that does nothing.
+  {%- endcomment -%}
+  {% render 'carousel-shell',
+     id: carousel_id,
+     children: rows_markup,
+     direction: 'vertical',
+     detached: true,
+     layout: 'carousel',
+     layout_mobile: 'carousel',
+     tag: 'ul',
+     label: label,
+     classes: 'product-bundle__carousel',
+     track_classes: 'product-bundle__list',
+     columns_desktop: rows,
+     columns_tablet: rows,
+     columns_mobile: rows_mobile,
+     gap_css: 'var(--bundle-row-gap)',
+     count: slide_count,
+     settings: section.settings %}
+
+  {%- comment -%}
+    The arrows and the pagination, outside the clip, pointing back at the
+    carousel by id — the pattern `carousel-shell`'s own documentation describes
+    and `sections/feature-cards.liquid` already uses.
+
+    The branching is `carousel-shell-tail`'s, because `detached` turned that
+    file's copy off and this is the same decision being made in the same order:
+    the control bar carries its own arrows, so it replaces the bare pair rather
+    than joining it.
+  {%- endcomment -%}
+  {%- liquid
+    assign has_controls = false
+    if section.settings.carousel_navigation or section.settings.carousel_pagination != 'none'
+      assign has_controls = true
+    endif
+  -%}
+
+  {%- if has_controls -%}
+  <div class="product-bundle__controls">
+    {%- if section.settings.carousel_pagination == 'controls' -%}
+      {% render 'carousel-controls',
+         settings: section.settings,
+         carousel: carousel_id,
+         align: section.settings.carousel_pagination_align %}
+    {%- else -%}
+      {%- if section.settings.carousel_navigation -%}
+        {% render 'carousel-nav', settings: section.settings, carousel: carousel_id %}
+      {%- endif -%}
+
+      {%- if section.settings.carousel_pagination != 'none' -%}
+        {% render 'carousel-pagination',
+           style: section.settings.carousel_pagination,
+           align: section.settings.carousel_pagination_align,
+           carousel: carousel_id %}
+      {%- endif -%}
+    {%- endif -%}
+  </div>
+  {%- endif -%}
+</div>
+</div>
+
+{%- comment -%}
+  ---- why the schema says `"tag": null` ----
+
+  This note used to live in the schema itself, under a comment-shaped key made
+  of two slashes. Shopify rejects that: a schema is validated against a fixed
+  set of attributes, and an unknown one fails the whole upload — `Invalid
+  schema: is not a valid attribute` — so the file never reached the theme at
+  all. JSON has no comments, and a key invented to act as one is still a key the
+  validator does not know. Prose about a schema belongs in Liquid, above it,
+  which is where this is.
+
+  Shopify wraps a theme block in a `<div>` unless the schema says otherwise, and
+  that wrapper would sit between `.product-bundle__panels` and this block's own
+  root — which breaks the strip outright, in three ways at once:
+
+    `display: contents` is on `.product-bundle__cat`. A wrapper in front of it
+    has a box of its own, so the pill and the panel would be laid out inside
+    that box instead of by the panels container — every Category would be one
+    item on one line, and the pills would never collect into a strip.
+
+    `.product-bundle__cat:first-child` is what opens the first Category before
+    a customer has chosen. Behind a wrapper, every cat is the first child of
+    its own wrapper, so every panel would be open at once.
+
+    `:only-child` is what hides a lone pill, and it would match every Category
+    in a strip of any length.
+
+  `blocks/_tab.liquid` and `blocks/_product-card.liquid` declare the same thing
+  for the same kind of reason.
+{%- endcomment -%}
+{% schema %}
+{
+  "name": "t:blocks.product_bundle_category.name",
+  "tag": null,
+
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "t:blocks.product_bundle_category.paragraph"
+    },
+    {
+      "type": "collection",
+      "id": "collection",
+      "label": "t:sections.featured_collection.settings.collection.label"
+    },
+    {
+      "type": "text",
+      "id": "label",
+      "label": "t:blocks.product_bundle_category.settings.label.label",
+      "info": "t:blocks.product_bundle_category.settings.label.info"
+    },
+    {
+      "type": "range",
+      "id": "products_limit",
+      "label": "t:blocks.product_bundle_category.settings.products_limit.label",
+      "min": 2,
+      "max": 24,
+      "step": 1,
+      "default": 6
+    },
+
+    { "type": "header", "content": "t:blocks.subheading.headers.icon" },
+    {
+      "type": "select",
+      "id": "icon_source",
+      "label": "t:blocks.subheading.settings.icon_source.label",
+      "options": [
+        { "value": "none", "label": "t:shared.none.label" },
+        { "value": "icon", "label": "t:blocks.subheading.settings.icon_source.options__2.label" }
+      ],
+      "default": "icon"
+    },
+    {
+      "type": "select",
+      "id": "icon",
+      "label": "t:blocks.subheading.settings.icon.label",
+      "options": [
+        { "value": "star", "label": "t:blocks.subheading.settings.icon.options__1.label" },
+        { "value": "check", "label": "t:blocks.subheading.settings.icon.options__2.label" },
+        { "value": "heart", "label": "t:blocks.subheading.settings.icon.options__3.label" },
+        { "value": "tag", "label": "t:blocks.subheading.settings.icon.options__4.label" },
+        { "value": "truck", "label": "t:blocks.subheading.settings.icon.options__5.label" },
+        { "value": "refresh", "label": "t:blocks.subheading.settings.icon.options__6.label" },
+        { "value": "lock", "label": "t:blocks.subheading.settings.icon.options__7.label" },
+        { "value": "clock", "label": "t:blocks.subheading.settings.icon.options__8.label" },
+        { "value": "location", "label": "t:blocks.subheading.settings.icon.options__9.label" },
+        { "value": "mail", "label": "t:blocks.subheading.settings.icon.options__10.label" },
+        { "value": "note", "label": "t:blocks.subheading.settings.icon.options__11.label" },
+        { "value": "info", "label": "t:blocks.subheading.settings.icon.options__12.label" },
+        { "value": "shield", "label": "t:blocks.product_bundle_category.settings.icon.options__13.label" },
+        { "value": "grid", "label": "t:blocks.product_bundle_category.settings.icon.options__14.label" },
+        { "value": "moon", "label": "t:blocks.product_bundle_category.settings.icon.options__15.label" },
+        { "value": "leaf", "label": "t:blocks.product_bundle_category.settings.icon.options__16.label" },
+        { "value": "droplet", "label": "t:blocks.product_bundle_category.settings.icon.options__17.label" },
+        { "value": "bolt", "label": "t:blocks.product_bundle_category.settings.icon.options__18.label" },
+        { "value": "brain", "label": "t:blocks.product_bundle_category.settings.icon.options__19.label" },
+        { "value": "pulse", "label": "t:blocks.product_bundle_category.settings.icon.options__20.label" },
+        { "value": "sun", "label": "t:blocks.product_bundle_category.settings.icon.options__21.label" },
+        { "value": "sparkle", "label": "t:blocks.product_bundle_category.settings.icon.options__22.label" }
+      ],
+      "default": "heart",
+      "visible_if": "{{ block.settings.icon_source == 'icon' }}"
+    },
+    {
+      "type": "select",
+      "id": "icon_size",
+      "label": "t:blocks.subheading.settings.icon_size.label",
+      "options": [
+        { "value": "extra_small", "label": "t:shared.icon_size.options__1.label" },
+        { "value": "small", "label": "t:shared.icon_size.options__2.label" },
+        { "value": "medium", "label": "t:shared.icon_size.options__3.label" },
+        { "value": "large", "label": "t:shared.icon_size.options__4.label" },
+        { "value": "extra_large", "label": "t:shared.icon_size.options__5.label" },
+        { "value": "custom", "label": "t:shared.icon_size.options__6.label" }
+      ],
+      "default": "custom",
+      "visible_if": "{{ block.settings.icon_source == 'icon' }}"
+    },
+    {
+      "type": "range",
+      "id": "icon_size_custom",
+      "label": "t:shared.icon_size.custom.label",
+      "info": "t:shared.icon_size.custom.info",
+      "min": 10,
+      "max": 32,
+      "step": 1,
+      "unit": "px",
+      "default": 14,
+      "visible_if": "{{ block.settings.icon_source == 'icon' and block.settings.icon_size == 'custom' }}"
+    },
+
+    { "type": "header", "content": "t:blocks.product_bundle_category.headers.pill" },
+    { "type": "paragraph", "content": "t:blocks.product_bundle_category.paragraphs.pill" },
+    {
+      "type": "color",
+      "id": "tab_background",
+      "label": "t:sections.product_bundle.settings.tab_background.label"
+    },
+    {
+      "type": "color",
+      "id": "tab_color",
+      "label": "t:blocks.tabs.settings.tab_color.label"
+    },
+    {
+      "type": "color",
+      "id": "tab_active_background",
+      "label": "t:sections.product_bundle.settings.tab_active_background.label"
+    },
+    {
+      "type": "color",
+      "id": "tab_active_color",
+      "label": "t:blocks.tabs.settings.tab_active_color.label"
+    },
+
+    {
+      "type": "header",
+      "content": "t:shared.spacing.block_header"
+    },
+    {
+      "type": "select",
+      "id": "padding_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        {
+          "value": "desktop",
+          "label": "t:shared.spacing.devices.options__1.label"
+        },
+        {
+          "value": "mobile",
+          "label": "t:shared.spacing.devices.options__2.label"
+        }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 120,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 120,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 120,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 120,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 120,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 120,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left_mobile",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 120,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right_mobile",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 120,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    }
+  ]
+}
+{% endschema %}

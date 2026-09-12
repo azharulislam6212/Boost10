@@ -8,7 +8,7 @@
  *
  *   <modal-dialog>         Centred modal
  *   <drawer-component>     Edge drawer: start, end, top or bottom
- *   <quick-option-drawer>  Drawer that fetches product options on demand
+ *   <quick-add-modal>  Drawer that fetches product options on demand
  *
  * Built on the native `<dialog>` element rather than a hand-rolled overlay. The
  * browser then owns the hard parts: the top layer (so nothing can z-index above
@@ -201,7 +201,7 @@ export class Overlay extends BaseComponent {
 
   /**
    * Cancel any previous WAAPI animation on the panel before starting a new
-   * direction. This is important when a drawer is closed while its entrance
+   * direction. This is important when a modal is closed while its entrance
    * animation is still settling: reversing an already-running animation can
    * briefly expose the CSS transform and makes the panel appear to jump.
    *
@@ -435,11 +435,11 @@ export class DrawerComponent extends Overlay {
 defineComponent('drawer-component', DrawerComponent);
 
 /* ==========================================================================
-   <quick-option-drawer>
+   <quick-add-modal>
    ========================================================================== */
 
 /**
- * A drawer that renders a product's options on demand.
+ * A modal that renders a product's options on demand.
  *
  * Nothing is fetched until a customer actually asks for it, which is the whole
  * point: a collection page with forty products would otherwise ship forty
@@ -447,14 +447,28 @@ defineComponent('drawer-component', DrawerComponent);
  * the Section Rendering API, so translations, money formatting and metafield
  * logic are not duplicated in JavaScript.
  *
+ * ## A modal, not a modal
+ *
+ * It extends `ModalDialog`, so it arrives in the centre of the screen with the
+ * modal's own scale-and-rise entrance. That is the difference between quick add
+ * and every drawer in the theme, and it is deliberate: a modal is a place a
+ * customer goes and comes back from — the cart, the menu, the filters — while
+ * quick add is one decision taken on top of the page the customer is already
+ * reading. Sliding the page aside to ask which size they want puts a
+ * navigational gesture on an inline choice.
+ *
+ * Only the placement changes. Fetching, focus, Escape, scroll locking and the
+ * abort on teardown are all the same code they were, inherited one class higher
+ * up rather than rewritten.
+ *
  * Triggers pass the product through the trigger element:
  *
  *   <button
- *     data-overlay-open="QuickOptions"
+ *     data-overlay-open="QuickAdd"
  *     data-product-url="{{ product.url }}"
- *     data-section-id="quick-view">Choose options</button>
+ *     data-section-id="quick-add">Choose options</button>
  */
-export class QuickOptionDrawer extends DrawerComponent {
+export class QuickAddModal extends ModalDialog {
   /** @type {AbortController|null} */
   #request = null;
 
@@ -462,28 +476,28 @@ export class QuickOptionDrawer extends DrawerComponent {
   #loadedUrl = null;
 
   get overlayType() {
-    return 'quick-view';
+    return 'quick-add';
   }
 
   /**
    * Fetch the product markup before focus moves, so a screen reader is not sent
-   * into an empty drawer.
+   * into an empty modal.
    */
   async beforeOpen() {
     const url = this.dataset.pendingUrl;
     if (!url || url === this.#loadedUrl) return;
 
-    await this.load(url, this.dataset.pendingSection || 'quick-view');
+    await this.load(url, this.dataset.pendingSection || 'quick-add');
   }
 
   /**
-   * Load a product into the drawer.
+   * Load a product into the modal.
    *
    * @param {string} url Product URL.
-   * @param {string} [sectionId='quick-view']
+   * @param {string} [sectionId='quick-add']
    * @returns {Promise<void>}
    */
-  async load(url, sectionId = 'quick-view') {
+  async load(url, sectionId = 'quick-add') {
     const body = this.refs.body;
     if (!(body instanceof HTMLElement)) return;
 
@@ -497,12 +511,12 @@ export class QuickOptionDrawer extends DrawerComponent {
       const { fetchSection, applyHTML } = await import('@theme/section-renderer');
       const html = await fetchSection(sectionId, { url, signal: this.#request.signal });
 
-      applyHTML(html, body, { selector: '[data-quick-view-content]', sectionId });
+      applyHTML(html, body, { selector: '[data-quick-add-content]', sectionId });
       this.#loadedUrl = url;
     } catch (error) {
       if (error?.name === 'AbortError') return;
 
-      console.error('[Boost10] <quick-option-drawer> could not load the product.', error);
+      console.error('[Boost10] <quick-add-modal> could not load the product.', error);
       body.textContent = themeString('networkError', '');
       announceUrgent(themeString('networkError', ''));
     } finally {
@@ -534,6 +548,6 @@ export class QuickOptionDrawer extends DrawerComponent {
   }
 }
 
-defineComponent('quick-option-drawer', QuickOptionDrawer);
+defineComponent('quick-add-modal', QuickAddModal);
 
-export default { Overlay, ModalDialog, DrawerComponent, QuickOptionDrawer };
+export default { Overlay, ModalDialog, DrawerComponent, QuickAddModal };

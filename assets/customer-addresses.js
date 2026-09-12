@@ -49,7 +49,7 @@
  */
 
 import { BaseComponent, defineComponent } from '@theme/component';
-import { getFocusableElements, themeString, announce, parseJSONScript } from '@theme/utilities';
+import { getFocusableElements, themeString, announce } from '@theme/utilities';
 
 export class CustomerAddressForm extends BaseComponent {
   /** The control that opened the form currently showing. */
@@ -220,7 +220,13 @@ export class CustomerAddressForm extends BaseComponent {
     if (!(province instanceof HTMLSelectElement)) return;
 
     const option = countrySelect.selectedOptions[0];
-    const provinces = parseJSONScript(option) || this.#parseAttribute(option);
+
+    // Shopify writes the list onto the `<option>` as `data-provinces`, so the
+    // attribute is the only source. This used to try `parseJSONScript(option)`
+    // first, which read the option's own label as JSON — it never matched and
+    // now that the helper parses what it is handed, it would warn on every
+    // country change instead of quietly returning nothing.
+    const provinces = this.#parseAttribute(option);
     const wrapper = province.closest('[data-province-wrapper]');
 
     if (!Array.isArray(provinces) || provinces.length === 0) {

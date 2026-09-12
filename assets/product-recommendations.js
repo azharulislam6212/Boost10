@@ -106,7 +106,7 @@ class RecommendationsBase extends BaseComponent {
   /**
    * Load recommendations for a different product.
    *
-   * Used by the quick view drawer, which reuses one instance across products.
+   * Used by the quick add modal, which reuses one instance across products.
    *
    * @param {string|number} productId
    * @returns {Promise<boolean>}

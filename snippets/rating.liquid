@@ -13,8 +13,20 @@
   Renders nothing when the metafield is missing, so a store without a review app
   gets no empty row rather than "0 out of 5".
 
-  @param {product} product
+  ## Driving it without a product
+
+  `value` and `count` override the metafield, which is what an onboarding
+  placeholder needs: a card with no product behind it still has to show the row
+  of stars, or the empty state is a different shape from the thing it stands in
+  for. Passing them renders exactly the same markup from the same loop, so the
+  placeholder cannot drift from the real card — which a second hand-written row
+  of star icons would, the first time the scale or the class names changed.
+
+  @param {product} [product]
   @param {boolean} [show_count] - Appends the review count. Default true
+  @param {number} [value] - Rating out of `max`. Overrides the metafield.
+  @param {number} [count] - Review count. Overrides the metafield.
+  @param {number} [max] - Scale maximum when `value` is passed. Default 5.
   @param {string} [class]
 
   @example
@@ -24,19 +36,40 @@
 {% enddoc %}
 
 {%- liquid
-  assign rating = product.metafields.reviews.rating.value
-  assign count = product.metafields.reviews.rating_count.value | default: 0
   assign show_the_count = true
   if show_count == false
     assign show_the_count = false
   endif
+
+  comment
+    Two sources, one shape. `value` passed in wins outright — it is the caller
+    saying there is no metafield to read and here is what to draw instead — and
+    everything below this point works from `star_value`, `star_count` and
+    `scale_max` without knowing which of the two filled them.
+  endcomment
+  assign has_rating = false
+
+  if value != blank
+    assign star_value = value | times: 1.0
+    assign star_count = count | default: 0 | plus: 0
+    assign scale_max = max | default: 5 | plus: 0
+    assign has_rating = true
+  else
+    assign rating = product.metafields.reviews.rating.value
+    assign star_count = product.metafields.reviews.rating_count.value | default: 0
+    if rating != blank and rating.rating != blank and star_count > 0
+      assign scale_max = rating.scale_max | default: 5
+      assign star_value = rating.rating | times: 1.0
+      assign has_rating = true
+    endif
+  endif
 -%}
 
-{%- if rating != blank and rating.rating != blank and count > 0 -%}
+{%- if has_rating -%}
   {%- liquid
-    assign scale_max = rating.scale_max | default: 5
-    assign value = rating.rating | times: 1.0
-    assign rounded = value | round: 1
+    assign value = star_value
+    assign count = star_count
+    assign rounded = star_value | round: 1
   -%}
 
   <div class="rating {{ class }}" data-rating="{{ rounded }}">

@@ -78,6 +78,9 @@
   @param {string} [nav]
   @param {string} [tag]
   @param {string} [track_classes]
+  @param {string} [direction] - horizontal | vertical. Default horizontal. Vertical needs a height on the element; see `--carousel-row-size` in `assets/base.css`.
+  @param {boolean} [detached] - The caller renders the arrows and the pagination itself, somewhere else, passing `carousel:` with this `id`. Keeps the pause button and the live region, which have to stay inside the element.
+  @param {string} [gap_css] - A CSS length or `var()` for `--carousel-gap`, for a carousel whose spacing steps at a breakpoint. See `carousel-vars`.
 
 
   @example
@@ -112,6 +115,21 @@
   assign pagination = settings.carousel_pagination | default: 'none'
   assign nav_place = settings.carousel_nav_position | default: 'outside'
 
+  # Both off in one place rather than at each render tag below, so a caller
+  # cannot switch one out and leave the other doubled. The pause button and the
+  # live region are deliberately not covered: they are found by ref and
+  # announced from inside, so they stay where the component can reach them
+  # however the visible controls are arranged.
+  #
+  # The same parameter `carousel-shell-tail.liquid` already takes, for the same
+  # reason and with the same meaning. A vertical carousel needs it: the element
+  # clips to its own height, so arrows placed outside the track and a row of
+  # dots below it are both drawn where there is nothing to see them.
+  if detached
+    assign show_nav = false
+    assign pagination = 'none'
+  endif
+
   # `count` arrives from the caller and is passed straight through to
   # `carousel-options`, where it decides whether the merchant's loop setting is
   # achievable. Swiper silently disables looping below twice `slidesPerView`,
@@ -131,15 +149,26 @@
     assign use_controls = true
   endif
 
+  # `data-direction` is on the element rather than only inside `data-options`,
+  # because CSS has to know it too: the pre-init slide sizing, the track's flex
+  # direction and the element's own height all switch axis on it, and none of
+  # them can read a JSON attribute. `assets/carousel.js` reads it as well, to
+  # measure `row-gap` instead of `column-gap` for Swiper's `spaceBetween`.
+  assign axis = direction | default: 'horizontal'
+  if axis != 'vertical'
+    assign axis = 'horizontal'
+  endif
+
   assign inline_style = '--columns-desktop: ' | append: cols_desktop
   assign inline_style = inline_style | append: '; --columns-tablet: ' | append: cols_tablet
   assign inline_style = inline_style | append: '; --columns-mobile: ' | append: cols_mobile | append: ';'
 -%}
 <swiper-carousel
   {% if id %}id="{{ id }}"{% endif %}
-  class="carousel-shell swiper carousel-shell--nav-{{ nav_place }} {{ classes }}"
+  class="carousel-shell swiper carousel-shell--nav-{{ nav_place }} carousel-shell--{{ axis }} {{ classes }}"
   data-layout="{{ layout_desktop }}"
   data-layout-mobile="{{ layout_mob }}"
+  data-direction="{{ axis }}"
   data-options="
     {%- render 'carousel-options',
         settings: settings,
@@ -147,13 +176,15 @@
         columns_desktop: cols_desktop,
         columns_tablet: cols_tablet,
         columns_mobile: cols_mobile,
+        direction: axis,
         pagination: pagination -%}
   "
   style="{{ inline_style }}{% render 'carousel-vars',
       settings: settings,
       columns_desktop: cols_desktop,
       columns_tablet: cols_tablet,
-      columns_mobile: cols_mobile %}{% render 'carousel-style', settings: settings %}"
+      columns_mobile: cols_mobile,
+      gap_css: gap_css %}{% render 'carousel-style', settings: settings %}"
 >
   <{{ track_tag }}
     class="carousel-shell__track {{ track_classes }}"

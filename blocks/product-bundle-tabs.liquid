@@ -1,0 +1,738 @@
+{% comment %}
+  blocks/product-bundle-tabs.liquid — the category tab strip, and the panels
+  behind it.
+
+  ## Why this is a block and not part of the section
+
+  It used to be markup welded into `sections/product-bundle.liquid`: a picker
+  column on the left, a tray on the right, and one `content_for 'blocks'` that
+  could only ever mean "the categories". A merchant who wanted the tray above
+  the picker on desktop, or the strip under the heading, or a second column of
+  anything at all, had no way to say so.
+
+  As a block it is one thing a merchant places, inside a **Group** like any
+  other block, and the section is what it should have been from the start: a
+  `<product-bundle>` with `{% content_for 'blocks' %}` in it. The arrangement
+  becomes the merchant's, which is what the rest of this theme already assumes.
+
+  ## Its children draw their own pills, and this block draws none
+
+  `block.blocks` does not exist in Liquid: a block cannot read its children's
+  settings, so this one cannot draw its Categories' pills. That is a real
+  constraint and it has not changed.
+
+  What changed is the conclusion. This block used to render an empty
+  `role="tablist"` for `assets/collection-tabs.js` to fill from markup each
+  Category published beside its panel — and every version of that hand-off ran
+  through a copy of the pill's markup. A copy that comes back short says
+  nothing: the label survived every time, because the module could rebuild it
+  from `data-label` alone, and the icon never appeared once.
+
+  A block cannot draw its children's pills; it can draw its own. So each
+  Category renders its complete pill where it stands, in Liquid, and there is
+  no strip element here at all — `assets/base.css` lays the pills out as a row
+  with `display: contents` on the Category root and `order` on its children.
+  Which one is open is a radio group read by `:checked`. Nothing is assembled
+  by script, so nothing can arrive empty.
+
+  ## The strip's own design lives here, not on the section
+
+  Every number and colour the pills are made of is a setting on this block:
+  the four colours, the border, the corners, the height, the type, the space
+  between the pills and the space between the strip and the products.
+
+  They used to be `section.settings`, under a **Category tabs** heading, and a
+  merchant styling the strip was in one panel while the thing they were styling
+  was three blocks away. Worse, there was no way to have two strips look
+  different — the settings belonged to the section, so every strip in it had
+  the same design by construction.
+
+  They resolve through `--bundle-tab-*` custom properties, and the cascade does
+  the choosing between three levels without any rule knowing which won:
+
+    the pill's own   `style="--bundle-tab-background: …"`, from the Category
+    the strip's      the same property here, from this block
+    the scheme's     the fallback written into each `var()` in `base.css`
+
+  A colour the merchant has not set is never emitted, so an unset level simply
+  is not there and the next one applies. That is why an unset colour is absent
+  rather than `transparent`: a property that exists but is empty invalidates
+  the whole declaration, and the pill would lose its background rather than
+  inherit one.
+
+  What stayed on the section is what is not the strip: how many product rows
+  are on screen, the card's height, the tier ladder, the tray's wording.
+
+  ## Plain and Segmented are one strip
+
+  Segmented is the pill chooser drawn as a switch — a filled track with the
+  options sharing its width. It is a modifier rather than a second component:
+  what changes is a background, a radius and how the pills divide the space.
+
+  There is no track element, because nothing can wrap the pills — they are
+  drawn by four different blocks. So the track is drawn *by* the pills: they
+  sit flush with the track colour behind each one and only the two on the ends
+  are rounded, which is what a segmented control is. `assets/base.css` has it.
+
+  There is no marker element sliding between the names either. The selected
+  pill is filled by `:checked`, which is the browser's own state, so nothing
+  can look selected while a different category is open.
+
+  Segmented is horizontal by definition: a filled track running down the side
+  of a page with the options stacked in it is a menu, not a switch. The
+  orientation is forced here rather than hidden behind a `visible_if`, so a
+  merchant who picks Segmented on a strip that was vertical gets the strip they
+  chose instead of a broken one.
+{% endcomment %}
+
+{%- liquid
+  assign s = block.settings
+
+  assign tabs_id = 'bundle-tabs-' | append: block.id
+
+  comment
+    ---- the arrangement ----
+
+    Segmented forces horizontal; see the note above. Everything else follows
+    the merchant's Direction, and below 990px `base.css` turns a vertical strip
+    back into a scrolling row — a phone spends one line on the categories
+    rather than the whole screen.
+  endcomment
+  assign strip_style = s.strip_style | default: 'plain'
+  assign orientation = s.direction | default: 'horizontal'
+  if strip_style == 'segmented'
+    assign orientation = 'horizontal'
+  endif
+
+  assign classes = 'product-bundle__tabs product-bundle__tabs--' | append: orientation
+  if strip_style == 'segmented'
+    assign classes = classes | append: ' product-bundle__tabs--segmented'
+  endif
+
+  comment
+    Two properties, not one, and for the reason `snippets/group.liquid` sets
+    out at length: `flex` only means anything to a flex *item*, and this block
+    is one only when what it sits in lays its children out in a flex container
+    — which a Group does and a plain container does not. Each option writes
+    both, they agree, and neither context is a special case.
+  endcomment
+  if s.width == 'fit'
+    assign width_flex = '0 0 auto'
+    assign width_size = 'fit-content'
+  else
+    assign width_flex = '1 1 0%'
+    assign width_size = '100%'
+  endif
+
+  comment
+    `none` is a zero width rather than `border-style: none`, so the pills keep
+    the same box either way and choosing None does not resize the strip.
+  endcomment
+  assign tab_border_style = s.tab_border_style | default: 'solid'
+  assign tab_border_width = 0
+  if tab_border_style != 'none'
+    assign tab_border_width = s.tab_border_width | default: 1 | plus: 0
+  endif
+
+  assign strip_label = s.label
+  if strip_label == blank
+    assign strip_label = 'products.bundle.categories' | t
+  endif
+
+  comment
+    ---- the line under the strip ----
+
+    There has always been one, and it was never a decision. `[role='tablist']`
+    in `assets/base.css` draws `border-block-end: 1px solid var(--color-border)`
+    on every tablist in the theme — the underlined tab bar the cart drawer and
+    the mega menu are built from — and this strip carries `role="tablist"`
+    because it is one. So the line arrived by inheritance, hard against the
+    bottom of the pills with nothing between them, and no setting in this panel
+    could move it, recolour it or switch it off.
+
+    It is now declared from these three properties, and the space above it is
+    the fourth. `assets/base.css` defaults the width to 0, so the inherited line
+    is gone until a merchant asks for one here.
+
+    Only for a horizontal, plain strip. A vertical rail's pills run down the
+    side, so a line under the last one is a rule across the middle of the
+    section; a segmented strip already has a filled track drawn round it, and a
+    line under that is a track with a tail.
+  endcomment
+  assign underline_applies = true
+  if orientation != 'horizontal' or strip_style == 'segmented'
+    assign underline_applies = false
+  endif
+
+  assign underline_style = s.strip_underline | default: 'none'
+  unless underline_applies
+    assign underline_style = 'none'
+  endunless
+-%}
+
+{%- capture tabs_style -%}
+  {%- render 'spacing', block: s, declarations: true -%}
+
+  --bundle-tabs-gap: {{ s.gap | default: 24 | plus: 0 }}px;
+  --bundle-tabs-rail-width: {{ s.rail_width | default: 260 | plus: 0 }}px;
+
+  {%- comment -%}
+    ---- the line under the strip, and the space above it ----
+
+    Both only on the strip the line is drawn on. A vertical rail has no bottom
+    edge to underline and a segmented strip already has a track round it — see
+    the note at the top — so neither the rule nor the room below it is written
+    there, and choosing Vertical does not leave a stray 16px under the rail.
+
+    The two-value device switch the rest of the theme uses: the mobile number
+    defaults to half the desktop one rather than to the desktop one, because a
+    phone spends that space on a screen a third as tall.
+  {%- endcomment -%}
+  {%- if underline_applies -%}
+    {%- liquid
+      assign underline_gap = s.strip_underline_gap | default: 16 | plus: 0
+      assign underline_gap_half = underline_gap | divided_by: 2
+      assign underline_gap_mobile = s.strip_underline_gap_mobile | default: underline_gap_half | plus: 0
+    -%}
+    --bundle-strip-underline-gap: {{ underline_gap }}px;
+    --bundle-strip-underline-gap-mobile: {{ underline_gap_mobile }}px;
+
+    {%- if underline_style != 'none' -%}
+      --bundle-strip-border-width: {{ s.strip_underline_width | default: 1 | plus: 0 }}px;
+      --bundle-strip-border-style: {{ underline_style }};
+      {%- if s.strip_underline_color != blank -%}
+        --bundle-strip-border-color: {{ s.strip_underline_color }};
+      {%- endif -%}
+    {%- endif -%}
+  {%- endif -%}
+
+  {%- comment -%}
+    ---- the track ----
+
+    Only written in Segmented. In Plain there is no track, and a colour or a
+    radius emitted for one would be a number on something that is not drawn.
+
+    **Track padding** is gone with the track element. There is no box around the
+    pills to pad any more — there cannot be, because the pills are drawn by four
+    different blocks and nothing can wrap them — so the segmented look is the
+    pills themselves: flush against each other, the track colour behind each,
+    and only the two on the ends rounded. The radius is those ends' radius,
+    which is what the setting has always described. A padding slider with
+    nothing to pad is a setting that lies, so it is not offered.
+  {%- endcomment -%}
+  {%- if strip_style == 'segmented' -%}
+    --bundle-tabs-track-radius: {{ s.track_radius | default: 50 | plus: 0 }}px;
+    {%- if s.track_background != blank -%}
+      --bundle-tabs-track-background: {{ s.track_background }};
+    {%- endif -%}
+  {%- endif -%}
+
+  {%- comment -%}
+    ---- the pill's measurements ----
+
+    Every number the drawing pins, written here rather than taken from a token
+    another panel is free to change. The type was `var(--font-size-sm)` once —
+    Theme settings › Typography › Detail size — so a store that had set that to
+    16 got a 16px tab, wider labels, and a strip that no longer matched the
+    design it was built from.
+  {%- endcomment -%}
+  --bundle-tab-height: {{ s.tab_height | default: 37 | plus: 0 }}px;
+  --bundle-tab-radius: {{ s.tab_radius | default: 50 | plus: 0 }}px;
+  --bundle-tab-padding-inline: {{ s.tab_padding_inline | default: 16 | plus: 0 }}px;
+  --bundle-tab-gap: {{ s.tab_gap | default: 10 | plus: 0 }}px;
+  {%- comment -%}
+    The space between the glyph and the name, inside one pill — not the space
+    between two pills, which is `--bundle-tab-gap` above. `assets/base.css` has
+    read this property since the pill was drawn and nothing ever wrote it, so
+    every strip in every store has had the 0.6rem fallback and no way to change
+    it. The drawing sets the pair 6 apart, which is what that fallback is, so
+    the default here changes nothing and the slider now moves something.
+  {%- endcomment -%}
+  --bundle-tab-icon-gap: {{ s.tab_icon_gap | default: 6 | plus: 0 }}px;
+  --bundle-tab-font-size: {{ s.tab_font_size | default: 14 | plus: 0 }}px;
+  --bundle-tab-font-weight: {{ s.tab_font_weight | default: '500' }};
+
+  --bundle-tab-border-width: {{ tab_border_width }}px;
+  {%- if tab_border_width > 0 -%}
+    --bundle-tab-border-style: {{ tab_border_style }};
+    {%- if s.tab_border_color != blank -%}
+      --bundle-tab-border: {{ s.tab_border_color }};
+    {%- endif -%}
+  {%- endif -%}
+
+  {%- comment -%}
+    ---- the four colours ----
+
+    Each is emitted only when the merchant has set it, so an untouched strip
+    falls through to the colour scheme exactly as it did before these settings
+    existed. See the note at the top for why absence and not `transparent`.
+
+    Four fields because they are four decisions: what an unselected pill is
+    made of, and what the selected one becomes. Saying "selected" with opacity
+    alone reads on a tinted panel and nowhere else — over a photograph, or on a
+    dark track, the chosen name and the three behind it are the same colour at
+    two strengths, and which one is chosen stops being obvious at a glance.
+  {%- endcomment -%}
+  {%- if s.tab_background != blank -%}
+    --bundle-tab-background: {{ s.tab_background }};
+  {%- endif -%}
+  {%- if s.tab_color != blank -%}
+    --bundle-tab-color: {{ s.tab_color }};
+  {%- endif -%}
+  {%- if s.tab_active_background != blank -%}
+    --bundle-tab-active-background: {{ s.tab_active_background }};
+  {%- endif -%}
+  {%- if s.tab_active_color != blank -%}
+    --bundle-tab-active-color: {{ s.tab_active_color }};
+  {%- endif -%}
+{%- endcapture -%}
+
+{%- comment -%}
+  ---- the animation ----
+
+  One target, and it is the panels element, because the strip is no longer a
+  second one — the pills are laid out inside the panels element rather than in
+  a box of their own. Naming the pills as well would nest a motion target
+  inside a motion target, and naming the panels individually would leave a
+  reveal's opacity on a panel that CSS is about to show, which is the one way
+  to make a category open to an empty rectangle.
+
+  `block_level` so a preset that splits text into words or letters is mapped
+  onto the whole-element preset that moves the same way: a pill is one shape
+  and a pill whose label arrives letter by letter is a pill coming apart.
+{%- endcomment -%}
+<motion-effect
+  class="product-bundle__tabs-motion"
+  style="--bundle-tabs-flex: {{ width_flex }}; --bundle-tabs-width: {{ width_size }};"
+  {% render 'motion-attrs',
+     kind: 'text',
+     block: s,
+     block_level: true,
+     target: '.product-bundle__panels'
+  %}
+  {{ block.shopify_attributes }}
+>
+  {%- comment -%}
+    `data-block-spacing` is not decoration. `snippets/spacing.liquid` with
+    `declarations: true` returns the custom properties and nothing else — no
+    `style=`, no hook — because the declarations have to go into this element's
+    one `style` attribute alongside everything else here. `assets/base.css`
+    applies block padding through `[data-block-spacing]`, so without the
+    attribute the four properties land on an element no rule selects and every
+    padding slider in the panel moves a value nothing reads.
+  {%- endcomment -%}
+  <collection-tabs
+    class="{{ classes }}"
+    id="{{ tabs_id }}"
+    data-block-spacing
+    style="{{ tabs_style | strip_newlines | strip }}"
+  >
+    {%- comment -%}
+      ---- there is no strip element any more ----
+
+      There used to be an empty `role="tablist"` here for
+      `assets/collection-tabs.js` to fill. Every Category published its pill as
+      inert markup beside its panel and the module copied it in, because
+      `block.blocks` does not exist in Liquid: this block cannot read its
+      children's settings and so cannot draw their buttons.
+
+      That constraint is real and it is not going away. What was wrong was the
+      conclusion drawn from it — that the pills must therefore be *assembled* by
+      script. Every route the module had into this element ran through a copy of
+      the pill's markup, and a copy that comes back short says nothing: the
+      label survived every time, because the module could rebuild that from
+      `data-label` on its own, and the icon never did. One bug, three
+      implementations, and the only way to stop writing it was to stop copying.
+
+      A block cannot draw its children's pills. It can draw its own — so it
+      does, in `blocks/_product-bundle-category.liquid`, where the icon is a
+      `snippets/icon.liquid` SVG in the HTML the server sends, with nothing
+      between rendering it and seeing it.
+
+      The strip is then a row in a layout rather than an element:
+      `.product-bundle__cat` is `display: contents`, so each Category's pill and
+      panel are laid out by `.product-bundle__panels` below, and `order` puts
+      every pill on the first line and every panel under them. The block comment
+      in `assets/base.css` has the whole arrangement.
+
+      Which category is open is a radio group read by `:checked` — no roving
+      tabindex to maintain, no panel hidden by script, and the arrow keys are
+      the browser's own. `collection-tabs.js` builds nothing now: it re-measures
+      a carousel when its panel is revealed and follows the Theme Editor's block
+      selection. The strip is complete and correct with the module absent.
+
+      The strip's name moves onto the panels element, because that is what now
+      contains the radios. `role="group"` rather than `radiogroup`: the radios
+      are not this element's only children — the panels are in here too — and a
+      `radiogroup` promises a container of nothing but options.
+    {%- endcomment -%}
+    <div
+      class="product-bundle__panels"
+      data-ref="panels"
+      role="group"
+      aria-label="{{ strip_label | escape }}"
+    >
+      {% content_for 'blocks' %}
+    </div>
+  </collection-tabs>
+</motion-effect>
+
+{% schema %}
+{
+  "name": "t:blocks.product_bundle_tabs.name",
+  "tag": null,
+  "blocks": [
+    { "type": "_product-bundle-category" }
+  ],
+  "settings": [
+    { "type": "paragraph", "content": "t:blocks.product_bundle_tabs.paragraph" },
+
+    { "type": "header", "content": "t:blocks.group.headers.layout" },
+    {
+      "type": "select",
+      "id": "strip_style",
+      "label": "t:blocks.tabs.settings.strip_style.label",
+      "info": "t:blocks.product_bundle_tabs.settings.strip_style.info",
+      "options": [
+        { "value": "plain", "label": "t:blocks.tabs.settings.strip_style.options__1.label" },
+        { "value": "segmented", "label": "t:blocks.tabs.settings.strip_style.options__2.label" }
+      ],
+      "default": "plain"
+    },
+    {
+      "type": "color",
+      "id": "track_background",
+      "label": "t:blocks.tabs.settings.track_background.label",
+      "visible_if": "{{ block.settings.strip_style == 'segmented' }}"
+    },
+    {
+      "type": "range",
+      "id": "track_radius",
+      "label": "t:blocks.tabs.settings.track_radius.label",
+      "info": "t:blocks.product_bundle_tabs.settings.track_radius.info",
+      "min": 0,
+      "max": 50,
+      "step": 2,
+      "unit": "px",
+      "default": 50,
+      "visible_if": "{{ block.settings.strip_style == 'segmented' }}"
+    },
+    {
+      "type": "color",
+      "id": "tab_background",
+      "label": "t:sections.product_bundle.settings.tab_background.label"
+    },
+    {
+      "type": "color",
+      "id": "tab_color",
+      "label": "t:blocks.tabs.settings.tab_color.label",
+      "info": "t:blocks.tabs.settings.tab_color.info"
+    },
+    {
+      "type": "color",
+      "id": "tab_active_background",
+      "label": "t:sections.product_bundle.settings.tab_active_background.label",
+      "info": "t:blocks.product_bundle_tabs.settings.tab_active_background.info"
+    },
+    {
+      "type": "color",
+      "id": "tab_active_color",
+      "label": "t:blocks.tabs.settings.tab_active_color.label",
+      "info": "t:blocks.product_bundle_tabs.settings.tab_active_color.info"
+    },
+    {
+      "type": "select",
+      "id": "direction",
+      "label": "t:blocks.tabs.settings.direction.label",
+      "info": "t:blocks.tabs.settings.direction.info",
+      "options": [
+        { "value": "horizontal", "label": "t:blocks.tabs.settings.direction.options__2.label" },
+        { "value": "vertical", "label": "t:blocks.tabs.settings.direction.options__1.label" }
+      ],
+      "default": "horizontal",
+      "visible_if": "{{ block.settings.strip_style != 'segmented' }}"
+    },
+    {
+      "type": "range",
+      "id": "rail_width",
+      "label": "t:blocks.tabs.settings.rail_width.label",
+      "info": "t:blocks.tabs.settings.rail_width.info",
+      "min": 140,
+      "max": 400,
+      "step": 10,
+      "unit": "px",
+      "default": 260,
+      "visible_if": "{{ block.settings.direction == 'vertical' and block.settings.strip_style != 'segmented' }}"
+    },
+    {
+      "type": "range",
+      "id": "gap",
+      "label": "t:blocks.tabs.settings.gap.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 24
+    },
+    {
+      "type": "select",
+      "id": "width",
+      "label": "t:blocks.group.settings.width.label",
+      "info": "t:blocks.group.settings.width.info",
+      "options": [
+        { "value": "fill", "label": "t:blocks.group.settings.width.options__2.label" },
+        { "value": "fit", "label": "t:blocks.group.settings.width.options__1.label" }
+      ],
+      "default": "fill"
+    },
+    {
+      "type": "text",
+      "id": "label",
+      "label": "t:blocks.tabs.settings.label.label",
+      "info": "t:blocks.tabs.settings.label.info"
+    },
+
+    { "type": "header", "content": "t:shared.appearance.header" },
+    {
+      "type": "select",
+      "id": "tab_border_style",
+      "label": "t:blocks.tabs.settings.tab_border_style.label",
+      "info": "t:blocks.product_bundle_tabs.settings.tab_border_style.info",
+      "options": [
+        { "value": "none", "label": "t:shared.options.none" },
+        { "value": "solid", "label": "t:shared.options.solid" },
+        { "value": "dashed", "label": "t:shared.border.style.options__2.label" }
+      ],
+      "default": "solid"
+    },
+    {
+      "type": "range",
+      "id": "tab_border_width",
+      "label": "t:shared.border.thickness.label",
+      "min": 1,
+      "max": 6,
+      "step": 1,
+      "unit": "px",
+      "default": 1,
+      "visible_if": "{{ block.settings.tab_border_style != 'none' }}"
+    },
+    {
+      "type": "color",
+      "id": "tab_border_color",
+      "label": "t:shared.border.color.label",
+      "visible_if": "{{ block.settings.tab_border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "tab_radius",
+      "label": "t:blocks.product_bundle_tabs.settings.tab_radius.label",
+      "info": "t:blocks.product_bundle_tabs.settings.tab_radius.info",
+      "min": 0,
+      "max": 50,
+      "step": 1,
+      "unit": "px",
+      "default": 50
+    },
+    {
+      "type": "range",
+      "id": "tab_height",
+      "label": "t:sections.product_bundle.settings.tab_height.label",
+      "info": "t:sections.product_bundle.settings.tab_height.info",
+      "min": 24,
+      "max": 64,
+      "step": 1,
+      "unit": "px",
+      "default": 37
+    },
+    {
+      "type": "range",
+      "id": "tab_padding_inline",
+      "label": "t:sections.product_bundle.settings.tab_padding_inline.label",
+      "min": 0,
+      "max": 40,
+      "step": 1,
+      "unit": "px",
+      "default": 16
+    },
+    {
+      "type": "range",
+      "id": "tab_gap",
+      "label": "t:blocks.product_bundle_tabs.settings.tab_gap.label",
+      "min": 0,
+      "max": 40,
+      "step": 1,
+      "unit": "px",
+      "default": 10
+    },
+    {
+      "type": "range",
+      "id": "tab_icon_gap",
+      "label": "t:blocks.product_bundle_tabs.settings.tab_icon_gap.label",
+      "info": "t:blocks.product_bundle_tabs.settings.tab_icon_gap.info",
+      "min": 0,
+      "max": 24,
+      "step": 1,
+      "unit": "px",
+      "default": 6
+    },
+
+    { "type": "header", "content": "t:blocks.product_bundle_tabs.headers.underline" },
+    { "type": "paragraph", "content": "t:blocks.product_bundle_tabs.paragraphs.underline" },
+    {
+      "type": "select",
+      "id": "strip_underline",
+      "label": "t:blocks.product_bundle_tabs.settings.strip_underline.label",
+      "options": [
+        { "value": "none", "label": "t:shared.options.none" },
+        { "value": "solid", "label": "t:shared.options.solid" },
+        { "value": "dashed", "label": "t:shared.border.style.options__2.label" }
+      ],
+      "default": "solid",
+      "visible_if": "{{ block.settings.strip_style != 'segmented' and block.settings.direction != 'vertical' }}"
+    },
+    {
+      "type": "range",
+      "id": "strip_underline_width",
+      "label": "t:shared.border.thickness.label",
+      "min": 1,
+      "max": 6,
+      "step": 1,
+      "unit": "px",
+      "default": 1,
+      "visible_if": "{{ block.settings.strip_underline != 'none' and block.settings.strip_style != 'segmented' and block.settings.direction != 'vertical' }}"
+    },
+    {
+      "type": "color",
+      "id": "strip_underline_color",
+      "label": "t:shared.border.color.label",
+      "visible_if": "{{ block.settings.strip_underline != 'none' and block.settings.strip_style != 'segmented' and block.settings.direction != 'vertical' }}"
+    },
+    {
+      "type": "select",
+      "id": "strip_underline_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        { "value": "desktop", "label": "t:shared.spacing.devices.options__1.label" },
+        { "value": "mobile", "label": "t:shared.spacing.devices.options__2.label" }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "strip_underline_gap",
+      "label": "t:blocks.product_bundle_tabs.settings.strip_underline_gap.label",
+      "info": "t:blocks.product_bundle_tabs.settings.strip_underline_gap.info",
+      "min": 0,
+      "max": 64,
+      "step": 2,
+      "unit": "px",
+      "default": 16,
+      "visible_if": "{{ block.settings.strip_underline_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "strip_underline_gap_mobile",
+      "label": "t:blocks.product_bundle_tabs.settings.strip_underline_gap.label",
+      "info": "t:blocks.product_bundle_tabs.settings.strip_underline_gap.info",
+      "min": 0,
+      "max": 64,
+      "step": 2,
+      "unit": "px",
+      "default": 8,
+      "visible_if": "{{ block.settings.strip_underline_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "tab_font_size",
+      "label": "t:sections.product_bundle.settings.tab_font_size.label",
+      "info": "t:sections.product_bundle.settings.tab_font_size.info",
+      "min": 10,
+      "max": 24,
+      "step": 1,
+      "unit": "px",
+      "default": 14
+    },
+    {
+      "type": "select",
+      "id": "tab_font_weight",
+      "label": "t:sections.product_bundle.settings.tab_font_weight.label",
+      "options": [
+        { "value": "400", "label": "t:sections.product_bundle.settings.tab_font_weight.options__1.label" },
+        { "value": "500", "label": "t:sections.product_bundle.settings.tab_font_weight.options__2.label" },
+        { "value": "600", "label": "t:sections.product_bundle.settings.tab_font_weight.options__3.label" },
+        { "value": "700", "label": "t:sections.product_bundle.settings.tab_font_weight.options__4.label" }
+      ],
+      "default": "500"
+    },
+
+    { "type": "header", "content": "t:shared.animation.header" },
+    {
+      "type": "select",
+      "id": "animation_text",
+      "label": "t:shared.animation.animation_text.label",
+      "options": [
+        { "value": "inherit", "label": "t:shared.animation.animation_text.options__1.label" },
+        { "value": "none", "label": "t:shared.animation.animation_text.options__2.label" },
+        { "value": "fade-in", "label": "t:shared.animation.animation_text.options__3.label" },
+        { "value": "fade-up", "label": "t:shared.animation.animation_text.options__4.label" },
+        { "value": "slide-up", "label": "t:shared.animation.animation_text.options__5.label" }
+      ],
+      "default": "inherit"
+    },
+    {
+      "type": "range",
+      "id": "animation_duration",
+      "label": "t:shared.animation.animation_duration.label",
+      "info": "t:shared.animation.animation_duration.info",
+      "min": 0,
+      "max": 2000,
+      "step": 100,
+      "unit": "ms",
+      "default": 800,
+      "visible_if": "{{ block.settings.animation_text != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "animation_stagger",
+      "label": "t:shared.animation.animation_stagger.label",
+      "info": "t:shared.animation.animation_stagger.info",
+      "min": 0,
+      "max": 300,
+      "step": 10,
+      "unit": "ms",
+      "default": 90,
+      "visible_if": "{{ block.settings.animation_text != 'none' }}"
+    },
+
+    { "type": "header", "content": "t:shared.spacing.block_header" },
+    {
+      "type": "select",
+      "id": "padding_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        { "value": "desktop", "label": "t:shared.spacing.devices.options__1.label" },
+        { "value": "mobile", "label": "t:shared.spacing.devices.options__2.label" }
+      ],
+      "default": "desktop"
+    },
+    { "type": "range", "id": "padding_top", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 120, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'desktop' }}" },
+    { "type": "range", "id": "padding_bottom", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 120, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'desktop' }}" },
+    { "type": "range", "id": "padding_left", "label": "t:shared.spacing.padding_left.label", "min": 0, "max": 120, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'desktop' }}" },
+    { "type": "range", "id": "padding_right", "label": "t:shared.spacing.padding_right.label", "min": 0, "max": 120, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'desktop' }}" },
+    { "type": "range", "id": "padding_top_mobile", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 120, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'mobile' }}" },
+    { "type": "range", "id": "padding_bottom_mobile", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 120, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'mobile' }}" },
+    { "type": "range", "id": "padding_left_mobile", "label": "t:shared.spacing.padding_left.label", "min": 0, "max": 120, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'mobile' }}" },
+    { "type": "range", "id": "padding_right_mobile", "label": "t:shared.spacing.padding_right.label", "min": 0, "max": 120, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'mobile' }}" }
+  ],
+  "presets": [
+    {
+      "name": "t:blocks.product_bundle_tabs.name",
+      "blocks": [
+        { "type": "_product-bundle-category" },
+        { "type": "_product-bundle-category" },
+        { "type": "_product-bundle-category" }
+      ]
+    }
+  ]
+}
+{% endschema %}

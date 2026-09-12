@@ -1,0 +1,360 @@
+{% comment %}
+  sections/quick-add.liquid
+
+  The section the quick add modal renders.
+
+  `assets/dialog.js` requests `{{ product.url }}?section_id=quick-add` and morphs
+  the `[data-quick-add-content]` element out of the response into the modal
+  body. This file did not exist — so every quick add in the theme fetched a
+  section id Shopify could not resolve, every request came back 404, and the
+  modal opened onto its own loading paragraph and stayed there.
+
+  Exactly the failure `sections/predictive-search.liquid` was written to fix, in
+  exactly the same shape, and the fix is the same: the section the JavaScript
+  already asks for, written in Liquid, so money formatting, translations,
+  metafields and the swatch settings are the theme's single copies rather than a
+  second set reconstructed in JavaScript.
+
+  ## It is not rendered by any template, and that is correct
+
+  A section requested through `?section_id=` does not have to appear on the page.
+  Shopify renders it against the requested URL with no layout, which is what
+  makes a product URL the right thing to ask. It therefore has no preset and no
+  editable settings of its own — a merchant can never select it in the editor, so
+  settings here would be a panel nobody can open. Everything configurable lives
+  in **Theme settings › Product cards › Quick add modal** instead.
+
+  ## What is in the modal
+
+    Title and description   the product's own
+    Options                 `snippets/variant-picker.liquid`, the same one the
+                            product page uses, so buttons, dropdowns and swatches
+                            all follow the theme's swatch settings
+    Purchase options        `<selling-plan-selector>`, one-time against
+                            subscribe, when the product has selling plans
+    Quantity and add        a real `<form action="/cart/add" method="post">`
+
+  ## `data-product-root` is what makes two of these safe
+
+  `<variant-picker>`, `<product-form>`, `<selling-plan-selector>` and
+  `<inventory-status>` all resolve their peers through
+  `this.closest('[data-product-root]') || document`. Without that attribute here,
+  a modal opened on top of a product page would find the *page's* picker and
+  form, and choosing a flavour in the modal would change the variant behind it.
+
+  ## The add button's label is written by JavaScript
+
+  `product-form.js` sets `button.textContent` on every variant change, which
+  replaces whatever is inside the button. So the button holds text and nothing
+  else, and the arrow badge the drawing has on its end is drawn by `::after` in
+  `assets/base.css` — markup inside it would be wiped the first time a customer
+  changed an option.
+
+  `<quick-add-summary>` then appends the price and the chosen option to that
+  label, after the form has written it. See `assets/quick-add.js`.
+{% endcomment %}
+
+{%- liquid
+  comment
+    `product` is the global for the URL this section was requested against, which
+    is what makes `{{ product.url }}?section_id=quick-add` the whole of the
+    request. Nothing is passed in and nothing needs to be.
+  endcomment
+  assign current = product.selected_or_first_available_variant
+
+  comment
+    The modal is one product wide, so the form id only has to be unique against
+    the page underneath it — which is a product page often enough to matter. The
+    product id is what distinguishes them.
+  endcomment
+  assign form_id = 'quick-add-' | append: product.id | append: '-form'
+  assign qty_id = 'QuickAddQty-' | append: product.id
+
+  assign show_description = settings.quick_add_show_description
+  assign show_plans = settings.quick_add_show_selling_plans
+  assign has_plans = false
+  if show_plans and product.selling_plan_groups.size > 0
+    assign has_plans = true
+  endif
+
+  comment
+    The benefit list under Subscribe & save is one line of the textarea per
+    benefit. `newline_to_br` then `split` rather than `split: '\n'`, because a
+    Liquid string literal has no escape sequences and "\n" there is a backslash
+    followed by an n.
+  endcomment
+  assign benefits = settings.quick_add_benefits | newline_to_br | split: '<br />'
+
+  assign first_allocation = current.selling_plan_allocations.first
+-%}
+
+<div
+  class="quick-add__content"
+  data-quick-add-content
+  data-product-root
+  data-section-id="quick-add"
+  data-product-id="{{ product.id }}"
+>
+  {%- comment -%}
+    The whole product, as JSON, for anything in the modal that needs a price or
+    a title without another request. `<quick-add-summary>` reads it to build the
+    add button's label; `<product-bundle>` reads it to fill a bundle slot from a
+    variant the customer chose here.
+  {%- endcomment -%}
+  <script type="application/json" data-quick-add-product>
+    {
+      "id": {{ product.id }},
+      "title": {{ product.title | json }},
+      "handle": {{ product.handle | json }},
+      "url": {{ product.url | json }},
+      "featured_image": {{ product.featured_image | image_url: width: 200 | json }},
+      "has_only_default_variant": {{ product.has_only_default_variant | json }},
+      "variants": {{ product.variants | json }}
+    }
+  </script>
+
+  <header class="quick-add__heading">
+    <h2 class="quick-add__title">
+      <a href="{{ product.url }}">{{ product.title | escape }}</a>
+    </h2>
+
+    {%- if show_description and product.description != blank -%}
+      {%- comment -%}
+        One line, not the whole description. The modal exists so a customer does
+        not have to leave the grid; a full product description in it is the
+        product page, badly.
+      {%- endcomment -%}
+      <p class="quick-add__summary">
+        {{- product.description | strip_html | truncatewords: 26 -}}
+      </p>
+    {%- endif -%}
+  </header>
+
+  {%- comment -%}
+    The dashed rule under the heading. A `<hr>` rather than a border, because it
+    separates the identity of the product from the choices being made about it,
+    and that is a thematic break.
+  {%- endcomment -%}
+  <hr class="quick-add__rule">
+
+  <div class="quick-add__options">
+    {%- unless product.has_only_default_variant -%}
+      {% render 'variant-picker',
+         product: product,
+         section: section,
+         update_url: false,
+         form_id: form_id %}
+    {%- endunless -%}
+  </div>
+
+  {%- if has_plans -%}
+    {%- comment -%}
+      The purchase options, as two cards rather than the plain radio pair
+      `snippets/selling-plans.liquid` renders.
+
+      Every ref `assets/product-selling-plans.js` requires is still here and
+      still spelled the same — `oneTime`, `subscribe`, `interval`, `summary`,
+      `unavailable`, and `[data-allocations]`. The component is untouched; only
+      what sits around its inputs is different, which is why this can be richer
+      without a second component to keep in step.
+    {%- endcomment -%}
+    <selling-plan-selector
+      class="quick-add__plans selling-plans selling-plans--cards"
+      data-layout="cards"
+    >
+      <script type="application/json" data-allocations>
+        {
+          {%- for v in product.variants -%}
+            "{{ v.id }}": [
+              {%- for allocation in v.selling_plan_allocations -%}
+                {
+                  "id": {{ allocation.selling_plan.id }},
+                  "name": {{ allocation.selling_plan.name | json }},
+                  "price": {{ allocation.price }},
+                  "compare_at_price": {{ allocation.compare_at_price | default: v.price }},
+                  "per_delivery_price": {{ allocation.per_delivery_price }}
+                }{%- unless forloop.last -%},{%- endunless -%}
+              {%- endfor -%}
+            ]{%- unless forloop.last -%},{%- endunless -%}
+          {%- endfor -%}
+        }
+      </script>
+
+      <fieldset class="selling-plans__options">
+        <legend class="visually-hidden">{{ 'products.selling_plans.heading' | t }}</legend>
+
+        <label class="selling-plans__card" data-purchase-option>
+          <input type="radio" name="purchase-option" value="" data-ref="oneTime" checked>
+
+          <span class="selling-plans__card-main">
+            <span class="selling-plans__card-title">
+              {{ 'products.selling_plans.one_time' | t }}
+            </span>
+
+            {%- if settings.quick_add_one_time_note != blank -%}
+              <span class="selling-plans__card-note">
+                {{ settings.quick_add_one_time_note }}
+              </span>
+            {%- endif -%}
+          </span>
+
+          <span class="selling-plans__card-price" data-one-time-price>
+            {% render 'price', variant: current, context: 'product', show_badges: true %}
+          </span>
+        </label>
+
+        <label class="selling-plans__card" data-purchase-option>
+          <input type="radio" name="purchase-option" value="subscription" data-ref="subscribe">
+
+          <span class="selling-plans__card-main">
+            <span class="selling-plans__card-title">
+              {{ 'products.selling_plans.subscription' | t }}
+
+              {%- if settings.quick_add_recommended_badge != blank -%}
+                <span class="selling-plans__card-badge">
+                  {{- settings.quick_add_recommended_badge -}}
+                </span>
+              {%- endif -%}
+            </span>
+
+            {%- comment -%}
+              The frequency select sits inside the card it belongs to. The
+              component hides and disables it while One-time is chosen, so it is
+              never a control a customer can set and have ignored.
+            {%- endcomment -%}
+            <label class="visually-hidden" for="QuickAddPlan-{{ product.id }}">
+              {{ 'products.selling_plans.select_plan' | t }}
+            </label>
+            <select
+              id="QuickAddPlan-{{ product.id }}"
+              class="selling-plans__interval"
+              data-ref="interval"
+              name="selling_plan"
+              form="{{ form_id }}"
+              hidden
+              disabled
+            ></select>
+
+            {%- if benefits.size > 0 -%}
+              <span class="selling-plans__benefits">
+                {%- for benefit in benefits -%}
+                  {%- assign line = benefit | strip_html | strip -%}
+                  {%- if line != blank -%}
+                    <span class="selling-plans__benefit">
+                      {% render 'icon', icon: 'check', size: 12 %}
+                      {{ line }}
+                    </span>
+                  {%- endif -%}
+                {%- endfor -%}
+              </span>
+            {%- endif -%}
+          </span>
+
+          <span class="selling-plans__card-price" data-plan-price>
+            {%- if first_allocation -%}
+              {%- comment -%}
+                Written out rather than rendered through `snippets/price.liquid`,
+                because a selling plan allocation is not a variant and the
+                snippet prices variants. The class names and the
+                `data-price-*` hooks are the snippet's, so it styles the same
+                and `<quick-add-summary>` finds it the same way.
+              {%- endcomment -%}
+              <span class="price price--subscription">
+                <span class="price__regular" data-price-current>{{ first_allocation.price | money }}</span>
+                <s
+                  class="price__compare"
+                  data-price-compare
+                  {% unless first_allocation.compare_at_price > first_allocation.price %}hidden{% endunless %}
+                >
+                  {{- first_allocation.compare_at_price | money -}}
+                </s>
+              </span>
+            {%- endif -%}
+          </span>
+        </label>
+      </fieldset>
+
+      <p class="selling-plans__summary" data-ref="summary" role="status"></p>
+      <p class="selling-plans__unavailable" data-ref="unavailable" hidden></p>
+    </selling-plan-selector>
+  {%- else -%}
+    {%- comment -%}
+      No subscriptions on this product, so the price is its own row rather than
+      a column of a card that is not there.
+    {%- endcomment -%}
+    <div class="quick-add__price">
+      {% render 'price', variant: current, context: 'product', show_badges: true %}
+    </div>
+  {%- endif -%}
+
+  <product-form class="quick-add__buy buy-buttons" data-product-id="{{ product.id }}">
+    <form
+      action="{{ routes.cart_add_url }}"
+      method="post"
+      id="{{ form_id }}"
+      class="quick-add__form"
+      data-ref="form"
+      novalidate="novalidate"
+    >
+      <input type="hidden" name="id" value="{{ current.id }}" data-ref="idInput">
+
+      {% render 'quantity-selector',
+         id: qty_id,
+         min: 1,
+         step: 1,
+         product_title: product.title %}
+
+      {%- comment -%}
+        Text and nothing else — see the note at the top on why this button holds
+        no markup.
+      {%- endcomment -%}
+      <button
+        type="submit"
+        class="button button--primary quick-add__submit"
+        data-ref="submit"
+        {% unless current.available %}disabled{% endunless %}
+      >
+        {%- if current.available -%}
+          {{ 'products.product.add_to_cart' | t }}
+        {%- else -%}
+          {{ 'products.product.sold_out' | t }}
+        {%- endif -%}
+      </button>
+
+      <p class="quick-add__error" data-ref="error" role="alert" hidden></p>
+    </form>
+  </product-form>
+
+  {%- comment -%}
+    Decorates the button's label with the price and the chosen option, after
+    `product-form.js` has written it, and reports which option is selected up
+    beside the picker's heading. Renders nothing on its own — it only ever
+    rewrites text that is already there.
+  {%- endcomment -%}
+  <quick-add-summary
+    class="visually-hidden"
+    data-product-id="{{ product.id }}"
+    data-add-label="{{ 'products.product.add_to_cart' | t | escape }}"
+  ></quick-add-summary>
+
+  {%- if settings.quick_add_show_details_link or settings.quick_add_footnote != blank -%}
+    <footer class="quick-add__footer">
+      {%- if settings.quick_add_show_details_link -%}
+        <a class="quick-add__details" href="{{ product.url }}">
+          {{ 'products.product.view_details' | t | default: product.title }}
+        </a>
+      {%- endif -%}
+
+      {%- if settings.quick_add_footnote != blank -%}
+        <span class="quick-add__footnote">{{ settings.quick_add_footnote }}</span>
+      {%- endif -%}
+    </footer>
+  {%- endif -%}
+</div>
+
+{% schema %}
+{
+  "name": "t:sections.quick_add.name",
+  "settings": []
+}
+{% endschema %}
