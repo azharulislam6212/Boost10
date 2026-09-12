@@ -44,14 +44,21 @@
 
   ## The add button's label is written by JavaScript
 
-  `product-form.js` sets `button.textContent` on every variant change, which
-  replaces whatever is inside the button. So the button holds text and nothing
-  else, and the arrow badge the drawing has on its end is drawn by `::after` in
-  `assets/base.css` — markup inside it would be wiped the first time a customer
-  changed an option.
+  `product-form.js` rewrites it on every variant change — "Add to cart",
+  "Pre-order", "Sold out" — and `<quick-add-summary>` then appends the price and
+  the chosen option to whatever the form wrote. See `assets/quick-add.js`.
 
-  `<quick-add-summary>` then appends the price and the chosen option to that
-  label, after the form has written it. See `assets/quick-add.js`.
+  Both used to set `button.textContent`, which replaces every child the button
+  has. So the button could hold text and nothing else, and the arrow badge the
+  drawing puts on its end is drawn by `::after` in `assets/base.css` because a
+  pseudo-element is not a child and `textContent` cannot reach it.
+
+  That stopped being enough the moment the button needed a spinner: an arrow is
+  decoration and can live in a pseudo-element, but a loader that replaces the
+  label has to be a sibling of it. So the words are in a `[data-button-label]`
+  span and both writers aim at that instead — `labelTarget()` in
+  `assets/utilities.js` is the one line of it, and it falls back to the button
+  for every other add button in the theme.
 {% endcomment %}
 
 {%- liquid
@@ -305,8 +312,8 @@
          product_title: product.title %}
 
       {%- comment -%}
-        Text and nothing else — see the note at the top on why this button holds
-        no markup.
+        The words go in a span, and the spinner is its sibling — see the note at
+        the top on why they could not both simply be children of the button.
       {%- endcomment -%}
       <button
         type="submit"
@@ -314,11 +321,24 @@
         data-ref="submit"
         {% unless current.available %}disabled{% endunless %}
       >
-        {%- if current.available -%}
-          {{ 'products.product.add_to_cart' | t }}
-        {%- else -%}
-          {{ 'products.product.sold_out' | t }}
-        {%- endif -%}
+        <span data-button-label>
+          {%- if current.available -%}
+            {{ 'products.product.add_to_cart' | t }}
+          {%- else -%}
+            {{ 'products.product.sold_out' | t }}
+          {%- endif -%}
+        </span>
+
+        {%- comment -%}
+          Shown while `<product-form>` has the request in flight, in place of the
+          label. Adding from the modal is a network round trip and the modal
+          closes on success, so until this the only sign a press had landed was
+          the modal eventually going away.
+
+          It is the same spinner the tray's button and every bundle row use, so
+          "working" looks like one thing across the section.
+        {%- endcomment -%}
+        <span class="quick-add__submit-loader">{% render 'icon', icon: 'loader', size: 18 %}</span>
       </button>
 
       <p class="quick-add__error" data-ref="error" role="alert" hidden></p>

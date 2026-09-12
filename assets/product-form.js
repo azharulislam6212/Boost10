@@ -23,7 +23,7 @@ import { BaseComponent, defineComponent } from '@theme/component';
 import { EVENTS } from '@theme/events';
 import { toast } from '@theme/toast';
 import { cart } from '@theme/cart-drawer';
-import { themeString, announceUrgent, getRoute } from '@theme/utilities';
+import { themeString, announceUrgent, getRoute, labelTarget } from '@theme/utilities';
 
 /* ==========================================================================
    <product-form>
@@ -95,14 +95,20 @@ export class ProductForm extends BaseComponent {
     const button = this.refs.submit;
     if (!(button instanceof HTMLButtonElement)) return;
 
+    // `labelTarget` rather than the button, so a button that carries a spinner
+    // or an icon beside its words keeps them. It returns the button itself when
+    // there is no `[data-button-label]`, which is every other add button in the
+    // theme — see the note on the helper in `assets/utilities.js`.
+    const label = labelTarget(button);
+
     if (!variant) {
       button.disabled = true;
-      button.textContent = themeString('unavailable', '');
+      label.textContent = themeString('unavailable', '');
       return;
     }
 
     button.disabled = !variant.available;
-    button.textContent = variant.available
+    label.textContent = variant.available
       ? themeString(this.#isPreorder(variant) ? 'preorder' : 'addToCart', '')
       : themeString('soldOut', '');
 

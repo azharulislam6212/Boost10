@@ -119,6 +119,28 @@ export class Overlay extends BaseComponent {
   }
 
   /**
+   * How long the entrance runs, in milliseconds.
+   *
+   * A getter and not a constant so a subclass can make it the merchant's —
+   * `<modal-dialog>` reads `data-animation-duration`. Every other overlay keeps
+   * the 320/240 pair this file has always used, because a drawer's length is
+   * part of the drawer feeling attached to the edge it came from rather than
+   * something a store would want to tune.
+   *
+   * @returns {number}
+   */
+  get enterDuration() {
+    return 320;
+  }
+
+  /**
+   * @returns {number} How long the exit runs, in milliseconds.
+   */
+  get exitDuration() {
+    return 240;
+  }
+
+  /**
    * Open the overlay.
    *
    * @param {HTMLElement} [trigger] The control that opened it. Focus returns here on close.
@@ -220,8 +242,11 @@ export class Overlay extends BaseComponent {
 
     this.#cancelPanelAnimations();
 
+    // `enterDuration` is a getter rather than a constant so a subclass or an
+    // attribute can set it — `<modal-dialog>` reads `data-animation-duration`.
+    // The default is the 320ms every overlay has always used.
     const animation = this.refs.panel.animate(this.enterKeyframes(), {
-      duration: 320,
+      duration: this.enterDuration,
       easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
       fill: 'both'
     });
@@ -243,7 +268,7 @@ export class Overlay extends BaseComponent {
     this.#cancelPanelAnimations();
 
     const animation = this.refs.panel.animate(this.enterKeyframes().slice().reverse(), {
-      duration: 240,
+      duration: this.exitDuration,
       easing: 'cubic-bezier(0.76, 0, 0.24, 1)',
       fill: 'both'
     });
@@ -370,19 +395,86 @@ export class Overlay extends BaseComponent {
    ========================================================================== */
 
 /**
+ * The entrances a modal can make.
+ *
+ * A drawer's movement is decided by the edge it comes from, which is why
+ * `<drawer-component>` reads `data-placement` and has no choice to offer. A
+ * modal has no edge — it is in the middle of the screen — so how it arrives is
+ * a design decision, and until now it was one decision made here for every
+ * modal in the theme.
+ *
+ * Each entry is the *opening* frame; the resting frame is added below, and the
+ * exit is the whole thing reversed. So a movement is one line here and needs no
+ * second keyframe written backwards — which is the way the two used to drift
+ * apart in every theme that wrote both.
+ *
+ * `zoom-out` is the one that is not the reverse of another: it arrives *larger*
+ * and settles, which reads as the modal coming towards the customer rather than
+ * away from the page. It is the right one over a photograph, where a panel that
+ * grows into place competes with the image behind it.
+ *
+ * @type {Record<string, Keyframe>}
+ */
+const MODAL_ENTRANCES = {
+  fade: { opacity: 0 },
+  'fade-up': { opacity: 0, transform: 'translate3d(0, 24px, 0)' },
+  'fade-down': { opacity: 0, transform: 'translate3d(0, -24px, 0)' },
+  'zoom-in': { opacity: 0, transform: 'scale(0.92)' },
+  'zoom-out': { opacity: 0, transform: 'scale(1.06)' },
+  'rise': { opacity: 0, transform: 'translate3d(0, 12px, 0) scale(0.98)' }
+};
+
+/** The entrance a modal makes when it names none. Unchanged from before these existed. */
+const MODAL_ENTRANCE_DEFAULT = 'rise';
+
+/**
  * A centred modal. Used for size guides, share sheets, address forms and
  * anything else that interrupts the page rather than sitting beside it.
+ *
+ * ## The entrance is the element's, and so is its length
+ *
+ * `data-animation` picks one of `MODAL_ENTRANCES` and `data-animation-duration`
+ * sets how long it runs. Both are attributes rather than settings read from
+ * theme config here, because `assets/dialog.js` drives every overlay in the
+ * theme and only the Liquid that renders one knows which merchant setting it
+ * belongs to — `sections/overlays.liquid` writes them onto the quick add modal
+ * from **Theme settings › Product cards › Quick add modal**.
+ *
+ * The exit is the entrance reversed and a little faster, which it always was.
+ * A modal leaving at the same speed it arrived reads as hesitant: the customer
+ * has already decided, and the only thing left is to get out of the way.
  */
 export class ModalDialog extends Overlay {
   get overlayType() {
     return this.dataset.overlayType || 'modal';
   }
 
+  /**
+   * @returns {number} Entrance length in milliseconds.
+   */
+  get enterDuration() {
+    const value = Number(this.dataset.animationDuration);
+    // Clamped rather than trusted: a merchant slider is a number this file did
+    // not choose, and an overlay that takes three seconds to appear is one the
+    // customer thinks is broken. Zero is allowed and means "no movement".
+    return Number.isFinite(value) && value >= 0 ? Math.min(value, 1200) : 320;
+  }
+
+  /**
+   * @returns {number} Exit length in milliseconds.
+   */
+  get exitDuration() {
+    return Math.round(this.enterDuration * 0.75);
+  }
+
   enterKeyframes() {
-    return [
-      { opacity: 0, transform: 'translate3d(0, 12px, 0) scale(0.98)' },
-      { opacity: 1, transform: 'translate3d(0, 0, 0) scale(1)' }
-    ];
+    const name = this.dataset.animation || MODAL_ENTRANCE_DEFAULT;
+    const from = MODAL_ENTRANCES[name] ?? MODAL_ENTRANCES[MODAL_ENTRANCE_DEFAULT];
+
+    // The resting frame names both properties whatever the opening frame used,
+    // so a movement that only fades still lands on a known transform rather
+    // than on whatever the stylesheet happens to leave behind.
+    return [{ transform: 'none', ...from }, { opacity: 1, transform: 'none' }];
   }
 }
 

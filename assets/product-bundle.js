@@ -61,7 +61,19 @@
 import { BaseComponent, defineComponent } from '@theme/component';
 import { EVENTS } from '@theme/events';
 import { cart } from '@theme/cart-drawer';
-import { announce, announceUrgent, clamp, formatMoney, parseJSONScript, themeString } from '@theme/utilities';
+import { announce, announceUrgent, clamp, formatMoney, parseJSONScript, themeString, wait } from '@theme/utilities';
+
+/**
+ * How long a row's spinner turns for at minimum, in milliseconds.
+ *
+ * Nothing waits on this. The product is in the slot and the tray has redrawn
+ * before the first frame of the spin — this only decides when the glyph stops
+ * turning and the check replaces it, which is what makes the swap a transition
+ * instead of a flicker nobody can see. Roughly two turns of `@keyframes spin`
+ * at its 700ms period would be too long; a little over half of one reads as an
+ * acknowledgement and is gone before it can feel like a wait.
+ */
+const MIN_SPIN = 420;
 
 /**
  * One entry in the tray.
@@ -448,6 +460,7 @@ export class ProductBundle extends BaseComponent {
 
   /**
    * @param {HTMLElement} row
+   * @returns {Promise<void>|void} Settles once the modal is open — see `#hold`.
    * @private
    */
   #openQuickAddFor(row) {
@@ -468,7 +481,12 @@ export class ProductBundle extends BaseComponent {
     button.dataset.productUrl = row.dataset.productUrl || '';
     button.dataset.sectionId = 'quick-add';
 
-    modal.open?.(button);
+    // Returned, not just called. `Overlay.open()` resolves after the product's
+    // section has been fetched and the entrance has run, and that promise is
+    // the whole reason the row's spinner knows how long to turn — dropping it
+    // here would stop the spin on the minimum beat and leave the customer
+    // watching a settled button through the rest of the request.
+    return modal.open?.(button);
   }
 
   /** @private */
@@ -491,11 +509,16 @@ export class ProductBundle extends BaseComponent {
 
     // Already in a slot. The rule is that it cannot be added a second time; the
     // affordance is that pressing it again takes it out.
+    //
+    // No loader on the way out. Removing is local and instant, and a spinner on
+    // an undo is a delay the customer can see and nothing else.
     if (this.#indexOfProduct(productId) !== -1) {
       this.remove(productId);
       return;
     }
 
+    // A refusal is an answer, not work. Spinning first would say the press was
+    // being acted on and then take it back.
     if (this.isFull) {
       this.#error(themeString('bundleFull', ''));
       announceUrgent(themeString('bundleFull', ''));
@@ -503,9 +526,16 @@ export class ProductBundle extends BaseComponent {
     }
 
     if (row.dataset.needsOptions === 'true') {
-      this.#openQuickAddFor(row);
+      // The real wait: `#openQuickAddFor` starts a fetch of the product's
+      // section, and until this the row gave no sign a press had registered.
+      // The spinner is released when the modal is open — or when opening it
+      // failed, so a network error leaves a button the customer can press
+      // again rather than one spinning forever.
+      this.#hold(button, Promise.resolve(this.#openQuickAddFor(row)));
       return;
     }
+
+    this.#hold(button);
 
     this.add({
       productId,
@@ -515,6 +545,39 @@ export class ProductBundle extends BaseComponent {
       image: row.dataset.image || '',
       price: Number(row.dataset.price) || 0,
       quantity: quantityOf(row)
+    });
+  }
+
+  /**
+   * Spin a row's control while its press is being acted on.
+   *
+   * The two paths behind one press are very different lengths: opening the
+   * quick add modal is a fetch, and dropping a simple product into a slot is
+   * synchronous — it is done before the browser has painted the press. A
+   * spinner shown only for the slow one is a control that acknowledges some
+   * presses and not others, which reads as the fast path being broken.
+   *
+   * So both spin, and `MIN_SPIN` is the floor. It is not a fake delay: nothing
+   * waits on it. The product is in the slot on the same frame either way and
+   * the tray has already redrawn — the timer only decides when the glyph stops
+   * turning and the check takes over, which is the transition between the two
+   * states rather than a pause before one of them.
+   *
+   * @param {HTMLElement} button
+   * @param {Promise<unknown>} [work] Released when this settles, or after `MIN_SPIN`, whichever is later.
+   * @private
+   */
+  #hold(button, work) {
+    button.dataset.loading = '';
+
+    const floor = wait(MIN_SPIN);
+    const done = work ? Promise.allSettled([work, floor]) : floor;
+
+    done.then(() => {
+      // The row may have been morphed away by a section re-render while the
+      // press was in flight, in which case this is a flag on a detached node
+      // and removing it is simply free.
+      delete button.dataset.loading;
     });
   }
 

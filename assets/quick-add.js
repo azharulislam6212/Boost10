@@ -41,7 +41,7 @@
 
 import { BaseComponent, defineComponent } from '@theme/component';
 import { EVENTS } from '@theme/events';
-import { formatMoney, parseJSONScript, themeString } from '@theme/utilities';
+import { formatMoney, parseJSONScript, themeString, labelTarget } from '@theme/utilities';
 
 /**
  * What joins the label, the price and the chosen option on the add button.
@@ -255,9 +255,16 @@ export class QuickAddSummary extends BaseComponent {
     // with `<label>{SEPARATOR}<price>…`, so taking the first segment recovers
     // exactly what the form wrote, whether this has run before or not — and no
     // label the form writes contains the separator.
+    // The span the form writes into when the button has one, and the button
+    // otherwise. Reading the base label from the same element the next line
+    // writes to is what keeps the round trip exact — taking it off the button
+    // while writing to a span inside it would fold the spinner's own (empty)
+    // text into the label on every pass.
+    const label = labelTarget(button);
+
     const base = bundleMode
       ? themeString('bundleAdd', this.dataset.addLabel || '')
-      : button.textContent.split(SEPARATOR)[0].trim() || this.dataset.addLabel || '';
+      : label.textContent.split(SEPARATOR)[0].trim() || this.dataset.addLabel || '';
 
     const parts = [base];
 
@@ -271,7 +278,7 @@ export class QuickAddSummary extends BaseComponent {
       parts.push(variant.title);
     }
 
-    button.textContent = parts.join(SEPARATOR);
+    label.textContent = parts.join(SEPARATOR);
   }
 }
 

@@ -1004,6 +1004,32 @@ export function parseJSONAttribute(element, attribute, fallback = null) {
 }
 
 /**
+ * Where a button's words live.
+ *
+ * Two components rewrite an add-to-cart button's text as the customer changes
+ * things — `product-form.js` swaps "Add to cart" for "Pre-order" or "Sold out",
+ * and `quick-add.js` appends the price and the chosen option to whatever the
+ * form wrote. Both used to set `button.textContent`, which replaces every child
+ * the button has, so the button could hold text and nothing else: a spinner or
+ * an icon inside it survived exactly until the first variant change and then
+ * silently vanished. `sections/quick-add.liquid` carried a note saying so, and
+ * `assets/base.css` draws that button's arrow badge as a `::after` for the same
+ * reason — a pseudo-element is not a child, so `textContent` cannot reach it.
+ *
+ * A `[data-button-label]` span is the other half of that: the writers aim at it
+ * when it is there, so everything beside it is out of the blast radius. Absent,
+ * they write the button itself and behave exactly as they always did, which is
+ * what keeps every other button in the theme working untouched.
+ *
+ * @param {HTMLElement} button
+ * @returns {HTMLElement} The element to write the label into.
+ */
+export function labelTarget(button) {
+  const label = button.querySelector?.('[data-button-label]');
+  return label instanceof HTMLElement ? label : button;
+}
+
+/**
  * @param {string} name Custom property name, with or without the leading dashes.
  * @param {string|number} value
  * @param {HTMLElement} [target=document.documentElement]

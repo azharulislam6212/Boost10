@@ -15150,10 +15150,37 @@ testimonial-product[data-open] .testimonial-card__info {
     cursor: not-allowed;
   }
 
-  /* Both glyphs are in the markup and one is shown, rather than the icon being
-     swapped in JavaScript: swapping means the module owns a piece of the
+  /* All three glyphs are in the markup and one is shown, rather than the icon
+     being swapped in JavaScript: swapping means the module owns a piece of the
      drawing, and a failed module then leaves a button with no glyph in it. */
-  .bundle-row__add-check { display: none; }
+  .bundle-row__add-check,
+  .bundle-row__add-loader { display: none; }
+
+  /* ---- the loader --------------------------------------------------------
+
+     While the press is being acted on: the plus and the check both stand down
+     and the spinner takes the button's one slot, so the control never changes
+     size and nothing beside it moves.
+
+     `data-loading` is written by `assets/product-bundle.js` on the button
+     itself rather than on the tray, because two rows can be mid-press at once —
+     a customer who taps a second product before the first one's modal has
+     opened — and a flag on the tray would spin both.
+
+     `@keyframes spin` is the theme's, the one `.button__spinner` already turns.
+     Reduced motion keeps the glyph and drops the turning: the spinner is still
+     the sign that something is happening, and it is still replaced by the check
+     when that something lands. */
+  .bundle-row__add[data-loading] .bundle-row__add-plus,
+  .bundle-row__add[data-loading] .bundle-row__add-check { display: none; }
+  .bundle-row__add[data-loading] .bundle-row__add-loader {
+    display: block;
+    animation: spin 700ms linear infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bundle-row__add[data-loading] .bundle-row__add-loader { animation: none; }
+  }
 
   .bundle-row__add[aria-pressed='true'] {
     border-style: solid;
@@ -15807,17 +15834,39 @@ testimonial-product[data-open] .testimonial-card__info {
    ========================================================================== */
 
 @layer components {
+  /* 598px in the drawing, against a panel that was 880. The modal is one
+     column of decisions about one product — a name, a row of flavours, two
+     purchase options and a button — and at 88rem each of those rows was a short
+     phrase stranded at the start of a very wide line. */
   .quick-add {
-    --modal-width: 88rem;
+    --modal-width: 60rem;
   }
 
+  /* ---- the title and the close button share a line ----------------------
+
+     The drawing puts them on one: the product's name at the start, the dark
+     round close at the end, both against the top of the panel.
+
+     They cannot be siblings. The close button is chrome — it is in the panel
+     before the fetch and it must stay reachable if the fetch fails — while the
+     title arrives inside the body as part of `sections/quick-add.liquid`. So
+     the header keeps the button and is taken out of the flow instead, and the
+     body's first line runs up beside it.
+
+     `inset-block-start` matches the body's own padding rather than being a
+     number of its own, so the button stays level with the first line of the
+     title at every type scale. The title's `padding-inline-end` is what keeps a
+     long product name from running underneath it. */
   .quick-add .modal__header {
-    justify-content: flex-end;
-    padding-block-end: 0;
+    position: absolute;
+    inset-block-start: var(--space-5);
+    inset-inline-end: var(--space-5);
+    z-index: 2;
+    padding: 0;
   }
 
-  .quick-add .modal__body {
-    padding-block-start: var(--space-3);
+  .quick-add .modal__panel {
+    position: relative;
   }
 
   .quick-add__content {
@@ -15834,8 +15883,10 @@ testimonial-product[data-open] .testimonial-card__info {
 
   .quick-add__title {
     margin: 0;
-    font-size: var(--font-size-h4, 2.4rem);
-    line-height: 1.2;
+    /* Room for the close button, plus the gap the drawing leaves beside it. */
+    padding-inline-end: var(--space-8);
+    font-size: var(--font-size-h3, 2.8rem);
+    line-height: 1.15;
   }
 
   .quick-add__title a {
@@ -15848,11 +15899,17 @@ testimonial-product[data-open] .testimonial-card__info {
     color: var(--color-text-subtle, var(--color-text));
   }
 
+  /* Dotted at a fifth of the heading colour, which is the drawing's 1px-on-2px
+     hairline — `dashed` at this width renders about 3 on 3 off and reads as a
+     line rather than as the texture the panel actually has. It is the rule
+     `.bundle-row__foot` already draws, so the two panels in this design share
+     one hairline rather than having two that nearly match. */
   .quick-add__rule {
     inline-size: 100%;
     margin: 0;
     border: 0;
-    border-block-start: 1px dashed var(--color-border);
+    border-block-start: 1px dotted var(--color-border);
+    border-block-start-color: color-mix(in srgb, var(--color-heading) 20%, transparent);
   }
 
   /* ---- purchase options, as cards -------------------------------------- */
@@ -15866,23 +15923,41 @@ testimonial-product[data-open] .testimonial-card__info {
     border: 0;
   }
 
+  /* Dashed at rest and solid when chosen, which is the drawing and is also the
+     idiom the rest of this design uses for "not yet decided" — the flavour
+     pills and the quantity stepper are both dashed capsules.
+
+     The border style carries the state rather than only the colour, because the
+     two cards sit one above the other on a pale panel: a colour change alone is
+     legible on a screen and gone in a photograph of one, and the customer is
+     choosing between two prices. */
   .selling-plans__card {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: start;
     gap: var(--space-3);
     padding: var(--space-4);
-    border: 1px solid var(--color-border);
+    border: 1px dashed var(--color-border);
     border-radius: var(--radius-card, 16px);
     cursor: pointer;
-    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+    transition: border-color var(--transition-fast), background-color var(--transition-fast),
+      box-shadow var(--transition-fast);
   }
 
   /* `:has()` on the label, so the whole card reacts to its own radio rather
-     than to a class something has to remember to write. */
+     than to a class something has to remember to write.
+
+     The fill is mixed from the scheme's own heading colour rather than being
+     the drawing's `#E7F2EE` written down: a modal on a dark scheme needs the
+     chosen card to lift *away* from the panel, and a pale mint pinned in place
+     would be a white card on a black one. The inset ring doubles the border
+     without changing the box, so the card does not grow by a pixel and shunt
+     the one under it when it is chosen. */
   .selling-plans__card:has(input:checked) {
-    border-color: var(--product-bundle-accent, var(--color-success));
-    box-shadow: inset 0 0 0 1px var(--product-bundle-accent, var(--color-success));
+    border-style: solid;
+    border-color: var(--color-heading);
+    background: color-mix(in srgb, var(--color-heading) 8%, var(--color-background));
+    box-shadow: inset 0 0 0 1px var(--color-heading);
   }
 
   /* A subscription that this variant has no allocation for. The component marks
@@ -15890,6 +15965,43 @@ testimonial-product[data-open] .testimonial-card__info {
   .selling-plans__card[data-unavailable] {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+
+  /* The radio, drawn.
+
+     The native control is left in place and repainted rather than hidden behind
+     a span: it keeps its own focus ring, its own keyboard behaviour and its own
+     announcement, and `<selling-plan-selector>` keeps addressing it by the same
+     `data-ref`. `appearance: none` is all that changes.
+
+     Scoped to the card, so every other radio in the theme — the filters, the
+     bundle strip's hidden ones — is untouched. */
+  .selling-plans__card > input[type='radio'] {
+    appearance: none;
+    inline-size: 2rem;
+    block-size: 2rem;
+    margin: 0;
+    border: 1.5px solid color-mix(in srgb, var(--color-heading) 35%, transparent);
+    border-radius: 999px;
+    background: var(--color-background);
+    cursor: inherit;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  }
+
+  /* The dot is an inset ring rather than a `::before`, because a replaced
+     element has no generated content to give: a pseudo-element on an `<input>`
+     is not rendered at all in several engines, which is how a radio ends up
+     looking permanently unchecked in exactly one browser. A shadow spread from
+     the inside paints a filled centre with the border still visible around it,
+     and it animates. */
+  .selling-plans__card > input[type='radio']:checked {
+    border-color: var(--color-heading);
+    box-shadow: inset 0 0 0 0.6rem var(--color-heading);
+  }
+
+  .selling-plans__card > input[type='radio']:focus-visible {
+    outline: 2px solid var(--color-heading);
+    outline-offset: 2px;
   }
 
   .selling-plans__card-main {
@@ -15947,9 +16059,18 @@ testimonial-product[data-open] .testimonial-card__info {
     gap: var(--space-2);
   }
 
+  /* A filled disc with the tick punched out of it, which is what the drawing
+     has — three floating ticks down the side of a card read as a list that has
+     lost its bullets. The glyph is the theme's `check` at 12px inside an 18px
+     disc, so it is the same tick the rest of the theme draws rather than a
+     second one at another weight. */
   .selling-plans__benefit .icon {
     flex: 0 0 auto;
-    color: var(--product-bundle-accent, var(--color-success));
+    box-sizing: content-box;
+    padding: 0.3rem;
+    border-radius: 999px;
+    background: var(--product-bundle-accent, var(--color-success));
+    color: var(--color-background);
   }
 
   /* ---- quantity and add ------------------------------------------------ */
@@ -16055,7 +16176,11 @@ testimonial-product[data-open] .testimonial-card__info {
     aspect-ratio: 1;
     border-radius: 999px;
     background: var(--color-heading);
-    color: var(--color-background);
+    /* The arrow is the accent, not the background. Both drawings put a green
+       glyph in the dark circle, and on a green button a background-coloured
+       arrow is the same green as the pill around the circle — the badge reads
+       as a hole rather than as a control. */
+    color: var(--product-bundle-accent, var(--color-background));
     font-size: 1.4rem;
     line-height: 1;
   }
@@ -16066,5 +16191,67 @@ testimonial-product[data-open] .testimonial-card__info {
   .bundle-tray__submit:disabled::after,
   .quick-add__submit:disabled::after {
     opacity: 0.5;
+  }
+
+  /* ---- working ----------------------------------------------------------
+
+     Both buttons make the slowest request their section has — one `/cart/add`
+     for up to six lines from the tray, one for the chosen variant from the
+     modal — and both used to stay exactly as they were until something else
+     appeared. A button that does not acknowledge a press is a button pressed
+     twice, and here twice means two carts.
+
+     So the label stands down and the spinner takes its place. The two flags are
+     each component's own `setLoading()` — `data-loading` on `<product-bundle>`
+     and on `<product-form>` — so neither button needs a state of its own and
+     neither can be left spinning by a path that forgot to clear one.
+
+     `grid` with both children in the same cell, rather than swapping `display`:
+     the button keeps the width its label gives it, so a tray that is mid-add
+     does not shrink and drag the panel's layout with it. */
+  .bundle-tray__submit,
+  .quick-add__submit {
+    display: grid;
+    grid-template-areas: 'label';
+    place-items: center;
+  }
+
+  .bundle-tray__submit-label,
+  .quick-add__submit > [data-button-label],
+  .bundle-tray__submit-loader,
+  .quick-add__submit-loader {
+    grid-area: label;
+  }
+
+  .bundle-tray__submit-loader,
+  .quick-add__submit-loader {
+    display: flex;
+    visibility: hidden;
+  }
+
+  product-bundle[data-loading] .bundle-tray__submit .bundle-tray__submit-label,
+  product-form[data-loading] .quick-add__submit > [data-button-label] {
+    visibility: hidden;
+  }
+
+  product-bundle[data-loading] .bundle-tray__submit .bundle-tray__submit-loader,
+  product-form[data-loading] .quick-add__submit .quick-add__submit-loader {
+    visibility: visible;
+    animation: spin 700ms linear infinite;
+  }
+
+  /* The arrow says "and then this happens", which is a promise the button is
+     in the middle of keeping. It goes for the length of the request rather
+     than sitting beside a spinner offering the same thing twice. */
+  product-bundle[data-loading] .bundle-tray__submit::after,
+  product-form[data-loading] .quick-add__submit::after {
+    opacity: 0;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    product-bundle[data-loading] .bundle-tray__submit .bundle-tray__submit-loader,
+    product-form[data-loading] .quick-add__submit .quick-add__submit-loader {
+      animation: none;
+    }
   }
 }
