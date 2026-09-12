@@ -266,6 +266,13 @@
                 `data-price-*` hooks are the snippet's, so it styles the same
                 and `<quick-add-summary>` finds it the same way.
               {%- endcomment -%}
+              {%- liquid
+                assign plan_saved = first_allocation.compare_at_price | minus: first_allocation.price
+                assign plan_percent = 0
+                if first_allocation.compare_at_price > 0
+                  assign plan_percent = plan_saved | times: 100.0 | divided_by: first_allocation.compare_at_price | round
+                endif
+              -%}
               <span class="price price--subscription">
                 <span class="price__regular" data-price-current>{{ first_allocation.price | money }}</span>
                 <s
@@ -275,6 +282,26 @@
                 >
                   {{- first_allocation.compare_at_price | money -}}
                 </s>
+
+                {%- comment -%}
+                  The saving, said the same way the one-time card says it.
+
+                  This card had no badge at all, so the drawing's pair — "Save
+                  10%" under the one-time price and "Save 20%" under the
+                  subscription — only ever showed one of them, and the discount
+                  that is the whole reason to subscribe was the one missing.
+
+                  `data-price-saving` and the same string as `price.liquid`, so
+                  `assets/quick-add.js` keeps both in step on a variant change
+                  and the two cards cannot word the same thing differently.
+                {%- endcomment -%}
+                <span
+                  class="price__saving"
+                  data-price-saving
+                  {% unless plan_percent > 0 %}hidden{% endunless %}
+                >
+                  {{- 'products.product.sale_percent' | t: percent: plan_percent -}}
+                </span>
               </span>
             {%- endif -%}
           </span>

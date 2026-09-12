@@ -207,6 +207,8 @@ export class QuickAddSummary extends BaseComponent {
     const oneTime = this.root.querySelector('[data-one-time-price] [data-price-current]');
     if (oneTime instanceof HTMLElement) oneTime.textContent = formatMoney(Number(variant.price));
 
+    this.#renderSaving('[data-one-time-price]', Number(variant.compare_at_price), Number(variant.price));
+
     const plans = this.#allocations?.[String(variant.id)] || [];
     const chosen = plans.find((entry) => Number(entry.id) === this.#planId) || plans[0];
 
@@ -221,6 +223,42 @@ export class QuickAddSummary extends BaseComponent {
       planCompare.textContent = show ? formatMoney(compare) : '';
       planCompare.toggleAttribute('hidden', !show);
     }
+
+    if (chosen) {
+      this.#renderSaving('[data-plan-price]', Number(chosen.compare_at_price), Number(chosen.price));
+    }
+  }
+
+  /**
+   * Keep one card's saving badge in step with the price above it.
+   *
+   * The percentage was the one part of a price nothing updated. The figures
+   * either side of it are rewritten on every flavour change, so a product whose
+   * flavours discount differently showed the new prices with the old card's
+   * percentage between them — two numbers that disagreed, on the line the
+   * customer is deciding from.
+   *
+   * Percentage only, and always. `price.liquid` offers the merchant an amount
+   * or a plain word as well, and honouring that here would mean re-reading
+   * which one they chose from a string this has just replaced. The badge is
+   * hidden outright when there is no saving, so a flavour that is not on sale
+   * does not keep the last one's.
+   *
+   * @param {string} scope Selector for the card's price container.
+   * @param {number} compare
+   * @param {number} price
+   * @private
+   */
+  #renderSaving(scope, compare, price) {
+    const badge = this.root.querySelector(`${scope} [data-price-saving]`);
+    if (!(badge instanceof HTMLElement)) return;
+
+    const saving = Number.isFinite(compare) && Number.isFinite(price) && compare > price;
+    badge.toggleAttribute('hidden', !saving);
+    if (!saving) return;
+
+    const percent = Math.round(((compare - price) / compare) * 100);
+    badge.textContent = themeString('salePercent', '', { percent }) || `-${percent}%`;
   }
 
   /**

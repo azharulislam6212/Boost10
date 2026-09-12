@@ -160,6 +160,22 @@ export class Overlay extends BaseComponent {
     if (!this.refs.dialog.open) this.refs.dialog.showModal();
 
     lockScroll();
+
+    // Started here, awaited below, and the difference matters for any overlay
+    // whose `beforeOpen()` fetches something.
+    //
+    // The entrance used to run *after* that fetch, so a quick add opened in two
+    // beats: the panel appeared instantly at its loading size — no animation at
+    // all, because nothing had started one — the customer watched a spinner in
+    // it, and only once the product had landed did the panel play an entrance
+    // it had already finished making. That is the jump.
+    //
+    // Begun with the dialog instead, the panel animates in while the request is
+    // in flight and is settled by the time the content arrives. For every other
+    // overlay `beforeOpen()` resolves on the same microtask, so this is the
+    // order it always had.
+    const entrance = this.animateIn();
+
     await this.beforeOpen();
 
     this.setAttribute('data-state', 'open');
@@ -173,7 +189,7 @@ export class Overlay extends BaseComponent {
       overlayDetail(this.id, { triggerId: this.#trigger?.id || null, type: this.overlayType })
     );
 
-    await this.animateIn();
+    await entrance;
     this.afterOpen();
   }
 
@@ -603,7 +619,26 @@ export class QuickAddModal extends ModalDialog {
       const { fetchSection, applyHTML } = await import('@theme/section-renderer');
       const html = await fetchSection(sectionId, { url, signal: this.#request.signal });
 
-      applyHTML(html, body, { selector: '[data-quick-add-content]', sectionId });
+      // `childrenOnly`, and this is the whole of why the modal had no padding.
+      //
+      // `morph()` syncs attributes both ways: it copies the source's onto the
+      // target and removes any the source does not have. Morphing the fetched
+      // `[data-quick-add-content]` wrapper *onto* the body therefore rewrote
+      // `class="modal__body"` as `class="quick-add__content"` and dropped
+      // `data-ref="body"` and `data-lenis-prevent` with it. From the first fetch
+      // onwards the element was no longer the modal body, so it lost the body's
+      // padding, its `overflow-y: auto` — a tall product could not be scrolled —
+      // and its opt-out from Lenis's wheel handling.
+      //
+      // Only the contents are the section's. The body's own identity is this
+      // file's, and `sections/overlays.liquid` carries the two hooks the fetched
+      // wrapper used to bring with it, so `<variant-picker>`, `<product-form>`
+      // and `<quick-add-summary>` still scope themselves to the modal.
+      applyHTML(html, body, {
+        selector: '[data-quick-add-content]',
+        sectionId,
+        morphOptions: { childrenOnly: true }
+      });
       this.#loadedUrl = url;
     } catch (error) {
       if (error?.name === 'AbortError') return;

@@ -30,6 +30,115 @@
 {%- endcomment -%}
 {%- if settings.enable_quick_add -%}
   {%- comment -%}
+    ---- the frosted backdrop, and the panel on it ----
+
+    A `{% style %}` block rather than custom properties on the element, and that
+    is not a preference: `::backdrop` is the one thing on the page that cannot
+    be reached by inheriting a value onto an ancestor. It has no parent element
+    in the original spec — browsers only began inheriting it from the
+    originating element in 2023, and relying on that would mean the blur worked
+    in a recent Chrome and silently did nothing in a Safari a year older.
+
+    A rule that targets the pseudo-element directly works everywhere, and both
+    halves of the design read from the same two numbers, so the page behind and
+    the panel over it are frosted to the same degree.
+
+    Opacity goes into the colour rather than onto the element: `opacity` on the
+    panel would fade the product inside it along with its background.
+  {%- endcomment -%}
+  {%- liquid
+    assign qa_blur = settings.quick_add_blur | default: 20 | plus: 0
+
+    assign qa_backdrop_alpha = settings.quick_add_backdrop_opacity | default: 20 | divided_by: 100.0
+    assign qa_backdrop = settings.quick_add_backdrop_color | default: '#ffffff'
+    assign qa_backdrop = qa_backdrop | color_modify: 'alpha', qa_backdrop_alpha
+
+    assign qa_panel_alpha = settings.quick_add_panel_opacity | default: 85 | divided_by: 100.0
+    assign qa_panel = settings.quick_add_panel_color | default: '#ffffff'
+    assign qa_panel = qa_panel | color_modify: 'alpha', qa_panel_alpha
+  -%}
+
+  {%- comment -%}
+    The backdrop's own entrance.
+
+    It had none. The panel animated and the backdrop was simply *there* on the
+    frame the dialog opened and gone on the frame it closed — a hard cut behind
+    a moving panel, which reads as the jump it is. The two now run to the same
+    numbers, so the page dims as the modal arrives and lifts as it leaves.
+
+    It has to be an animation rather than a transition, and for a reason that
+    is specific to `::backdrop`: the pseudo-element does not exist until
+    `showModal()` creates it, and a transition needs a previous value to move
+    from. An animation has its own first frame.
+
+    The state comes from `data-state` on the overlay element, which
+    `assets/dialog.js` writes for exactly this — `opening`, `open`, `closing`.
+    Both open states name the same animation, so the attribute changing from
+    one to the other does not restart it.
+
+    The exit is three quarters of the entrance, which is what `exitDuration` in
+    `assets/dialog.js` uses, so the backdrop and the panel finish together
+    rather than one waiting on the other.
+  {%- endcomment -%}
+  {%- liquid
+    assign qa_enter = settings.quick_add_animation_duration | default: 320 | plus: 0
+    assign qa_exit = qa_enter | times: 0.75 | round
+  -%}
+
+  {% style %}
+    @keyframes quick-add-backdrop-in {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes quick-add-backdrop-out {
+      from { opacity: 1; }
+      to { opacity: 0; }
+    }
+
+    #QuickAdd .modal__dialog::backdrop {
+      background-color: {{ qa_backdrop }};
+      {%- if qa_blur > 0 %}
+        -webkit-backdrop-filter: blur({{ qa_blur }}px);
+        backdrop-filter: blur({{ qa_blur }}px);
+      {%- endif %}
+    }
+
+    #QuickAdd[data-state='opening'] .modal__dialog::backdrop,
+    #QuickAdd[data-state='open'] .modal__dialog::backdrop {
+      animation: quick-add-backdrop-in {{ qa_enter }}ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    #QuickAdd[data-state='closing'] .modal__dialog::backdrop {
+      animation: quick-add-backdrop-out {{ qa_exit }}ms cubic-bezier(0.76, 0, 0.24, 1) both;
+    }
+
+    {%- comment -%}
+      The dimming stays, the movement goes. A backdrop that faded out under
+      reduced motion would still be a backdrop appearing instantly on open,
+      which is the thing being fixed — so both ends simply land at once.
+    {%- endcomment -%}
+    @media (prefers-reduced-motion: reduce) {
+      #QuickAdd[data-state] .modal__dialog::backdrop {
+        animation-duration: 0.01ms;
+      }
+    }
+
+    #QuickAdd .modal__panel {
+      background-color: {{ qa_panel }};
+      {%- comment -%}
+        Only when the panel is actually see-through. A blur behind an opaque
+        surface is a compositing layer the browser maintains for every frame
+        the modal is open and nobody can see the result of.
+      {%- endcomment -%}
+      {%- if qa_blur > 0 and qa_panel_alpha < 1 %}
+        -webkit-backdrop-filter: blur({{ qa_blur }}px);
+        backdrop-filter: blur({{ qa_blur }}px);
+      {%- endif %}
+    }
+  {% endstyle %}
+
+  {%- comment -%}
     The entrance and its length are the merchant's — **Theme settings › Product
     cards › Quick add modal**. They are attributes rather than a stylesheet
     variable because the movement is a WAAPI animation on the panel, built from
@@ -76,8 +185,55 @@
              attributes: 'data-overlay-close' %}
         </header>
 
-        <div class="modal__body" data-ref="body" data-lenis-prevent>
-          <p class="quick-add__loading">{{ 'sections.quick_add.loading' | t }}</p>
+        {%- comment -%}
+          `data-quick-add-content` and `data-product-root` live here rather than
+          arriving with the fetched markup.
+
+          They used to ride on the wrapper `sections/quick-add.liquid` renders,
+          and reached this element only because `morph()` copied every attribute
+          off that wrapper — which also overwrote `class="modal__body"` and took
+          the body's padding and scrolling with it. `assets/dialog.js` now morphs
+          the children only, so the two hooks have to be declared where the
+          element actually is.
+
+          They are what scope the modal's own `<variant-picker>`,
+          `<product-form>` and `<quick-add-summary>` to it. Without them a modal
+          opened over a product page finds the *page's* picker and form, and
+          choosing a flavour in the modal changes the variant behind it.
+        {%- endcomment -%}
+        <div
+          class="modal__body"
+          data-ref="body"
+          data-lenis-prevent
+          data-quick-add-content
+          data-product-root
+        ></div>
+
+        {%- comment -%}
+          The loading state, and it is a sibling of the body rather than the
+          body's first child.
+
+          It used to be a "Loading product" paragraph inside it, which meant it
+          existed exactly once: `applyHTML` replaces the body with the fetched
+          section, so from the second product onwards there was no loading state
+          at all — opening a different one showed the previous one's markup until
+          the new one arrived. Out here it survives every fetch, because nothing
+          ever writes over it.
+
+          `quick-add-modal` carries `data-loading` through `setLoading()` for the
+          length of the request, so the spinner needs no state of its own and
+          cannot be left turning by a path that forgot to clear one.
+
+          The words stay, hidden. `aria-busy` on the body says *that* something
+          is happening; this is the only thing that says what, and a screen
+          reader entering the dialog before the fetch lands would otherwise meet
+          an empty region. It is `display: none` when idle, so it is out of the
+          accessibility tree rather than being read out on a modal that has
+          already loaded.
+        {%- endcomment -%}
+        <div class="quick-add__loader">
+          {% render 'icon', icon: 'loader', size: 28 %}
+          <span class="visually-hidden">{{ 'sections.quick_add.loading' | t }}</span>
         </div>
       </div>
     </dialog>

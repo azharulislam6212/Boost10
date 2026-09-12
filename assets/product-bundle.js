@@ -444,7 +444,7 @@ export class ProductBundle extends BaseComponent {
     // the row's number instead would silently overrule the one they just set.
     const quantity = Number(new FormData(form).get('quantity')) || 1;
 
-    this.add({
+    const item = {
       productId: Number(product.id),
       variantId,
       title: product.title,
@@ -452,46 +452,196 @@ export class ProductBundle extends BaseComponent {
       image: variant.featured_image?.src || product.featured_image || '',
       price: Number(variant.price) || 0,
       quantity
-    });
+    };
 
-    this.#clearPending();
-    modal?.close?.();
+    // ---- the modal's own button spins too -------------------------------
+    //
+    // `stopPropagation()` above is what makes this necessary. It is the whole
+    // point of the interception — `<product-form>`'s submit listener never runs,
+    // so `/cart/add.js` is never called — but that listener is also the only
+    // thing that would have called `setLoading()`, so in bundle mode the modal's
+    // button was the one add control in the section that acknowledged nothing.
+    // A customer pressed "Add to bundle" and watched a button that had not
+    // moved until the modal went away.
+    //
+    // `setLoading` rather than writing `data-loading` here: it is the
+    // component's own public API and it sets `aria-busy` with the flag, so a
+    // screen reader is told the button is working rather than only sighted
+    // customers seeing it.
+    const productForm = form.closest('product-form');
+    productForm?.setLoading?.(true);
+
+    // The same beat the row's control takes, for the same reason: dropping a
+    // chosen variant into a slot is synchronous, so the spin is the transition
+    // rather than a request. Using one constant keeps the two controls in step
+    // — pressing add in the modal and pressing + on a simple row should feel
+    // like the same action, because they are.
+    wait(MIN_SPIN).then(() => {
+      // The row's spinner comes off before the product goes in, not after.
+      //
+      // `add()` redraws the tray, which writes `aria-pressed="true"` onto that
+      // row's control — and every glyph on it shares one grid cell, so a tick
+      // set while the flag is still up is a tick drawn inside a spinner. The
+      // direct path in `#hold` orders these the same way.
+      //
+      // `#releaseRow` and not `#clearPending`, because the modal's
+      // `data-bundle-mode` must outlive this: `<quick-add-summary>` reads it to
+      // decide whether the button says "Add to bundle" or "Add to cart", and
+      // anything that re-rendered the label between here and the modal actually
+      // being gone would flash the wrong one. The close event clears it.
+      this.#releaseRow();
+      this.add(item);
+
+      // The modal's spinner is released after the exit, not before it. Closing
+      // is the answer to the press, so the button should still be working while
+      // it happens — and it has to be released at all, because a modal reopened
+      // on the same product is not re-fetched (`#loadedUrl` in `dialog.js`) and
+      // would come back with a button still spinning.
+      Promise.resolve(modal?.close?.()).finally(() => productForm?.setLoading?.(false));
+    });
   };
 
   /**
+   * Hand a product with options to the quick add modal.
+   *
+   * ## The spinner lasts as long as the press does
+   *
+   * It comes up here and comes off in `#releaseRow`, which means it is up for
+   * the fetch, the entrance *and* the whole time the customer is choosing a
+   * flavour. That is longer than "until the modal has appeared", and
+   * deliberately: the press is not finished when the modal opens, it is
+   * finished when the customer has either chosen or given up. A row that went
+   * back to a plus the moment the panel appeared was saying the press was over
+   * while the thing it started was still on screen.
+   *
+   * So the row resolves into exactly one of two things, and never needs a third:
+   *
+   *   added      `#onQuickAddSubmit` releases the row and then adds — the tick
+   *   dismissed  the overlay's close event releases it — back to the plus
+   *
+   * Every path runs `#releaseRow` — the second through `#clearPending`, which
+   * releases the modal as well — so there is no way to leave a row spinning at
+   * a modal that is gone.
+   *
    * @param {HTMLElement} row
-   * @returns {Promise<void>|void} Settles once the modal is open — see `#hold`.
    * @private
    */
   #openQuickAddFor(row) {
     const modal = this.#quickAdd;
     const button = row.querySelector('[data-bundle-add]');
+    if (!(button instanceof HTMLElement)) return;
 
     // No modal on the page means quick add is switched off in theme settings.
     // The product page is then the only place the options exist, so that is
     // where the customer goes — a control that does nothing would be worse.
-    if (!modal || !(button instanceof HTMLElement)) {
-      if (row.dataset.productUrl) window.location.assign(row.dataset.productUrl);
+    //
+    // The spinner stays on through this: the page is leaving, and a control
+    // that settles back to a plus while the browser navigates says the press
+    // did nothing.
+    if (!modal) {
+      if (row.dataset.productUrl) {
+        button.dataset.loading = '';
+        window.location.assign(row.dataset.productUrl);
+      }
       return;
     }
 
     this.#pendingRow = row;
+    button.dataset.loading = '';
+
     modal.dataset.bundleMode = this.dataset.sectionId || '';
 
     button.dataset.productUrl = row.dataset.productUrl || '';
     button.dataset.sectionId = 'quick-add';
 
-    // Returned, not just called. `Overlay.open()` resolves after the product's
-    // section has been fetched and the entrance has run, and that promise is
-    // the whole reason the row's spinner knows how long to turn — dropping it
-    // here would stop the spin on the minimum beat and leave the customer
-    // watching a settled button through the rest of the request.
-    return modal.open?.(button);
+    // The number the customer set on the row, carried into the modal.
+    //
+    // The row has a stepper and so does the modal, and they were two unrelated
+    // controls: setting a row to 3 and pressing + opened a modal that said 1,
+    // and 1 is what went into the slot — the modal's stepper is what
+    // `#onQuickAddSubmit` reads. So the number the customer had chosen was
+    // silently discarded by the step that was meant to ask them for one more
+    // decision, not fewer.
+    //
+    // Read now rather than when the modal lands, so it is the value that was on
+    // screen when they pressed the button.
+    const quantity = quantityOf(row);
+
+    // `open()` is async and the spinner does not wait on it — the flag is
+    // already up and `#clearPending` is what takes it down. What does wait is
+    // the quantity: the modal's stepper does not exist until the product's
+    // section has been fetched into it, which is what this promise resolves
+    // after.
+    //
+    // The catch is for the case the overlay never opens at all: without it a
+    // rejection would leave a row spinning with no modal on screen to close and
+    // no way back to the plus.
+    Promise.resolve(modal.open?.(button))
+      .then(() => this.#applyQuantity(modal, quantity))
+      .catch(() => this.#clearPending());
   }
 
-  /** @private */
-  #clearPending() {
+  /**
+   * Set the modal's stepper to the number the row was showing.
+   *
+   * Through `<product-form>`'s own `setQuantity()` where it exists, because
+   * that is the method that knows to go through `<quantity-selector>` — which
+   * clamps to the product's own min, max and increment, redraws its buttons and
+   * announces the change, so the add button's label updates with it. Writing
+   * the input directly would set a number past a maximum the merchant had set
+   * and leave the label saying the old one.
+   *
+   * The input is the fallback for the frame before those modules land. It is
+   * the value the customer can see either way, and the component reads the
+   * input rather than its own state when it arrives.
+   *
+   * @param {HTMLElement} modal
+   * @param {number} quantity
+   * @private
+   */
+  #applyQuantity(modal, quantity) {
+    if (!Number.isFinite(quantity) || quantity <= 1) return;
+
+    const form = modal.querySelector('product-form');
+    if (form && typeof (/** @type {any} */ (form).setQuantity) === 'function') {
+      /** @type {any} */ (form).setQuantity(quantity);
+      return;
+    }
+
+    const input = modal.querySelector('[name="quantity"]');
+    if (input instanceof HTMLInputElement) input.value = String(quantity);
+  }
+
+  /**
+   * The row's half: its control stops spinning and stops being the pending one.
+   *
+   * Separate from the modal's half because the two want different moments. The
+   * row has to settle *before* `add()` redraws the tray onto it; the modal's
+   * `data-bundle-mode` has to survive until the modal is actually gone, because
+   * `<quick-add-summary>` reads it on every render to decide whether the button
+   * says "Add to bundle" or "Add to cart".
+   *
+   * Idempotent: the submit path releases the row and the close event then
+   * arrives on a tray that has already finished.
+   *
+   * @private
+   */
+  #releaseRow() {
+    const button = this.#pendingRow?.querySelector('[data-bundle-add]');
+    if (button instanceof HTMLElement) delete button.dataset.loading;
+
     this.#pendingRow = null;
+  }
+
+  /**
+   * Both halves. This is the dismissal path — closing without choosing — and
+   * `teardown()`, where nothing is going to run afterwards that could care
+   * about either flag.
+   *
+   * @private
+   */
+  #clearPending() {
+    this.#releaseRow();
     delete this.#quickAdd?.dataset.bundleMode;
   }
 
@@ -525,19 +675,30 @@ export class ProductBundle extends BaseComponent {
       return;
     }
 
+    // A press that is already being acted on.
+    //
+    // Both paths leave a window where the tray does not yet hold the product,
+    // so the duplicate rule above cannot see it: the direct path's is the beat
+    // the spinner is up, and the options path's is however long the customer
+    // spends choosing a flavour. Either way a second press would start a second
+    // one, and on the options path it would re-open a modal that is already on
+    // screen over the top of the row.
+    if (button.dataset.loading !== undefined) return;
+
     if (row.dataset.needsOptions === 'true') {
-      // The real wait: `#openQuickAddFor` starts a fetch of the product's
-      // section, and until this the row gave no sign a press had registered.
-      // The spinner is released when the modal is open — or when opening it
-      // failed, so a network error leaves a button the customer can press
-      // again rather than one spinning forever.
-      this.#hold(button, Promise.resolve(this.#openQuickAddFor(row)));
+      // The spinner is not this method's to release on this path. It comes up
+      // in `#openQuickAddFor` and stays up for as long as the press is unfinished
+      // — which is until the customer has chosen a flavour or closed the modal,
+      // not until the modal has finished appearing. `#releaseRow` is where both
+      // of those meet.
+      this.#openQuickAddFor(row);
       return;
     }
 
-    this.#hold(button);
-
-    this.add({
+    // The quantity is read now rather than when the spin ends, so what goes
+    // into the slot is the number the customer was looking at when they
+    // pressed — not whatever the stepper says 420ms later.
+    const item = {
       productId,
       variantId: Number(row.dataset.variantId),
       title: row.dataset.title || '',
@@ -545,39 +706,51 @@ export class ProductBundle extends BaseComponent {
       image: row.dataset.image || '',
       price: Number(row.dataset.price) || 0,
       quantity: quantityOf(row)
-    });
+    };
+
+    this.#hold(button, () => this.add(item));
   }
 
   /**
-   * Spin a row's control while its press is being acted on.
+   * Spin a row's control for a beat, then hand over.
    *
-   * The two paths behind one press are very different lengths: opening the
-   * quick add modal is a fetch, and dropping a simple product into a slot is
-   * synchronous — it is done before the browser has painted the press. A
-   * spinner shown only for the slow one is a control that acknowledges some
-   * presses and not others, which reads as the fast path being broken.
+   * This is the direct path only. Dropping a product into a slot is
+   * synchronous — it is done before the browser has painted the press — so
+   * there is no request here for the spinner to be honest about. What it is
+   * honest about is the *transition*: `MIN_SPIN` is how long the plus takes to
+   * become a tick, the same way the panel's entrance in `assets/base.css` has a
+   * length.
    *
-   * So both spin, and `MIN_SPIN` is the floor. It is not a fake delay: nothing
-   * waits on it. The product is in the slot on the same frame either way and
-   * the tray has already redrawn — the timer only decides when the glyph stops
-   * turning and the check takes over, which is the transition between the two
-   * states rather than a pause before one of them.
+   * Holding the work until the flag comes off is half of the fix for a row that
+   * drew both glyphs at once. Adding on the click set `aria-pressed` straight
+   * away, so the button was pressed and loading together — and with every glyph
+   * in one grid cell, "both shown" means "both drawn on top of each other". Now
+   * they cannot overlap in time either: the spinner comes up, the flag comes
+   * off, and the product lands in the slot in the same frame the tick replaces
+   * it. (The other half is rule order in `assets/base.css`; each alone still
+   * left a way to draw both.)
+   *
+   * The options path does not come through here. Its spinner is not a beat —
+   * it stays up for as long as the press is unfinished, which is the whole time
+   * the modal is open. See `#openQuickAddFor`.
    *
    * @param {HTMLElement} button
-   * @param {Promise<unknown>} [work] Released when this settles, or after `MIN_SPIN`, whichever is later.
+   * @param {() => void} then Run once the spinner has come off, in the same task.
    * @private
    */
-  #hold(button, work) {
+  #hold(button, then) {
     button.dataset.loading = '';
 
-    const floor = wait(MIN_SPIN);
-    const done = work ? Promise.allSettled([work, floor]) : floor;
-
-    done.then(() => {
+    wait(MIN_SPIN).then(() => {
       // The row may have been morphed away by a section re-render while the
       // press was in flight, in which case this is a flag on a detached node
       // and removing it is simply free.
       delete button.dataset.loading;
+
+      // After the flag, never before: `add()` redraws the tray and writes
+      // `aria-pressed` onto this button, and doing that while the spinner is
+      // still up is the overlap this ordering exists to prevent.
+      then();
     });
   }
 

@@ -2907,7 +2907,24 @@
 
   /* ---- quantity selector ----------------------------------------------- */
 
-  quantity-selector {
+  /* The bare-element form, and only that.
+     -----------------------------------------------------------------------
+     There are two steppers in this theme. `snippets/quantity-selector.liquid`
+     renders a structured one — a label, a `.quantity-selector__control` that
+     draws the box, and an optional rule — and `snippets/cart-item.liquid`
+     writes the buttons and the input as direct children of the element with no
+     classes at all.
+
+     These rules were written for the second and applied to both, which drew the
+     box twice: an outer bordered pill around an inner bordered control, with a
+     grid gap between the label row and the control pushing the two apart. That
+     is the tall double-walled stepper with the number lost inside it.
+
+     `:not(.quantity-selector)` is what separates them, and it reads as what it
+     is — the element without the snippet's class is the hand-written one. The
+     class-based rules further down this file own the other, including its
+     border, so nothing is lost by not drawing one here. */
+  quantity-selector:not(.quantity-selector) {
     display: inline-flex;
     align-items: center;
     border: 1px solid var(--color-input-border);
@@ -2915,7 +2932,7 @@
     overflow: hidden;
   }
 
-  quantity-selector button {
+  quantity-selector:not(.quantity-selector) button {
     display: grid;
     place-items: center;
     inline-size: 4rem;
@@ -2924,7 +2941,7 @@
 
   quantity-selector button[disabled] { opacity: 0.35; cursor: not-allowed; }
 
-  quantity-selector input {
+  quantity-selector:not(.quantity-selector) input {
     inline-size: 5rem;
     border: 0;
     border-radius: 0;
@@ -7166,14 +7183,6 @@
   .main-product__media { position: relative; }
   .main-product__complementary { margin-block-start: var(--space-9); }
 
-  /* `.quick-add__loading` is the paragraph `sections/overlays.liquid` renders
-     into the modal body before anything has been fetched. The rest of what was
-     here — `__info`, `__vendor`, `__full`, a two-column grid on `.quick-add`
-     itself — belonged to a quick view that was laid out on the page and is
-     gone. `.quick-add` is the modal element now, so a bare `display: grid` on
-     it was a layout applied to a `<dialog>`'s parent. */
-  .quick-add__loading { text-align: center; color: var(--color-accent-text); }
-
   .main-collection__count,
   .main-search__count { font-size: var(--font-size-sm); color: var(--color-accent-text); }
   .main-collection__sidebar,
@@ -7600,8 +7609,26 @@
    Variant pills
    -------------------------------------------------------------------------- */
 
+/* `.variant-picker__option` is the `<fieldset>`, not the pill.
+   -------------------------------------------------------------------------
+   These four rules named it, and painted a container with the colours meant
+   for the thing inside it. A fieldset always contains its own checked radio,
+   so `:has(input:checked)` matched *every* option group — and every group on
+   every product page rendered as a solid block of the selected-variant colour
+   with the legend sitting on top of it. It reads as a black bar across the
+   page, which is exactly what it is.
+
+   The pill is `.variant-picker__swatch-label`, and it is reached through the
+   fieldset rather than on its own so a colour swatch is left out: those are the
+   same label element with a background the merchant chose, and painting
+   `--color-variant-bg` over it would replace the colour with the pill's.
+   `snippets/variant-picker.liquid` marks that case on the fieldset, which makes
+   the exclusion one selector rather than a second class on every swatch.
+
+   `.variant-option` stays as it was. It is the bare-element form used outside
+   the picker, and it was never the thing that was wrong. */
 .variant-option,
-.variant-picker__option {
+.variant-picker__option:not(.variant-picker__option--swatch) .variant-picker__swatch-label {
   background-color: var(--color-variant-bg);
   color: var(--color-variant-text);
   border: 1px solid var(--color-variant-border);
@@ -7611,10 +7638,8 @@
     border-color 150ms ease;
 }
 
-/* :where() keeps this at zero specificity for the hover part, so the selected
-   state below wins without needing !important. */
 .variant-option:hover,
-.variant-picker__option:hover {
+.variant-picker__option:not(.variant-picker__option--swatch) .variant-picker__swatch-label:hover {
   background-color: var(--color-variant-hover-bg);
   color: var(--color-variant-hover-text);
   border-color: var(--color-variant-hover-border);
@@ -7622,9 +7647,7 @@
 
 .variant-option[aria-checked='true'],
 .variant-option.is-selected,
-.variant-picker__option[aria-checked='true'],
-.variant-picker__option.is-selected,
-.variant-picker__option:has(input:checked) {
+.variant-picker__option:not(.variant-picker__option--swatch) input:checked + .variant-picker__swatch-label {
   background-color: var(--color-variant-selected-bg);
   color: var(--color-variant-selected-text);
   border-color: var(--color-variant-selected-border);
@@ -7633,7 +7656,7 @@
 /* Unavailable variants keep the merchant's out-of-stock colour rather than a
    hardcoded grey, so the signal matches the stock indicator elsewhere. */
 .variant-option[data-available='false'],
-.variant-picker__option[data-available='false'] {
+.variant-picker__swatch-label[data-unavailable] {
   color: var(--color-outofstock);
   border-color: var(--color-outofstock);
 }
@@ -15156,32 +15179,6 @@ testimonial-product[data-open] .testimonial-card__info {
   .bundle-row__add-check,
   .bundle-row__add-loader { display: none; }
 
-  /* ---- the loader --------------------------------------------------------
-
-     While the press is being acted on: the plus and the check both stand down
-     and the spinner takes the button's one slot, so the control never changes
-     size and nothing beside it moves.
-
-     `data-loading` is written by `assets/product-bundle.js` on the button
-     itself rather than on the tray, because two rows can be mid-press at once —
-     a customer who taps a second product before the first one's modal has
-     opened — and a flag on the tray would spin both.
-
-     `@keyframes spin` is the theme's, the one `.button__spinner` already turns.
-     Reduced motion keeps the glyph and drops the turning: the spinner is still
-     the sign that something is happening, and it is still replaced by the check
-     when that something lands. */
-  .bundle-row__add[data-loading] .bundle-row__add-plus,
-  .bundle-row__add[data-loading] .bundle-row__add-check { display: none; }
-  .bundle-row__add[data-loading] .bundle-row__add-loader {
-    display: block;
-    animation: spin 700ms linear infinite;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .bundle-row__add[data-loading] .bundle-row__add-loader { animation: none; }
-  }
-
   .bundle-row__add[aria-pressed='true'] {
     border-style: solid;
     background: var(--bundle-card-ink);
@@ -15196,6 +15193,51 @@ testimonial-product[data-open] .testimonial-card__info {
 
   .bundle-row__add[aria-pressed='true'] .bundle-row__add-plus { display: none; }
   .bundle-row__add[aria-pressed='true'] .bundle-row__add-check { display: block; }
+
+  /* ---- the loader --------------------------------------------------------
+
+     While the press is being acted on: the plus and the check both stand down
+     and the spinner takes the button's one slot, so the control never changes
+     size and nothing beside it moves.
+
+     ## Last, and that is the whole rule
+
+     The button is `display: grid` with every glyph in one cell, so two of them
+     shown at once are not two states in sequence — they are drawn on top of
+     each other. That is exactly what happened: `[aria-pressed='true']` and
+     `[data-loading]` are both one class and one attribute, so they are the same
+     specificity, and the pressed pair sat *after* this block and won. A row
+     that was both pressed and loading drew the tick with the spinner turning
+     around it.
+
+     Written after the pressed state instead, the later rule wins for the same
+     reason the earlier one used to — no `!important`, and no specificity
+     inflated past what the next state will need. The order in the file is the
+     order the states take on screen: plus, then spinner, then tick.
+
+     `assets/product-bundle.js` also no longer lets the two overlap in time —
+     the product goes into the slot when the spin ends rather than on the click
+     — but that is the sequence, and this is the guarantee. Either alone would
+     have left a way to draw both.
+
+     `data-loading` is on the button rather than on the tray, because two rows
+     can be mid-press at once — a customer who taps a second product before the
+     first one's modal has opened — and a flag on the tray would spin both.
+
+     `@keyframes spin` is the theme's, the one `.button__spinner` already turns.
+     Reduced motion keeps the glyph and drops the turning: the spinner is still
+     the sign that something is happening, and it is still replaced by the tick
+     when that something lands. */
+  .bundle-row__add[data-loading] .bundle-row__add-plus,
+  .bundle-row__add[data-loading] .bundle-row__add-check { display: none; }
+  .bundle-row__add[data-loading] .bundle-row__add-loader {
+    display: block;
+    animation: spin 700ms linear infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bundle-row__add[data-loading] .bundle-row__add-loader { animation: none; }
+  }
 
   /* ---- the tray -------------------------------------------------------- */
 
@@ -15840,6 +15882,61 @@ testimonial-product[data-open] .testimonial-card__info {
      phrase stranded at the start of a very wide line. */
   .quick-add {
     --modal-width: 60rem;
+
+    /* The drawing's panel inset is 30 on every side. `--space-5` is the modal's
+       shared 20, which is right for a size guide and leaves this one's content
+       hard against the corner radius — the panel is 600 wide and every row in
+       it runs the full width, so the gutter is the only thing holding the
+       design off the edge.
+
+       One property, because the header is positioned against the same number:
+       the close button has to line up with the first line of the title, and two
+       values that have to agree is one value. */
+    --quick-add-gutter: var(--space-7);
+
+    /* The close button, smaller here than anywhere else in the theme.
+       -------------------------------------------------------------------
+       Every other close in the theme is a control the customer may genuinely
+       need to find — the cart drawer's, the filters'. This one sits on a panel
+       whose whole job is one decision, and at the theme's button height it was
+       a circle competing with the product's name beside it.
+
+       Derived from `--height-button` rather than typed as a number, so a store
+       that raises its button height gets a close that grew with everything
+       else instead of one that stayed put and began to look wrong.
+
+       It goes under the 44px pointer target the rest of the theme keeps, and
+       that is a decision rather than an oversight: this dialog also closes on
+       Escape and on a press anywhere outside the panel, so the small circle is
+       the third way out rather than the only one. */
+    --quick-add-close-size: calc(var(--height-button, 44px) * 0.72);
+  }
+
+  .quick-add .close-quick-add {
+    --button-height: var(--quick-add-close-size);
+    --button-icon-size: 1.2rem;
+  }
+
+  /* The body is the column, and the gutter is on it.
+     -----------------------------------------------------------------------
+     `.quick-add__content` is the wrapper `sections/quick-add.liquid` renders,
+     and it is not in the live DOM: `assets/dialog.js` morphs that wrapper's
+     *children* into this element, so the rows land here as direct children.
+     Both selectors carry the layout so it does not matter which of the two the
+     markup happens to put on screen — the section rendered on its own still
+     lays out, and the modal lays out without it.
+
+     The padding is only ever the body's. It is the modal's gutter, not the
+     section's, and a section fetched into something else should not bring one. */
+  .quick-add .modal__body,
+  .quick-add__content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  .quick-add .modal__body {
+    padding: var(--quick-add-gutter);
   }
 
   /* ---- the title and the close button share a line ----------------------
@@ -15859,20 +15956,96 @@ testimonial-product[data-open] .testimonial-card__info {
      long product name from running underneath it. */
   .quick-add .modal__header {
     position: absolute;
-    inset-block-start: var(--space-5);
-    inset-inline-end: var(--space-5);
+    inset-block-start: var(--quick-add-gutter);
+    inset-inline-end: var(--quick-add-gutter);
     z-index: 2;
     padding: 0;
   }
 
+  /* ---- the panel has a floor --------------------------------------------
+
+     Without one the modal is whatever its contents are, and before the fetch
+     lands its contents are nothing — so opening it drew a thin white strip
+     across the page with the close button hanging off the end of it, and then
+     a full panel snapped into existence underneath. Two shapes in a third of a
+     second, and the first one looks like a broken page rather than a loading
+     one.
+
+     The floor is the loading state's height, so the panel the customer sees
+     first is the size of the panel they are about to read. It is deliberately
+     short of the drawing's 717px: a product with one option and no
+     subscription is a genuinely shorter modal, and padding it out to the
+     tallest case would leave a field of empty panel under the button.
+
+     Clamped against the viewport, because `min-block-size` beats
+     `max-block-size` in the cascade — a bare 40rem would push a panel past the
+     bottom of a phone held sideways, which is the one place the existing 90vh
+     cap was doing real work. */
+  /* The panel's own corner. `--radius-card` is the theme's card radius, which
+     is what every other modal takes; the drawing's quick add is softer than
+     that, and it is the one modal that is a product rather than a document. */
   .quick-add .modal__panel {
     position: relative;
+    min-block-size: min(40rem, 70vh);
+    border-radius: 2.8rem;
   }
 
-  .quick-add__content {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-5);
+  /* The ink every chosen thing in this modal is drawn in.
+     -----------------------------------------------------------------------
+     The drawing fills a chosen card with `#E7F2EE` and outlines it in the
+     brand's dark green, and fills the chosen flavour pill with the same green.
+     That colour is already in the theme — it is the colour scheme's
+     `secondary_button_background`, which is what the theme fills every dark
+     control with — so this reads it rather than writing the hex down. A store
+     that changes its scheme gets a modal that followed it.
+
+     `--color-heading` is the fallback, and it is why this is a property rather
+     than a value repeated in four rules: on a scheme with no secondary button
+     colour the mix has to come off *something*, and heading at 8% is a neutral
+     tint rather than nothing at all. It was `--color-heading` outright, which
+     on the default scheme is `#111` — so the chosen card came out grey, and the
+     one thing the drawing uses colour for was the one thing that had none. */
+  .quick-add {
+    --bundle-choice-ink: var(--color-secondary-button-background, var(--color-heading));
+  }
+
+  /* ---- the spinner ------------------------------------------------------
+
+     Laid over the panel rather than placed in it, so it is centred in the box
+     the customer is already looking at and does not have to be re-centred when
+     the body fills. It is a sibling of the body for a reason
+     `sections/overlays.liquid` sets out: the body is replaced wholesale by
+     every fetch, so anything inside it exists for exactly one product.
+
+     The body is hidden rather than left underneath, so a re-fetch does not show
+     the previous product greyed out behind a spinner — that reads as the modal
+     having failed to change rather than as it working. `visibility` and not
+     `display`, so the panel keeps whatever height that content gave it and the
+     modal does not resize twice per open. */
+  .quick-add__loader {
+    display: none;
+  }
+
+  .quick-add[data-loading] .quick-add__loader {
+    display: grid;
+    place-items: center;
+    position: absolute;
+    inset: 0;
+    color: var(--color-heading);
+  }
+
+  .quick-add[data-loading] .quick-add__loader .icon {
+    animation: spin 700ms linear infinite;
+  }
+
+  .quick-add[data-loading] .modal__body {
+    visibility: hidden;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .quick-add[data-loading] .quick-add__loader .icon {
+      animation: none;
+    }
   }
 
   .quick-add__heading {
@@ -15881,10 +16054,29 @@ testimonial-product[data-open] .testimonial-card__info {
     gap: var(--space-2);
   }
 
+  /* The room for the close button is the heading block's, not the title's.
+     -----------------------------------------------------------------------
+     It was on the title alone, which is right only while the description is
+     one short line. The button is a 44px circle sitting 32px down, so it hangs
+     level with the first line or two of the summary as well — and a long
+     product description ran straight under it, with the close sitting on top
+     of the words.
+
+     Reserving it on the block indents the summary's later lines too, which is
+     the trade: a couple of words earlier per line, against text disappearing
+     beneath a control. The drawing's own summary stops well short of the edge,
+     so at the copy length this is designed for nothing moves at all.
+
+     The number is the button's own size plus a gap, not a value of its own.
+     Two numbers that have to agree is one number — and this is the pair that
+     would have drifted first, because the moment the close shrank, a reserved
+     48px became a gap the design never asked for. */
+  .quick-add__heading {
+    padding-inline-end: calc(var(--quick-add-close-size) + var(--space-4));
+  }
+
   .quick-add__title {
     margin: 0;
-    /* Room for the close button, plus the gap the drawing leaves beside it. */
-    padding-inline-end: var(--space-8);
     font-size: var(--font-size-h3, 2.8rem);
     line-height: 1.15;
   }
@@ -15899,16 +16091,17 @@ testimonial-product[data-open] .testimonial-card__info {
     color: var(--color-text-subtle, var(--color-text));
   }
 
-  /* Dotted at a fifth of the heading colour, which is the drawing's 1px-on-2px
-     hairline — `dashed` at this width renders about 3 on 3 off and reads as a
-     line rather than as the texture the panel actually has. It is the rule
-     `.bundle-row__foot` already draws, so the two panels in this design share
-     one hairline rather than having two that nearly match. */
+  /* Dashed, at a fifth of the heading colour.
+     It was dotted, matching the hairline `.bundle-row__foot` draws. Dashed is
+     the longer stroke and it is what the rest of this panel is edged with —
+     the flavour pills, the one-time card and the stepper are all dashed — so
+     the rule now belongs to the modal it is in rather than to a card in a
+     different section. */
   .quick-add__rule {
     inline-size: 100%;
     margin: 0;
     border: 0;
-    border-block-start: 1px dotted var(--color-border);
+    border-block-start: 1px dashed var(--color-border);
     border-block-start-color: color-mix(in srgb, var(--color-heading) 20%, transparent);
   }
 
@@ -15935,10 +16128,12 @@ testimonial-product[data-open] .testimonial-card__info {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: start;
-    gap: var(--space-3);
-    padding: var(--space-4);
-    border: 1px dashed var(--color-border);
-    border-radius: var(--radius-card, 16px);
+    gap: var(--space-4);
+    padding: var(--space-5);
+    border: 1px dashed color-mix(in srgb, var(--color-heading) 30%, transparent);
+    /* 20 in the drawing, against the panel's own 28 — a card inside a rounded
+       panel wants a smaller radius than the panel or the two corners fight. */
+    border-radius: 2rem;
     cursor: pointer;
     transition: border-color var(--transition-fast), background-color var(--transition-fast),
       box-shadow var(--transition-fast);
@@ -15955,9 +16150,9 @@ testimonial-product[data-open] .testimonial-card__info {
      the one under it when it is chosen. */
   .selling-plans__card:has(input:checked) {
     border-style: solid;
-    border-color: var(--color-heading);
-    background: color-mix(in srgb, var(--color-heading) 8%, var(--color-background));
-    box-shadow: inset 0 0 0 1px var(--color-heading);
+    border-color: var(--bundle-choice-ink);
+    background: color-mix(in srgb, var(--bundle-choice-ink) 12%, var(--color-background));
+    box-shadow: inset 0 0 0 1px var(--bundle-choice-ink);
   }
 
   /* A subscription that this variant has no allocation for. The component marks
@@ -15995,13 +16190,88 @@ testimonial-product[data-open] .testimonial-card__info {
      the inside paints a filled centre with the border still visible around it,
      and it animates. */
   .selling-plans__card > input[type='radio']:checked {
-    border-color: var(--color-heading);
-    box-shadow: inset 0 0 0 0.6rem var(--color-heading);
+    border-color: var(--bundle-choice-ink, var(--color-heading));
+    box-shadow: inset 0 0 0 0.6rem var(--bundle-choice-ink, var(--color-heading));
   }
 
   .selling-plans__card > input[type='radio']:focus-visible {
     outline: 2px solid var(--color-heading);
     outline-offset: 2px;
+  }
+
+  /* The prices inside a card are not the sale colour.
+     `snippets/price.liquid` paints a reduced price in `--color-sale-price`,
+     which is right on a product card where the saving is the message. Here the
+     saving is already said twice — by the struck compare-at beside it and by
+     the badge under it — and a third red number turns the price the customer is
+     reading into a warning. The drawing has both in the heading colour, the
+     compare-at a step smaller and faded. */
+  .selling-plans__card-price .price__sale,
+  .selling-plans__card-price .price__regular {
+    color: var(--color-heading);
+    font-size: var(--font-size-md, 1.6rem);
+    font-weight: 700;
+  }
+
+  .selling-plans__card-price .price__compare {
+    color: var(--color-heading);
+    font-size: 1.3rem;
+    font-weight: 400;
+    opacity: 0.55;
+  }
+
+  /* ---- the saving, as a badge -------------------------------------------
+
+     `.price__saving` is red text everywhere else in the theme, which is right
+     on a product card where it sits under a photograph. On a purchase-option
+     card it is on its own line under two figures that are already saying the
+     same thing, and a third red number there reads as a warning about the
+     price rather than as the reason to choose this option.
+
+     The drawing makes it a pill, and gives the two cards different colours on
+     purpose: the one-time saving is the product's own discount and takes the
+     accent, and the subscription's is the offer being made here and takes a
+     colour nothing else on the panel uses. That is the whole of why a customer
+     can tell the two apart at a glance without reading either.
+
+     The subscription's is picked out by the card's own `[data-plan-price]`
+     hook, so it follows the markup rather than the order the cards happen to
+     be in. */
+  /* The figures on one line and the badge under them, both hard to the right.
+     -----------------------------------------------------------------------
+     A grid rather than a wrapping flex row, because the badge has to start a
+     new line *always* and not only when it runs out of room — flex wrapping
+     would put it beside the prices on a wide card and under them on a narrow
+     one, which is the same card looking like two different designs.
+
+     The visually-hidden labels `snippets/price.liquid` writes between the
+     figures are `position: absolute`, so they are out of flow and never become
+     grid items. That is what lets this be two columns rather than five. */
+  .selling-plans__card-price .price {
+    display: grid;
+    grid-template-columns: auto auto;
+    justify-content: end;
+    align-items: baseline;
+    column-gap: var(--space-2);
+  }
+
+  .selling-plans__card-price .price__saving {
+    grid-column: 1 / -1;
+    justify-self: end;
+    margin-block-start: var(--space-2);
+    padding: 0.2rem var(--space-2);
+    border-radius: 999px;
+    background: var(--product-bundle-accent, var(--color-success));
+    color: var(--color-secondary-button-background, var(--color-heading));
+    font-size: 1.1rem;
+    font-weight: 700;
+    line-height: 1.4;
+    white-space: nowrap;
+  }
+
+  [data-plan-price] .price__saving {
+    background: var(--quick-add-plan-badge, #F2E85C);
+    color: var(--color-heading);
   }
 
   .selling-plans__card-main {
@@ -16073,13 +16343,87 @@ testimonial-product[data-open] .testimonial-card__info {
     color: var(--color-background);
   }
 
+  /* ---- the price, when there are no purchase options --------------------
+
+     A product with no subscription renders its price as a row of its own
+     instead of inside a card, and that row kept `snippets/price.liquid`'s
+     defaults: the current figure in the sale red at body size, the saving as
+     more red text beside it. Three red things in a row at the size of the
+     small print, directly under the flavour the customer just chose.
+
+     Same treatment as the card's, because it is the same information — the
+     figure in the heading colour a step up, the compare-at struck and faded,
+     the saving as a badge. */
+  .quick-add__price {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+  }
+
+  .quick-add__price .price {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-3);
+  }
+
+  .quick-add__price .price__sale,
+  .quick-add__price .price__regular {
+    color: var(--color-heading);
+    font-size: var(--font-size-h5, 2rem);
+    font-weight: 700;
+  }
+
+  .quick-add__price .price__compare {
+    color: var(--color-heading);
+    font-size: var(--font-size-sm, 1.4rem);
+    font-weight: 400;
+    opacity: 0.55;
+  }
+
+  .quick-add__price .price__saving {
+    padding: 0.2rem var(--space-2);
+    border-radius: 999px;
+    background: var(--product-bundle-accent, var(--color-success));
+    color: var(--color-secondary-button-background, var(--color-heading));
+    font-size: 1.1rem;
+    font-weight: 700;
+    line-height: 1.4;
+    white-space: nowrap;
+  }
+
   /* ---- quantity and add ------------------------------------------------ */
 
+  /* One line, stepper then button, which is the drawing.
+     `wrap` let the button drop onto its own row the moment its label grew —
+     and its label grows on every variant change, because `quick-add.js`
+     appends the price and the chosen option to it. So the footer was one row
+     or two depending on how long the flavour was called, which is the kind of
+     layout that looks broken without anything being wrong.
+
+     `nowrap` with the button set to shrink is what keeps them together: the
+     stepper is a fixed size, the button takes the rest and its own label
+     truncates rather than the row breaking. Below 750px they stack, because at
+     that width they genuinely do not both fit. */
   .quick-add__form {
     display: flex;
     align-items: center;
-    flex-wrap: wrap;
-    gap: var(--space-3);
+    flex-wrap: nowrap;
+    gap: var(--space-4);
+  }
+
+  .quick-add__form > quantity-selector {
+    flex: 0 0 auto;
+  }
+
+  @media screen and (max-width: 749px) {
+    .quick-add__form {
+      flex-wrap: wrap;
+    }
+
+    .quick-add__form .quick-add__submit {
+      flex: 1 0 100%;
+    }
   }
 
   .quick-add__submit {
@@ -16094,9 +16438,13 @@ testimonial-product[data-open] .testimonial-card__info {
     font-size: var(--font-size-sm, 1.4rem);
   }
 
+  /* Centred, which is the drawing — the last line of the panel is a footnote
+     about the whole purchase rather than a label for the control above it, and
+     a left-aligned one reads as a fourth row of the form. */
   .quick-add__footer {
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: var(--space-3);
     flex-wrap: wrap;
     font-size: var(--font-size-sm, 1.4rem);
@@ -16113,11 +16461,6 @@ testimonial-product[data-open] .testimonial-card__info {
   .quick-add__footnote::before {
     content: '\2022';
     margin-inline-end: var(--space-3);
-  }
-
-  .quick-add__loading {
-    margin: 0;
-    color: var(--color-text-subtle, var(--color-text));
   }
 
   @media screen and (max-width: 749px) {
@@ -16254,4 +16597,138 @@ testimonial-product[data-open] .testimonial-card__info {
       animation: none;
     }
   }
+}
+
+/* ==========================================================================
+   The quick add modal's controls — outside the layer, because theirs are
+   --------------------------------------------------------------------------
+   Two of the components this modal is built from draw themselves from
+   unlayered rules: the variant pills under "Variant pills" above, and the
+   stepper in the `.quantity-selector__*` block after it. An unlayered rule
+   beats every rule in `@layer components` however specific it is, so the
+   modal's own versions of both were written, shipped, and silently discarded —
+   the pills kept the theme-wide selected colour instead of the drawing's
+   green, and the stepper kept its boxed 44px control instead of the drawing's
+   capsule.
+
+   Same hazard the card in `sections/product-bundle.liquid` documents against
+   `swiper.css`, met here against this file's own older half. The answer is the
+   same: the declarations that have to win live out here next to what they are
+   winning against, and only those. Everything the layer does not have to fight
+   stays in the layer with the rest of the modal.
+
+   All of it is scoped to `.quick-add`. The pill and the stepper are the
+   product page's too, and the drawing here is not the drawing there —
+   restyling the shared classes would redesign every product page in the store
+   off the back of a modal.
+   ========================================================================== */
+
+/* ---- the flavour pills ------------------------------------------------
+
+   Dashed capsules at rest, filled in the brand's green when chosen. The same
+   shape the bundle strip's category pills and the stepper below use, which is
+   what makes the drawing read as one design rather than three.
+
+   Scoped to the modal on purpose. `.variant-picker__swatch-label` is the
+   product page's pill too, and the drawing here is not the drawing there —
+   restyling the shared class would silently redesign every product page in
+   the store off the back of a modal.
+
+   The fill wins over `--color-variant-selected-bg` because it is more
+   specific, so a merchant who has set the variant pill colours in Theme
+   settings still gets them everywhere except inside this modal, where the
+   design is the design. */
+.quick-add .variant-picker__legend {
+  align-items: baseline;
+  margin-block-end: var(--space-3);
+  font-size: var(--font-size-md, 1.6rem);
+}
+
+.quick-add .variant-picker__values {
+  gap: var(--space-3);
+}
+
+.quick-add .variant-picker__option:not(.variant-picker__option--swatch) .variant-picker__swatch-label {
+  min-block-size: 4.8rem;
+  padding-inline: var(--space-5);
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--color-heading) 30%, transparent);
+  border-radius: 999px;
+  background-color: var(--color-background);
+  color: var(--color-heading);
+  font-size: var(--font-size-sm, 1.4rem);
+}
+
+.quick-add
+  .variant-picker__option:not(.variant-picker__option--swatch)
+  input:checked
+  + .variant-picker__swatch-label {
+  position: relative;
+  border-style: solid;
+  border-color: var(--bundle-choice-ink);
+  background-color: var(--bundle-choice-ink);
+  color: var(--color-secondary-button-text, var(--color-background));
+  box-shadow: none;
+}
+
+/* The tick on the chosen pill's shoulder.
+   A filled capsule already says "this one", and on a strip of five where the
+   dark fill is the only difference the eye has to compare pills to find it.
+   The badge is absolute so the pill keeps its size and the row does not
+   reflow as the customer moves through the flavours — and a pseudo-element
+   rather than markup, because the pill is `snippets/variant-picker.liquid`'s
+   and this design is only the modal's.
+
+   The glyph is drawn rather than rendered, for the same reason: an SVG cannot
+   come from a pseudo-element. It is a character, so it needs no request and
+   is out of the accessibility tree — the radio behind the label already
+   announces the selection. */
+.quick-add
+  .variant-picker__option:not(.variant-picker__option--swatch)
+  input:checked
+  + .variant-picker__swatch-label::after {
+  content: '\2713';
+  position: absolute;
+  inset-block-start: -0.2rem;
+  inset-inline-end: -0.2rem;
+  display: grid;
+  place-items: center;
+  inline-size: 1.8rem;
+  block-size: 1.8rem;
+  border-radius: 999px;
+  background: var(--product-bundle-accent, var(--color-success));
+  color: var(--color-secondary-button-background, var(--color-heading));
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+/* The stepper is the drawing's dashed capsule, not the theme's boxed one.
+   The buttons keep the 44px pointer target the default size exists to
+   protect — this only changes what is drawn around them. */
+.quick-add .quantity-selector__control {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--color-heading) 30%, transparent);
+  border-radius: 999px;
+  background: var(--color-background);
+}
+
+/* Wide enough for two digits without the number touching either button, and
+   with the dividing rules the default draws taken off — the capsule is one
+   control in the drawing, not three cells. */
+.quick-add .quantity-selector__input {
+  inline-size: 4rem;
+  border-inline: 0;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* Sized so the capsule comes out the same height as the button beside it,
+   which is what the drawing has and what stops the footer row reading as two
+   controls that happen to be near each other. `--button-height` is the
+   button's own property, so the two follow a theme setting together rather
+   than being matched by a number typed twice. */
+.quick-add .quantity-selector__button {
+  inline-size: calc(var(--height-button, 44px) - 0.8rem);
+  block-size: calc(var(--height-button, 44px) - 0.8rem);
+  border-radius: 50%;
 }
