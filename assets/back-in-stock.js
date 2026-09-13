@@ -43,8 +43,15 @@ export class BackInStockForm extends BaseComponent {
     this.on(this.root, EVENTS.VARIANT_UNAVAILABLE, () => this.#syncTo(null));
     this.on(this.refs.form, 'submit', this.#onSubmit);
 
+    // The picker's opening position, for the case where this form upgraded
+    // before the picker. Without it the read below saw `undefined` on an
+    // element that had not been upgraded, took it for "no variant", and hid the
+    // notify-me form on the sold-out variant it exists for. See
+    // `VARIANT_READY` in `@theme/events`.
+    this.on(this.root, EVENTS.VARIANT_READY, (event) => this.#syncTo(event.detail?.variant ?? null));
+
     const picker = this.root.querySelector?.('variant-picker');
-    this.#syncTo(picker?.currentVariant ?? null);
+    if (!picker || picker.currentVariant !== undefined) this.#syncTo(picker?.currentVariant ?? null);
   }
 
   /**

@@ -66,6 +66,12 @@ export class StickyAddToCart extends BaseComponent {
     this.on(this.root, EVENTS.VARIANT_CHANGE, (event) => this.render(event.detail?.variant));
     this.on(this.root, EVENTS.VARIANT_UNAVAILABLE, () => this.render(null));
 
+    // The picker's opening position, for the case where this bar upgraded
+    // before the picker and the read at the end of `setup()` could only see an
+    // element that was not a `<variant-picker>` yet. See `VARIANT_READY` in
+    // `@theme/events`: the same race put "Unavailable" on the main add button.
+    this.on(this.root, EVENTS.VARIANT_READY, (event) => this.render(event.detail?.variant ?? null));
+
     // The inline controls write into the real form rather than holding state.
     // A second source of truth for the selected variant is the bug that makes
     // sticky bars add the wrong one.
@@ -86,8 +92,10 @@ export class StickyAddToCart extends BaseComponent {
 
     this.#observeTrigger();
 
+    // `undefined` means "not upgraded yet", not "no variant" — the listener
+    // above is what covers that case.
     const picker = this.root.querySelector?.('variant-picker');
-    if (picker) this.render(picker.currentVariant);
+    if (picker && picker.currentVariant !== undefined) this.render(picker.currentVariant);
   }
 
   teardown() {

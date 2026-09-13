@@ -93,6 +93,14 @@ export class QuickAddSummary extends BaseComponent {
       this.schedule();
     });
 
+    // The picker's opening position, for the case where this element upgraded
+    // before the picker and the read above fell back to the first variant. See
+    // `VARIANT_READY` in `@theme/events`.
+    this.on(this.root, EVENTS.VARIANT_READY, (event) => {
+      this.#variantId = Number(event.detail?.variant?.id) || null;
+      this.schedule();
+    });
+
     this.on(this.root, EVENTS.SELLING_PLAN_CHANGE, (event) => {
       const value = event.detail?.sellingPlan ?? event.detail?.selling_plan ?? null;
       this.#planId = value ? Number(value) : null;

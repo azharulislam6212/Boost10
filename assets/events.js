@@ -43,6 +43,30 @@ export const EVENTS = {
   /* --------------------------------------------------------------- product */
   VARIANT_CHANGE: 'variant:change',
   VARIANT_UNAVAILABLE: 'variant:unavailable',
+
+  /**
+   * What `<variant-picker>` already had selected when it connected.
+   *
+   * `variant:change` says "the customer picked something". This says "this is
+   * what is picked", and it is dispatched once, at the end of the picker's
+   * `setup()`.
+   *
+   * It exists because every other component on a product reads the picker's
+   * state directly in its own `setup()` — and which of them runs first depends
+   * on which module finished downloading, not on the order of the markup. A
+   * `<product-form>` that upgrades before the picker reads `currentVariant` off
+   * an element that is still a plain `HTMLElement`, gets `undefined`, and
+   * disables its own button with "Unavailable" on a product that is in stock.
+   * Nothing corrected it afterwards, because the picker only speaks when the
+   * customer does.
+   *
+   * With this, the order stops mattering: whoever upgraded first hears it, and
+   * whoever upgraded later read `currentVariant` and was already right.
+   *
+   * Deliberately not `variant:change`, which means a choice was *made* and so
+   * pushes a history entry, moves the gallery and announces to a screen reader.
+   */
+  VARIANT_READY: 'variant:ready',
   SELLING_PLAN_CHANGE: 'selling-plan:change',
   QUANTITY_CHANGE: 'quantity:change',
   PRODUCT_FORM_SUBMIT: 'product-form:submit',

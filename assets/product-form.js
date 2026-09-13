@@ -51,8 +51,23 @@ export class ProductForm extends BaseComponent {
     this.on(this.root, EVENTS.VARIANT_CHANGE, (event) => this.setVariant(event.detail?.variant));
     this.on(this.root, EVENTS.VARIANT_UNAVAILABLE, () => this.setVariant(null));
 
+    // The picker's opening position, for the case where this form upgraded
+    // first and the read below could not work. See `VARIANT_READY` in
+    // `@theme/events`.
+    this.on(this.root, EVENTS.VARIANT_READY, (event) => this.setVariant(event.detail?.variant ?? null));
+
     const picker = this.root.querySelector?.('variant-picker');
-    if (picker) this.setVariant(picker.currentVariant);
+    if (!picker) return;
+
+    // `currentVariant` is `undefined` on an element the browser has not upgraded
+    // yet, and `null` on an upgraded picker whose combination does not exist.
+    // Only the second is an answer.
+    //
+    // Reading `undefined` as one is the whole of the "Unavailable on a product
+    // that is in stock" bug: `setVariant(undefined)` takes the no-variant branch
+    // and disables the button, and nothing ever revisited it. The listener above
+    // covers this case instead, so the read is skipped rather than guessed at.
+    if (picker.currentVariant !== undefined) this.setVariant(picker.currentVariant);
   }
 
   /* --------------------------------------------------------- public API -- */

@@ -73,6 +73,16 @@ export class SellingPlanSelector extends BaseComponent {
 
     this.on(this.root, EVENTS.VARIANT_UNAVAILABLE, () => this.applyVariant(null));
 
+    // Opening position, for the case where this component upgraded before the
+    // picker did and the direct read below found an element that was still a
+    // plain `HTMLElement`. Then the plan list belonged to no variant at all —
+    // in the quick add modal, the subscription card priced whatever Liquid had
+    // rendered rather than the flavour actually selected. See `VARIANT_READY`
+    // in `@theme/events`.
+    this.on(this.root, EVENTS.VARIANT_READY, (event) => {
+      this.applyVariant(event.detail?.variant ?? null, { silent: true });
+    });
+
     // Direct path: the variant that was already selected when this connected,
     // including a page loaded on a `?variant=` URL.
     const picker = this.root.querySelector?.('variant-picker');

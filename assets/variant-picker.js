@@ -66,6 +66,7 @@ export class VariantPicker extends BaseComponent {
 
     this.#markAvailability();
     this.#syncIdInput();
+    this.#announceReady();
   }
 
   /* --------------------------------------------------------- public API -- */
@@ -230,6 +231,39 @@ export class VariantPicker extends BaseComponent {
       variant.available
         ? themeString('variantSelected', '', { variant: variant.title })
         : themeString('soldOut', '')
+    );
+  }
+
+  /**
+   * Say what is selected, once, to whatever was already listening.
+   *
+   * Everything else on a product — the form, the price, the plan selector, the
+   * quick add summary — reads `currentVariant` directly in its own `setup()`.
+   * That only works for a component that upgrades *after* this one, and nothing
+   * guarantees it does: each component is a separate lazy module, so the order
+   * is whichever download finished first.
+   *
+   * A `<product-form>` that lost that race read `currentVariant` off an element
+   * that had not been upgraded yet, got `undefined`, and disabled its button
+   * with "Unavailable" — on a product with stock, and permanently, because this
+   * picker had nothing more to say until the customer touched it. It was most
+   * visible in the quick add modal, where every one of these components is
+   * upgraded for the first time inside the same fetch.
+   *
+   * `#commit()` is not what is called here on purpose. It means a choice was
+   * made: it rewrites the URL, moves the gallery and announces to a screen
+   * reader, none of which may happen because a component finished loading.
+   *
+   * @private
+   */
+  #announceReady() {
+    this.dispatch(
+      EVENTS.VARIANT_READY,
+      variantChangeDetail(this.#current, {
+        options: this.selectedOptions,
+        productId: this.dataset.productId,
+        sectionId: this.dataset.sectionId
+      })
     );
   }
 

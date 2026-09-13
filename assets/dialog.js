@@ -619,6 +619,38 @@ export class QuickAddModal extends ModalDialog {
       const { fetchSection, applyHTML } = await import('@theme/section-renderer');
       const html = await fetchSection(sectionId, { url, signal: this.#request.signal });
 
+      // A different product is inserted, never morphed onto the last one.
+      //
+      // `morph()` preserves custom element instances on purpose — that is what
+      // keeps a carousel alive across a filter refresh — and in this modal that
+      // is exactly the wrong thing. Every component here reads its product once,
+      // in `setup()`: `<variant-picker>` parses `[data-variants]`,
+      // `<quick-add-summary>` parses `[data-quick-add-product]`,
+      // `<selling-plan-selector>` parses `[data-allocations]`. An element that is
+      // never removed is never set up again, so from the second product onwards
+      // the modal showed one product's markup driven by another product's
+      // components.
+      //
+      // That is the reported bug. Open a product with options and the add button
+      // says "Unavailable"; open a second and it says "Add to cart"; come back to
+      // the first and it *still* says "Add to cart" — not because anything
+      // re-derived it, but because nothing did. Liquid had rendered a fresh
+      // button underneath a `<product-form>` that had stopped listening to it,
+      // and the picker was matching the new radios against the old product's
+      // variant list, which is how a customer could reach add-to-cart with a
+      // variant id that does not belong to the product on screen.
+      //
+      // Emptying the body first turns the morph into a plain insert: everything
+      // is created new and upgrades against its own product's JSON. Nothing is
+      // lost — a different product has no focus, no typed value and no scroll
+      // offset worth carrying across.
+      //
+      // The test is against the url rather than against "is the body empty",
+      // so it also clears the network-error message a previous failure left
+      // behind. Only an explicit `load()` of the product already showing keeps
+      // its markup, which is the one case where morphing is what is wanted.
+      if (this.#loadedUrl !== url) body.replaceChildren();
+
       // `childrenOnly`, and this is the whole of why the modal had no padding.
       //
       // `morph()` syncs attributes both ways: it copies the source's onto the
@@ -642,6 +674,13 @@ export class QuickAddModal extends ModalDialog {
       this.#loadedUrl = url;
     } catch (error) {
       if (error?.name === 'AbortError') return;
+
+      // Forget whatever was last loaded, so `beforeOpen()` cannot decide the
+      // modal is already showing it. Without this, a failed fetch left the error
+      // message in the body and the previous product's url in `#loadedUrl` —
+      // and reopening *that* product skipped the fetch and showed the error
+      // again, with no way back but a page reload.
+      this.#loadedUrl = null;
 
       console.error('[Boost10] <quick-add-modal> could not load the product.', error);
       body.textContent = themeString('networkError', '');
