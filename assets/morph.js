@@ -183,6 +183,23 @@ function morphAttributes(from, to) {
   for (let i = fromAttributes.length - 1; i >= 0; i -= 1) {
     const { name } = fromAttributes[i];
     if (name.startsWith('data-morph-')) continue;
+
+    // `open` on a dialog or a details element is never removed, even for a
+    // moment. It is not an attribute in the ordinary sense: taking it off a
+    // `<dialog>` that was opened with `showModal()` closes it — top layer gone,
+    // backdrop gone, the page behind it no longer inert — and putting it back is
+    // not an undo, because a dialog restored by its attribute is *non-modal*.
+    // Escape stops closing it and the page behind it becomes clickable through
+    // the overlay.
+    //
+    // `preserveOpenState()` below used to be the answer and could not be: it
+    // runs after this loop, so by the time it restored the attribute the damage
+    // was already done. The cart drawer is the case that matters — every
+    // quantity change re-renders the drawer's own section underneath an open
+    // drawer — and it is exactly the kind of breakage that only shows up on the
+    // second interaction, which is why it survived so long.
+    if (name === 'open' && OPEN_STATE_ELEMENTS.has(from.tagName)) continue;
+
     if (!to.hasAttribute(name)) from.removeAttribute(name);
   }
 }
@@ -263,6 +280,12 @@ function syncSelectValue(select, next) {
  *
  * The server always renders the closed state, so taking its `open` attribute
  * literally would slam every open accordion shut whenever filters refresh.
+ *
+ * `morphAttributes()` now declines to remove `open` at all, so in the common
+ * case there is nothing here to restore. This stays for the other direction —
+ * a live node that lost the attribute some other way, and the `data-morph-
+ * force-open` opt-out — and because "the customer owns this flag" is worth
+ * saying once in a named function rather than only as a `continue` in a loop.
  *
  * @param {Element} from
  * @param {Element} to

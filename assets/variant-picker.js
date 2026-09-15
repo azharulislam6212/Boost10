@@ -159,8 +159,35 @@ export class VariantPicker extends BaseComponent {
 
   /* ---------------------------------------------------------- internals -- */
 
-  /** @private */
-  #onChange = () => {
+  /**
+   * A control inside the picker was used.
+   *
+   * The guard is not defensive tidying — it is what stops this component from
+   * calling itself. `#commit()` ends in `#syncIdInput()`, which writes the
+   * chosen id onto `[name="id"]` and fires a bubbling `change` on it so anything
+   * watching the real form field hears about it. That field lives *inside*
+   * `<variant-picker>`, so the echo arrived back here, re-entered `#onChange`,
+   * committed the same variant again and fired the same echo — unbounded
+   * recursion that ended in a stack overflow every time.
+   *
+   * The damage was silent and specific, because of where in `#commit()` the
+   * overflow happened: `#markAvailability()` and `#syncSelectedLabels()` had
+   * already run, so the pills and the "Size: 120 Capsules" line moved to the new
+   * choice, while `variant:change` — dispatched *after* `#syncIdInput()` — was
+   * never reached. Everything downstream of the event therefore kept the variant
+   * the page was rendered with: the price block, the add button's label, and the
+   * variant the quick add modal handed to a bundle slot.
+   *
+   * So only a real option control counts as a choice. `selectOption()` and
+   * `selectVariant()` call this directly with no event, which is also a choice.
+   *
+   * @param {Event} [event]
+   * @private
+   */
+  #onChange = (event) => {
+    const target = event?.target;
+    if (target instanceof Element && !target.closest('[data-option-index]')) return;
+
     const variant = this.#findVariant(this.selectedOptions);
 
     this.#markAvailability();
@@ -328,13 +355,46 @@ export class VariantPicker extends BaseComponent {
     }
   }
 
-  /** @private */
+  /**
+   * Write the chosen id onto every field that carries it.
+   *
+   * Plural, and by selector rather than by ref, because there can genuinely be
+   * more than one and `refs.idInput` was read as if there were exactly one. The
+   * no-JS `<select>` answered to that name too, and it is normally invisible to
+   * this code — a browser parses `<noscript>` contents as text — but the quick
+   * add modal arrives through `DOMParser`, which parses with scripting disabled
+   * and therefore turns those contents into real elements. So in the modal, and
+   * only there, `refs.idInput` was an array: `array.value = …` set a property on
+   * it and `array.dispatchEvent` threw, taking the rest of `#commit()` with it —
+   * which is why the price and the add button kept the variant the modal opened
+   * on however many times the customer changed their mind.
+   *
+   * The echo is only fired when the value actually moved, so nothing downstream
+   * is woken up to be told what it already knows.
+   *
+   * @private
+   */
   #syncIdInput() {
-    const input = this.refs.idInput || this.closest('form')?.querySelector('[name="id"]');
-    if (!input) return;
+    // Every id control this picker owns, by what it is rather than by what it
+    // was named. A `data-ref` can be missing — the no-JS `<select>` deliberately
+    // has none now — and a control that carries the variant id and is *not*
+    // updated is worse than one that does not exist: it is form-associated by
+    // `form=` like the rest, so `FormData` can answer with it.
+    const inputs = [...this.querySelectorAll('[name="id"]')];
 
-    input.value = this.#current ? String(this.#current.id) : '';
-    input.dispatchEvent(new Event('change', { bubbles: true }));
+    if (inputs.length === 0) {
+      const fallback = this.closest('form')?.querySelector('[name="id"]');
+      if (fallback) inputs.push(fallback);
+    }
+
+    const value = this.#current ? String(this.#current.id) : '';
+
+    for (const input of inputs) {
+      if (!(input instanceof HTMLElement) || input.value === value) continue;
+
+      input.value = value;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    }
   }
 
   /**

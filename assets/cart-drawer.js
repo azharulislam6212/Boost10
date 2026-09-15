@@ -37,6 +37,135 @@ import { applySections, clearSectionCache } from '@theme/section-renderer';
    ========================================================================== */
 
 /**
+ * Turn the name a piece of markup uses for a section into the id Shopify
+ * actually renders it under.
+ *
+ * A section placed directly by a template is addressed by its own name —
+ * `cart-drawer`. A section placed by a *section group* is not: Shopify renders
+ * it as `sections--<group>__cart-drawer`, and that is the only id both the
+ * Section Rendering API and `#shopify-section-…` will answer to. Boost10 puts
+ * the drawer in `sections/overlay-group.json` and the header in
+ * `sections/header-group.json`, so every `data-sections="cart-drawer,header"` in
+ * the theme was naming two sections that do not exist under those names. The
+ * request came back with nothing to apply, and the drawer kept whatever markup
+ * the page had loaded with — which is a cart that shows the previous state, or
+ * an empty one, after a successful add.
+ *
+ * Resolved from the DOM rather than from a Liquid variable so the markup keeps
+ * saying which section it means, not where the theme currently happens to put
+ * it. A section that moves in or out of a group needs no change here.
+ *
+ * @param {string} name
+ * @returns {string} The rendered id, or `name` unchanged when nothing matches.
+ */
+function resolveSectionId(name) {
+  const id = String(name || '').trim();
+  if (!id) return '';
+
+  if (document.getElementById(`shopify-section-${id}`)) return id;
+
+  const grouped = document.querySelector(`[id^="shopify-section-"][id$="__${id}"]`);
+  return grouped ? grouped.id.slice('shopify-section-'.length) : id;
+}
+
+/**
+ * Whether a section has somewhere to land on the page as it stands.
+ *
+ * The registry is per page but the elements that fill it are not always: a
+ * `<cart-items>` on the cart page registers `main-cart`, and the free shipping
+ * bar's own section is only in the drawer. Asking the server to render a section
+ * with no wrapper to morph it into is a round trip whose result is thrown away,
+ * and `refresh()` re-fetches whatever did not apply — so without this, one
+ * absent section would mean one wasted request on every cart mutation, forever.
+ *
+ * @param {string} id
+ * @returns {boolean}
+ */
+function isSectionOnPage(id) {
+  return Boolean(
+    document.getElementById(`shopify-section-${id}`) || document.querySelector(`[data-section-id="${id}"]`)
+  );
+}
+
+/**
+ * Split a code field into individual codes.
+ *
+ * Merchant-typed and customer-typed free text, so it is trimmed, de-duplicated
+ * and emptied of blanks before it is ever put in a URL.
+ *
+ * @param {string} value
+ * @returns {string[]}
+ */
+function parseCodes(value) {
+  return [
+    ...new Set(
+      String(value || '')
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter(Boolean)
+    )
+  ];
+}
+
+/**
+ * Shopify's discount route for a set of codes.
+ *
+ * Built from `routes.root` rather than written as `/discount/…`, because a
+ * market prefixes every path with its locale and a literal would silently stop
+ * working on every market but the primary one.
+ *
+ * `redirect` keeps the response small: the route answers with a redirect and the
+ * browser follows it, so without a target it would be the whole homepage
+ * downloaded to be thrown away. `/cart.js` is the cheapest destination on the
+ * store, and if a Shopify version ignores the parameter the only cost is the
+ * bytes — the discount is set either way, and it is the cart read afterwards
+ * that this module actually believes.
+ *
+ * @param {string[]} codes
+ * @returns {string}
+ */
+function discountUrl(codes) {
+  const root = String(globalThis.Theme?.routes?.root || '/').replace(/\/+$/, '');
+  const path = `${root}/discount/${codes.map(encodeURIComponent).join(',')}`;
+
+  return `${path}?redirect=${encodeURIComponent(getRoute('cart', { json: true }))}`;
+}
+
+/**
+ * Whether a cart is actually being discounted by a given code.
+ *
+ * Shopify reports a discount in more than one shape and which one it uses
+ * depends on what kind of discount it is: an order-level one lands in
+ * `cart_level_discount_applications`, a product-level one only ever appears on
+ * the lines it touched. Checking a single field is how a working discount gets
+ * reported as a failure.
+ *
+ * Matched on title, which for a code-based discount is the code. Case-insensitive
+ * because Shopify upper-cases them and customers do not.
+ *
+ * @param {Object} state A cart, as returned by Shopify.
+ * @param {string} code
+ * @returns {boolean}
+ */
+export function cartHasDiscount(state, code) {
+  const wanted = code.toUpperCase();
+
+  const titles = [
+    ...(state?.discount_codes || []).map((entry) => entry?.code),
+    ...(state?.cart_level_discount_applications || []).map((entry) => entry?.title),
+    ...(state?.discount_applications || []).map((entry) => entry?.title),
+    ...(state?.items || []).flatMap((item) => [
+      ...(item?.discounts || []).map((entry) => entry?.title),
+      ...(item?.line_level_discount_allocations || []).map(
+        (entry) => entry?.discount_application?.title
+      )
+    ])
+  ];
+
+  return titles.some((title) => String(title || '').toUpperCase() === wanted);
+}
+
+/**
  * The single source of truth for cart state and the only code in the theme that
  * writes to a cart endpoint.
  */
@@ -48,33 +177,50 @@ export const cart = {
   _request: null,
 
   /**
-   * Section ids that should be re-rendered with every mutation.
-   * Registered by the elements that own them, so a page that has no free
-   * shipping bar never asks the server to render one.
+   * Section ids that should be re-rendered with every mutation, against the
+   * number of elements currently asking for each. Registered by the elements
+   * that own them, so a page that has no free shipping bar never asks the
+   * server to render one.
    *
-   * @type {Set<string>}
+   * Counted rather than a plain set, because two elements legitimately want the
+   * same section: `<cart-drawer>` asks for `cart-drawer` because it *is* that
+   * section, and the `<cart-items>` inside it asks for the same id because it is
+   * what a quantity change has to re-render. With a set, the first of them to
+   * leave took the id away from the other — so a cart emptied to zero discarded
+   * its `<cart-items>`, that teardown deregistered `cart-drawer`, and from then
+   * on no mutation re-rendered the drawer at all.
+   *
+   * @type {Map<string, number>}
    */
-  _sections: new Set(),
+  _sections: new Map(),
 
   /**
    * @param {string} sectionId
    */
   registerSection(sectionId) {
-    if (sectionId) this._sections.add(sectionId);
+    const id = resolveSectionId(sectionId);
+    if (!id) return;
+
+    this._sections.set(id, (this._sections.get(id) ?? 0) + 1);
   },
 
   /**
    * @param {string} sectionId
    */
   unregisterSection(sectionId) {
-    this._sections.delete(sectionId);
+    const id = resolveSectionId(sectionId);
+    const count = this._sections.get(id);
+    if (!count) return;
+
+    if (count > 1) this._sections.set(id, count - 1);
+    else this._sections.delete(id);
   },
 
   /**
    * @returns {string[]}
    */
   get sections() {
-    return Array.from(this._sections);
+    return Array.from(this._sections.keys());
   },
 
   /**
@@ -105,7 +251,17 @@ export const cart = {
       sections_url: window.location.pathname
     });
 
-    await this.refresh({ sections: data.sections });
+    // Past this line the items are in Shopify's cart. Nothing that follows is
+    // allowed to make the caller believe otherwise: a drawer that could not be
+    // re-rendered is a display failure, and a bundle that threw away the
+    // customer's six choices because of one is a far worse outcome than a
+    // drawer showing a stale total for a moment.
+    try {
+      await this.refresh({ sections: data.sections });
+    } catch (error) {
+      console.error('[Boost10] The cart was updated but the drawer could not be refreshed.', error);
+      this._dispatch(EVENTS.CART_ERROR, cartErrorDetail(themeString('cartError', ''), { code: 'refresh' }));
+    }
 
     const added = data.items?.[0] || data;
     this._dispatch(EVENTS.CART_ITEM_ADDED, cartUpdatedDetail(this.state, 'add', added));
@@ -231,27 +387,62 @@ export const cart = {
   },
 
   /**
-   * Record a discount code for checkout.
+   * Hand a discount code to Shopify, so Shopify prices the cart.
    *
-   * Shopify has no storefront endpoint that validates a code against a cart.
-   * `/discount/CODE` is a redirect that sets a cookie, not a JSON API, and
-   * fetching it neither validates the code nor reliably attaches it. So the code
-   * is stored as a cart attribute and appended to the checkout URL, and the UI
-   * says "applied at checkout" rather than claiming a saving the theme cannot
-   * verify. Announcing a discount that then fails at checkout is worse than
-   * saying nothing.
+   * ## Why this is two requests and not one
    *
-   * @param {string} code
-   * @returns {Promise<Object>}
+   * There is no cart endpoint that takes a discount code. `/discount/<code>` is
+   * the only place a storefront can give Shopify one: it is a redirect that puts
+   * the code on the session. Nothing is returned that is worth reading — the
+   * point of the call is the side effect.
+   *
+   * The second request is what makes the drawer true. `/cart/update.js` comes
+   * back with the cart *after* the discount, and with the cart sections rendered
+   * by Liquid from that same cart — so the line prices, the
+   * `cart_level_discount_applications` row and the total in the drawer are
+   * Shopify's own numbers, not the theme's. This module still never prices
+   * anything; it asks, and then it shows the answer.
+   *
+   * This replaces storing the code as a cart attribute and calling that
+   * "applied at checkout". That was honest about not knowing, and it was also
+   * the reason a bundle could show "You save $7.95" beside a cart drawer
+   * charging full price: nothing had ever been handed to Shopify to price. The
+   * attribute is still written, because `checkoutUrl` appends it and because a
+   * code Shopify holds for checkout but does not show on the cart is still worth
+   * carrying.
+   *
+   * ## Several codes
+   *
+   * Comma separated, in one request, because that is how the route takes them.
+   * Whether Shopify keeps all of them is Shopify's decision — discounts combine
+   * only when the merchant has marked them combinable, and an order-level code
+   * replaces another order-level code. The cart read afterwards is what says
+   * which survived, so `applied` is observed rather than assumed.
+   *
+   * @param {string} code One code, or several separated by commas.
+   * @returns {Promise<Object>} The cart, after Shopify has priced it.
    */
   async applyDiscount(code) {
-    const trimmed = String(code || '').trim();
-    if (!trimmed) return this.state;
+    const codes = parseCodes(code);
+    if (codes.length === 0) return this.state;
 
-    const data = await this.updateAttributes({ discount_code: trimmed });
+    // Best effort, and deliberately not fatal. A failure here means the code was
+    // not put on the session; the update below still records it for checkout,
+    // which is exactly where this module stood before.
+    try {
+      await fetch(discountUrl(codes), { headers: { Accept: 'application/json' } });
+    } catch (error) {
+      console.warn(`[Boost10] Could not hand ${codes.join(', ')} to Shopify.`, error);
+    }
 
-    this._dispatch(EVENTS.CART_DISCOUNT, { code: trimmed, cart: data });
-    announce(themeString('discountApplied', ''));
+    const data = await this.updateAttributes({ discount_code: codes.join(',') });
+    const applied = codes.filter((entry) => cartHasDiscount(data, entry));
+
+    this._dispatch(EVENTS.CART_DISCOUNT, { code: codes.join(','), codes, applied, cart: data });
+
+    // Only when the cart actually shows it. Announcing an applied discount for a
+    // code Shopify ignored is the claim this whole method exists to stop making.
+    if (applied.length > 0) announce(themeString('discountApplied', ''));
 
     return data;
   },
@@ -259,11 +450,18 @@ export const cart = {
   /**
    * Clear the stored discount code.
    *
+   * The attribute goes, so `checkoutUrl` stops carrying the code. A code already
+   * on the session does not: Shopify has no storefront route that takes one off,
+   * and inventing one that appears to work would be worse than the gap. The cart
+   * read below is therefore the honest answer — if Shopify is still applying the
+   * discount, the drawer keeps showing it, and `<promo-code>` renders it as an
+   * applied discount with no remove button rather than as a pending one.
+   *
    * @returns {Promise<Object>}
    */
   async removeDiscount() {
     const data = await this.updateAttributes({ discount_code: '' });
-    this._dispatch(EVENTS.CART_DISCOUNT, { code: null, cart: data });
+    this._dispatch(EVENTS.CART_DISCOUNT, { code: null, codes: [], applied: [], cart: data });
     return data;
   },
 
@@ -286,12 +484,33 @@ export const cart = {
    * @returns {Promise<Object>}
    */
   async refresh({ sections } = {}) {
-    if (sections) {
-      this._applySections(sections);
-    } else if (this.sections.length > 0) {
-      const { fetchSections } = await import('@theme/section-renderer');
-      const rendered = await fetchSections(this.sections, { cache: false });
-      this._applySections(rendered);
+    const wanted = this.sections;
+
+    // What the mutation already rendered for us, if anything. `_applySections`
+    // reports what it could actually place, which is not the same as what was
+    // asked for: a section the current template does not have is skipped, and so
+    // — silently, until now — is one whose id the server did not recognise.
+    const applied = sections ? this._applySections(sections) : [];
+
+    // Anything still stale is fetched. This is what removes the race the drawer
+    // used to lose: whatever the add response did or did not contain, every
+    // section the cart owns is current by the time this resolves, and the drawer
+    // is not revealed until then.
+    const missing = wanted.filter((id) => !applied.includes(id) && isSectionOnPage(id));
+
+    // Best effort, and it has to be. Re-rendering markup and re-reading the cart
+    // are two different jobs, and letting the first stop the second is how the
+    // drawer ends up showing the right lines beside a free shipping bar that
+    // still thinks the cart is empty: `cart.state` is what every indicator in
+    // the theme reads — the bar, the badges, the gift threshold — and it is not
+    // allowed to go stale because one section failed to render.
+    if (missing.length > 0) {
+      try {
+        const { fetchSections } = await import('@theme/section-renderer');
+        this._applySections(await fetchSections(missing, { cache: false }));
+      } catch (error) {
+        console.warn(`[Boost10] Could not re-render ${missing.join(', ')}.`, error);
+      }
     }
 
     const response = await fetch(getRoute('cart', { json: true }), {
@@ -357,11 +576,12 @@ export const cart = {
 
   /**
    * @param {Object} sections
+   * @returns {string[]} The ids that were placed on the page.
    * @private
    */
   _applySections(sections) {
-    if (!sections) return;
-    applySections(sections);
+    if (!sections) return [];
+    return applySections(sections);
   },
 
   /**

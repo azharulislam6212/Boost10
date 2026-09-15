@@ -243,6 +243,67 @@
   assign tiers = tier_parts | split: ',' | join: ','
 
   comment
+    ---- the per-slot discount ----
+
+    A tier is a rung on a ladder: "reach three items and the tray is 25% off".
+    A slot discount is a different offer that happens to be configured beside it
+    — "whatever goes in slot one comes with CODE and 56% off it" — and the two
+    are not interchangeable, which is why this is its own panel and its own
+    payload rather than another number folded into `data-tiers`.
+
+    Serialised as JSON rather than as a third and fourth field on the attribute.
+    A discount code is merchant-typed free text and the attribute format is
+    comma-and-colon separated, so a code with a comma in it would silently take
+    the next slot's place.
+
+    Only what a slot actually has is emitted. A slot with no code and no value is
+    absent from the array, and the tray falls back to the ladder for it — which
+    is exactly the behaviour every store already running this section has.
+  endcomment
+  assign slot_discounts = ''
+  for i in (1..slots)
+    assign code_key = 'tier_' | append: i | append: '_code'
+    assign type_key = 'tier_' | append: i | append: '_value_type'
+    assign slot_percent_key = 'tier_' | append: i | append: '_discount_percent'
+    assign slot_amount_key = 'tier_' | append: i | append: '_discount_amount'
+
+    assign slot_code = s[code_key] | default: '' | strip
+    assign slot_type = s[type_key] | default: 'percentage'
+
+    comment
+      The slot's own value, never the tier's. They are separate fields on
+      purpose: `tier_N_percent` is the ladder, which every store already using
+      this section has set, and reading it here would have turned six configured
+      rungs into six per-slot discounts on upgrade. Unset means unset, and an
+      unset slot falls back to the ladder exactly as before.
+
+      Money in cents, to match every other price the component handles.
+    endcomment
+    assign slot_value = 0
+    if slot_type == 'amount'
+      assign slot_value = s[slot_amount_key] | default: 0 | times: 100 | round
+    else
+      assign slot_value = s[slot_percent_key] | default: 0 | plus: 0
+    endif
+
+    if slot_code != blank or slot_value > 0
+      capture slot_entry
+        echo '{"slot":'
+        echo i
+        echo ',"code":'
+        echo slot_code | json
+        echo ',"type":'
+        echo slot_type | json
+        echo ',"value":'
+        echo slot_value
+        echo '}'
+      endcapture
+      assign slot_discounts = slot_discounts | append: slot_entry | append: '||'
+    endif
+  endfor
+  assign slot_discounts = slot_discounts | split: '||' | join: ','
+
+  comment
     The element is a flex row and nothing more. Which side the tray is on used
     to be a select here that swapped a grid's columns; it is the order of two
     Groups now, which is both more direct and more capable — a merchant who
@@ -375,6 +436,22 @@
       data-bundle-label="{{ s.tray_heading | escape }}"
       data-quick-add="{{ settings.enable_quick_add }}"
     >
+      {%- comment -%}
+        The per-slot discounts, as JSON, read once by `assets/product-bundle.js`.
+
+        Rendered here and not on the slot boxes, because the tray is what owns
+        them: a slot's discount has to be known for the total and for the line
+        properties whether or not the Slot box block is the thing that draws it,
+        and a merchant is free to arrange those blocks — or leave one out.
+
+        The array is the merchant's settings and nothing else. What a slot costs
+        with one applied is worked out from it in one place, so the number on the
+        box and the number in the total cannot disagree.
+      {%- endcomment -%}
+      <script type="application/json" data-bundle-discounts>
+        [{{ slot_discounts }}]
+      </script>
+
       {%- comment -%}
         ---------- what the merchant arranged ----------
 
@@ -640,6 +717,195 @@
       "label": "t:sections.product_bundle.settings.tier_percent.label_6",
       "min": 0, "max": 70, "step": 5, "unit": "%", "default": 40,
       "visible_if": "{{ section.settings.tray_style == 'ladder' and section.settings.tier_6_enable }}"
+    },
+
+    { "type": "header", "content": "t:sections.product_bundle.headers.slot_discount" },
+    { "type": "paragraph", "content": "t:sections.product_bundle.paragraphs.slot_discount" },
+    { "type": "header", "content": "t:sections.product_bundle.headers.slot_1" },
+    {
+      "type": "text",
+      "id": "tier_1_code",
+      "label": "t:sections.product_bundle.settings.slot_code.label",
+      "info": "t:sections.product_bundle.settings.slot_code.info"
+    },
+    {
+      "type": "select",
+      "id": "tier_1_value_type",
+      "label": "t:sections.product_bundle.settings.slot_value_type.label",
+      "options": [
+        { "value": "percentage", "label": "t:sections.product_bundle.settings.slot_value_type.options__1.label" },
+        { "value": "amount", "label": "t:sections.product_bundle.settings.slot_value_type.options__2.label" }
+      ],
+      "default": "percentage"
+    },
+    {
+      "type": "range",
+      "id": "tier_1_discount_percent",
+      "label": "t:sections.product_bundle.settings.slot_percent.label",
+      "min": 0, "max": 100, "step": 1, "unit": "%", "default": 0,
+      "visible_if": "{{ section.settings.tier_1_value_type == 'percentage' }}"
+    },
+    {
+      "type": "number",
+      "id": "tier_1_discount_amount",
+      "label": "t:sections.product_bundle.settings.slot_amount.label",
+      "info": "t:sections.product_bundle.settings.slot_amount.info",
+      "visible_if": "{{ section.settings.tier_1_value_type == 'amount' }}"
+    },
+    { "type": "header", "content": "t:sections.product_bundle.headers.slot_2" },
+    {
+      "type": "text",
+      "id": "tier_2_code",
+      "label": "t:sections.product_bundle.settings.slot_code.label",
+      "info": "t:sections.product_bundle.settings.slot_code.info"
+    },
+    {
+      "type": "select",
+      "id": "tier_2_value_type",
+      "label": "t:sections.product_bundle.settings.slot_value_type.label",
+      "options": [
+        { "value": "percentage", "label": "t:sections.product_bundle.settings.slot_value_type.options__1.label" },
+        { "value": "amount", "label": "t:sections.product_bundle.settings.slot_value_type.options__2.label" }
+      ],
+      "default": "percentage"
+    },
+    {
+      "type": "range",
+      "id": "tier_2_discount_percent",
+      "label": "t:sections.product_bundle.settings.slot_percent.label",
+      "min": 0, "max": 100, "step": 1, "unit": "%", "default": 0,
+      "visible_if": "{{ section.settings.tier_2_value_type == 'percentage' }}"
+    },
+    {
+      "type": "number",
+      "id": "tier_2_discount_amount",
+      "label": "t:sections.product_bundle.settings.slot_amount.label",
+      "info": "t:sections.product_bundle.settings.slot_amount.info",
+      "visible_if": "{{ section.settings.tier_2_value_type == 'amount' }}"
+    },
+    { "type": "header", "content": "t:sections.product_bundle.headers.slot_3" },
+    {
+      "type": "text",
+      "id": "tier_3_code",
+      "label": "t:sections.product_bundle.settings.slot_code.label",
+      "info": "t:sections.product_bundle.settings.slot_code.info"
+    },
+    {
+      "type": "select",
+      "id": "tier_3_value_type",
+      "label": "t:sections.product_bundle.settings.slot_value_type.label",
+      "options": [
+        { "value": "percentage", "label": "t:sections.product_bundle.settings.slot_value_type.options__1.label" },
+        { "value": "amount", "label": "t:sections.product_bundle.settings.slot_value_type.options__2.label" }
+      ],
+      "default": "percentage"
+    },
+    {
+      "type": "range",
+      "id": "tier_3_discount_percent",
+      "label": "t:sections.product_bundle.settings.slot_percent.label",
+      "min": 0, "max": 100, "step": 1, "unit": "%", "default": 0,
+      "visible_if": "{{ section.settings.tier_3_value_type == 'percentage' }}"
+    },
+    {
+      "type": "number",
+      "id": "tier_3_discount_amount",
+      "label": "t:sections.product_bundle.settings.slot_amount.label",
+      "info": "t:sections.product_bundle.settings.slot_amount.info",
+      "visible_if": "{{ section.settings.tier_3_value_type == 'amount' }}"
+    },
+    { "type": "header", "content": "t:sections.product_bundle.headers.slot_4" },
+    {
+      "type": "text",
+      "id": "tier_4_code",
+      "label": "t:sections.product_bundle.settings.slot_code.label",
+      "info": "t:sections.product_bundle.settings.slot_code.info"
+    },
+    {
+      "type": "select",
+      "id": "tier_4_value_type",
+      "label": "t:sections.product_bundle.settings.slot_value_type.label",
+      "options": [
+        { "value": "percentage", "label": "t:sections.product_bundle.settings.slot_value_type.options__1.label" },
+        { "value": "amount", "label": "t:sections.product_bundle.settings.slot_value_type.options__2.label" }
+      ],
+      "default": "percentage"
+    },
+    {
+      "type": "range",
+      "id": "tier_4_discount_percent",
+      "label": "t:sections.product_bundle.settings.slot_percent.label",
+      "min": 0, "max": 100, "step": 1, "unit": "%", "default": 0,
+      "visible_if": "{{ section.settings.tier_4_value_type == 'percentage' }}"
+    },
+    {
+      "type": "number",
+      "id": "tier_4_discount_amount",
+      "label": "t:sections.product_bundle.settings.slot_amount.label",
+      "info": "t:sections.product_bundle.settings.slot_amount.info",
+      "visible_if": "{{ section.settings.tier_4_value_type == 'amount' }}"
+    },
+    { "type": "header", "content": "t:sections.product_bundle.headers.slot_5" },
+    {
+      "type": "text",
+      "id": "tier_5_code",
+      "label": "t:sections.product_bundle.settings.slot_code.label",
+      "info": "t:sections.product_bundle.settings.slot_code.info"
+    },
+    {
+      "type": "select",
+      "id": "tier_5_value_type",
+      "label": "t:sections.product_bundle.settings.slot_value_type.label",
+      "options": [
+        { "value": "percentage", "label": "t:sections.product_bundle.settings.slot_value_type.options__1.label" },
+        { "value": "amount", "label": "t:sections.product_bundle.settings.slot_value_type.options__2.label" }
+      ],
+      "default": "percentage"
+    },
+    {
+      "type": "range",
+      "id": "tier_5_discount_percent",
+      "label": "t:sections.product_bundle.settings.slot_percent.label",
+      "min": 0, "max": 100, "step": 1, "unit": "%", "default": 0,
+      "visible_if": "{{ section.settings.tier_5_value_type == 'percentage' }}"
+    },
+    {
+      "type": "number",
+      "id": "tier_5_discount_amount",
+      "label": "t:sections.product_bundle.settings.slot_amount.label",
+      "info": "t:sections.product_bundle.settings.slot_amount.info",
+      "visible_if": "{{ section.settings.tier_5_value_type == 'amount' }}"
+    },
+    { "type": "header", "content": "t:sections.product_bundle.headers.slot_6" },
+    {
+      "type": "text",
+      "id": "tier_6_code",
+      "label": "t:sections.product_bundle.settings.slot_code.label",
+      "info": "t:sections.product_bundle.settings.slot_code.info"
+    },
+    {
+      "type": "select",
+      "id": "tier_6_value_type",
+      "label": "t:sections.product_bundle.settings.slot_value_type.label",
+      "options": [
+        { "value": "percentage", "label": "t:sections.product_bundle.settings.slot_value_type.options__1.label" },
+        { "value": "amount", "label": "t:sections.product_bundle.settings.slot_value_type.options__2.label" }
+      ],
+      "default": "percentage"
+    },
+    {
+      "type": "range",
+      "id": "tier_6_discount_percent",
+      "label": "t:sections.product_bundle.settings.slot_percent.label",
+      "min": 0, "max": 100, "step": 1, "unit": "%", "default": 0,
+      "visible_if": "{{ section.settings.tier_6_value_type == 'percentage' }}"
+    },
+    {
+      "type": "number",
+      "id": "tier_6_discount_amount",
+      "label": "t:sections.product_bundle.settings.slot_amount.label",
+      "info": "t:sections.product_bundle.settings.slot_amount.info",
+      "visible_if": "{{ section.settings.tier_6_value_type == 'amount' }}"
     },
 
     { "type": "header", "content": "t:sections.bundle_builder.headers.picker" },

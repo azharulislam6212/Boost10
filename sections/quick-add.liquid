@@ -146,10 +146,20 @@
 
   <div class="quick-add__options">
     {%- unless product.has_only_default_variant -%}
+      {%- comment -%}
+        `no_script: false` — this section is only ever reached by a fetch, so a
+        no-JS fallback inside it can never be the thing that saves a sale, and it
+        is actively harmful here: the modal's markup arrives through `DOMParser`,
+        which materialises `<noscript>` contents as real elements. That put a
+        second `name="id"` control in front of the live one in tree order, and
+        `new FormData(form).get('id')` answered with it — the variant the modal
+        opened on, whatever the customer chose afterwards.
+      {%- endcomment -%}
       {% render 'variant-picker',
          product: product,
          section: section,
          update_url: false,
+         no_script: false,
          form_id: form_id %}
     {%- endunless -%}
   </div>
@@ -315,8 +325,15 @@
     {%- comment -%}
       No subscriptions on this product, so the price is its own row rather than
       a column of a card that is not there.
+
+      `data-one-time-price` is the hook `<quick-add-summary>` rewrites on every
+      variant change. Without it this row was Liquid's one-time answer for the
+      variant the modal opened on and nothing ever revisited it, so a customer
+      who switched size read the first size's price — on the line they are
+      deciding from. It is the same hook the subscription layout's one-time card
+      carries, which is why one writer keeps both in step.
     {%- endcomment -%}
-    <div class="quick-add__price">
+    <div class="quick-add__price" data-one-time-price>
       {% render 'price', variant: current, context: 'product', show_badges: true %}
     </div>
   {%- endif -%}

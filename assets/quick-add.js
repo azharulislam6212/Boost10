@@ -215,6 +215,18 @@ export class QuickAddSummary extends BaseComponent {
     const oneTime = this.root.querySelector('[data-one-time-price] [data-price-current]');
     if (oneTime instanceof HTMLElement) oneTime.textContent = formatMoney(Number(variant.price));
 
+    // The struck-through figure is part of the same answer. Leaving it on the
+    // previous variant's compare-at is how a customer ends up reading a saving
+    // that was never offered on the size they are looking at.
+    const oneTimeCompare = this.root.querySelector('[data-one-time-price] [data-price-compare]');
+    if (oneTimeCompare instanceof HTMLElement) {
+      const compare = Number(variant.compare_at_price);
+      const show = Number.isFinite(compare) && compare > Number(variant.price);
+
+      oneTimeCompare.textContent = show ? formatMoney(compare) : '';
+      oneTimeCompare.toggleAttribute('hidden', !show);
+    }
+
     this.#renderSaving('[data-one-time-price]', Number(variant.compare_at_price), Number(variant.price));
 
     const plans = this.#allocations?.[String(variant.id)] || [];
@@ -290,22 +302,7 @@ export class QuickAddSummary extends BaseComponent {
     // ancestor of everything the section rendered into it.
     const bundleMode = this.closest('[data-bundle-mode]') !== null;
 
-    // The form's current word for the button, taken fresh every time.
-    //
-    // It is read back off the button rather than remembered, because the form
-    // rewrites it: "Add to cart" for an ordinary variant, "Pre-order" for one
-    // on backorder. A remembered first value would still say "Add to cart"
-    // after the customer switched to a variant that is a pre-order.
-    //
-    // Splitting on the separator is what makes re-reading safe. Every run ends
-    // with `<label>{SEPARATOR}<price>…`, so taking the first segment recovers
-    // exactly what the form wrote, whether this has run before or not — and no
-    // label the form writes contains the separator.
-    // The span the form writes into when the button has one, and the button
-    // otherwise. Reading the base label from the same element the next line
-    // writes to is what keeps the round trip exact — taking it off the button
-    // while writing to a span inside it would fold the spinner's own (empty)
-    // text into the label on every pass.
+
     const label = labelTarget(button);
 
     const base = bundleMode

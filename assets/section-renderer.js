@@ -341,12 +341,30 @@ export function applySections(sections, { root = document, morphOptions } = {}) 
     if (!live) continue;
 
     const parsed = new DOMParser().parseFromString(html, 'text/html');
+
+    // The last resort is a single unwrapped root, and only when it is the same
+    // kind of element as the one it would replace.
+    //
+    // It used to be `parsed.body.firstElementChild`, unconditionally, which is
+    // fine for the response it was written for and dangerous for any other. When
+    // an id does not resolve — a section that has moved into a section group, a
+    // server that answered with something else entirely — `live` could still be
+    // matched by the `[data-section-id]` fallback, and this then handed `morph()`
+    // the first element of an unrelated document to apply to it. That is how a
+    // cart drawer ends up with a correct header, a correct footer and an item
+    // list with nothing in it.
+    const body = parsed.body;
+    const onlyRoot = body.children.length === 1 ? body.firstElementChild : null;
+
     const next =
       parsed.querySelector(`#shopify-section-${cssEscape(sectionId)}`) ||
       parsed.querySelector(`[data-section-id="${cssEscape(sectionId)}"]`) ||
-      parsed.body.firstElementChild;
+      (onlyRoot?.tagName === live.tagName ? onlyRoot : null);
 
-    if (!next) continue;
+    if (!next) {
+      console.warn(`[Boost10] applySections found no markup for "${sectionId}" in the response.`);
+      continue;
+    }
 
     morph(live, next, morphOptions);
     notifyRendered(sectionId, live);

@@ -25,6 +25,7 @@
   @param {object} [current]
   @param {string} [form_id]
   @param {boolean} [is_size_option]
+  @param {boolean} [no_script] - Default true. Set false on a surface that only exists because JavaScript ran — see the note on the fallback below.
   @param {object} [option]
   @param {string} [resolved_shape]
   @param {string} [this_picker]
@@ -207,25 +208,45 @@
     </fieldset>
   {%- endfor -%}
 
-  <noscript>
-    <label class="visually-hidden" for="{{ section.id }}-variant-select">{{ 'products.variants.legend' | t }}</label>
-    <select
-      id="{{ section.id }}-variant-select"
-      name="id"
-      form="{{ form_id }}"
-      data-ref="idInput"
-    >
-      {%- for variant in product.variants -%}
-        <option
-          value="{{ variant.id }}"
-          {% if variant == current %}selected{% endif %}
-          {% unless variant.available %}disabled{% endunless %}
-        >
-          {{ variant.title }} &ndash; {{ variant.price | money }}
-        </option>
-      {%- endfor -%}
-    </select>
-  </noscript>
+  {%- comment -%}
+    The no-JS fallback, and the two reasons it is conditional and unnamed.
+
+    `data-ref` is gone from it. A browser parses `<noscript>` contents as plain
+    text, so this `<select>` is not an element on a normally loaded page and the
+    picker's single `idInput` ref was the hidden input below. Markup fetched into
+    the quick add modal, though, is parsed by `DOMParser` — which parses with
+    scripting disabled — and there this became a real element answering to the
+    same ref name. `refs` returns an array when a name is used twice, and
+    `#syncIdInput()` treated it as one element: the write went nowhere and the
+    `dispatchEvent` that followed threw, which aborted `#commit()` before it could
+    announce `variant:change`. Nothing here needs a ref; `#syncIdInput()` is the
+    JavaScript path and this is the one where it never runs.
+
+    `no_script` then removes it altogether on a surface that only exists because
+    JavaScript ran. It would still be form-associated by `form=` in the modal, and
+    it comes first in tree order, so `new FormData(form).get('id')` answered with
+    this select's value — which nothing updates — rather than with the live one.
+  {%- endcomment -%}
+  {%- unless no_script == false -%}
+    <noscript>
+      <label class="visually-hidden" for="{{ section.id }}-variant-select">{{ 'products.variants.legend' | t }}</label>
+      <select
+        id="{{ section.id }}-variant-select"
+        name="id"
+        form="{{ form_id }}"
+      >
+        {%- for variant in product.variants -%}
+          <option
+            value="{{ variant.id }}"
+            {% if variant == current %}selected{% endif %}
+            {% unless variant.available %}disabled{% endunless %}
+          >
+            {{ variant.title }} &ndash; {{ variant.price | money }}
+          </option>
+        {%- endfor -%}
+      </select>
+    </noscript>
+  {%- endunless -%}
 
   <input type="hidden" name="id" value="{{ current.id }}" form="{{ form_id }}" data-ref="idInput">
 </variant-picker>
