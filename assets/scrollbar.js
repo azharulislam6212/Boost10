@@ -223,9 +223,33 @@ export class SmoothScrollbar extends BaseComponent {
       const lenis = this.#lenis;
       if (!lenis) return;
 
+      // Re-measure before doing anything else.
+      //
+      // This is what was yanking the page on reload. Lenis keeps its own cached
+      // page height, and it refreshes it from a ResizeObserver that is
+      // DEBOUNCED BY 250ms (`Dimensions` in assets/lenis.js) — so for the whole
+      // of a page load, while images decode, fonts swap, carousels mount and a
+      // phone's address bar collapses, that cached height is the height the
+      // page had a moment ago, not the height it has now.
+      //
+      // `scrollTo()` clamps its target to the limit that cached height implies.
+      // So on a reload deep into a long page, the browser would restore the
+      // customer correctly to, say, 2000px, this would ask Lenis to adopt 2000,
+      // Lenis would clamp it to the 1200px it still believed the page ended at,
+      // and — because the immediate path writes the result back out through
+      // `setScroll()` — the page was actively scrolled UP to 1200. Three calls
+      // below, so it could happen more than once.
+      //
+      // Refreshing the measurements first costs one layout read and makes the
+      // clamp a no-op, which is what it should always have been. Nothing else
+      // in Lenis is touched: this only updates the cached width and height.
+      lenis.dimensions.resize();
+
       const actual = window.scrollY;
       // A pixel of slack: `animatedScroll` is fractional mid-animation, and a
-      // hard comparison would re-seek on every frame it is called.
+      // hard comparison would re-seek on every frame it is called. It is also
+      // what keeps this from interrupting a customer who has already started
+      // scrolling before `load` fires.
       if (Math.abs(actual - (lenis.animatedScroll ?? 0)) <= 1) return;
 
       lenis.scrollTo(actual, { immediate: true, force: true });
