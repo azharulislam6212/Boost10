@@ -569,8 +569,9 @@ export class SwiperCarousel extends BaseComponent {
    *
    * ## Why Liquid does not write this class
    *
-   * `swiper.css` is unlayered, so `.swiper-wrapper { display: flex }` beats the
-   * `display: grid` that `@layer components` gives `.product-grid`,
+   * `swiper.css` is in `@layer overrides`, the last layer in the order, so
+   * `.swiper-wrapper { display: flex }` beats the `display: grid` that
+   * `@layer components` gives `.product-grid`,
    * `.multicolumn__grid` and `.testimonials__grid`. A section set to *Grid* on
    * desktop and *Carousel* on mobile is the same nodes at both widths, so with
    * the class in the markup its desktop grid rendered as a flex row — every
