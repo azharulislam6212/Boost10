@@ -2,7 +2,7 @@
  * announcement-bar.js — Boost10
  *
  * Dismissal, and only dismissal. Slider and marquee behaviour belong to
- * `<swiper-carousel>` and `<motion-effect>`, which are already inside.
+ * `<carousel-slider>` and `<motion-effect>`, which are already inside.
  *
  * ## Why the flag is keyed by section id
  *

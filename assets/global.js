@@ -103,7 +103,7 @@ const LAZY_MODULES = [
   { specifier: '@theme/form-validation', tags: ['validated-form'] },
   { specifier: '@theme/variant-swatch', tags: ['variant-swatch'] },
 
-  { specifier: '@theme/carousel', tags: ['swiper-carousel'] },
+  { specifier: '@theme/carousel', tags: ['carousel-slider'] },
   { specifier: '@theme/testimonial-product', tags: ['testimonial-product'] },
 
   // `<button-swap>` is only emitted for buttons whose hover effect actually

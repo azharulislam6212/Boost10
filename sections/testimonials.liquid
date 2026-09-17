@@ -56,8 +56,8 @@
 
   `{% content_for 'block', type: '_testimonial-intro' %}`, the same mechanism
   `sections/feature-cards.liquid` uses for its heading cluster. Inside the track
-  it would be a slide: it would scroll away on the first arrow press, and Swiper
-  would count it when deciding whether the merchant's Loop setting is
+  it would be a slide: it would scroll away on the first arrow press, and it
+  would be counted when deciding whether the merchant's Loop setting is
   achievable. Outside it, it holds its column and the reviews move past it.
 
   `--tc-intro-width` is published by the block and read by the grid here, so the
@@ -66,7 +66,7 @@
 
   ## The controls are outside the track, and that is why the id exists
 
-  Rendered under the row rather than inside `<swiper-carousel>`, because the
+  Rendered under the row rather than inside `<carousel-slider>`, because the
   track bleeds off the screen and controls inside it would go with it — arrows
   set to Outside would end up beyond the viewport edge.
 
@@ -83,16 +83,16 @@
   and a stagger, rather than an effect on each card. A card is a merchant block
   — `{% content_for 'blocks' %}` renders them all in one call and passes no
   index — so there is no `forloop.index0` to turn into a per-card delay.
-  Targeting rather than `data-children` is deliberate: once Swiper mounts it
-  moves the cards into a wrapper of its own, and a selector still finds them
+  Targeting rather than `data-children` is deliberate: the effect’s children
+  are the carousel element, not the cards, and a selector still finds them
   where a child list would not.
 
   ## Nothing clips
 
   A card's product disc hangs past the bottom of the card on purpose. So the
   track carries `--tc-thumb-overhang` worth of padding underneath it rather than
-  `overflow: hidden` anywhere, and Swiper's own wrapper is left visible in
-  `base.css`.
+  `overflow: hidden` anywhere. The element only clips once it is running, and
+  the padding is below the clip either way.
 
   ## Migration note
 
@@ -256,7 +256,7 @@
 
     Two types, two answers, resolved exactly as `sections/feature-cards.liquid`
     resolves them. Only `carousel` reaches `data-layout`, or the component would
-    try to build a Swiper out of a layout that is not one.
+    try to build a carousel out of a layout that is not one.
 
     The default is Carousel rather than Grid — the row is drawn against a fixed
     intro panel and running past the edge of the page — but Grid is a real
@@ -294,10 +294,11 @@
     The slide count, and only the slides.
 
     `carousel-options` uses it to decide whether the merchant's Loop setting is
-    achievable — Swiper silently disables looping below twice `slidesPerView`,
-    which reads as the setting doing nothing. So it has to be the number of
-    cards, not `section.blocks.size`: an app block sitting in the row would
-    inflate the number and let a loop through that Swiper then refuses.
+    achievable — a loop below twice `slidesPerView` has too few slides to fill
+    the far side of the seam, so it is refused and a rewind is sent instead. So
+    it has to be the number of cards, not `section.blocks.size`: an app block
+    sitting in the row would inflate the number and let a loop through that is
+    then refused.
   endcomment
   assign cs_count = 0
   for review_block in section.blocks
@@ -349,9 +350,9 @@
 
     Stated here rather than on the card, and inherited by every card, because
     the section is the only element that can reserve room for it: the disc hangs
-    past the bottom of the card and swiper.css gives the carousel element
-    `overflow: hidden`. The track's bottom padding and the disc's overhang are the
-    same number, so they are the same setting.
+    past the bottom of the card and the carousel element clips while it runs.
+    The track’s bottom padding and the disc’s overhang are the same number, so
+    they are the same setting.
 
     `blocks/_testimonial-card.liquid` documents the other half of this.
   endcomment
@@ -515,7 +516,7 @@
            target: '.testimonial-card',
            stagger: card_stagger %}
       >
-        <swiper-carousel
+        <carousel-slider
           {% render 'carousel-shell-attrs',
              settings: s,
              id: carousel_id,
@@ -546,7 +547,7 @@
              layout: cs_layout,
              layout_mobile: cs_layout_mobile,
              detached: true %}
-        </swiper-carousel>
+        </carousel-slider>
       </motion-effect>
     </div>
 

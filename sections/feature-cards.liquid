@@ -89,9 +89,8 @@
   in step, and it survives a merchant reordering the row.
 
   Targeting rather than `data-children` is deliberate: the panel's children are
-  the carousel element, not the cards, and once Swiper mounts it moves the
-  cards into a wrapper of its own. A selector still finds them; a child list
-  would not.
+  the carousel element, not the cards, which sit one level further down inside
+  the track. A selector still finds them; a child list would not.
 {% endcomment %}
 
 {%- liquid
@@ -267,8 +266,8 @@
     ---- the carousel ----
 
     Two types, two answers. `grid` is a CSS grid; only `carousel` reaches
-    `data-layout`, or the component would try to build a Swiper out of a layout
-    that is not one.
+    `data-layout`, or the component would try to build a carousel out of a
+    layout that is not one.
   endcomment
   assign layout_type = s.layout | default: 'grid'
 
@@ -301,11 +300,11 @@
     The slide count, and only the slides.
 
     `carousel-options` uses it to decide whether the merchant's Loop setting is
-    achievable — Swiper silently disables looping below twice `slidesPerView`,
-    which reads as the setting doing nothing. So it has to be the number of
-    cards, not `section.blocks.size`: an app block sitting in the row, or the
-    static heading if the platform ever counts it, would inflate the number and
-    let a loop through that Swiper then refuses.
+    achievable — a loop below twice `slidesPerView` has too few slides to fill
+    the far side of the seam, so it is refused and a rewind is sent instead. So
+    it has to be the number of cards, not `section.blocks.size`: an app block
+    sitting in the row, or the static heading if the platform ever counts it,
+    would inflate the number and let a loop through that is then refused.
   endcomment
   assign cs_count = 0
   for feature_block in section.blocks
@@ -385,9 +384,9 @@
 
     `--grid-gap-*` is still what the row is finally spaced by, so the pre-init
     grid, the `.feature-cards` grid layout and `carousel-vars`' slide widths all
-    keep reading the one pair of names they already read. `carousel.js` measures
-    the track's used `column-gap` and re-measures on a breakpoint change, so
-    Swiper's `spaceBetween` follows the step-down without being told about it.
+    keep reading the one pair of names they already read. The carousel's spacing
+    is a CSS `gap` built from the same properties, so it follows the step-down
+    without anything having to be told about it.
 
     `plus: 0` rather than `default` alone: 0 is a gap a merchant can legitimately
     want here — the design's panel has its cards flush against a shared frame —
@@ -502,7 +501,7 @@
         and the controls from the same sub-snippets the shell itself uses.
         `sections/multicolumn.liquid` does the same, for the same reason.
       {%- endcomment -%}
-      <swiper-carousel
+      <carousel-slider
         {% render 'carousel-shell-attrs',
            settings: s,
            id: carousel_id,
@@ -533,7 +532,7 @@
            layout: cs_layout,
            layout_mobile: cs_layout_mobile,
            detached: true %}
-      </swiper-carousel>
+      </carousel-slider>
     </motion-effect>
 
     {%- if has_controls -%}

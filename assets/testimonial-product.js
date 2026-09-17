@@ -56,8 +56,8 @@ const TOUCH_QUERY = '(hover: none), (max-width: 749px)';
  * second one pushes the first off the screen.
  *
  * The close is dispatched as a plain event on `document` rather than through a
- * registry, so a card that arrives later — Swiper cloning slides for a loop,
- * the editor re-rendering a section — takes part without being told about.
+ * registry, so a card that arrives later — the carousel cloning slides for a
+ * loop, the editor re-rendering a section — takes part without being told about.
  *
  * In practice the press handler usually gets there first: pressing another
  * card's disc is a press outside this one's panel. The event is what covers the

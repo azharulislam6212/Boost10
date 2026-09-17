@@ -76,11 +76,11 @@ export class CollectionTabs extends BaseComponent {
 /**
  * Re-measures anything inside a category whose panel has just been revealed.
  *
- * A carousel mounted inside a `display: none` panel measured a container with
- * no width and no height, so every slide it sized came out at zero. Swiper's
- * own `resizeObserver` does fire when the panel is shown, but not before the
- * frame in which the customer first sees it — so the first paint after a pill
- * is pressed is a collapsed track that then snaps to its real size.
+ * A carousel measured inside a `display: none` panel reads a container with no
+ * width and no height, so every position it caches comes out at zero. The
+ * component's own `ResizeObserver` does fire when the panel is shown, but not
+ * before the frame in which the customer first sees it — so the first paint
+ * after a pill is pressed is a collapsed track that then snaps to its real size.
  *
  * Asking for the update here makes the measurement part of the same frame as
  * the reveal. It matters twice over for this picker, whose carousels are
@@ -88,16 +88,16 @@ export class CollectionTabs extends BaseComponent {
  * slides, so a container with no height is a panel with nothing visible in it
  * at all rather than a track that is merely the wrong width.
  *
- * `element.swiper` is Swiper's own handle, set on the element it mounts. A
- * carousel whose module has not landed yet does not have one and does not need
- * one — by the time it mounts, the panel is visible.
+ * `refresh()` is `<carousel-slider>`'s own re-read. A carousel whose module has
+ * not landed yet does not have the method and does not need it — by the time it
+ * upgrades, the panel is visible and its own `ResizeObserver` has measured it.
  *
  * @param {Element | null} scope
  */
 function remeasure(scope) {
   if (!scope) return;
-  for (const carousel of scope.querySelectorAll('swiper-carousel')) {
-    /** @type {any} */ (carousel).swiper?.update();
+  for (const carousel of scope.querySelectorAll('carousel-slider')) {
+    /** @type {any} */ (carousel).refresh?.();
   }
 }
 

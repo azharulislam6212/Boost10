@@ -8,16 +8,16 @@
  *
  * ## Why this is a module and not part of the carousel
  *
- * Two very different components render that bar. `<swiper-carousel>` is a
- * Swiper adapter; `<media-gallery>` is a hand-written gallery that coordinates
- * zoom, video playback and a thumbnail strip and has no Swiper in it at all.
+ * Two very different components render that bar. `<carousel-slider>` is a
+ * transform-driven track; `<media-gallery>` is a scroll-snapping gallery that
+ * coordinates zoom, video playback and a thumbnail strip.
  *
  * Both need the same four things done — pad the numbers, scale the bar, find
  * detached controls, toggle their visibility — and duplicating that in two
  * components is how the product gallery and the collection carousels come to
  * look subtly different after six months.
  *
- * Nothing here touches Swiper or the gallery. It takes a set of elements and a
+ * Nothing here knows about either of them. It takes a set of elements and a
  * position; it does not know or care what is driving them.
  *
  * @module @theme/carousel-controls
@@ -53,20 +53,21 @@ export function pad(value) {
 /**
  * Writes a position into a controls bar.
  *
- * ## The bar is driven by Swiper's own progress, not by the numbers
+ * ## The bar is driven by the caller's travel, not by the numbers
  *
  * It used to be `index / count`, which is only right when one slide shows at a
- * time. With `slidesPerView: 4` and seven slides, Swiper stops at slide four —
- * that is the last position where four slides still fit — so the old maths gave
- * 4/7 and the bar sat at 57% while the carousel was visibly at the end.
+ * time. With four slides across and seven slides, the track runs out of travel
+ * at slide four — that is the last position where four slides still fit — so
+ * the old maths gave 4/7 and the bar sat at 57% while the carousel was visibly
+ * at the end.
  *
- * `swiper.progress` is the translate position normalised to 0…1. It is exactly
- * 0 at the first snap point and exactly 1 at the last, for any `slidesPerView`,
- * any `spaceBetween`, loop or not. So the caller passes it through rather than
- * recomputing something Swiper already knows.
+ * `progress` is the translate position normalised to 0…1: exactly 0 at the
+ * first stopping place and exactly 1 at the last, for any slides-per-view, any
+ * gap, loop or not. The caller passes it through rather than having it
+ * recomputed from something it already knows.
  *
- * When nothing can scroll — fewer slides than fit — Swiper reports progress 0
- * forever. A bar stuck empty reads as broken, so that case is filled instead.
+ * When nothing can travel — fewer slides than fit — the caller passes 1. A bar
+ * stuck empty reads as broken.
  *
  * The numbers stay slide-based: `04` of `07` names which slide you are looking
  * at, which is what a customer reads. It is deliberately not a page count.
@@ -74,7 +75,7 @@ export function pad(value) {
  * @param {ControlRefs} refs
  * @param {number} index One-based position of the current slide.
  * @param {number} count Total slides.
- * @param {number} [progress] Swiper's 0…1 progress. Falls back to index/count.
+ * @param {number} [progress] Travel normalised to 0…1. Falls back to index/count.
  */
 export function renderControls(refs, index, count, progress) {
   if (!refs) return;
@@ -89,7 +90,7 @@ export function renderControls(refs, index, count, progress) {
         ? index / count
         : 0;
 
-    // Clamped because Swiper reports slightly out of range while rubber-banding
+    // Clamped because a drag reports slightly out of range while rubber-banding
     // past either end, and a bar scaled to 1.08 spills out of its track.
     const clamped = Math.min(Math.max(fraction, 0), 1);
     refs.bar.style.setProperty('--carousel-progress', String(clamped));

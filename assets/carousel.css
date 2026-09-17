@@ -1,0 +1,1115 @@
+/* ==========================================================================
+   carousel.css — Boost10
+   ==========================================================================
+   Every rule the carousel system owns, in one file: the layout half of
+   `<carousel-slider>`, and the chrome — arrows, controls bar, dots, counter,
+   progress bar, pause button — that `snippets/carousel-*.liquid` render around
+   it. `assets/carousel.js` moves the track and keeps the controls in step;
+   how big a slide is, how far apart two slides sit and which way the track
+   runs is here.
+
+   ## Why it is a separate stylesheet
+
+   It replaces `swiper.css`, which was a separate stylesheet too, so this is one
+   request where there was one before — for a fraction of the bytes, and with
+   the carousel's own chrome moved out of `base.css` to sit beside it. Keeping
+   it separate is also what lets it be one cache entry: a carousel change does
+   not invalidate the 11,000 lines of `base.css`.
+
+   ## The layer
+
+   `@layer overrides`, the last of the seven `base.css` declares
+   (`reset, tokens, base, layout, components, utilities, overrides`), and the
+   layer `swiper.css` and the carousel block in `base.css` both wrote into
+   before this file existed.
+
+   It has to be this layer, and the reason is worth stating once. A carousel's
+   track usually carries the calling section's own grid class as well —
+   `.product-grid`, `.article-grid`, `.multicolumn__grid`,
+   `.hero__carousel-track`, `.recently-viewed__grid`, `.product-card__slides` —
+   and every one of those is `display: grid` in `base.css`'s `@layer components`.
+   A layer beats specificity, so a carousel stylesheet below `components` would
+   leave the track a grid while the component translated it. Loaded after
+   `base.css` in the same last layer, these rules settle against the theme's own
+   on specificity and source order, which is where the choice belongs.
+
+   Where a section does need to speak over the carousel — the announcement bar,
+   testimonials and the product bundle all adjust the detached controls — it does
+   it on specificity. The reveal rules below are deliberately written with
+   `:where()` so a section's own `display` for a control keeps winning.
+
+   `@property` sits outside the layer, because a property registration is not a
+   style rule and takes no part in the cascade.
+
+   ## The split with JavaScript
+
+   CSS owns every number. `assets/carousel.js` reads `--carousel-slides` back
+   with `getComputedStyle` rather than restating the breakpoint arithmetic, so
+   there is nothing to keep in sync and nothing to jump when the module lands.
+   The component writes three things and no others: `data-running`,
+   `data-locked` and `data-active`/`data-motion-*` on the slides — plus the
+   inline `transform` and `transition-duration` on the track.
+
+   ## The properties
+
+     --carousel-slides-mobile / -tablet / -desktop
+        Slides per view at each breakpoint. Written by
+        `snippets/carousel-vars.liquid`, or seeded from `data-options` by the
+        component when Liquid did not.
+
+     --carousel-slides
+        The one that is live, stepped from the three above. Read back by the
+        component; never written by it.
+
+     --carousel-gap
+        Space between two slides, on whichever axis the carousel runs.
+
+     --carousel-speed
+        Transition duration. The component writes the inline duration from
+        `data-options.speed`; this is the fallback for markup with neither.
+
+     --carousel-row-size
+        One row's height, for a vertical carousel. See the vertical section.
+
+     --carousel-reveal-distance / -duration / -easing
+        The slide entrance animation. See the reveal rules in the track
+        section; the component decides which slides get it and never writes a
+        style to do it.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   The autoplay countdown ring's property registration
+   --------------------------------------------------------------------------
+   The ring is a `conic-gradient` on `.carousel-shell__pause` swept by
+   `--carousel-autoplay-progress`. The component sets it to 0 and then to 1 and
+   lets a transition do the sweep, so nothing runs in JavaScript between one
+   slide and the next.
+
+   A custom property can only be interpolated once it has been registered with a
+   type, which is what `@property` is for. Without the registration the property
+   is an unanimatable string, the transition is ignored and the ring steps from
+   empty to full at the start of each slide — degraded, not broken, which is the
+   right failure for a decoration.
+
+   `inherits: true` because the gradient is read on a pseudo-element of the
+   button and the component writes the property on the button.
+
+   Declared outside the layer: `@property` registers a type, it does not
+   contribute a declaration to any element, so there is nothing for a layer to
+   order it against.
+   -------------------------------------------------------------------------- */
+
+@property --carousel-autoplay-progress {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+
+@layer overrides {
+/* --------------------------------------------------------------------------
+   1. Host
+   --------------------------------------------------------------------------
+   The breakpoints match `carousel-options.liquid`, which writes the same
+   750/990 pair into `data-options`, and the pair `base.css` steps every other
+   responsive property at. One set of numbers.
+   -------------------------------------------------------------------------- */
+
+carousel-slider {
+  --carousel-slides: var(--carousel-slides-mobile, 1);
+  --carousel-gap: var(--grid-gap-x, 0px);
+  /* The fallback. `carousel.js` republishes this from `data-options.speed`
+     the moment it takes charge, because the reveal reset below has to wait out
+     exactly as long as the track takes to move. */
+  --carousel-speed: 500ms;
+  --carousel-easing: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+
+  /* The slide entrance. A short lift rather than a long one: the slide is also
+     travelling sideways under it, and two large movements at once read as a
+     wobble. The duration is longer than --carousel-speed on purpose, so the
+     content settles just after the track does. */
+  --carousel-reveal-distance: 1.6rem;
+  --carousel-reveal-duration: 600ms;
+  --carousel-reveal-easing: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* The width one slide resolves to. Named so a section can read it — the
+     product gallery's thumbnail column does — rather than restating the
+     division. */
+  --carousel-slide-size: calc(
+    (100% - (var(--carousel-slides, 1) - 1) * var(--carousel-gap, 0px)) / var(--carousel-slides, 1)
+  );
+
+  display: block;
+  position: relative;
+}
+
+@media screen and (min-width: 750px) {
+  carousel-slider {
+    --carousel-slides: var(--carousel-slides-tablet, var(--carousel-slides-mobile, 1));
+  }
+}
+
+@media screen and (min-width: 990px) {
+  carousel-slider {
+    --carousel-slides: var(--carousel-slides-desktop, var(--carousel-slides-tablet, var(--carousel-slides-mobile, 1)));
+  }
+}
+
+/* Clipping is what makes the slides either side of the viewport invisible, and
+   it is only correct while the element is a carousel: at a grid breakpoint the
+   same clip would cut off anything a card hangs outside its own box.
+
+   `clip` rather than `hidden`, and the difference is not cosmetic. An
+   `overflow: hidden` box is still a scroll container, so focusing a link inside
+   a slide that is currently off to the side makes the browser scroll that box
+   to bring the link into view — which leaves the track's `scrollLeft` at a
+   value the transform knows nothing about, and every slide after that is drawn
+   at the wrong offset. `clip` is not a scroll container and cannot be scrolled,
+   so the bug has nowhere to happen. */
+carousel-slider[data-running] {
+  overflow: clip;
+
+  /* A carousel's width comes from the page. It must never come from the slides.
+     ------------------------------------------------------------------------
+     The track is a flex row of N slides, so its *min-content* width is roughly
+     the sum of N slides' worth of unwrappable content — around 1500px for six
+     product cards. That number is normally invisible, because a block-level box
+     in normal flow is sized by its container and never asks its contents how
+     wide they would like to be.
+
+     It stops being invisible the moment a carousel sits in a flex or grid
+     parent, which is most of this theme. There the parent *does* ask, the
+     answer is 1500px, and on a phone the section — and with it the page — is
+     laid out 1500px wide with everything on it overflowing to the right. That
+     is the classic "the whole site scrolls sideways on mobile, but only on
+     pages with a slider" bug, and it is not one an `overflow` can fix: a clip
+     container is not a scroll container, so it does not zero the contribution,
+     and `hidden` — which is a scroll container — does not zero it either once
+     the contents are laid out by a flex line.
+
+     `contain: inline-size` states the rule directly: this box's inline size does
+     not depend on its contents. The min-content contribution becomes zero, the
+     width still comes from the parent, and the block size still follows the
+     tallest slide, which is the one thing that does have to come from the
+     content. */
+  contain: inline-size;
+}
+
+/* `.carousel-shell--nav-outside` asks for a gutter down each side for arrows
+   that sit beside the track, and it has never had one. The element that carries
+   the modifier is also the element that clips, and an `overflow` clip is taken
+   at the padding box — so a slide translated into the gutter is drawn in it,
+   and pulling the clip in to the content box with `overflow-clip-margin` takes
+   the arrows with it, because they are positioned against that same padding
+   box. The previous stylesheet cancelled the padding outright for exactly that
+   reason, so every "outside" arrow in this theme overlays the edge of its
+   track. No rule is declared here, which keeps that as it is rather than
+   quietly turning on a gutter no section has been designed against.
+
+   Giving the gutter back is a markup change — a wrapper around the element, so
+   the padding and the clip are on different boxes — not a rule in this file. */
+
+
+/* --------------------------------------------------------------------------
+   2. Track
+   --------------------------------------------------------------------------
+   A flex line that is moved by one transform. Nothing else about it changes
+   while the carousel runs, so a slide change is a compositor job with no
+   layout and no paint.
+   -------------------------------------------------------------------------- */
+
+carousel-slider[data-running] > [data-ref~='track'] {
+  display: flex;
+  gap: var(--carousel-gap, 0px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  /* The component writes `transition-duration` inline — 0ms while a finger is
+     down, the authored speed on release — so a drag never has to fight a
+     transition and never costs a second style recalculation to turn one off. */
+  transition-property: transform;
+  transition-duration: var(--carousel-speed, 500ms);
+  transition-timing-function: var(--carousel-easing);
+
+  /* A carousel that was a native scroll-snap track before the module loaded —
+     which is every one of them, and the correct no-JS presentation — must stop
+     being one now, or it can be both scrolled and translated and lands between
+     slides. */
+  overflow: visible;
+  scroll-snap-type: none;
+
+  /* The gesture along the carousel's axis is ours; the one across it belongs to
+     the page. This is what keeps vertical page scroll — Lenis included — from
+     ever being hijacked by a horizontal carousel. */
+  touch-action: pan-y pinch-zoom;
+  outline-offset: 0.4rem;
+}
+
+carousel-slider[data-running][data-direction='vertical'] > [data-ref~='track'] {
+  touch-action: pan-x pinch-zoom;
+}
+
+carousel-slider[data-running] > [data-ref~='track'] > * {
+  flex: 0 0 var(--carousel-slide-size);
+  /* Without this a slide with a long unbroken string in it refuses to shrink to
+     its flex basis and the whole row drifts wider than the sum of its parts. */
+  min-inline-size: 0;
+  /* A card's height is its own content's business; a flex item stretching to
+     the tallest sibling is what made every card in a row the same height. */
+  block-size: auto;
+  scroll-snap-align: none;
+}
+
+/* --- drag ---------------------------------------------------------------- */
+
+carousel-slider[data-running]:not([data-locked]) > [data-ref~='track'] {
+  cursor: grab;
+}
+
+carousel-slider[data-running] > [data-ref~='track'].is-dragging {
+  cursor: grabbing;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* A drag that passes over a link must not hover it, and a text selection
+   started inside a slide must not survive the gesture. */
+carousel-slider[data-running] > [data-ref~='track'].is-dragging > * {
+  pointer-events: none;
+}
+
+carousel-slider[data-running] > [data-ref~='track']:focus-visible {
+  outline: 2px solid var(--color-accent-text, currentColor);
+}
+
+/* Clones are a duplicate of content that is already in the reading order, so
+   they are hidden from assistive technology and unreachable by keyboard — the
+   component sets `inert` and `aria-hidden` on each one. Nothing is needed here
+   beyond making sure a stylesheet cannot accidentally single one out. */
+carousel-slider [data-carousel-clone] {
+  user-select: none;
+}
+
+/* --- reveal -------------------------------------------------------------- */
+
+/* The slide-level entrance animation, and the whole of it. `carousel.js`
+   writes two attributes and never a style:
+
+     [data-motion-armed]                        this component is holding it
+     [data-motion-armed][data-motion-revealed]  it is in view — show it
+
+   Which slides are revealed is decided in JavaScript from the real slide index,
+   so a clone and the slide it copies are always in the same state. That is why
+   there is no rule for `[data-carousel-clone]` here. A stylesheet that has to
+   force a clone visible — `.clone.revealed { opacity: 1 !important }` and its
+   relatives — is a stylesheet compensating for index arithmetic that was not
+   done, and it breaks the reset in the same stroke: a slide forced visible can
+   never go back to its resting state, so it only ever animates once.
+
+   The resting state is here rather than inline because it is the same three
+   declarations for every slide in the theme and inline styles on every slide of
+   every carousel is a lot of string writing for no configurability. It is still
+   JavaScript that hides the content, in the sense `motion-engine.js` means:
+   `data-motion-armed` is written by the component, so with the module missing
+   nothing below ever matches and no slide was ever hidden. */
+carousel-slider[data-running] > [data-ref~='track'] > [data-motion-armed] {
+  transition:
+    opacity var(--carousel-reveal-duration) var(--carousel-reveal-easing),
+    transform var(--carousel-reveal-duration) var(--carousel-reveal-easing);
+}
+
+/* Going *to* this state is instant and delayed; going away from it animates.
+   A transition is read from the state being entered, so the two halves of the
+   reveal can be timed separately, which is exactly what is needed:
+
+   Revealing is the rule above — the slide fades and lifts into place over
+   `--carousel-reveal-duration`.
+
+   Resetting is this rule — a zero-length transition that does not start until
+   the track has finished moving. Without the delay a slide would snap back to
+   opacity 0 the moment the index changed, which is while it is still on screen
+   sliding away: the outgoing slide would visibly blink out mid-flight. With it,
+   the reset lands after `--carousel-speed`, by which time the slide is behind
+   the edge of a box that is `overflow: clip`, and nobody ever sees it happen.
+   The next time it comes back into view, it animates in again. */
+carousel-slider[data-running] > [data-ref~='track'] > [data-motion-armed]:not([data-motion-revealed]) {
+  opacity: 0;
+  transform: translate3d(0, var(--carousel-reveal-distance), 0);
+  transition-duration: 0s;
+  transition-delay: var(--carousel-speed, 500ms);
+}
+
+/* A vertical carousel already moves its slides up the screen, so an entrance
+   that also travels up is movement hidden inside movement. Across the axis of
+   travel it reads as an entrance again. */
+carousel-slider[data-running][data-direction='vertical'] > [data-ref~='track'] > [data-motion-armed]:not([data-motion-revealed]) {
+  transform: translate3d(var(--carousel-reveal-distance), 0, 0);
+}
+
+/* The component does not arm anything under reduced motion, so this matches
+   nothing on a normal page load. It is here for the case the component cannot
+   see: the preference changed after the carousel started. Same specificity as
+   the rule it overrides, later in the file, so it wins without `!important`. */
+@media (prefers-reduced-motion: reduce) {
+  carousel-slider[data-running] > [data-ref~='track'] > [data-motion-armed]:not([data-motion-revealed]) {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+/* Paper has no viewport to enter. Every slide prints. */
+@media print {
+  carousel-slider > [data-ref~='track'] > [data-motion-armed]:not([data-motion-revealed]) {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+
+/* --------------------------------------------------------------------------
+   3. Grid breakpoints
+   --------------------------------------------------------------------------
+   `data-layout` is the desktop behaviour and `data-layout-mobile` the phone
+   one, and either may be `grid`. The same nodes are a CSS grid at one width and
+   a carousel at another — two Liquid branches could only ship both and hide
+   one.
+
+   Each branch names its own breakpoint, so grid and carousel are symmetric and
+   neither depends on out-specifying the other.
+   -------------------------------------------------------------------------- */
+
+/* Each branch is inside the media query that owns it, and every branch names
+   its own layout value. Neither of those is decoration.
+
+   The stylesheet these replace records what happens without them: its grid
+   branch was written with no test for *which* layout the breakpoint is, so it applied at
+   carousel breakpoints too and a mobile carousel rendered as a one-column stack
+   of every slide until the module loaded. The mirror image is just as easy — a
+   `[data-layout-mobile='carousel']` rule with no media query around it applies
+   on a desktop as well, and ties on specificity with the desktop grid branch,
+   so a grid-on-desktop section renders as a flex row until the module says
+   otherwise. Scoped and symmetric, neither can reach the other's breakpoint and
+   neither depends on winning a tie. */
+
+@media screen and (max-width: 749px) {
+  carousel-slider[data-layout-mobile='grid']:not([data-running]) > [data-ref~='track'] {
+    display: grid;
+    gap: var(--grid-gap-y) var(--grid-gap-x);
+    grid-template-columns: repeat(var(--columns-mobile, 1), minmax(0, 1fr));
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  carousel-slider[data-layout-mobile='grid']:not([data-running]) > [data-ref~='track'] > * {
+    inline-size: auto;
+    block-size: auto;
+  }
+
+  carousel-slider[data-layout-mobile='carousel']:not([data-running]) > [data-ref~='track'] {
+    display: flex;
+    gap: var(--carousel-gap, 0px);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+
+  carousel-slider[data-layout-mobile='carousel']:not([data-running]) > [data-ref~='track'] > * {
+    flex: 0 0 var(--carousel-slide-size);
+    min-inline-size: 0;
+    scroll-snap-align: start;
+  }
+}
+
+@media screen and (min-width: 750px) {
+  carousel-slider[data-layout='grid']:not([data-running]) > [data-ref~='track'] {
+    display: grid;
+    gap: var(--grid-gap-y) var(--grid-gap-x);
+    grid-template-columns: repeat(var(--columns-tablet, 2), minmax(0, 1fr));
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  carousel-slider[data-layout='grid']:not([data-running]) > [data-ref~='track'] > * {
+    inline-size: auto;
+    block-size: auto;
+  }
+
+  carousel-slider[data-layout='carousel']:not([data-running]) > [data-ref~='track'] {
+    display: flex;
+    gap: var(--carousel-gap, 0px);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+
+  carousel-slider[data-layout='carousel']:not([data-running]) > [data-ref~='track'] > * {
+    flex: 0 0 var(--carousel-slide-size);
+    min-inline-size: 0;
+    scroll-snap-align: start;
+  }
+}
+
+@media screen and (min-width: 990px) {
+  carousel-slider[data-layout='grid']:not([data-running]) > [data-ref~='track'] {
+    grid-template-columns: repeat(var(--columns-desktop, 4), minmax(0, 1fr));
+  }
+}
+
+/* `<carousel-slider>` with neither attribute — the bare element of the brief —
+   is a horizontal carousel at every width. It cannot collide with either branch
+   above, because both require an attribute this one forbids. */
+carousel-slider:not([data-layout]):not([data-layout-mobile]):not([data-running]) > [data-ref~='track'] {
+  display: flex;
+  gap: var(--carousel-gap, 0px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+
+carousel-slider:not([data-layout]):not([data-layout-mobile]):not([data-running]) > [data-ref~='track'] > * {
+  flex: 0 0 var(--carousel-slide-size);
+  min-inline-size: 0;
+  scroll-snap-align: start;
+}
+
+carousel-slider:not([data-running]) > [data-ref~='track']::-webkit-scrollbar {
+  display: none;
+}
+
+
+/* --------------------------------------------------------------------------
+   4. Vertical
+   --------------------------------------------------------------------------
+   The same component, the same properties, one axis turned. Horizontal is the
+   default and nothing switches to vertical on its own: a carousel is vertical
+   because a section wrote `data-direction="vertical"`, never because a phone
+   is narrow.
+
+   **A vertical carousel needs a height.** Horizontally the track's width comes
+   from the page; vertically there is no equivalent, and a slide whose
+   `flex-basis` is a percentage of nothing is a slide that is zero tall. The
+   height is built from `--carousel-row-size` — one row — and the two properties
+   the architecture already has: the slide count for this breakpoint and the
+   gap. A section therefore sets one property and the count it had to choose
+   anyway.
+   -------------------------------------------------------------------------- */
+
+carousel-slider[data-direction='vertical'] {
+  block-size: calc(
+    var(--carousel-slides, 1) * var(--carousel-row-size, 11rem) +
+    (var(--carousel-slides, 1) - 1) * var(--carousel-gap, 0px)
+  );
+}
+
+carousel-slider[data-direction='vertical'] > [data-ref~='track'] {
+  flex-direction: column;
+  block-size: 100%;
+}
+
+carousel-slider[data-direction='vertical'][data-running] > [data-ref~='track'] > * {
+  /* The basis resolves against the track's height now, which is what the column
+     direction changes. Everything else about the declaration is the same. */
+  flex: 0 0 var(--carousel-slide-size);
+  inline-size: auto;
+}
+
+carousel-slider[data-direction='vertical']:not([data-running]) > [data-ref~='track'] {
+  overflow-x: hidden;
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+}
+
+/* A vertical grid breakpoint is a contradiction — a grid has no axis of travel
+   and nothing to be told the height of — so the height comes off with the
+   carousel. */
+@media screen and (max-width: 749px) {
+  carousel-slider[data-direction='vertical'][data-layout-mobile='grid']:not([data-running]) {
+    block-size: auto;
+  }
+}
+
+@media screen and (min-width: 750px) {
+  carousel-slider[data-direction='vertical'][data-layout='grid']:not([data-running]) {
+    block-size: auto;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   5. The shell and its chrome
+   --------------------------------------------------------------------------
+   The arrows, the controls bar, the dots, the counter, the progress bar and the
+   pause button, exactly as `snippets/carousel-controls.liquid`,
+   `carousel-nav.liquid` and `carousel-pagination.liquid` render them. These
+   rules used to live in `base.css`; they moved here with the engine so that one
+   file answers for the whole carousel, and nothing about how they draw changed
+   on the way.
+
+   Two components share them. `<carousel-slider>` is one; `<media-gallery>` is
+   the other, and it renders the same bar through the same snippet with no
+   carousel element around it — which is why almost everything below is keyed on
+   a class rather than on the element.
+   -------------------------------------------------------------------------- */
+
+/* ---- 1. Container ---- */
+
+.carousel-shell {
+  position: relative;
+  display: block;
+}
+
+/* ---- 2. The track ----
+   Sizing and direction are sections 2–4 above. This is only what the track is
+   when it is a plain list: no bullets, no margin. */
+
+.carousel-shell__track {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* ---- 3. Shared button ---- */
+
+.carousel-button {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  inline-size: var(--carousel-nav-size, 44px);
+  block-size: var(--carousel-nav-size, 44px);
+  padding: 0;
+
+  border: var(--carousel-nav-border-width, 1px) var(--carousel-nav-border-style, solid)
+    var(--color-slider-arrow-border);
+  border-radius: var(--carousel-nav-radius, 50%);
+  background-color: var(--color-slider-arrow-background);
+  background-image: var(--carousel-nav-background, none);
+  color: var(--color-slider-arrow-icon);
+  cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease,
+    opacity 150ms ease;
+}
+
+.carousel-button:hover {
+  border-color: var(--color-slider-arrow-border-hover);
+  background-color: var(--color-slider-arrow-background-hover);
+  background-image: var(--carousel-nav-background-hover, var(--carousel-nav-background, none));
+  color: var(--color-slider-arrow-icon-hover);
+}
+
+.carousel-button--ghost {
+  background-color: transparent;
+  background-image: none;
+}
+
+.carousel-button--solid {
+  border-color: var(--color-slider-arrow-icon);
+  background-color: var(--color-slider-arrow-icon);
+  color: var(--color-slider-arrow-background);
+}
+
+/* ---- icon background ---- */
+.carousel-nav--bg-none .carousel-button,
+.carousel-controls--bg-none .carousel-button {
+  border-color: transparent;
+  background-color: transparent;
+  background-image: none;
+  color: var(--color-slider-arrow-icon);
+}
+
+.carousel-nav--bg-none .carousel-button:hover,
+.carousel-controls--bg-none .carousel-button:hover {
+  border-color: transparent;
+  background-color: transparent;
+  background-image: none;
+  color: var(--color-slider-arrow-background-hover);
+}
+
+.carousel-button--mirror svg {
+  transform: scaleX(-1);
+}
+
+.carousel-button--disabled {
+  opacity: 0.35;
+  cursor: default;
+  pointer-events: none;
+}
+
+/* ---- disabled, without losing the ring ---- */
+.carousel-nav .carousel-button--disabled,
+.carousel-controls .carousel-button--disabled {
+  opacity: 1;
+  border-color: var(--color-slider-arrow-border);
+  color: color-mix(in srgb, var(--color-slider-arrow-icon) 40%, transparent);
+}
+
+.carousel-nav .carousel-button--solid.carousel-button--disabled,
+.carousel-controls .carousel-button--solid.carousel-button--disabled {
+  border-color: var(--color-slider-arrow-icon);
+  background-color: color-mix(in srgb, var(--color-slider-arrow-icon) 30%, transparent);
+  color: var(--color-slider-arrow-background);
+}
+
+.carousel-nav--bg-none .carousel-button--disabled.carousel-button,
+.carousel-controls--bg-none .carousel-button--disabled.carousel-button {
+  opacity: 0.35;
+  border-color: transparent;
+  background-color: transparent;
+  color: var(--color-slider-arrow-icon);
+}
+
+/* ---- 4. Bare navigation pair ---- */
+
+.carousel-nav {
+  display: none;
+  gap: var(--space-2);
+}
+
+.carousel-nav[data-carousel-active] {
+  display: flex;
+}
+
+/* ---- outside the track ---- */
+
+.carousel-shell > .carousel-nav--outside,
+.carousel-shell > .carousel-nav--inside {
+  position: absolute;
+  inset-block-start: 50%;
+  z-index: 2;
+  justify-content: space-between;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.carousel-shell > .carousel-nav--outside { inset-inline: 0; }
+.carousel-shell > .carousel-nav--inside { inset-inline: var(--space-3); }
+
+.carousel-shell > .carousel-nav--outside .carousel-button,
+.carousel-shell > .carousel-nav--inside .carousel-button {
+  pointer-events: auto;
+}
+
+@media screen and (min-width: 750px) and (max-width: 989px) {
+  .carousel-shell > .carousel-nav--outside {
+    inset-inline: var(--space-3);
+  }
+}
+
+@media screen and (max-width: 749px) {
+  .carousel-shell > .carousel-nav--outside {
+    position: static;
+    inset-inline: auto;
+    justify-content: center;
+    gap: var(--space-3);
+    margin-block-start: var(--space-4);
+    transform: none;
+    pointer-events: auto;
+  }
+}
+
+/* ---- below the track ---- */
+
+.carousel-shell > .carousel-nav--bottom {
+  position: static;
+  justify-content: center;
+  margin-block-start: var(--space-5);
+}
+
+/* ---- inline, for a section header ---- */
+
+.carousel-nav--inline {
+  position: static;
+}
+
+/* ---- 5. Controls bar ---- */
+
+.carousel-controls {
+  display: none;
+  align-items: center;
+  gap: var(--space-4);
+  inline-size: 100%;
+}
+
+.carousel-controls[data-carousel-active] {
+  display: flex;
+}
+
+.carousel-controls--center { justify-content: center; }
+.carousel-controls--end { justify-content: flex-end; }
+
+.carousel-shell > .carousel-controls {
+  margin-block-start: var(--space-6);
+}
+
+.carousel-controls--inline {
+  inline-size: auto;
+  margin-block-start: 0;
+}
+
+.carousel-controls__count {
+  flex: 0 0 auto;
+  font-size: var(--carousel-count-size, var(--font-size-lg));
+  font-weight: var(--font-weight-bold, 700);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--color-slider-indicator-active);
+}
+
+.carousel-controls__count--total {
+  color: var(--color-slider-indicator-active);
+}
+
+.carousel-controls__progress {
+  position: relative;
+  flex: 1 1 auto;
+  min-inline-size: 6rem;
+  max-inline-size: var(--carousel-progress-width, 24rem);
+  block-size: var(--carousel-progress-height, 6px);
+  border-radius: var(--carousel-progress-radius, 0);
+  background-color: var(--color-slider-indicator);
+  overflow: hidden;
+}
+
+.carousel-controls__bar {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background-color: var(--color-slider-indicator-active);
+  background-image: var(--carousel-bar-background, none);
+  transform: scaleX(var(--carousel-progress, 0));
+  transform-origin: left center;
+  transition: transform 300ms var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+}
+
+[dir='rtl'] .carousel-controls__bar {
+  transform-origin: right center;
+}
+
+@media screen and (max-width: 749px) {
+  .carousel-controls {
+    gap: var(--space-3);
+  }
+
+  .carousel-controls__progress {
+    min-inline-size: 4rem;
+  }
+}
+
+/* ---- 6. Pagination ---- */
+
+.carousel-shell__dots,
+.carousel-shell__counter,
+.carousel-shell__progress {
+  display: none;
+  margin-block-start: var(--space-5);
+}
+
+/* ---- alignment ---- */
+.carousel-pagination--start.carousel-shell__dots,
+.carousel-pagination--start.carousel-shell__counter { text-align: start; }
+
+.carousel-pagination--center.carousel-shell__dots,
+.carousel-pagination--center.carousel-shell__counter { text-align: center; }
+
+.carousel-pagination--end.carousel-shell__dots,
+.carousel-pagination--end.carousel-shell__counter { text-align: end; }
+
+.carousel-shell__progress.carousel-pagination--start,
+.carousel-shell__progress.carousel-pagination--center,
+.carousel-shell__progress.carousel-pagination--end {
+  max-inline-size: var(--carousel-pagination-bar-width, 24rem);
+}
+
+.carousel-shell__progress.carousel-pagination--start { margin-inline: 0 auto; }
+.carousel-shell__progress.carousel-pagination--center { margin-inline: auto; }
+.carousel-shell__progress.carousel-pagination--end { margin-inline: auto 0; }
+
+/* ---- bullets ---- */
+
+.carousel-shell__dots {
+  position: static;
+  text-align: center;
+}
+
+.carousel-shell__dot {
+  display: inline-block;
+  inline-size: var(--carousel-dot-size, 0.8rem);
+  block-size: var(--carousel-dot-size, 0.8rem);
+  margin-inline: var(--space-1);
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background-color: var(--color-slider-indicator);
+  cursor: pointer;
+  transition: background-color 150ms ease, transform 150ms ease;
+}
+
+.carousel-shell__dot--active {
+  background-color: var(--color-slider-indicator-active);
+  transform: scale(1.3);
+}
+
+/* ---- fraction ---- */
+
+.carousel-shell__counter {
+  position: static;
+  text-align: center;
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-slider-indicator);
+}
+
+/* ---- progress bar ---- */
+
+.carousel-shell__progress {
+  position: relative;
+  inset: auto;
+  inline-size: 100%;
+  block-size: var(--carousel-pagination-bar-height, 4px);
+  border-radius: var(--carousel-pagination-bar-radius, 999px);
+  background-color: var(--color-slider-indicator);
+  overflow: hidden;
+}
+
+/* ---- 7. Pause control ---- */
+
+.carousel-shell__pause {
+  position: absolute;
+  inset-block-end: var(--space-3);
+  inset-inline-end: var(--space-3);
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  --carousel-pause-size: 3.4rem;
+
+  inline-size: var(--carousel-pause-size);
+  block-size: var(--carousel-pause-size);
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background-color: var(--color-slider-arrow-background);
+  color: var(--color-slider-arrow-icon);
+  cursor: pointer;
+  box-shadow: 0 1px 6px rgb(0 0 0 / 0.28);
+  transition:
+    transform 0.15s ease,
+    background-color 0.15s ease,
+    --carousel-autoplay-progress var(--carousel-autoplay-duration, 0ms) linear;
+}
+
+.carousel-shell__pause:hover { transform: scale(1.08); }
+
+.carousel-shell__pause:focus-visible {
+  outline: 2px solid var(--color-accent-text, currentColor);
+  outline-offset: 2px;
+}
+
+.carousel-shell__pause::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  background: conic-gradient(
+    var(--color-accent-text, currentColor) calc(var(--carousel-autoplay-progress, 0) * 360deg),
+    rgb(255 255 255 / 0.25) 0
+  );
+  mask: radial-gradient(circle, transparent 0 calc(50% - 3px), black calc(50% - 3px) 100%);
+  -webkit-mask: radial-gradient(circle, transparent 0 calc(50% - 3px), black calc(50% - 3px) 100%);
+  pointer-events: none;
+}
+
+.carousel-shell__pause > * {
+  position: relative;
+  z-index: 1;
+}
+
+.carousel-shell__pause[aria-pressed='false'] .carousel-shell__pause-glyph--play,
+.carousel-shell__pause[aria-pressed='true'] .carousel-shell__pause-glyph--pause {
+  display: none;
+}
+
+.carousel-shell__pause-glyph {
+  display: grid;
+  place-items: center;
+  line-height: 0;
+}
+
+.carousel-shell__pause[aria-pressed='true']::before {
+  opacity: 0.45;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .carousel-shell__pause { transition: none; }
+  .carousel-shell__pause:hover { transform: none; }
+}
+
+.carousel-shell__pause[hidden] { display: none !important; }
+
+/* ---- 8. Announcement bar slides ---- */
+
+.announcement-bar__carousel .carousel-shell__item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  block-size: auto;
+}
+
+/* ---- 9. Product media gallery controls ---- */
+
+.product-media {
+  position: relative;
+}
+
+.product-media .carousel-nav,
+.product-media .carousel-controls {
+  display: flex;
+}
+
+.product-media > .carousel-nav {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline: var(--space-3);
+  z-index: 2;
+  justify-content: space-between;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.product-media > .carousel-nav .carousel-button { pointer-events: auto; }
+
+.product-media > .carousel-controls {
+  margin-block-start: var(--space-4);
+}
+
+/* ---- 10. Reduced motion, for the chrome above ---- */
+
+@media (prefers-reduced-motion: reduce) {
+  .carousel-shell__item,
+  .carousel-shell__dot,
+  .carousel-button,
+  .carousel-controls__bar,
+  .carousel-shell__progress-fill {
+    transition: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   6. Which controls are reachable
+   --------------------------------------------------------------------------
+   A control is only ever shown once the carousel is actually running, and never
+   when it is locked — locked means the slides already fit, so there is nothing
+   for a control to do and a focusable button that does nothing is worse than no
+   button.
+
+   `data-running` and `data-locked` are the two attributes `carousel.js` writes.
+   Nested controls are matched through them; detached ones cannot be reached by
+   any selector on the element, so the component calls `toggleControls()` and
+   they are matched on `[data-carousel-active]` instead — see the arrows and the
+   controls bar in section 5, which are shown by that attribute alone.
+
+   `:where()` on the detached half, and it is load-bearing. `display: block` here
+   is the component saying "there is something to show", not saying what shape it
+   should be — and three sections say otherwise: `.product-bundle` lays its dots
+   out as a flex row, `.feature-cards__controls` and `.testimonials__controls`
+   restate the block. Without `:where()` this selector would tie with theirs on
+   specificity, win on source order, and turn the bundle's dot row back into a
+   stack. Zeroing the class leaves the attribute alone at (0,1,0): still enough
+   to beat the `display: none` default a few rules up, never enough to beat a
+   section that has an opinion. */
+
+carousel-slider[data-running]:not([data-locked]) .carousel-shell__dots,
+carousel-slider[data-running]:not([data-locked]) .carousel-shell__counter,
+carousel-slider[data-running]:not([data-locked]) .carousel-shell__progress,
+:where(.carousel-shell__dots, .carousel-shell__counter, .carousel-shell__progress)[data-carousel-active] {
+  display: block;
+}
+
+/* Nested controls on a locked carousel. A detached pair is handled by
+   `toggleControls()`, for the same reason — no selector on this element can
+   reach outside it. */
+carousel-slider[data-locked] .carousel-nav,
+carousel-slider[data-locked] .carousel-controls,
+carousel-slider[data-locked] .carousel-shell__dots,
+carousel-slider[data-locked] .carousel-shell__counter,
+carousel-slider[data-locked] .carousel-shell__progress,
+carousel-slider[data-locked] .carousel-shell__pause {
+  display: none;
+}
+
+/* Arrows that a section draws over its own media rather than beside the track.
+   `carousel.js` writes `carousel-button--disabled` on the pair at either end of
+   a carousel that neither loops nor rewinds. */
+.hero__arrow.carousel-button--disabled,
+.product-card__slider-arrow.carousel-button--disabled,
+.product-recommendations__arrow.carousel-button--disabled,
+.recently-viewed__arrow.carousel-button--disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+
+/* --------------------------------------------------------------------------
+   7. The two readouts the component builds
+   --------------------------------------------------------------------------
+   `.carousel-shell__counter` and `.carousel-shell__progress` are empty mount
+   points in the Liquid; `#renderPagination()` fills them once per slide set and
+   then only moves an attribute or a transform. These are the elements it makes.
+   -------------------------------------------------------------------------- */
+
+.carousel-shell__fraction-current {
+  color: var(--color-slider-indicator-active);
+}
+
+/* The fill inside `.carousel-shell__progress`. The transform is written by the
+   component, from the page index rather than the translate — the bar is a
+   position readout beside a row of slides, not a scrollbar. */
+.carousel-shell__progress-fill {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  border-radius: inherit;
+  background-color: var(--color-slider-indicator-active);
+  background-image: var(--carousel-bar-background, none);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 300ms ease;
+}
+
+[dir='rtl'] .carousel-shell__progress-fill {
+  transform-origin: right center;
+}
+
+
+/* --------------------------------------------------------------------------
+   8. Reduced motion
+   --------------------------------------------------------------------------
+   The carousel keeps working; it stops animating between slides and — in the
+   component — stops advancing on its own. Removing the controls would be worse
+   than removing the movement.
+   -------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  carousel-slider[data-running] > [data-ref~='track'] {
+    transition-duration: 0ms !important;
+  }
+
+  .carousel-shell__progress-fill {
+    transition: none;
+  }
+}
+
+}

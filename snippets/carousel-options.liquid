@@ -1,10 +1,10 @@
 {% doc %}
-  Builds the `data-options` JSON that `<swiper-carousel>` reads.
+  Builds the `data-options` JSON that `<carousel-slider>` reads.
 
   ## The contract
 
   One snippet is the only place in the theme that turns merchant settings into
-  Swiper configuration. Everything it emits is valid JSON — no trailing commas,
+  carousel configuration. Everything it emits is valid JSON — no trailing commas,
   no bare Liquid values, no `nil` leaking through as an empty token — because a
   single malformed character makes `JSON.parse` throw and the component falls
   back to its defaults with the merchant's every setting silently discarded.
@@ -21,15 +21,15 @@
   `carousel_autoplay_delay` is the pause between slides in **seconds** (2–15).
   They are different controls: a slow fade should not also mean a slow
   slideshow. Every section schema must define them with those ranges — the
-  announcement bar used to declare `carousel_speed` as 3–12 seconds, so it fed
-  Swiper a five *millisecond* transition and its slides snapped instantly.
+  announcement bar used to declare `carousel_speed` as 3–12 seconds, so it asked
+  for a five *millisecond* transition and its slides snapped instantly.
 
   ## Loop
 
-  Swiper needs at least twice `slidesPerView` slides to loop; below that it logs
-  "Not enough slides for loop mode" and turns looping off itself, leaving a
-  carousel that stops dead at the last slide with a merchant setting that says
-  otherwise. Pass `count` and this refuses the setting up front instead.
+  A loop needs at least twice `slidesPerView` slides: below that there are not
+  enough of them to fill the viewport on the far side of the seam, and the
+  component refuses the loop and rewinds instead. Pass `count` and this makes the
+  same call up front, so the JSON says what will actually happen.
 
   ## Direction
 
@@ -64,7 +64,7 @@
   @param {string} [direction] - horizontal | vertical. Default horizontal.
 
   @example
-    <swiper-carousel data-options="{% render 'carousel-options', settings: section.settings, count: 5 %}">
+    <carousel-slider data-options="{% render 'carousel-options', settings: section.settings, count: 5 %}">
 
   @example
     {% render 'carousel-options', settings: section.settings, direction: 'vertical', columns_desktop: 3 %}
@@ -74,7 +74,8 @@
   Slides per breakpoint comes from `carousel-slides`, never from arithmetic
   here. `carousel-vars` renders the same snippet for the CSS custom properties
   that size the slides before this JSON is ever parsed, and the two must agree
-  exactly — if they drift, the slides resize the moment Swiper mounts.
+  exactly — if they drift, the JSON and the layout describe two different
+  carousels.
 {%- endcomment -%}
 {%- capture spv_mobile -%}
   {%- render 'carousel-slides', settings: settings, viewport: 'mobile',
@@ -97,16 +98,16 @@
   assign spv_tablet = spv_tablet | strip
   assign spv_desktop = spv_desktop | strip
 
-  # The loop guard counts whole slides. `ceil`, not `floor`, because that is what
-  # Swiper itself does with a fractional value — `Math.ceil(parseFloat(...))` —
-  # so a 2.3-slide carousel needs six slides to loop, the same number Swiper
-  # would demand before printing its own warning.
+  # The loop guard counts whole slides. `ceil`, not `floor`: a peek means part of
+  # a further slide is on screen and it still has to exist on the far side of the
+  # seam, so a 2.3-slide carousel needs six slides to loop. `assets/carousel.js`
+  # rounds the same way, from the value CSS resolved.
   assign cols_desktop = spv_desktop | plus: 0 | ceil
 
   # Milliseconds, clamped rather than trusted. A stored value can predate the
   # current schema: the announcement bar used to declare this setting in
-  # seconds, so live stores hold a `carousel_speed` of 3–12 that would reach
-  # Swiper as a transition no customer could see. Anything under 20 is read as
+  # seconds, so live stores hold a `carousel_speed` of 3–12 that would become a
+  # transition no customer could see. Anything under 20 is read as
   # one of those and falls back to the default rather than being clamped to a
   # 100ms flick.
   assign raw_speed = settings.carousel_speed | default: 500 | plus: 0
@@ -115,8 +116,8 @@
   endif
   assign speed = raw_speed | at_least: 100 | at_most: 3000
 
-  # Seconds in the editor, milliseconds in Swiper. Converting here means neither
-  # the merchant nor the component has to know about the other.
+  # Seconds in the editor, milliseconds in the component. Converting here means
+  # neither the merchant nor the component has to know about the other.
   assign delay_seconds = settings.carousel_autoplay_delay | default: 5 | at_least: 1
   assign delay = delay_seconds | times: 1000
 
@@ -132,7 +133,8 @@
 
   # The loop guard. `count` is optional, so a caller that cannot count its
   # slides — a section passing content_for 'blocks' straight through — keeps
-  # the merchant's setting and lets Swiper make the call.
+  # the merchant's setting and lets the component make the call at runtime, from
+  # the slide set it can actually see.
   # `| default: 0 | plus: 0` is what makes the comparison safe when the caller
   # omitted `count`: an unset variable compared with `<` is a type error in a
   # strict Liquid engine, and silently false in a lenient one. Coercing to a
@@ -214,9 +216,9 @@
 
 {%- comment -%}
   Only emitted when the caller asked for one. Left out, `assets/carousel.js`
-  measures `--grid-gap-x` off the element so the carousel's spacing matches the
-  grid it turns into at the other breakpoint — Swiper positions with transforms
-  and cannot read a CSS `gap` itself.
+  and `carousel-vars` fall through to `--grid-gap-x`, so the carousel's spacing
+  matches the grid it turns into at the other breakpoint. The component never
+  reads this value: the gap is a CSS `gap` on the track and nothing else.
 {%- endcomment -%}
 {%- comment -%}
   `-1` is the sentinel for "the caller said nothing", because `0` is a real and

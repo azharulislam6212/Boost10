@@ -17,6 +17,21 @@
  * everything else and merchant Custom CSS — injected unlayered by theme.liquid —
  * still wins without `!important`.
  *
+ * It has to be `components` or later, and the reason is worth stating so nobody
+ * moves it down. This is a component stylesheet: part of what it does is speak
+ * over the generic rules base.css states for the same elements — the country and
+ * language button is `.localization__trigger`, which base.css gives a border, a
+ * radius, a padding and a font size in `@layer components`, and this file
+ * restyles it. A layer beats specificity, so from `base` those rules would win
+ * however the selectors here are written, and the footer's picker would revert
+ * to the generic pill. Deleting them from base.css is not an option: the header
+ * market picker uses the same class.
+ *
+ * base.css no longer carries the footer's *own* rules, though. The ones that
+ * were fully restated here were deleted, and the `<details>` disclosure — which
+ * this file did not restate — moved in; see "Menu block", below. So there is no
+ * longer a second stylesheet with an opinion about a `.footer-*` selector.
+ *
  * ## Where the colours come from
  *
  * The section's colour scheme, and only that. `.color-scheme-container` on the
@@ -428,6 +443,29 @@
      Links and nothing else. The heading, the surface and the disclosure moved
      up to the Column, which is the thing that actually collapses.
      ========================================================================== */
+
+  /* ---- the disclosure, moved here from base.css ----------------------------
+     `blocks/footer-menu.liquid` still renders a `<details>` with a summary, a
+     heading and a chevron on small screens, and these five rules are what drew
+     it. They lived in `base.css` — the only footer styling left there — and
+     moved here so one file answers for the footer. Same declarations, same
+     layer, and still ahead of the rules below, so the cascade lands exactly
+     where it did and the disclosure looks unchanged.
+
+     `blocks/menu.liquid` renders the same class without the `<details>`, which
+     is why none of this is keyed on the element. */
+
+  .footer-menu { border-block-end: 1px solid var(--color-border); }
+  .footer-menu__summary { display: flex; align-items: center; justify-content: space-between; padding-block: var(--space-3); }
+  .footer-menu__heading { font-size: var(--font-size-md); }
+  .footer-menu__icon { transition: transform var(--transition-fast); }
+  .footer-menu[open] > .footer-menu__summary .footer-menu__icon { transform: rotate(180deg); }
+  .footer-menu__content { display: block; }
+
+  @media screen and (min-width: 750px) {
+    .footer-menu { border-block-end: 0; }
+    .footer-menu__summary { padding-block: 0; margin-block-end: var(--space-3); }
+  }
 
   .footer-menu {
     display: block;

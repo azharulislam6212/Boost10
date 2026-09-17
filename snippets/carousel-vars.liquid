@@ -1,29 +1,28 @@
 {% doc %}
-  The CSS custom properties that size a carousel's slides before Swiper loads.
+  The CSS custom properties that size a carousel's slides, before the module
+  loads and after it.
 
   ## The problem this solves
 
-  `swiper.css` sets `.swiper-wrapper { display: flex }`, and it applies the
-  moment the stylesheet parses. `.swiper-slide { flex-shrink: 0; width: 100% }`
-  does *not* apply yet, because `assets/carousel.js` is what puts the
-  `swiper-slide` class on the track's children, and it is a lazily loaded module.
-
-  So between first paint and Swiper mounting, every slide is a flex item with the
-  browser default `flex: 0 1 auto` — free to shrink. Twelve announcements squeeze
-  into one row, and then snap to one slide when the module lands. That is the
-  "it shows all 12 on page load" report, and no amount of Swiper configuration
-  fixes it: Swiper is not running yet.
+  `assets/carousel.js` is a lazily loaded module, so there is always a window —
+  first paint to upgrade — in which the track is laid out by the stylesheet
+  alone. Without a declared slide width every slide is a flex item with the
+  browser default `flex: 0 1 auto`, free to shrink: twelve announcements squeeze
+  into one row and then snap to one slide when the module lands. That is the
+  "it shows all 12 on page load" report, and no amount of component
+  configuration fixes it, because the component is not running yet.
 
   The fix is to tell CSS what the slide width will be, in Liquid, in the markup.
-  `base.css` has one generic rule that reads these properties; a section adds no
-  CSS of its own, now or in future.
+  `carousel.css` has one generic rule that reads these properties, and it is the
+  same rule before and after the module arrives — so nothing resizes on upgrade.
+  A section adds no CSS of its own, now or in future.
 
   ## Why these are not the `--columns-*` properties the grid already uses
 
   `--columns-desktop` is a whole-number column count for a CSS grid. These are
-  Swiper's `slidesPerView`, which is a *fraction* whenever there is a peek. Same
-  idea, different values, and overloading one name for both is how a 2.3-slide
-  carousel ends up rendering as a 2-column grid for the first 200ms.
+  slides per view, which is a *fraction* whenever there is a peek. Same idea,
+  different values, and overloading one name for both is how a 2.3-slide
+  carousel ends up rendering as a 2-column grid.
 
   ## Parameters
 
@@ -40,16 +39,15 @@
   ## `gap_css`, and why a number is not always enough
 
   `space_between` is a px value that goes into `data-options` as well, which is
-  what most callers want: one number, agreed between CSS and Swiper.
+  what most callers want: one number, written once.
 
-  A carousel whose gap changes at a breakpoint cannot use it. `data-options`
-  carries one `spaceBetween` and Swiper reads it once, so a section that sets
-  48px on desktop and 24px on a phone would have CSS and Swiper disagreeing
-  below 750px. Passing `gap_css` instead — `var(--something)` that a media query
-  redefines — and omitting `space_between` puts the answer entirely in CSS,
-  which is where the breakpoint already lives: `#gap()` in `assets/carousel.js`
-  measures the used value and `#syncGap()` re-measures it whenever the element
-  changes width, so Swiper follows the media query rather than predating it.
+  A carousel whose gap changes at a breakpoint cannot use it — one attribute
+  cannot carry two values. Passing `gap_css` instead — `var(--something)` that a
+  media query redefines — and omitting `space_between` puts the answer entirely
+  in CSS, which is where the breakpoint already lives. Nothing in JavaScript
+  reads the gap: `--carousel-gap` is the only spacing there is, and the slide
+  width is a `calc()` built from it, so a media query that redefines the
+  property moves the slides with it.
 
   @param {string} [gap_css]
   @param {string} [columns_desktop]
@@ -61,7 +59,7 @@
 
 
   @example
-    <swiper-carousel
+    <carousel-slider
       style="{% render 'carousel-vars', settings: section.settings %}"
       data-options="{% render 'carousel-options', settings: section.settings %}">
 {% enddoc %}
@@ -97,9 +95,9 @@
   assign gap = space_between | default: -1 | plus: 0
 
   # `-1` is the sentinel for "the caller said nothing", because `0` is a real
-  # value here. Unset, the gap falls through to the grid's own spacing, which is
-  # the same number `carousel.js` measures for Swiper's `spaceBetween` — so the
-  # slides do not resize when it mounts.
+  # value here. Unset, the gap falls through to the grid's own spacing, so a
+  # section that is a grid at one breakpoint and a carousel at another keeps one
+  # rhythm across both.
   if gap_css != blank
     assign gap_value = gap_css
   elsif gap >= 0

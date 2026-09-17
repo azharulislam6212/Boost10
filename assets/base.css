@@ -14,10 +14,20 @@
  *   components  every BEM block
  *   utilities   single-purpose helpers, the only place !important is allowed
  *   overrides   declared last, so it outranks every layer above it. Shared
- *               with header.css, product-card.css and swiper.css, which load
+ *               with carousel.css, header.css and product-card.css, which load
  *               after this file and settle against these rules on specificity
- *               and source order, exactly as they did when all four were
- *               unlayered.
+ *               and source order. footer.css writes into `components`, after
+ *               this file's own block.
+ *
+ * Every separate stylesheet in this theme is a *component* stylesheet, and each
+ * one sits at or above `components` for the same reason: its job is to speak
+ * over the generic rules stated here for the same elements — `.drawer__panel`
+ * for the nav drawer, `.localization__trigger` for the footer picker, a section
+ * grid class for a carousel track. A cascade layer beats specificity, so from a
+ * lower layer none of them could win however their selectors were written, and
+ * the generic rules cannot be deleted because several components share them.
+ *
+ * This file no longer styles the header, the footer or the carousel itself.
  *
  * Two exceptions to that !important rule, both in `reset` and both unavoidable:
  * the `prefers-reduced-motion` block has to beat inline animation styles, and
@@ -390,7 +400,7 @@
   results-list,
   facet-filters,
   predictive-search,
-  swiper-carousel,
+  carousel-slider,
   accordion-element,
   tabs-element,
   show-more,
@@ -2487,21 +2497,6 @@
     }
   }
 
-  .footer-menu { border-block-end: 1px solid var(--color-border); }
-  .footer-menu__summary { display: flex; align-items: center; justify-content: space-between; padding-block: var(--space-3); }
-  .footer-menu__heading { font-size: var(--font-size-md); }
-  .footer-menu__icon { transition: transform var(--transition-fast); }
-  .footer-menu[open] > .footer-menu__summary .footer-menu__icon { transform: rotate(180deg); }
-  .footer-menu__content { display: block; }
-  .footer-menu__list { display: flex; flex-direction: column; gap: var(--space-2); padding-block-end: var(--space-4); }
-  .footer-menu__link { color: var(--color-accent-text); text-decoration: none; }
-  .footer-menu__link:hover { color: var(--color-heading); }
-
-  @media screen and (min-width: 750px) {
-    .footer-menu { border-block-end: 0; }
-    .footer-menu__summary { padding-block: 0; margin-block-end: var(--space-3); }
-  }
-
   .social-block__heading,
   .newsletter-block .newsletter__heading { font-size: var(--font-size-md); margin-block-end: var(--space-3); }
 
@@ -2520,8 +2515,7 @@
     font-size: var(--font-size-xs);
   }
 
-  .footer__payment-list,
-  .footer__policies { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+  .footer__payment-list { display: flex; flex-wrap: wrap; gap: var(--space-2); }
   .footer__payment-icon { block-size: 2.4rem; inline-size: auto; }
 
   /* ---- social ---- */
@@ -5570,9 +5564,7 @@
 
   .footer__text,
   .footer__copyright { color: var(--color-accent-text); }
-  .footer__policy-link { color: var(--color-accent-text); text-decoration: none; }
   .footer__summary-icon { transition: transform var(--transition-fast); }
-  .footer__localization { flex: 0 0 auto; }
   .footer__image { max-inline-size: 20rem; }
 
   .newsletter__heading { font-size: var(--font-size-md); margin-block-end: var(--space-2); }
@@ -6026,7 +6018,7 @@
 }
 
 /* ==========================================================================
-   Header, transparent header, overlay visibility, filter bar (was phase2.css)
+   Overlay visibility, menu drawer, filter bar (was phase2.css)
    ========================================================================== */
 
 @layer overrides {
@@ -6048,93 +6040,7 @@
     display: none;
   }
 
-  /* ---- 2. Sticky header modes ---- */
-
-  .header {
-    --header-transition: 250ms cubic-bezier(0.4, 0, 0.2, 1);
-
-    position: relative;
-    z-index: 100;
-    transition:
-      background-color var(--header-transition),
-      color var(--header-transition),
-      transform var(--header-transition),
-      box-shadow var(--header-transition);
-  }
-
-  sticky-header[data-sticky-mode='always'],
-  sticky-header[data-sticky-mode='scroll-up'] {
-    position: sticky;
-    inset-block-start: 0;
-  }
-
-  sticky-header[data-sticky-mode='scroll-up'][data-hidden] {
-    transform: translateY(-100%);
-  }
-
-  sticky-header[data-scrolled] {
-    box-shadow: var(--shadow-header, 0 1px 3px rgb(0 0 0 / 0.08));
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .header { transition-duration: 0.01ms; }
-  }
-
-  /* ---- 3. Transparent header ---- */
-
-  .header--transparent {
-    position: absolute;
-    inset-inline: 0;
-    inset-block-start: 0;
-    background-color: transparent;
-  }
-
-  sticky-header.header--transparent[data-sticky-mode='always'],
-  sticky-header.header--transparent[data-sticky-mode='scroll-up'] {
-    position: sticky;
-  }
-
-  sticky-header.header--transparent[data-transparent] {
-    background-color: transparent;
-    box-shadow: none;
-  }
-
-  sticky-header.header--transparent:not([data-transparent]) {
-    background-color: var(--color-background);
-  }
-
-  .header--transparent + * > .section:first-child,
-  .header--transparent ~ #MainContent > .shopify-section:first-child {
-    margin-block-start: 0;
-  }
-
-  /* ---- logo swap ---- */
-
-  .header__logo--has-alt .header__logo-image {
-    transition: opacity var(--header-transition);
-  }
-
-  .header__logo--has-alt .header__logo-image--transparent {
-    position: absolute;
-    inset-block-start: 0;
-    inset-inline-start: 0;
-    opacity: 0;
-    pointer-events: none;
-  }
-
-  .header__logo--has-alt .header__logo-link {
-    position: relative;
-    display: block;
-  }
-
-  sticky-header[data-transparent] .header__logo-image--solid { opacity: 0; }
-  sticky-header[data-transparent] .header__logo-image--transparent { opacity: 1; }
-
-  .header--transparent:not([data-scrolled]) .header__logo-image--transparent {
-    opacity: 1;
-  }
-
-  /* ---- 4. Menu drawer — open only on request ---- */
+  /* ---- 2. Menu drawer — open only on request ---- */
 
   .menu-drawer .drawer__panel {
     transition: transform var(--duration-drawer, 300ms) cubic-bezier(0.32, 0.72, 0, 1);
@@ -6164,7 +6070,7 @@
     transform: translateX(-100%);
   }
 
-  /* ---- 5. Horizontal dropdown filters ---- */
+  /* ---- 3. Horizontal dropdown filters ---- */
 
   .collection-filters--horizontal .collection-filters__bar {
     display: flex;
@@ -6250,532 +6156,6 @@
 
   @media screen and (min-width: 750px) {
     .collection-filters--horizontal .collection-filters__drawer-trigger { display: none; }
-  }
-}
-
-/* ==========================================================================
-   Carousel — Swiper-backed
-   ========================================================================== */
-
-@layer overrides {
-  /* ---- 1. Container ---- */
-
-  .carousel-shell {
-    position: relative;
-    display: block;
-  }
-
-  @media screen and (min-width: 990px) {
-    .carousel-shell--nav-outside {
-      --carousel-nav-gutter: calc(var(--carousel-nav-size, 44px) + var(--space-3));
-
-      padding-inline: var(--carousel-nav-gutter);
-    }
-
-    .carousel-shell--nav-outside[data-direction='vertical'] {
-      padding-inline: 0;
-    }
-  }
-
-  /* ---- 2. The track — a grid until Swiper takes it ---- */
-
-  .carousel-shell__track {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  @media screen and (max-width: 749px) {
-    swiper-carousel[data-layout-mobile='grid']:not(.swiper-initialized) > .carousel-shell__track {
-      display: grid;
-      gap: var(--grid-gap-y) var(--grid-gap-x);
-      grid-template-columns: repeat(var(--columns-mobile, 1), minmax(0, 1fr));
-    }
-  }
-
-  @media screen and (min-width: 750px) {
-    swiper-carousel[data-layout='grid']:not(.swiper-initialized) > .carousel-shell__track {
-      display: grid;
-      gap: var(--grid-gap-y) var(--grid-gap-x);
-      grid-template-columns: repeat(var(--columns-tablet, 2), minmax(0, 1fr));
-    }
-  }
-
-  @media screen and (min-width: 990px) {
-    swiper-carousel[data-layout='grid']:not(.swiper-initialized) > .carousel-shell__track {
-      grid-template-columns: repeat(var(--columns-desktop, 4), minmax(0, 1fr));
-    }
-  }
-
-  /* ---- 3. Slides ---- */
-
-  .carousel-shell.swiper-initialized .swiper-slide {
-    block-size: auto;
-  }
-
-  @media screen and (max-width: 749px) {
-    swiper-carousel[data-layout-mobile='grid']:not(.swiper-initialized) > .carousel-shell__track > * {
-      inline-size: auto;
-      block-size: auto;
-    }
-  }
-
-  @media screen and (min-width: 750px) {
-    swiper-carousel[data-layout='grid']:not(.swiper-initialized) > .carousel-shell__track > * {
-      inline-size: auto;
-      block-size: auto;
-    }
-  }
-
-  /* ---- 4. Shared button ---- */
-
-  .carousel-button {
-    display: grid;
-    place-items: center;
-    flex: 0 0 auto;
-    inline-size: var(--carousel-nav-size, 44px);
-    block-size: var(--carousel-nav-size, 44px);
-    padding: 0;
-
-    border: var(--carousel-nav-border-width, 1px) var(--carousel-nav-border-style, solid)
-      var(--color-slider-arrow-border);
-    border-radius: var(--carousel-nav-radius, 50%);
-    background-color: var(--color-slider-arrow-background);
-    background-image: var(--carousel-nav-background, none);
-    color: var(--color-slider-arrow-icon);
-    cursor: pointer;
-    transition:
-      background-color 150ms ease,
-      border-color 150ms ease,
-      color 150ms ease,
-      opacity 150ms ease;
-  }
-
-  .carousel-button:hover {
-    border-color: var(--color-slider-arrow-border-hover);
-    background-color: var(--color-slider-arrow-background-hover);
-    background-image: var(--carousel-nav-background-hover, var(--carousel-nav-background, none));
-    color: var(--color-slider-arrow-icon-hover);
-  }
-
-  .carousel-button--ghost {
-    background-color: transparent;
-    background-image: none;
-  }
-
-  .carousel-button--solid {
-    border-color: var(--color-slider-arrow-icon);
-    background-color: var(--color-slider-arrow-icon);
-    color: var(--color-slider-arrow-background);
-  }
-
-  /* ---- icon background ---- */
-  .carousel-nav--bg-none .carousel-button,
-  .carousel-controls--bg-none .carousel-button {
-    border-color: transparent;
-    background-color: transparent;
-    background-image: none;
-    color: var(--color-slider-arrow-icon);
-  }
-
-  .carousel-nav--bg-none .carousel-button:hover,
-  .carousel-controls--bg-none .carousel-button:hover {
-    border-color: transparent;
-    background-color: transparent;
-    background-image: none;
-    color: var(--color-slider-arrow-background-hover);
-  }
-
-  .carousel-button--mirror svg {
-    transform: scaleX(-1);
-  }
-
-  .carousel-button--disabled {
-    opacity: 0.35;
-    cursor: default;
-    pointer-events: none;
-  }
-
-  /* ---- disabled, without losing the ring ---- */
-  .carousel-nav .carousel-button--disabled,
-  .carousel-controls .carousel-button--disabled {
-    opacity: 1;
-    border-color: var(--color-slider-arrow-border);
-    color: color-mix(in srgb, var(--color-slider-arrow-icon) 40%, transparent);
-  }
-
-  .carousel-nav .carousel-button--solid.carousel-button--disabled,
-  .carousel-controls .carousel-button--solid.carousel-button--disabled {
-    border-color: var(--color-slider-arrow-icon);
-    background-color: color-mix(in srgb, var(--color-slider-arrow-icon) 30%, transparent);
-    color: var(--color-slider-arrow-background);
-  }
-
-  .carousel-nav--bg-none .carousel-button--disabled.carousel-button,
-  .carousel-controls--bg-none .carousel-button--disabled.carousel-button {
-    opacity: 0.35;
-    border-color: transparent;
-    background-color: transparent;
-    color: var(--color-slider-arrow-icon);
-  }
-
-  .carousel-button--locked {
-    display: none;
-  }
-
-  /* ---- 5. Bare navigation pair ---- */
-
-  .carousel-nav {
-    display: none;
-    gap: var(--space-2);
-  }
-
-  .carousel-shell.swiper-initialized .carousel-nav,
-  .carousel-nav[data-carousel-active] {
-    display: flex;
-  }
-
-  /* ---- outside the track ---- */
-
-  .carousel-shell > .carousel-nav--outside,
-  .carousel-shell > .carousel-nav--inside {
-    position: absolute;
-    inset-block-start: 50%;
-    z-index: 2;
-    justify-content: space-between;
-    pointer-events: none;
-    transform: translateY(-50%);
-  }
-
-  .carousel-shell > .carousel-nav--outside { inset-inline: 0; }
-  .carousel-shell > .carousel-nav--inside { inset-inline: var(--space-3); }
-
-  .carousel-shell > .carousel-nav--outside .carousel-button,
-  .carousel-shell > .carousel-nav--inside .carousel-button {
-    pointer-events: auto;
-  }
-
-  @media screen and (min-width: 750px) and (max-width: 989px) {
-    .carousel-shell > .carousel-nav--outside {
-      inset-inline: var(--space-3);
-    }
-  }
-
-  @media screen and (max-width: 749px) {
-    .carousel-shell > .carousel-nav--outside {
-      position: static;
-      inset-inline: auto;
-      justify-content: center;
-      gap: var(--space-3);
-      margin-block-start: var(--space-4);
-      transform: none;
-      pointer-events: auto;
-    }
-  }
-
-  /* ---- below the track ---- */
-
-  .carousel-shell > .carousel-nav--bottom {
-    position: static;
-    justify-content: center;
-    margin-block-start: var(--space-5);
-  }
-
-  /* ---- inline, for a section header ---- */
-
-  .carousel-nav--inline {
-    position: static;
-  }
-
-  /* ---- 6. Controls bar ---- */
-
-  .carousel-controls {
-    display: none;
-    align-items: center;
-    gap: var(--space-4);
-    inline-size: 100%;
-  }
-
-  .carousel-shell.swiper-initialized .carousel-controls,
-  .carousel-controls[data-carousel-active] {
-    display: flex;
-  }
-
-  .carousel-controls--center { justify-content: center; }
-  .carousel-controls--end { justify-content: flex-end; }
-
-  .carousel-shell > .carousel-controls {
-    margin-block-start: var(--space-6);
-  }
-
-  .carousel-controls--inline {
-    inline-size: auto;
-    margin-block-start: 0;
-  }
-
-  .carousel-controls__count {
-    flex: 0 0 auto;
-    font-size: var(--carousel-count-size, var(--font-size-lg));
-    font-weight: var(--font-weight-bold, 700);
-    font-variant-numeric: tabular-nums;
-    line-height: 1;
-    color: var(--color-slider-indicator-active);
-  }
-
-  .carousel-controls__count--total {
-    color: var(--color-slider-indicator-active);
-  }
-
-  .carousel-controls__progress {
-    position: relative;
-    flex: 1 1 auto;
-    min-inline-size: 6rem;
-    max-inline-size: var(--carousel-progress-width, 24rem);
-    block-size: var(--carousel-progress-height, 6px);
-    border-radius: var(--carousel-progress-radius, 0);
-    background-color: var(--color-slider-indicator);
-    overflow: hidden;
-  }
-
-  .carousel-controls__bar {
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    background-color: var(--color-slider-indicator-active);
-    background-image: var(--carousel-bar-background, none);
-    transform: scaleX(var(--carousel-progress, 0));
-    transform-origin: left center;
-    transition: transform 300ms var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
-  }
-
-  [dir='rtl'] .carousel-controls__bar {
-    transform-origin: right center;
-  }
-
-  @media screen and (max-width: 749px) {
-    .carousel-controls {
-      gap: var(--space-3);
-    }
-
-    .carousel-controls__progress {
-      min-inline-size: 4rem;
-    }
-  }
-
-  /* ---- 7. Pagination ---- */
-
-  .carousel-shell__dots,
-  .carousel-shell__counter,
-  .carousel-shell__progress {
-    display: none;
-    margin-block-start: var(--space-5);
-  }
-
-  /* ---- alignment ---- */
-  .carousel-pagination--start.carousel-shell__dots,
-  .carousel-pagination--start.carousel-shell__counter { text-align: start; }
-
-  .carousel-pagination--center.carousel-shell__dots,
-  .carousel-pagination--center.carousel-shell__counter { text-align: center; }
-
-  .carousel-pagination--end.carousel-shell__dots,
-  .carousel-pagination--end.carousel-shell__counter { text-align: end; }
-
-  .carousel-shell__progress.carousel-pagination--start,
-  .carousel-shell__progress.carousel-pagination--center,
-  .carousel-shell__progress.carousel-pagination--end {
-    max-inline-size: var(--carousel-pagination-bar-width, 24rem);
-  }
-
-  .carousel-shell__progress.carousel-pagination--start { margin-inline: 0 auto; }
-  .carousel-shell__progress.carousel-pagination--center { margin-inline: auto; }
-  .carousel-shell__progress.carousel-pagination--end { margin-inline: auto 0; }
-
-  .carousel-shell.swiper-initialized .carousel-shell__dots,
-  .carousel-shell.swiper-initialized .carousel-shell__counter,
-  .carousel-shell.swiper-initialized .carousel-shell__progress {
-    display: block;
-  }
-
-  .carousel-shell__pagination--locked { display: none !important; }
-
-  /* ---- bullets ---- */
-
-  .carousel-shell__dots {
-    position: static;
-    text-align: center;
-  }
-
-  .carousel-shell__dot {
-    display: inline-block;
-    inline-size: var(--carousel-dot-size, 0.8rem);
-    block-size: var(--carousel-dot-size, 0.8rem);
-    margin-inline: var(--space-1);
-    padding: 0;
-    border: 0;
-    border-radius: 50%;
-    background-color: var(--color-slider-indicator);
-    cursor: pointer;
-    transition: background-color 150ms ease, transform 150ms ease;
-  }
-
-  .carousel-shell__dot--active {
-    background-color: var(--color-slider-indicator-active);
-    transform: scale(1.3);
-  }
-
-  /* ---- fraction ---- */
-
-  .carousel-shell__counter {
-    position: static;
-    text-align: center;
-    font-size: var(--font-size-sm);
-    font-variant-numeric: tabular-nums;
-    color: var(--color-slider-indicator);
-  }
-
-  .carousel-shell__counter .swiper-pagination-current {
-    color: var(--color-slider-indicator-active);
-  }
-
-  /* ---- progress bar ---- */
-
-  .carousel-shell__progress,
-  .carousel-shell__progress.swiper-pagination-progressbar {
-    position: relative;
-    inset: auto;
-    inline-size: 100%;
-    block-size: var(--carousel-pagination-bar-height, 4px);
-    border-radius: var(--carousel-pagination-bar-radius, 999px);
-    background-color: var(--color-slider-indicator);
-    overflow: hidden;
-  }
-
-  .carousel-shell__progress .swiper-pagination-progressbar-fill,
-  .carousel-shell__progress.swiper-pagination-progressbar .swiper-pagination-progressbar-fill {
-    border-radius: inherit;
-    background-color: var(--color-slider-indicator-active);
-    background-image: var(--carousel-bar-background, none);
-  }
-
-  /* ---- 8. Pause control ---- */
-
-  .carousel-shell__pause {
-    position: absolute;
-    inset-block-end: var(--space-3);
-    inset-inline-end: var(--space-3);
-    z-index: 2;
-    display: grid;
-    place-items: center;
-    --carousel-pause-size: 3.4rem;
-
-    inline-size: var(--carousel-pause-size);
-    block-size: var(--carousel-pause-size);
-    padding: 0;
-    border: 0;
-    border-radius: 50%;
-    background-color: var(--color-slider-arrow-background);
-    color: var(--color-slider-arrow-icon);
-    cursor: pointer;
-    box-shadow: 0 1px 6px rgb(0 0 0 / 0.28);
-    transition: transform 0.15s ease, background-color 0.15s ease;
-  }
-
-  .carousel-shell__pause:hover { transform: scale(1.08); }
-
-  .carousel-shell__pause:focus-visible {
-    outline: 2px solid var(--color-accent-text, currentColor);
-    outline-offset: 2px;
-  }
-
-  .carousel-shell__pause::before {
-    content: '';
-    position: absolute;
-    inset: -3px;
-    border-radius: 50%;
-    background: conic-gradient(
-      var(--color-accent-text, currentColor) calc(var(--carousel-autoplay-progress, 0) * 360deg),
-      rgb(255 255 255 / 0.25) 0
-    );
-    mask: radial-gradient(circle, transparent 0 calc(50% - 3px), black calc(50% - 3px) 100%);
-    -webkit-mask: radial-gradient(circle, transparent 0 calc(50% - 3px), black calc(50% - 3px) 100%);
-    pointer-events: none;
-  }
-
-  .carousel-shell__pause > * {
-    position: relative;
-    z-index: 1;
-  }
-
-  .carousel-shell__pause[aria-pressed='false'] .carousel-shell__pause-glyph--play,
-  .carousel-shell__pause[aria-pressed='true'] .carousel-shell__pause-glyph--pause {
-    display: none;
-  }
-
-  .carousel-shell__pause-glyph {
-    display: grid;
-    place-items: center;
-    line-height: 0;
-  }
-
-  .carousel-shell__pause[aria-pressed='true']::before {
-    opacity: 0.45;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .carousel-shell__pause { transition: none; }
-    .carousel-shell__pause:hover { transform: none; }
-  }
-
-  .carousel-shell__pause[hidden] { display: none !important; }
-
-  /* ---- 8b. Announcement bar slides ---- */
-
-  .announcement-bar__carousel .swiper-slide {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--space-2);
-    block-size: auto;
-  }
-
-  /* ---- 9. Product media gallery controls ---- */
-
-  .product-media {
-    position: relative;
-  }
-
-  .product-media .carousel-nav,
-  .product-media .carousel-controls {
-    display: flex;
-  }
-
-  .product-media > .carousel-nav {
-    position: absolute;
-    inset-block-start: 50%;
-    inset-inline: var(--space-3);
-    z-index: 2;
-    justify-content: space-between;
-    pointer-events: none;
-    transform: translateY(-50%);
-  }
-
-  .product-media > .carousel-nav .carousel-button { pointer-events: auto; }
-
-  .product-media > .carousel-controls {
-    margin-block-start: var(--space-4);
-  }
-
-  /* ---- 10. Reduced motion ---- */
-
-  @media (prefers-reduced-motion: reduce) {
-    .carousel-shell__item,
-    .carousel-shell__dot,
-    .carousel-button,
-    .carousel-controls__bar,
-    .carousel-shell__progress .swiper-pagination-progressbar-fill {
-      transition: none;
-    }
   }
 }
 
@@ -7623,138 +7003,6 @@
   }
 }
 
-/* ==========================================================================
-   Swiper adoption for the four formerly scroll-snap tracks
-   ========================================================================== */
-
-@layer overrides {
-  swiper-carousel.swiper-initialized > [data-ref~='track'] {
-    overflow: visible;
-    scroll-snap-type: none;
-    gap: 0;
-    display: flex;
-  }
-
-  swiper-carousel.swiper-initialized > [data-ref~='track'] > * {
-    flex: 0 0 auto;
-    scroll-snap-align: none;
-  }
-
-  .carousel-button--locked,
-  .hero__arrow.carousel-button--locked,
-  .product-card__slider-arrow.carousel-button--locked,
-  .product-recommendations__arrow.carousel-button--locked,
-  .recently-viewed__arrow.carousel-button--locked {
-    display: none;
-  }
-
-  .hero__arrow.carousel-button--disabled,
-  .product-card__slider-arrow.carousel-button--disabled,
-  .product-recommendations__arrow.carousel-button--disabled,
-  .recently-viewed__arrow.carousel-button--disabled {
-    opacity: 0.35;
-    pointer-events: none;
-  }
-}
-
-/* ==========================================================================
-   Pre-init slide sizing — the one rule every carousel inherits
-   ========================================================================== */
-
-@layer overrides {
-  swiper-carousel {
-    --carousel-slides: var(--carousel-slides-mobile, 1);
-  }
-
-  @media screen and (min-width: 750px) {
-    swiper-carousel {
-      --carousel-slides: var(--carousel-slides-tablet, var(--carousel-slides-mobile, 1));
-    }
-  }
-
-  @media screen and (min-width: 990px) {
-    swiper-carousel {
-      --carousel-slides: var(--carousel-slides-desktop, var(--carousel-slides-tablet, 1));
-    }
-  }
-
-  /* ---- below 750px, if this breakpoint is a carousel ---- */
-  @media screen and (max-width: 749px) {
-    swiper-carousel[data-layout-mobile='carousel']:not(.swiper-initialized) > [data-ref~='track'] {
-      display: flex;
-      gap: var(--carousel-gap, 0px);
-    }
-
-    swiper-carousel[data-layout-mobile='carousel']:not(.swiper-initialized) > [data-ref~='track'] > * {
-      flex: 0 0 calc(
-        (100% - (var(--carousel-slides, 1) - 1) * var(--carousel-gap, 0px))
-        / var(--carousel-slides, 1)
-      );
-      min-inline-size: 0;
-    }
-  }
-
-  /* ---- 750px and up, if this breakpoint is a carousel ---- */
-  @media screen and (min-width: 750px) {
-    swiper-carousel[data-layout='carousel']:not(.swiper-initialized) > [data-ref~='track'] {
-      display: flex;
-      gap: var(--carousel-gap, 0px);
-    }
-
-    swiper-carousel[data-layout='carousel']:not(.swiper-initialized) > [data-ref~='track'] > * {
-      flex: 0 0 calc(
-        (100% - (var(--carousel-slides, 1) - 1) * var(--carousel-gap, 0px))
-        / var(--carousel-slides, 1)
-      );
-      min-inline-size: 0;
-    }
-  }
-
-  /* ---- grid breakpoints ---- */
-  @media screen and (max-width: 749px) {
-    swiper-carousel[data-layout-mobile='grid']:not(.swiper-initialized) {
-      overflow: visible;
-    }
-  }
-
-  @media screen and (min-width: 750px) {
-    swiper-carousel[data-layout='grid']:not(.swiper-initialized) {
-      overflow: visible;
-    }
-  }
-}
-
-/* ==========================================================================
-   Vertical carousels
-   ========================================================================== */
-
-@layer overrides {
-  swiper-carousel[data-direction='vertical'] {
-    block-size: calc(
-      var(--carousel-slides, 1) * var(--carousel-row-size, 11rem) +
-      (var(--carousel-slides, 1) - 1) * var(--carousel-gap, 0px)
-    );
-    row-gap: var(--carousel-gap, 0px);
-    overflow: hidden;
-  }
-
-  swiper-carousel[data-direction='vertical'] > [data-ref~='track'] {
-    flex-direction: column;
-    block-size: 100%;
-  }
-
-  @media screen and (max-width: 749px) {
-    swiper-carousel[data-direction='vertical'][data-layout-mobile='grid']:not(.swiper-initialized) {
-      block-size: auto;
-    }
-  }
-
-  @media screen and (min-width: 750px) {
-    swiper-carousel[data-direction='vertical'][data-layout='grid']:not(.swiper-initialized) {
-      block-size: auto;
-    }
-  }
-}
 
 /* ==========================================================================
    Text block
@@ -9061,14 +8309,14 @@
       color: var(--feature-icon-ring-color-hover, var(--feature-icon-ring-color, currentColor));
     }
 
-    .feature-card.swiper-slide-active .feature-icon-block__ring,
+    .feature-card[data-active] .feature-icon-block__ring,
     .feature-card:hover .feature-icon-block__ring,
     .feature-card:focus-within .feature-icon-block__ring,
     .feature-card:active .feature-icon-block__ring {
       transform: rotate(var(--feature-icon-ring-spin, 0deg));
     }
 
-    .feature-card.swiper-slide-active .feature-icon-block--connector-swap .feature-icon-block__connector,
+    .feature-card[data-active] .feature-icon-block--connector-swap .feature-icon-block__connector,
     .feature-card:hover .feature-icon-block--connector-swap .feature-icon-block__connector,
     .feature-card:focus-within .feature-icon-block--connector-swap .feature-icon-block__connector,
     .feature-card:active .feature-icon-block--connector-swap .feature-icon-block__connector {
@@ -9104,11 +8352,11 @@
       transform: none;
     }
 
-    .feature-card.swiper-slide-active .feature-icon-block__ring,
+    .feature-card[data-active] .feature-icon-block__ring,
     .feature-card:hover .feature-icon-block__ring,
     .feature-card:focus-within .feature-icon-block__ring,
     .feature-card:active .feature-icon-block__ring,
-    .feature-card.swiper-slide-active .feature-icon-block--connector-swap .feature-icon-block__connector,
+    .feature-card[data-active] .feature-icon-block--connector-swap .feature-icon-block__connector,
     .feature-card:hover .feature-icon-block--connector-swap .feature-icon-block__connector,
     .feature-card:focus-within .feature-icon-block--connector-swap .feature-icon-block__connector,
     .feature-card:active .feature-icon-block--connector-swap .feature-icon-block__connector {
@@ -9256,13 +8504,13 @@
 
   /* ---- the track ---- */
 
-  swiper-carousel.testimonials__carousel {
+  carousel-slider.testimonials__carousel {
     padding-block-end: var(--tc-track-reserve, 30px);
   }
 
-  .testimonials__carousel .swiper-slide { block-size: auto; }
+  .testimonials__carousel .carousel-shell__track > * { block-size: auto; }
 
-  .testimonials__carousel.swiper-initialized > .carousel-shell__track {
+  .testimonials__carousel[data-running] > .carousel-shell__track {
     align-items: stretch;
   }
 
@@ -11196,16 +10444,13 @@
     margin-block-start: 3.2rem;
   }
 
-  .product-bundle .carousel-shell__dots.swiper-pagination-bullets,
-  .product-bundle .carousel-shell__dots.swiper-pagination-vertical {
+  .product-bundle .carousel-shell__dots {
+    --carousel-dot-size: 1.2rem;
+
     position: static;
     inset: auto;
     inline-size: auto;
     transform: none;
-  }
-
-  .product-bundle .carousel-shell__dots {
-    --carousel-dot-size: 1.2rem;
 
     display: flex;
     align-items: center;

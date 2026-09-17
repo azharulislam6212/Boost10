@@ -4,7 +4,7 @@
  * `<media-gallery>` and `<media-thumbnails>` — the product media viewer.
  *
  * The gallery is a scroll-snapping list of media, the same mechanism as
- * `<swiper-carousel>`, plus the parts that are specific to product media:
+ * `<carousel-slider>`, plus the parts that are specific to product media:
  * thumbnails that stay in sync, video and 3D models that only load when asked,
  * and pausing anything playing when the customer moves to another item.
  *
@@ -53,11 +53,11 @@ export class MediaGallery extends BaseComponent {
   /**
    * The arrows and readout rendered by `snippets/carousel-controls.liquid`.
    *
-   * The gallery is not a Swiper carousel — it coordinates zoom, video playback
-   * and the thumbnail strip, none of which Swiper would simplify — but it
-   * renders the same control bar so the product page and the collection
-   * carousels stay visually identical. `@theme/carousel-controls` is the shared
-   * part; nothing about Swiper leaks in here.
+   * The gallery is not a `<carousel-slider>` — it coordinates zoom, video
+   * playback and the thumbnail strip, none of which the carousel would
+   * simplify — but it renders the same control bar so the product page and the
+   * collection carousels stay visually identical. `@theme/carousel-controls` is
+   * the shared part; nothing about the carousel leaks in here.
    *
    * @type {import('@theme/carousel-controls').ControlRefs}
    */

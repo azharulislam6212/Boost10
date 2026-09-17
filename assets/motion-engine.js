@@ -1224,7 +1224,7 @@ export function marquee(track, { speed = 60, direction = 'left', pauseOnHover = 
   // A marquee built inside a hidden container — the announcement bar before it
   // is revealed, a closed drawer, an inactive tab — measures zero and would
   // otherwise never move. Rebuilding when the box gains a real width is the
-  // same recovery `<swiper-carousel>` makes.
+  // same recovery `<carousel-slider>` makes.
   let lastWidth = container.offsetWidth;
   observer = new ResizeObserver(() => {
     const width = container.offsetWidth;

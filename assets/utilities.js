@@ -1283,7 +1283,7 @@ export function openDisclosure(details) {
   //
   // A dropdown is text: it has its final height the moment `open` is set, and
   // two frames was plenty. A mega menu is not. Its carousel only discovers its
-  // track width when the panel gains a size, and Swiper then relays out — after
+  // track width when the panel gains a size, and it relays out then — after
   // the reveal has already started. The inner element is translating by `-101%`
   // of a height that is no longer the height it began from, so the panel lurches
   // halfway through. That is why the dropdowns were smooth and the mega menus

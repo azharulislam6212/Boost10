@@ -23,10 +23,11 @@
 
    ## Load order
 
-   Loaded after `base.css`, which still holds the older `.site-header__*` rules from
-   the previous header. Those rules are unreachable — the class names changed —
-   but the file is left alone here so a merchant mid-migration does not lose a
-   header between two uploads.
+   Loaded after `base.css`, into the same `@layer overrides`, so these rules
+   settle against its own override blocks on specificity and source order. The
+   older header's rules have been removed from `base.css`: the class-keyed ones
+   were unreachable, and the three keyed on `<sticky-header>` itself were not —
+   see section 47.2.
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
@@ -72,10 +73,26 @@
    also where it belonged. The header still overrides its own layout tokens
    below. */
 
-/* In `@layer overrides`, the last layer in the order base.css declares, and
-   the layer base.css, product-card.css and swiper.css also write into. Same
-   layer, loaded in that order: these rules settle against theirs on
-   specificity and source order, and all of them outrank every layer above. */
+/* In `@layer overrides`, the last layer in the order base.css declares, and the
+   layer base.css's own override blocks and product-card.css write into. Same
+   layer, loaded in that order: these rules settle against theirs on specificity
+   and source order, and all of them outrank every layer above.
+
+   It has to be the last layer, and the reason is worth stating so nobody moves
+   it again. This is a component stylesheet: most of what it does is speak over
+   the generic rules base.css states for the same elements — `.drawer__panel` is
+   `inline-size: min(42rem, 100vw)` in `@layer components` and the nav drawer
+   wants `min(420px, 92vw)`; `.drawer__body` sets the padding and the scroll
+   behaviour every drawer shares. A layer beats specificity, so from any layer
+   below `components` those rules would win no matter how the selectors here are
+   written, and the drawer would come out the wrong width with the wrong padding.
+   Deleting them from base.css is not an option either — the cart, search, facet
+   and compare drawers all rely on them.
+
+   base.css no longer carries the *previous* header's rules, though: the
+   class-keyed ones could never match (`site-header*` now), and the three keyed
+   on the `<sticky-header>` element name itself were actively wrong. See section
+   47.2. */
 @layer overrides {
   :root {
     --header-ease: cubic-bezier(0.22, 1, 0.36, 1);
@@ -1630,7 +1647,7 @@
   }
 
   /* Inside a carousel the track owns the columns, so the grid steps aside rather
-     than fighting Swiper for the same property. */
+     than fighting the carousel for the same property. */
   .tabs__panel .carousel-shell__track {
     --grid-columns-desktop: var(--tab-columns, 3);
   }
@@ -3154,7 +3171,7 @@
      36. The panel opens without a jump
      --------------------------------------------------------------------------
      The lurch was a carousel, not the animation. Opening a panel dispatched a
-     window `resize` so that any Swiper inside would re-measure — but that told
+     window `resize` so that any carousel inside would re-measure — but that told
      *every* carousel on the page to relayout, mid-transition, and the panel's own
      height changed under the reveal.
 
@@ -3794,26 +3811,26 @@
     min-block-size: var(--header-block-size, auto);
   }
 
-  /* ---- 47.2 The previous header's rules still match this one -------------- */
+  /* ---- 47.2 The previous header's rules must not reach this one ----------- */
 
-  /* `base.css` still carries the rules from the header this file replaced. They
-     were left in place deliberately — the comment at the top of this file says so
-     — on the understanding that the class names had changed and nothing could
-     match. But three of them are keyed on the *element name*:
+  /* `base.css` used to carry the rules from the header this file replaced. They
+     were left in place deliberately — on the understanding that the class names
+     had changed and nothing could match. But three of them were keyed on the
+     *element name*:
 
        sticky-header[data-sticky-mode='always'] { position: sticky; inset-block-start: 0 }
        sticky-header[data-sticky-mode='scroll-up'] { … }
        sticky-header[data-scrolled] { box-shadow: … }
 
-     and `<sticky-header>` is still `<sticky-header>`. So the inner element has
-     been sticky this whole time, inside a `.header-section` that is also sticky —
-     two pinned boxes, one nested in the other, and a stacking context on the
-     inner one that the panel positioning in section 3 was never written against.
+     and `<sticky-header>` is still `<sticky-header>`. So the inner element was
+     sticky, inside a `.header-section` that is also sticky — two pinned boxes,
+     one nested in the other, and a stacking context on the inner one that the
+     panel positioning in section 3 was never written against.
 
-     Section 2 of this file is explicit that the positioning belongs on
-     `.header-section`. This restores that. Same specificity as the base.css rule
-     (one element, one class against one element, one attribute) and this file
-     loads second, so it wins on order. */
+     Those rules are gone from `base.css` now, along with the dead `.header*`
+     block around them. This rule stays: section 2 of this file is explicit that
+     the positioning belongs on `.header-section`, and stating it here means the
+     header does not depend on the absence of something in another file. */
   sticky-header.site-header {
     position: relative;
     inset-block-start: auto;
