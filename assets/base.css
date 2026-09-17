@@ -9281,11 +9281,86 @@
     gap: var(--expert-quote-gap-y, var(--space-6)) var(--expert-quote-gap-x, var(--space-6));
   }
 
+  /* ---- the row narrows, it does not break ----
+
+     A flex line breaks on the items' flex-*basis*, before shrinking is ever
+     considered, so a row that is a few pixels too wide does not come out a few
+     pixels narrower — it wraps. With a featured picture that cannot shrink
+     (`flex: 0 0 auto`, because it is the one the arrangement is built around)
+     the drawing's own numbers need 800px of content, and anything under about
+     880px wide wrapped: the picture after the expert dropped to a second line,
+     the picture before it grew into the whole leftover, and the dropped one's
+     lift — a negative `margin-block-start`, which is the point of the scatter —
+     pulled it up over the featured picture and over the expert's name. Every
+     tablet held in portrait landed in that band.
+
+     So above the phone the line never breaks and the scattered pictures give up
+     width instead, which is what the `flex: 1 1` on them was always asking for.
+     The phone keeps `wrap`: there the featured picture is a full line of its
+     own and the wrap is the layout. */
+  @media screen and (min-width: 750px) {
+    .expert-quote__stage {
+      flex-wrap: nowrap;
+    }
+  }
+
   .expert-quote-pic {
     order: var(--eqp-order, 2);
     display: flex;
     justify-content: center;
     min-inline-size: 0;
+
+    /* ---- one set of numbers, resolved once per device ----
+
+       The width, and the height derived from it and the ratio, are read in four
+       places between here and the reservation below. Resolving the
+       Desktop/Mobile pair into one name at the top means the phone override at
+       the bottom of the file is one declaration rather than the same
+       `var(--x-mobile, var(--x))` chain repeated through every rule. */
+    --eqp-frame-inline: var(--eqp-width, 260px);
+    --eqp-frame-tilt: var(--eqp-tilt, 0deg);
+    --eqp-frame-block: calc(var(--eqp-frame-inline) / (var(--eqp-aspect, 1)));
+
+    /* ---- the tilt is part of the layout, not only part of the paint ----
+
+       `rotate` does not change the box a flex row reserves, so a turned picture
+       swings its corners out over whatever stands next to it. On a tablet, where
+       the three pictures had just stopped fitting and were already giving up
+       width to each other, the drawing's own 12 and 14 degrees put a corner of
+       one photograph through its neighbour and through the gutter.
+
+       Desktop and tablet only: the phone switches this back off at the bottom of
+       the file and keeps the arrangement it has always had.
+
+       A box w by h turned by t occupies `w × cos(t) + h × sin(t)`, so half the
+       difference from w is what each side has to be given back. The block
+       publishes the ratio because the height is the one term CSS cannot read
+       off the element: `aspect-ratio` sizes a box, it does not answer a
+       calculation standing beside it.
+
+       Clamped at zero because far past the Tilt slider's own ±20° — around 57°
+       on a 16:9 picture — the turned box comes out *narrower* than the upright
+       one, and an unclamped result would then be a negative margin pulling the
+       neighbours in rather than holding them off. The slider cannot reach that,
+       but the arithmetic is what a later, wider slider would meet. */
+    --eqp-bleed-x: max(
+      0px,
+      calc(
+        (
+            var(--eqp-frame-block) * sin(var(--eqp-frame-tilt)) - var(--eqp-frame-inline) *
+              (1 - cos(var(--eqp-frame-tilt)))
+          ) / 2
+      )
+    );
+    --eqp-bleed-y: max(
+      0px,
+      calc(
+        (
+            var(--eqp-frame-inline) * sin(var(--eqp-frame-tilt)) - var(--eqp-frame-block) *
+              (1 - cos(var(--eqp-frame-tilt)))
+          ) / 2
+      )
+    );
   }
 
   .expert-quote-pic--feature {
@@ -9295,15 +9370,24 @@
   }
 
   .expert-quote-pic--scatter {
-    flex: 1 1 var(--eqp-width, 260px);
+    flex: 1 1 calc(var(--eqp-frame-inline) + 2 * var(--eqp-bleed-x));
     margin-block-start: var(--eqp-offset, 0px);
   }
 
   .expert-quote-pic__frame {
     position: relative;
     isolation: isolate;
-    inline-size: var(--eqp-width, 260px);
-    max-inline-size: 100%;
+    inline-size: var(--eqp-frame-inline);
+
+    /* The reservation is worn by the frame rather than by the flex item, so it
+       is the turned picture that is held off its neighbours rather than an item
+       box padded away from a picture centred inside it. `100%` has to lose the
+       same two margins, or a frame squeezed by a narrow row fills its item and
+       starts bleeding again at exactly the width with the least room for it. */
+    max-inline-size: calc(100% - 2 * var(--eqp-bleed-x));
+    margin-inline: var(--eqp-bleed-x);
+    margin-block: var(--eqp-bleed-y);
+
     rotate: var(--eqp-rotate, 0deg);
     --radius-media: var(--eqp-radius, 0px);
   }
@@ -9433,13 +9517,30 @@
       flex: 1 1 100%;
     }
 
+    /* ---- the phone keeps the arrangement it always had ----
+
+       The width swaps to the mobile slider, and the reservation the tilt is
+       given above is switched back off: a phone renders these pictures exactly
+       as it rendered them before that reservation existed, at the size they are
+       set to and shoulder to shoulder, which is the arrangement asked for here.
+
+       Zeroing the two bleeds rather than restating the rules they appear in is
+       what keeps that honest — `flex`, `inline-size`, `max-inline-size` and both
+       margins above all collapse to the values they carried before, so there is
+       one place to look to see that the phone is deliberately left alone and
+       one value to change if it should ever stop being. */
+    .expert-quote-pic {
+      --eqp-frame-inline: var(--eqp-width-mobile, var(--eqp-width, 260px));
+      --eqp-bleed-x: 0px;
+      --eqp-bleed-y: 0px;
+    }
+
     .expert-quote-pic--scatter {
       flex: 0 1 auto;
       margin-block-start: var(--eqp-offset-mobile, 0px);
     }
 
     .expert-quote-pic__frame {
-      inline-size: var(--eqp-width-mobile, var(--eqp-width, 260px));
       --radius-media: var(--eqp-radius-mobile, var(--eqp-radius, 0px));
     }
 

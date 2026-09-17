@@ -84,7 +84,39 @@
   assign offset = b.offset | default: 0 | plus: 0
   assign offset_mobile = b.offset_mobile | default: offset | plus: 0
 
+  comment
+    ---- the tilt ----
+
+    One angle for every width. A phone renders the scattered pictures at the
+    size and the angle they are set to, shoulder to shoulder, which is the
+    arrangement this section has always had there and the one it should keep.
+
+    `tilt` is published alongside it because `assets/base.css` gives a turned
+    picture the room its corners need on desktop and tablet, where the three
+    pictures are already giving up width to each other and a corner through a
+    neighbour is a fault rather than a scatter. `abs` because that calculation
+    wants the size of the turn, not its direction: a picture tilted -12deg
+    swings exactly as much of itself out of its box as one tilted 12deg, and
+    `sin()` of a negative angle would hand back a negative margin that pulls the
+    neighbours in instead.
+  endcomment
   assign rotate = b.rotate | default: 0 | plus: 0
+  assign tilt = rotate | abs
+
+  comment
+    The ratio the frame was given, published so the stylesheet can derive the
+    picture's height from its width. A box turned by t is
+    `w × cos(t) + h × sin(t)` wide, and the height is the one term of that CSS
+    cannot read off the element itself — `aspect-ratio` is a property a box is
+    sized *by*, not one a calculation standing beside it can ask about.
+
+    `snippets/aspect-ratio.liquid` resolves the seven names, so Adapt arrives
+    here as the uploaded image's own ratio rather than as a word, and an empty
+    block falls back to 1 alongside the placeholder.
+  endcomment
+  capture aspect
+    render 'aspect-ratio', ratio: b.ratio, image: b.image
+  endcapture
 
   comment
     ---- the outline ----
@@ -141,6 +173,8 @@
   --eqp-offset: {{ offset }}px;
   --eqp-offset-mobile: {{ offset_mobile }}px;
   --eqp-rotate: {{ rotate }}deg;
+  --eqp-tilt: {{ tilt }}deg;
+  --eqp-aspect: {{ aspect | strip }};
   --eqp-radius: {{ radius }}px;
   --eqp-radius-mobile: {{ radius_mobile }}px;
   {%- comment -%}
