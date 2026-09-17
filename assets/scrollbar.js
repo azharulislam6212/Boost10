@@ -57,6 +57,19 @@ export class SmoothScrollbar extends BaseComponent {
   /** @type {(() => void)|null} */
   #unsubscribe = null;
 
+  /**
+   * The back-to-top control, looked up once.
+   *
+   * `#publishProgress` runs on every frame of every scroll, and it used to find
+   * this with a fresh `querySelector` each time — a whole-document query per
+   * frame to reach an element that is rendered once by Liquid and never moves.
+   * Resolved lazily rather than in `setup()` because the control is a sibling in
+   * `sections/overlays.liquid` and may not be parsed yet when this runs.
+   *
+   * @type {Element|null|undefined} undefined until looked up, null if absent.
+   */
+  #backToTop;
+
   /* ------------------------------------------------------------ lifecycle */
 
   setup() {
@@ -75,6 +88,7 @@ export class SmoothScrollbar extends BaseComponent {
 
   teardown() {
     this.#token += 1;
+    this.#backToTop = undefined;
     this.#stopLoop();
     this.#unsubscribe?.();
     this.#unsubscribe = null;
@@ -122,13 +136,22 @@ export class SmoothScrollbar extends BaseComponent {
   /**
    * Scroll to a position, element or selector.
    *
+   * Note that **Scroll easing** does not reach this. Lenis animates towards a
+   * target either by damping (`lerp`, which is what the setting drives, and what
+   * a wheel or a finger gets) or over a fixed `duration` — and passing a
+   * duration, which a jump to a known place should, switches the damping off
+   * entirely. So this number is the one that decides how long every back-to-top,
+   * anchor link and filter result takes, no matter where the merchant leaves the
+   * slider, and 900ms was long enough that the page felt like it was catching up
+   * rather than answering.
+   *
    * @param {number|string|Element} target Offset in pixels, a selector, or an element.
    * @param {Object} [options]
    * @param {number} [options.offset=0] Extra pixels, usually a negative header height.
-   * @param {number} [options.duration=900] Milliseconds. Lenis takes seconds; converted here.
+   * @param {number} [options.duration=600] Milliseconds. Lenis takes seconds; converted here.
    * @param {boolean} [options.immediate=false] Jump without animating.
    */
-  scrollTo(target, { offset = 0, duration = 900, immediate = false } = {}) {
+  scrollTo(target, { offset = 0, duration = 600, immediate = false } = {}) {
     const jump = immediate || prefersReducedMotion();
 
     if (this.#lenis) {
@@ -319,7 +342,8 @@ export class SmoothScrollbar extends BaseComponent {
 
     // Direct method call on the element that consumes this state. No event, no
     // registry, and nothing to unsubscribe.
-    document.querySelector('scroll-to-top')?.updateFromScroll?.(scrollY, progress);
+    if (this.#backToTop === undefined) this.#backToTop = document.querySelector('scroll-to-top');
+    this.#backToTop?.updateFromScroll?.(scrollY, progress);
   }
 
   /**
