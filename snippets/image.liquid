@@ -31,14 +31,24 @@
 
   ## Ratios
 
-    adapt      the image's own ratio
-    square     1:1
-    portrait   3:4
-    landscape  4:3
-    wide       16:9
-    tall       2:3
-    long       9:16
-    <number>   any custom value, e.g. 1.5 or "5 / 4"
+  The names, and the numbers behind them, belong to
+  `snippets/aspect-ratio.liquid` — this snippet only passes them through.
+
+    9-16           9:16
+    2-3            2:3
+    3-4            3:4
+    portrait       4:5
+    1-1            1:1
+    5-4            5:4
+    4-3            4:3
+    3-2            3:2
+    16-9           16:9
+    aspect-ratio   the image's own ratio
+    <number>       any custom value, e.g. 1.5 or "5 / 4"
+
+  `square`, `portrait`, `landscape`, `wide`, `tall`, `long` and `adapt` were the
+  previous names and still resolve. `portrait` is the one that changed meaning:
+  it was 3:4 and is now 4:5, so `3-4` is what keeps the old shape.
 
   @param {image} image - Shopify image or media preview
   @param {image} [mobile_image] - Shown at 767px and below
@@ -48,7 +58,7 @@
   @param {string} [sizes] - Defaults to a full-width hint
   @param {string} [mobile_sizes] - Defaults to 100vw
   @param {string} [widths] - Comma separated. Defaults to a standard ladder
-  @param {string} [ratio] - See above. Default: adapt
+  @param {string} [ratio] - See above. Default: aspect-ratio
   @param {string} [mobile_ratio] - Defaults to `ratio`
   @param {boolean} [priority] - Eager load, high fetch priority. Hero images only
   @param {boolean} [preload] - Emits a preload hint. Requires `priority`
@@ -56,8 +66,8 @@
   @param {string} [placeholder]
 
   @example
-    {% render 'image', image: section.settings.image, ratio: 'wide',
-       mobile_image: section.settings.image_mobile, mobile_ratio: 'long',
+    {% render 'image', image: section.settings.image, ratio: '16-9',
+       mobile_image: section.settings.image_mobile, mobile_ratio: '9-16',
        priority: true, preload: true %}
 
   @example
@@ -117,19 +127,19 @@
 
   # ---- aspect ratios -------------------------------------------------------
   #
-  # The seven names resolve in `snippets/aspect-ratio.liquid`. They used to
+  # The names resolve in `snippets/aspect-ratio.liquid`. They used to
   # resolve here, in two case blocks, which was fine while an `<img>` was the
   # only thing in the theme with a shape — `blocks/image-card.liquid` gives the
   # ratio to a card whose picture is a background, and a second copy of the
   # numbers is the copy that drifts.
-  assign ratio_key = ratio | default: 'adapt'
+  assign ratio_key = ratio | default: 'aspect-ratio'
   assign mobile_ratio_key = mobile_ratio | default: ratio_key
 
   capture aspect
     render 'aspect-ratio', ratio: ratio_key, image: image
   endcapture
 
-  # The mobile fallback is the desktop image, so a mobile-only `adapt` with no
+  # The mobile fallback is the desktop image, so a mobile-only `aspect-ratio` with no
   # second upload keeps the shape the first one had.
   capture mobile_aspect
     render 'aspect-ratio', ratio: mobile_ratio_key, image: mobile_image, fallback: image.aspect_ratio
