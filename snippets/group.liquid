@@ -138,6 +138,7 @@
   # ---- size -------------------------------------------------------------
   assign width_pct = settings.width_custom | default: 100 | plus: 0
   assign width_mobile_pct = settings.width_custom_mobile | default: 100 | plus: 0
+  assign width_tablet_pct = settings.width_custom_tablet | default: 100 | plus: 0
 
   # Two properties, not one.
   #
@@ -173,6 +174,34 @@
     else
       assign width_mobile_value = '0 0 auto'
       assign width_mobile_size = 'fit-content'
+  endcase
+
+  comment
+    Tablet is the only one of the three that can say "not my problem".
+
+    Desktop and mobile always answer, because there is no wider tier behind
+    them to fall through to. A tablet left alone should render whatever
+    desktop renders, and the way to mean that is to emit nothing: the
+    stylesheet's tablet rule falls back to `--group-width`, so an unset tier
+    costs no declaration and cannot drift from the desktop value it copies.
+
+    An empty string rather than a "desktop" keyword, matching the Mobile
+    ratio control - a merchant reads "Same as desktop" either way, and blank
+    is the value a select with no stored answer already has.
+  endcomment
+  assign width_tablet_value = blank
+  assign width_tablet_size = blank
+
+  case settings.width_tablet
+    when 'fill'
+      assign width_tablet_value = '1 1 0%'
+      assign width_tablet_size = '100%'
+    when 'custom'
+      assign width_tablet_value = '0 0 ' | append: width_tablet_pct | append: '%'
+      assign width_tablet_size = width_tablet_pct | append: '%'
+    when 'fit'
+      assign width_tablet_value = '0 0 auto'
+      assign width_tablet_size = 'fit-content'
   endcase
 
   case settings.height
@@ -375,6 +404,10 @@
   --group-width-size: {{ width_size }};
   --group-width-mobile: {{ width_mobile_value }};
   --group-width-mobile-size: {{ width_mobile_size }};
+  {%- if width_tablet_value != blank -%}
+    --group-width-tablet: {{ width_tablet_value }};
+    --group-width-tablet-size: {{ width_tablet_size }};
+  {%- endif -%}
   --group-height: {{ height_value }};
   --group-radius: {{ radius }}px;
   {%- if border_width > 0 -%}
