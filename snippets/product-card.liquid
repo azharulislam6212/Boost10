@@ -81,6 +81,22 @@
   endif
 
   comment
+    The card can carry its own colour scheme, the same way the bundle row
+    already does - and by the same rule: inherit is the default, so a store
+    that never opens the setting has every card painted by the section it
+    sits in, exactly as before.
+
+    Two settings rather than one because a colour_scheme setting has no
+    "none" value. Without the checkbox the only way to say "follow the
+    section" would be to leave the picker on whichever scheme happened to be
+    first, which is a different instruction that looks the same.
+  endcomment
+  assign card_scheme_classes = ''
+  if settings.card_inherit_color_scheme == false and settings.card_color_scheme != blank
+    assign card_scheme_classes = ' color-scheme-container color-' | append: settings.card_color_scheme
+  endif
+
+  comment
     Which option gets swatches on a card is the same setting the product page
     uses, so a store selling by Flavour gets flavour swatches in both places.
   endcomment
@@ -124,7 +140,7 @@
      section: section,
      target: '.product-card__media',
      delay: card_delay %}
-  class="product-card product-card--{{ alignment }} product-card--hover-{{ hover_effect }} {{ class }}"
+  class="product-card product-card--{{ alignment }} product-card--hover-{{ hover_effect }}{{ card_scheme_classes }} {{ class }}"
   {%- comment -%}
     The placement lives on the card, not only on the actions, because the
     reveal is driven by `:hover` on the card and the badge collision rule
@@ -406,8 +422,7 @@
                  option_name: swatch_option.name,
                  option_value: value,
                  variant: value_variant,
-                 shape: settings.swatch_shape,
-                 size_px: settings.swatch_size %}
+                 shape: settings.swatch_shape %}
               <span class="visually-hidden">{{ value }}</span>
             </button>
           {%- endfor -%}

@@ -45,6 +45,36 @@
   assign btn_size = settings.type_button_size | default: 15
   assign btn_case = settings.type_button_case | default: 'none'
 
+  # ---- Swatches ------------------------------------------------------------
+  # Three named choices that CSS cannot branch on, turned into values it can.
+  #
+  # The selected state is the exception and is NOT resolved here: ring, border
+  # and underline are three different rules, not three values of one, so it
+  # travels as `data-swatch-selected` on <html> and the stylesheet keys off it.
+  case settings.swatch_hover_effect
+    when 'lift'
+      assign swatch_hover = 'translateY(-2px)'
+    when 'zoom'
+      assign swatch_hover = 'scale(1.12)'
+    else
+      assign swatch_hover = 'none'
+  endcase
+
+  case settings.swatch_alignment
+    when 'center'
+      assign swatch_justify = 'center'
+    when 'end'
+      assign swatch_justify = 'flex-end'
+    else
+      assign swatch_justify = 'flex-start'
+  endcase
+
+  # No circle branch here. `.swatch[data-shape='circle']` is 50% in the
+  # stylesheet, where the shape is known per element - a block that overrides
+  # the shape to Rounded would otherwise inherit a 50% token from a theme set
+  # to Circle and draw a circle anyway.
+  assign swatch_radius = settings.swatch_radius | default: 6
+
   # ---- Named line heights and tracking ------------------------------------
   # Merchants choose words; CSS needs numbers. Doing the translation here means
   # the schema never asks anyone what 1.15 looks like.
@@ -292,6 +322,22 @@
         {%- else -%}
           --font-custom-color: var(--color-text);
       {%- endcase -%}
+
+      /* ---- swatches -------------------------------------------------------
+         `--swatch-size` is the one a caller may override per element -
+         `snippets/swatch.liquid` writes it inline for the named small, medium
+         and large steps - so the theme setting lands on `--swatch-size-card`
+         and the component picks between them. Writing the setting straight
+         into `--swatch-size` would have made the three named sizes
+         unreachable. */
+      --swatch-size-card: {{ settings.swatch_size | default: 24 }}px;
+      --swatch-gap: {{ settings.swatch_gap | default: 8 }}px;
+      --swatch-border-width: {{ settings.swatch_border_width | default: 1 }}px;
+      --swatch-radius: {{ swatch_radius }}px;
+      --swatch-ring-width: {{ settings.swatch_selected_width | default: 1 }}px;
+      --swatch-ring-offset: {{ settings.swatch_selected_offset | default: 2 }}px;
+      --swatch-hover-transform: {{ swatch_hover }};
+      --swatch-justify: {{ swatch_justify }};
 
       /* ---- names the rest of the theme already reads ----
          `--font-size-base` follows the responsive paragraph token rather than
