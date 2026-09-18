@@ -1,53 +1,58 @@
 {% comment %}
-  blocks/product-collapsible.liquid
+  blocks/_timeline-item.liquid
 
-  Public and repeatable — which is the reason it has to be a block. Shipping,
-  returns, ingredients and care are four rows on one store and one row on another.
+  One moment in a brand story.
 
-  A page reference is offered alongside the rich text so a merchant writes the
-  returns policy once and reuses it on every product.
+  An `<li>` inside the section's ordered list, because a timeline is a sequence
+  and marking it up as a list is what tells a screen reader "four of nine" rather
+  than leaving the customer to count.
 {% endcomment %}
 
-{%- if block.settings.heading != blank -%}
-  <accordion-element class="product-collapsible" {% render 'spacing', block: block.settings %} {{ block.shopify_attributes }}>
-    <details {% if block.settings.open_by_default %}open data-default-open{% endif %}>
-      <summary>
-        {%- if block.settings.icon != 'none' -%}
-          {% render 'icon', icon: block.settings.icon, size: 18 %}
-        {%- endif -%}
-        <span>{{ block.settings.heading }}</span>
-        {% render 'icon', icon: 'chevron-down', size: 14 %}
-      </summary>
+<li class="timeline__item" {% render 'spacing', block: block.settings %} {{ block.shopify_attributes }}>
+  <motion-effect {% render 'motion-attrs', kind: 'text', block: block.settings %} class="timeline__inner">
+    {%- if block.settings.year != blank -%}
+      <p class="timeline__year">{{ block.settings.year }}</p>
+    {%- endif -%}
 
-      <div class="product-collapsible__content rte">
-        {{ block.settings.content }}
-        {%- if block.settings.page != blank -%}{{ block.settings.page.content }}{%- endif -%}
-      </div>
-    </details>
-  </accordion-element>
-{%- endif -%}
+    {%- if block.settings.image != blank -%}
+      {% render 'image',
+         image: block.settings.image,
+         alt: '',
+         ratio: 'landscape',
+         sizes: '(min-width: 750px) 33vw, 80vw',
+         wrapper_class: 'timeline__media' %}
+    {%- endif -%}
+
+    {%- if block.settings.heading != blank -%}
+      <h3 class="timeline__heading">{{ block.settings.heading }}</h3>
+    {%- endif -%}
+
+    {%- if block.settings.text != blank -%}
+      <div class="timeline__text rte">{{ block.settings.text }}</div>
+    {%- endif -%}
+  </motion-effect>
+</li>
 
 {% schema %}
 {
-  "name": "t:blocks.product_collapsible.name",
+  "name": "t:blocks.timeline_item.name",
   "tag": null,
   "settings": [
-    { "type": "text", "id": "heading", "label": "t:shared.heading.label", "default": "Shipping and returns" },
-    { "type": "richtext", "id": "content", "label": "t:shared.text.label" },
-    { "type": "page", "id": "page", "label": "t:sections.main_product.blocks.collapsible.settings.page.label", "info": "t:sections.main_product.blocks.collapsible.settings.page.info" },
+    { "type": "text", "id": "year", "label": "t:blocks.timeline_item.settings.year.label", "default": "2019" },
+    { "type": "text", "id": "heading", "label": "t:shared.heading.label", "default": "The first workshop" },
+    { "type": "richtext", "id": "text", "label": "t:shared.text.label" },
+    { "type": "image_picker", "id": "image", "label": "t:shared.image.label" },
+    { "type": "header", "content": "t:shared.animation.header" },
     {
-      "type": "select", "id": "icon", "label": "t:blocks.icon_with_text.settings.icon.label",
+      "type": "select", "id": "animation_text", "label": "t:shared.animation.animation_text.label",
       "options": [
+        { "value": "inherit", "label": "t:shared.animation.animation_text.options__1.label" },
         { "value": "none", "label": "t:shared.animation.animation_text.options__2.label" },
-        { "value": "truck", "label": "t:blocks.icon_with_text.settings.icon.options__1.label" },
-        { "value": "refresh", "label": "t:blocks.icon_with_text.settings.icon.options__2.label" },
-        { "value": "lock", "label": "t:blocks.icon_with_text.settings.icon.options__3.label" },
-        { "value": "info", "label": "t:blocks.icon_with_text.settings.icon.options__7.label" }
+        { "value": "fade-up", "label": "t:shared.animation.animation_text.options__4.label" }
       ],
-      "default": "none"
+      "default": "inherit"
     },
-    { "type": "checkbox", "id": "open_by_default", "label": "t:sections.main_product.blocks.collapsible.settings.open_by_default.label", "default": false },
-        {
+            {
       "type": "header",
       "content": "t:shared.spacing.block_header"
     },
@@ -150,6 +155,6 @@
       "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
     }
   ],
-  "presets": [{ "name": "t:blocks.product_collapsible.name" }]
+  "presets": [{ "name": "t:blocks.timeline_item.name", "category": "t:categories.text" }]
 }
 {% endschema %}

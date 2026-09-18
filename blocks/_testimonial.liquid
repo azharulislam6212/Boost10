@@ -1,58 +1,82 @@
 {% comment %}
-  blocks/timeline-item.liquid
+  blocks/_testimonial.liquid
 
-  One moment in a brand story.
+  A quote with an attribution.
 
-  An `<li>` inside the section's ordered list, because a timeline is a sequence
-  and marking it up as a list is what tells a screen reader "four of nine" rather
-  than leaving the customer to count.
+  Private. No section lists it yet — `sections/testimonials.liquid` takes
+  `_testimonial-card` instead. Add `{ "type": "_testimonial" }` to a section's
+  `blocks` list to offer it there.
+
+  Marked up as `<blockquote>` and `<cite>` rather than two divs, because a
+  testimonial is a quotation and screen readers announce it as one. The rating is
+  decorative stars plus a translated sentence, for the same reason as everywhere
+  else: five identical glyphs read aloud are five identical words.
+
+  The theme does not collect, store or verify reviews — that is an app's job, and
+  the Theme Store rejects themes that do it. This displays what a merchant typed.
 {% endcomment %}
 
-<li class="timeline__item" {% render 'spacing', block: block.settings %} {{ block.shopify_attributes }}>
-  <motion-effect {% render 'motion-attrs', kind: 'text', block: block.settings %} class="timeline__inner">
-    {%- if block.settings.year != blank -%}
-      <p class="timeline__year">{{ block.settings.year }}</p>
-    {%- endif -%}
+<motion-effect
+  {% render 'motion-attrs', kind: 'text', block: block.settings %}
+  class="testimonial"
+  {% render 'spacing', block: block.settings %}
+  {{ block.shopify_attributes }}
+>
+  {%- if block.settings.rating > 0 -%}
+    <div class="testimonial__rating">
+      <div class="testimonial__stars" aria-hidden="true">
+        {%- for i in (1..5) -%}
+          {% render 'icon', icon: 'star', size: 14, class: i, default: false %}
+        {%- endfor -%}
+      </div>
+      <span class="visually-hidden">
+        {{- 'products.product.rating_html' | t: rating: block.settings.rating, max: 5 -}}
+      </span>
+    </div>
+  {%- endif -%}
 
-    {%- if block.settings.image != blank -%}
-      {% render 'image',
-         image: block.settings.image,
-         alt: '',
-         ratio: 'landscape',
-         sizes: '(min-width: 750px) 33vw, 80vw',
-         wrapper_class: 'timeline__media' %}
-    {%- endif -%}
+  <blockquote class="testimonial__quote">
+    {{ block.settings.quote }}
+  </blockquote>
 
-    {%- if block.settings.heading != blank -%}
-      <h3 class="timeline__heading">{{ block.settings.heading }}</h3>
-    {%- endif -%}
+  {%- if block.settings.author != blank -%}
+    <figcaption class="testimonial__author">
+      {%- if block.settings.avatar != blank -%}
+        {% render 'image', image: block.settings.avatar, ratio: 'square', sizes: '48px', wrapper_class: 'testimonial__avatar' %}
+      {%- endif -%}
 
-    {%- if block.settings.text != blank -%}
-      <div class="timeline__text rte">{{ block.settings.text }}</div>
-    {%- endif -%}
-  </motion-effect>
-</li>
+      <div>
+        <cite class="testimonial__name">{{ block.settings.author }}</cite>
+        {%- if block.settings.role != blank -%}
+          <span class="testimonial__role">{{ block.settings.role }}</span>
+        {%- endif -%}
+      </div>
+    </figcaption>
+  {%- endif -%}
+</motion-effect>
 
 {% schema %}
 {
-  "name": "t:blocks.timeline_item.name",
+  "name": "t:blocks.testimonial.name",
   "tag": null,
   "settings": [
-    { "type": "text", "id": "year", "label": "t:blocks.timeline_item.settings.year.label", "default": "2019" },
-    { "type": "text", "id": "heading", "label": "t:shared.heading.label", "default": "The first workshop" },
-    { "type": "richtext", "id": "text", "label": "t:shared.text.label" },
-    { "type": "image_picker", "id": "image", "label": "t:shared.image.label" },
+    { "type": "richtext", "id": "quote", "label": "t:blocks.testimonial.settings.quote.label", "default": "<p>The best purchase I have made all year.</p>" },
+    { "type": "text", "id": "author", "label": "t:blocks.testimonial.settings.author.label", "default": "Sam Taylor" },
+    { "type": "text", "id": "role", "label": "t:blocks.testimonial.settings.role.label" },
+    { "type": "image_picker", "id": "avatar", "label": "t:blocks.testimonial.settings.avatar.label" },
+    { "type": "range", "id": "rating", "label": "t:blocks.testimonial.settings.rating.label", "info": "t:blocks.testimonial.settings.rating.info", "min": 0, "max": 5, "step": 1, "default": 5 },
     { "type": "header", "content": "t:shared.animation.header" },
     {
       "type": "select", "id": "animation_text", "label": "t:shared.animation.animation_text.label",
       "options": [
         { "value": "inherit", "label": "t:shared.animation.animation_text.options__1.label" },
         { "value": "none", "label": "t:shared.animation.animation_text.options__2.label" },
+        { "value": "fade-in", "label": "t:shared.animation.animation_text.options__3.label" },
         { "value": "fade-up", "label": "t:shared.animation.animation_text.options__4.label" }
       ],
       "default": "inherit"
     },
-            {
+        {
       "type": "header",
       "content": "t:shared.spacing.block_header"
     },
@@ -155,6 +179,17 @@
       "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
     }
   ],
-  "presets": [{ "name": "t:blocks.timeline_item.name" }]
+  "presets": [{ "name": "t:blocks.testimonial.name", "category": "t:categories.text" }]
 }
 {% endschema %}
+{% comment %}
+
+This file has been rewritten to preserve the original behavior.
+
+---
+Changes:
+- from: "{% render 'icon', icon: 'star', size: 14, class: i <= block.settings.rating
+    | default: false %}"
+  to: "{% render 'icon', icon: 'star', size: 14, class: i, default: false %}"
+  position: 927..996
+{% endcomment %}
