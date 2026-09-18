@@ -2,8 +2,8 @@
   sections/product-recommendations.liquid
 
   Related products. Also the section the recommendations endpoint renders when
-  `<product-recommendations>` fetches with `section_id`, which is why the heading
-  starts hidden: it is revealed only once there is something to head.
+  the `product-recommendations` element fetches with `section_id`, which is why
+  the heading starts hidden: it is revealed only once there is something to head.
 {% endcomment %}
 
 {%- liquid
@@ -28,14 +28,25 @@
       further away, and a recommendation is worth less the further it sits from
       the product that prompted it.
 
-      Both layouts are the same list. `<carousel-slider>` wraps it rather than
-      replacing it, so the markup a customer gets without JavaScript is a
-      readable row either way.
+      Both layouts are the same list. The `carousel-slider` element wraps it
+      rather than replacing it, so the markup a customer gets without JavaScript
+      is a readable row either way.
 
       The cards arrive by fetch, so the track is empty when this element
       connects. `assets/carousel.js` watches the track for children and builds
       the carousel when they land — without that, the carousel would initialise
       against nothing and stay dead for the life of the page.
+
+      ## Why the list is written out twice
+
+      The obvious shape — open the `carousel-slider` element in an `if`, write
+      the list once, close the element in a second `if` — renders correctly and
+      is a parse error for Theme Check, which reads a tag opened in one branch and
+      closed in another as unbalanced markup. The usual way out is to capture
+      the list and print it in both branches, and that is not available here:
+      the cards come from `{% content_for 'block' %}`, whose output Shopify
+      cannot buffer. So both branches carry the list. The two copies are
+      identical apart from their indentation and must stay that way.
     {%- endcomment -%}
     {%- if section.settings.layout == 'carousel' -%}
       <carousel-slider
@@ -55,37 +66,34 @@
           columns_mobile: 1,
           peek_mobile: 20 %}"
       >
-    {%- endif -%}
+        <ul
+          class="product-grid product-grid--{{ section.settings.layout }}"
+          role="list"
+          {%- comment -%}
+            One element, two names: `content` is what the
+            `product-recommendations` element morphs into, `track` is what the
+            carousel scrolls. Giving the carousel a separate wrapper would mean
+            the morph replaced the element the carousel holds a reference to.
+          {%- endcomment -%}
+          data-ref="content track"
+          data-recommendations-content
+          style="--columns-desktop: {{ section.settings.columns_desktop }};"
+        >
+          {%- if recommendations.performed and recommendations.products_count > 0 -%}
+            {%- for item in recommendations.products -%}
+              <li class="product-grid__item" data-product-id="{{ item.id }}">
+                {% content_for 'block',
+                  type: '_product-card',
+                  id: 'product-card',
+                  product: item,
+                  index: forloop.index0,
+                  sizes: '(min-width: 990px) 25vw, 50vw'
+                %}
+              </li>
+            {%- endfor -%}
+          {%- endif -%}
+        </ul>
 
-    <ul
-      class="product-grid product-grid--{{ section.settings.layout }}"
-      role="list"
-      {%- comment -%}
-        One element, two names: `content` is what `<product-recommendations>`
-        morphs into, `track` is what the carousel scrolls. Giving the carousel a
-        separate wrapper would mean the morph replaced the element the carousel
-        holds a reference to.
-      {%- endcomment -%}
-      data-ref="content track"
-      data-recommendations-content
-      style="--columns-desktop: {{ section.settings.columns_desktop }};"
-    >
-      {%- if recommendations.performed and recommendations.products_count > 0 -%}
-        {%- for item in recommendations.products -%}
-          <li class="product-grid__item" data-product-id="{{ item.id }}">
-            {% content_for 'block',
-              type: '_product-card',
-              id: 'product-card',
-              product: item,
-              index: forloop.index0,
-              sizes: '(min-width: 990px) 25vw, 50vw'
-            %}
-          </li>
-        {%- endfor -%}
-      {%- endif -%}
-    </ul>
-
-    {%- if section.settings.layout == 'carousel' -%}
         <button type="button" class="product-recommendations__arrow" data-ref="previous" aria-label="{{ 'accessibility.previous_slide' | t }}">
           {% render 'icon', icon: 'chevron-left', size: 16 %}
         </button>
@@ -96,6 +104,28 @@
 
         <p class="visually-hidden" data-ref="status" role="status"></p>
       </carousel-slider>
+    {%- else -%}
+      <ul
+        class="product-grid product-grid--{{ section.settings.layout }}"
+        role="list"
+        data-ref="content track"
+        data-recommendations-content
+        style="--columns-desktop: {{ section.settings.columns_desktop }};"
+      >
+        {%- if recommendations.performed and recommendations.products_count > 0 -%}
+          {%- for item in recommendations.products -%}
+            <li class="product-grid__item" data-product-id="{{ item.id }}">
+              {% content_for 'block',
+                type: '_product-card',
+                id: 'product-card',
+                product: item,
+                index: forloop.index0,
+                sizes: '(min-width: 990px) 25vw, 50vw'
+              %}
+            </li>
+          {%- endfor -%}
+        {%- endif -%}
+      </ul>
     {%- endif -%}
   </div>
 </product-recommendations>
