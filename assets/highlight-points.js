@@ -45,6 +45,32 @@ const SELECTION_HOLD = 2500;
  * holds while the section arrives and the last one holds while it leaves,
  * rather than the run being over before the customer has looked at it.
  *
+ * ## Two ways to read the scroll, and the layout picks
+ *
+ * That sweep is right when the points are around the product and all five are
+ * on screen together: the customer is looking at the whole arrangement, so the
+ * light moving through it is the section talking.
+ *
+ * It is wrong the moment they are not. Below 990px `assets/base.css` drops the
+ * placement and the points become a column under the picture — taller than the
+ * screen — and the sweep then lights the fourth point while the customer is
+ * reading the first, because it is measuring the stage and they are reading a
+ * point. What it should say there is "this one", about the one in front of
+ * them.
+ *
+ * So there are two mappings and the geometry chooses, not a breakpoint. If the
+ * points span more than a screen they cannot be taken in at once, and the lit
+ * one is whichever sits nearest the middle of the viewport; if they fit, the
+ * sweep runs as before. That is the same fact the media query is standing in
+ * for, asked directly — so a narrow desktop window, a stage in a sidebar or a
+ * merchant who stacked the points on purpose all get the right one without
+ * this file knowing what 990px is.
+ *
+ * Where the points are is measured once and kept, because it only changes when
+ * the layout does — a `ResizeObserver` on the stage is what says it has. So the
+ * frame budget is still the one rect the sweep always read, and the stacked
+ * mapping is arithmetic on top of it.
+ *
  * ## Reduced motion keeps the points, and drops the fade
  *
  * A point lighting up is a change of state, not a movement — switching it off
@@ -71,6 +97,22 @@ export class HighlightPoints extends BaseComponent {
 
   /** @type {number|null} */
   #holdUntil = null;
+
+  /**
+   * Where the points are, measured down from the stage's top: one centre each,
+   * and how tall the whole run of them is from the first one's top edge to the
+   * last one's bottom.
+   *
+   * Null until the first frame that needs it and after every resize, so the
+   * measuring is one pass when the layout settles rather than five
+   * `getBoundingClientRect()` calls a frame for the life of the page.
+   *
+   * @type {{ centres: number[], span: number }|null}
+   */
+  #geometry = null;
+
+  /** @type {ResizeObserver|null} */
+  #resizeObserver = null;
 
   setup() {
     this.#points = /** @type {HTMLElement[]} */ ([...this.querySelectorAll('[data-highlight-point]')]);
@@ -100,6 +142,18 @@ export class HighlightPoints extends BaseComponent {
       return;
     }
 
+    // A resize is the only thing that moves a point relative to the stage, and
+    // it moves every one of them: a breakpoint crossing, a font arriving, an
+    // image finally laying out. Dropping the cache is the whole handler — the
+    // next ticker frame re-measures, so nothing is measured on a frame that was
+    // not going to run anyway.
+    if (typeof ResizeObserver === 'function') {
+      this.#resizeObserver = new ResizeObserver(() => {
+        this.#geometry = null;
+      });
+      this.#resizeObserver.observe(this);
+    }
+
     this.#unsubscribe = subscribeToTicker(() => this.#update());
 
     // The first frame, before a scroll has happened: a section already on
@@ -111,6 +165,9 @@ export class HighlightPoints extends BaseComponent {
   teardown() {
     this.#unsubscribe?.();
     this.#unsubscribe = null;
+    this.#resizeObserver?.disconnect();
+    this.#resizeObserver = null;
+    this.#geometry = null;
     this.#index = -1;
     this.#holdUntil = null;
   }
@@ -157,6 +214,8 @@ export class HighlightPoints extends BaseComponent {
 
     const viewport = window.innerHeight || document.documentElement.clientHeight;
 
+    const { centres, span: reach } = this.#geometry ?? this.#measure();
+
     // 0 when the top edge is at the bottom of the viewport; 1 when the bottom
     // edge has passed the top of it. The denominator is the whole distance the
     // stage travels, so it is right for a stage taller than the screen and for
@@ -173,13 +232,94 @@ export class HighlightPoints extends BaseComponent {
     // Published for anything that wants to draw the run — a rail, a bar, a
     // fading connector. Nothing reads it yet; it costs one property and saves
     // the next feature from adding a second measurement of the same scroll.
+    // It is the sweep either way: it says where the *section* is, which is
+    // still true when the points are stacked and something else is lighting
+    // them.
     this.style.setProperty('--highlight-progress', progress.toFixed(4));
 
-    // `floor` over an open-ended range, then clamped: at exactly 1 the floor is
-    // the count itself, which is one past the last point.
-    const index = clamp(Math.floor(progress * this.#points.length), 0, this.#points.length - 1);
+    // Top of the first point to the bottom of the last, against the screen. Not
+    // the stage's own height — that includes the picture and whatever floor
+    // **Stage height** puts under it, and a tall stage with the five points
+    // around its middle is still five points a customer takes in at once.
+    const stacked = reach > viewport;
+
+    let index;
+
+    if (stacked) {
+      // Whichever point is nearest the middle of the screen. Pure arithmetic on
+      // the cached centres and the one rect already read, so the stacked
+      // mapping costs no more per frame than the sweep does.
+      const focus = viewport / 2;
+      let best = 0;
+      let nearest = Infinity;
+
+      for (let i = 0; i < centres.length; i++) {
+        const distance = Math.abs(rect.top + (centres[i] ?? 0) - focus);
+        if (distance < nearest) {
+          nearest = distance;
+          best = i;
+        }
+      }
+
+      index = best;
+    } else {
+      // `floor` over an open-ended range, then clamped: at exactly 1 the floor
+      // is the count itself, which is one past the last point.
+      index = clamp(Math.floor(progress * this.#points.length), 0, this.#points.length - 1);
+    }
 
     this.#apply(index);
+  }
+
+  /**
+   * Each point's centre as a distance down from the stage's top, and how much
+   * screen the whole run of them asks for.
+   *
+   * ## Offsets, and not `getBoundingClientRect()`
+   *
+   * A rect includes the transform, and on the frame this runs the points may
+   * still be carrying the entrance animation's — `<motion-effect>` moves them
+   * on `transform`, staggered, so a rect taken then is each point's resting
+   * place plus however much of its own slide is left. The result is cached
+   * until a resize, and nothing about an animation finishing is a resize, so
+   * one badly timed measurement would be wrong for the life of the page.
+   *
+   * An offset is layout, which the entrance never touches. The one thing it
+   * leaves out is **Nudge up or down**, and that is by construction rather than
+   * by luck: the nudge exists only above 990px, and above 990px the points fit
+   * on a screen and the sweep is running, which does not read these centres at
+   * all. What it can change is `span`, and only upward — an un-nudged run is
+   * the taller one — so the question "do these fit on a screen" is asked of the
+   * layout, which is the honest version of it.
+   *
+   * @returns {{ centres: number[], span: number }}
+   * @private
+   */
+  #measure() {
+    // `offsetTop` is measured against the nearest positioned ancestor. The stage
+    // is a static grid, so that is normally some ancestor both it and the points
+    // share and the subtraction is right — but a merchant's own CSS can position
+    // the stage, and then the points are measured against the stage itself and
+    // there is nothing to subtract.
+    const points = this.#points;
+    const origin = points[0]?.offsetParent === this ? 0 : this.offsetTop;
+
+    const centres = [];
+    let top = Infinity;
+    let bottom = -Infinity;
+
+    for (const point of points) {
+      const start = point.offsetTop - origin;
+      const end = start + point.offsetHeight;
+
+      centres.push((start + end) / 2);
+      top = Math.min(top, start);
+      bottom = Math.max(bottom, end);
+    }
+
+    const geometry = { centres, span: bottom - top };
+    this.#geometry = geometry;
+    return geometry;
   }
 
   /**

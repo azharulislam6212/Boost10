@@ -10,9 +10,14 @@
   is the right block for three benefits in a row. Two things make this one
   different, and neither could be a setting on that block.
 
-  It has a **position**: two percentages of the stage, which only mean anything
-  inside `blocks/_highlight-stage.liquid`. A tile placed at 73% across some
-  other section is a tile that has escaped its container.
+  It has a **place in the stage**: a column and a row, which only mean anything
+  inside `blocks/_highlight-stage.liquid`'s grid. A tile that says "left column,
+  row 2" somewhere else is a tile that has escaped its container.
+
+  That grid is also the section's one promise: the product owns the middle
+  column, points go either side of it, and no picture at any size can end up
+  underneath a label. See the note on **Where it sits** below for what this
+  replaced and why.
 
   And it has a **lit state** that something else drives. The mark fills in when
   `<highlight-points>` puts `data-highlight-active` on it, and what it fills in
@@ -55,17 +60,63 @@
   comment
     ---- where it sits ----
 
-    Percentages of the stage, and the point is centred on them: a merchant
-    moves two sliders and the whole thing — mark, name and line — travels
-    together, which is what "put this one on the cap" means.
+    A column and a row, not a pair of coordinates.
 
-    Read on every breakpoint and used on one. `assets/base.css` ignores them
-    below 990px, where the points are a grid; emitting them unconditionally is
-    what lets a merchant lay out the desktop while previewing a phone, which is
-    the order the theme editor actually works in.
+    This block used to carry an Across and a Down measured against the stage,
+    with the photograph on a layer of its own inside it. Nothing connected the
+    two, so a taller bottle or a wider picture put labels across the product
+    and the only fix was for somebody to notice and re-drag two sliders.
+
+    Now the stage is a three-column grid and the product owns the middle one.
+    A point is in the left column or the right column, so it cannot be over the
+    picture at any size — the guarantee is the layout rather than the numbers.
+    A **centre** point is for the one above the product, which is row 1 in the
+    drawing.
+
+    **Gap from the product** is a margin on the side facing the middle, so it
+    only ever moves a point further out. Which side that is comes from the
+    column, so one number gives the drawing's symmetric stagger instead of a
+    left value and a right value that have to be kept equal by hand.
+
+    Emitted on every breakpoint and read on one: `assets/base.css` drops the
+    placement below 990px, where the points are a plain grid under the picture.
+    Writing it anyway is what lets a merchant lay out the desktop while the
+    editor is previewing a phone.
   endcomment
-  assign pos_x = s.position_x | default: 50 | plus: 0
-  assign pos_y = s.position_y | default: 50 | plus: 0
+  assign column = s.column | default: 'left'
+  assign row = s.row | default: 2 | plus: 0
+  assign offset = s.offset | default: 40 | plus: 0
+
+  comment
+    **Nudge up or down**, and why it is not a second row setting.
+
+    A row is as tall as the tallest point in it — a mark, a name and a line —
+    and the drawing does not stack its rows that way: the upper pair sits level
+    with the top of the picture, beside the first point's caption rather than
+    below it. No number of rows produces that, because a row short enough to
+    give it would cut the point above off.
+
+    So the row keeps the point's full height and this moves the drawn result
+    out of it, as a `translate` in `assets/base.css`. A margin would be read
+    when the row is measured and would drag every row after it along; this
+    changes nothing the stage measures, which is what keeps the scroll run
+    reading the same box.
+
+    Written for every point and honoured for two: a centre point is in the
+    product's column and a centre point nudged downward is the one way left to
+    put a label on the picture. The stylesheet applies it to left and right
+    only, and the schema says so.
+  endcomment
+  assign nudge = s.nudge | default: 0 | plus: 0
+
+  case s.row_align
+    when 'center'
+      assign row_align = 'center'
+    when 'end'
+      assign row_align = 'end'
+    else
+      assign row_align = 'start'
+  endcase
 
   case s.alignment
     when 'start'
@@ -108,18 +159,20 @@
 
 {%- capture point_style -%}
   {%- render 'spacing', block: s, declarations: true -%}
-  --hp-x: {{ pos_x }}%;
-  --hp-y: {{ pos_y }}%;
+  --hp-row: {{ row }};
+  --hp-row-align: {{ row_align }};
+  --hp-offset: {{ offset }}px;
+  --hp-nudge: {{ nudge }}px;
   --hp-align: {{ align_axis }};
   --hp-text-align: {{ text_align }};
-  --hp-width: {{ s.width | default: 180 | plus: 0 }}px;
-  --hp-gap: {{ s.gap | default: 12 | plus: 0 }}px;
-  --hp-stack-gap: {{ s.gap_vertical | default: 4 | plus: 0 }}px;
-  --hp-text-size: {{ s.text_size | default: 14 | plus: 0 | divided_by: 10.0 }}rem;
+  --hp-width: {{ s.width | default: 150 | plus: 0 }}px;
+  --hp-gap: {{ s.gap | default: 16 | plus: 0 }}px;
+  --hp-stack-gap: {{ s.gap_vertical | default: 2 | plus: 0 }}px;
+  --hp-text-size: {{ s.text_size | default: 16 | plus: 0 | divided_by: 10.0 }}rem;
   {%- if s.text_color != blank -%}
     --hp-text-color: {{ s.text_color }};
   {%- endif -%}
-  --hp-number-size: {{ s.number_size | default: 26 | plus: 0 }}px;
+  --hp-number-size: {{ s.number_size | default: 28 | plus: 0 }}px;
   {%- if s.number_background != blank -%}
     --hp-number-background: {{ s.number_background }};
   {%- endif -%}
@@ -129,18 +182,27 @@
 {%- endcapture -%}
 
 {%- comment -%}
-  `data-highlight-point` is what the component collects on, and it is a
-  data attribute rather than the class so a restyle cannot silently take the
-  behaviour with it.
+  `data-highlight-point` is what the component collects on, and it is a data
+  attribute rather than the class so a restyle cannot silently take the
+  behaviour with it. `data-column` is the same idea for the layout: the grid
+  placement in `assets/base.css` is keyed on it, so the column a point is in is
+  one value read by both the stylesheet and anyone reading the markup.
 
-  `<li>`, because five points about one product is a list and announcing it as
-  one tells a screen reader how many there are before the first is read. The
-  stage's points layer is the `<ul>` — see `assets/base.css`, which strips the
-  markers and the padding rather than the element.
+  A `<div>` and not an `<li>`. The points have to be direct children of the
+  stage for the grid to place them — a `<ul>` between the two would be one grid
+  item holding all five, and the column that keeps them off the product would
+  not exist. `display: contents` on the list would flatten it, but an element
+  with no box is one an IntersectionObserver never sees, and the entrance
+  animation depends on that.
+
+  What is lost is the "list of 5" a screen reader would announce. What is kept
+  is every point's number, name and line, each read in order — which is the
+  content. The layout guarantee was worth more than the count.
 {%- endcomment -%}
-<li
+<div
   class="highlight-point icon-mark-host"
   data-highlight-point
+  data-column="{{ column }}"
   {% if is_active %}data-highlight-active aria-current="true"{% endif %}
   data-block-spacing
   style="{{ point_style | strip_newlines | strip }}"
@@ -182,7 +244,7 @@
       <span class="highlight-point__text">{{ s.text }}</span>
     {%- endif -%}
   </span>
-</li>
+</div>
 
 {%- comment -%}
   Every setting below is a control a merchant reaches in the editor, and the
@@ -221,28 +283,89 @@
       "info": "t:blocks.highlight_point.settings.active.info",
       "default": false
     },
-
-    { "type": "header", "content": "t:blocks.highlight_point.headers.position" },
-    { "type": "paragraph", "content": "t:blocks.highlight_point.paragraphs.position" },
     {
-      "type": "range",
-      "id": "position_x",
-      "label": "t:blocks.highlight_point.settings.position_x.label",
-      "min": 0,
-      "max": 100,
-      "step": 1,
-      "unit": "%",
-      "default": 50
+      "type": "header",
+      "content": "t:blocks.highlight_point.headers.position"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:blocks.highlight_point.paragraphs.position"
+    },
+    {
+      "type": "select",
+      "id": "column",
+      "label": "t:blocks.highlight_point.settings.column.label",
+      "info": "t:blocks.highlight_point.settings.column.info",
+      "options": [
+        {
+          "value": "left",
+          "label": "t:blocks.highlight_point.settings.column.options__1.label"
+        },
+        {
+          "value": "center",
+          "label": "t:blocks.highlight_point.settings.column.options__2.label"
+        },
+        {
+          "value": "right",
+          "label": "t:blocks.highlight_point.settings.column.options__3.label"
+        }
+      ],
+      "default": "left"
     },
     {
       "type": "range",
-      "id": "position_y",
-      "label": "t:blocks.highlight_point.settings.position_y.label",
-      "min": 0,
-      "max": 100,
+      "id": "row",
+      "label": "t:blocks.highlight_point.settings.row.label",
+      "info": "t:blocks.highlight_point.settings.row.info",
+      "min": 1,
+      "max": 6,
       "step": 1,
-      "unit": "%",
-      "default": 50
+      "default": 2
+    },
+    {
+      "type": "range",
+      "id": "offset",
+      "label": "t:blocks.highlight_point.settings.offset.label",
+      "info": "t:blocks.highlight_point.settings.offset.info",
+      "min": 0,
+      "max": 280,
+      "step": 4,
+      "unit": "px",
+      "default": 40,
+      "visible_if": "{{ block.settings.column != 'center' }}"
+    },
+    {
+      "type": "range",
+      "id": "nudge",
+      "label": "t:blocks.highlight_point.settings.nudge.label",
+      "info": "t:blocks.highlight_point.settings.nudge.info",
+      "min": -160,
+      "max": 160,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.column != 'center' }}"
+    },
+    {
+      "type": "select",
+      "id": "row_align",
+      "label": "t:blocks.highlight_point.settings.row_align.label",
+      "info": "t:blocks.highlight_point.settings.row_align.info",
+      "options": [
+        {
+          "value": "start",
+          "label": "t:blocks.group.settings.position.options__1.label"
+        },
+        {
+          "value": "center",
+          "label": "t:blocks.group.settings.position.options__2.label"
+        },
+        {
+          "value": "end",
+          "label": "t:blocks.group.settings.position.options__3.label"
+        }
+      ],
+      "default": "start"
     },
     {
       "type": "range",
@@ -253,16 +376,25 @@
       "max": 320,
       "step": 10,
       "unit": "px",
-      "default": 180
+      "default": 150
     },
     {
       "type": "select",
       "id": "alignment",
       "label": "t:blocks.group.settings.alignment.label",
       "options": [
-        { "value": "start", "label": "t:blocks.group.settings.alignment.options__1.label" },
-        { "value": "center", "label": "t:blocks.group.settings.alignment.options__2.label" },
-        { "value": "end", "label": "t:blocks.group.settings.alignment.options__3.label" }
+        {
+          "value": "start",
+          "label": "t:blocks.group.settings.alignment.options__1.label"
+        },
+        {
+          "value": "center",
+          "label": "t:blocks.group.settings.alignment.options__2.label"
+        },
+        {
+          "value": "end",
+          "label": "t:blocks.group.settings.alignment.options__3.label"
+        }
       ],
       "default": "center"
     },
@@ -274,7 +406,7 @@
       "max": 40,
       "step": 2,
       "unit": "px",
-      "default": 12
+      "default": 16
     },
     {
       "type": "range",
@@ -284,17 +416,25 @@
       "max": 24,
       "step": 1,
       "unit": "px",
-      "default": 4
+      "default": 2
     },
-
-    { "type": "header", "content": "t:blocks.subheading.headers.icon" },
+    {
+      "type": "header",
+      "content": "t:blocks.subheading.headers.icon"
+    },
     {
       "type": "select",
       "id": "icon_source",
       "label": "t:blocks.subheading.settings.icon_source.label",
       "options": [
-        { "value": "none", "label": "t:shared.options.none" },
-        { "value": "icon", "label": "t:blocks.subheading.settings.icon_source.options__2.label" }
+        {
+          "value": "none",
+          "label": "t:shared.options.none"
+        },
+        {
+          "value": "icon",
+          "label": "t:blocks.subheading.settings.icon_source.options__2.label"
+        }
       ],
       "default": "icon"
     },
@@ -303,24 +443,92 @@
       "id": "icon",
       "label": "t:blocks.subheading.settings.icon.label",
       "options": [
-        { "value": "leaf", "label": "t:shared.icons.leaf" },
-        { "value": "droplet", "label": "t:shared.icons.droplet" },
-        { "value": "bolt", "label": "t:shared.icons.bolt" },
-        { "value": "brain", "label": "t:shared.icons.brain" },
-        { "value": "pulse", "label": "t:shared.icons.pulse" },
-        { "value": "sparkle", "label": "t:shared.icons.sparkle" },
-        { "value": "sun", "label": "t:shared.icons.sun" },
-        { "value": "moon", "label": "t:shared.icons.moon" },
-        { "value": "shield", "label": "t:blocks.icon_with_text.settings.icon.options__2" },
-        { "value": "grid", "label": "t:blocks.feature_icon.settings.icon.options__16" },
-        { "value": "check", "label": "t:blocks.subheading.settings.icon.options__2.label" },
-        { "value": "star", "label": "t:blocks.subheading.settings.icon.options__1.label" },
-        { "value": "heart", "label": "t:blocks.subheading.settings.icon.options__3.label" },
-        { "value": "clock", "label": "t:blocks.subheading.settings.icon.options__8.label" },
-        { "value": "lock", "label": "t:blocks.subheading.settings.icon.options__7.label" },
-        { "value": "info", "label": "t:blocks.subheading.settings.icon.options__12.label" }
+        {
+          "value": "molecule",
+          "label": "t:shared.icons.molecule"
+        },
+        {
+          "value": "cells",
+          "label": "t:shared.icons.cells"
+        },
+        {
+          "value": "capsule",
+          "label": "t:shared.icons.capsule"
+        },
+        {
+          "value": "compound",
+          "label": "t:shared.icons.compound"
+        },
+        {
+          "value": "atom",
+          "label": "t:shared.icons.atom"
+        },
+        {
+          "value": "leaf",
+          "label": "t:shared.icons.leaf"
+        },
+        {
+          "value": "droplet",
+          "label": "t:shared.icons.droplet"
+        },
+        {
+          "value": "bolt",
+          "label": "t:shared.icons.bolt"
+        },
+        {
+          "value": "brain",
+          "label": "t:shared.icons.brain"
+        },
+        {
+          "value": "pulse",
+          "label": "t:shared.icons.pulse"
+        },
+        {
+          "value": "sparkle",
+          "label": "t:shared.icons.sparkle"
+        },
+        {
+          "value": "sun",
+          "label": "t:shared.icons.sun"
+        },
+        {
+          "value": "moon",
+          "label": "t:shared.icons.moon"
+        },
+        {
+          "value": "shield",
+          "label": "t:blocks.icon_with_text.settings.icon.options__2"
+        },
+        {
+          "value": "grid",
+          "label": "t:blocks.feature_icon.settings.icon.options__16"
+        },
+        {
+          "value": "check",
+          "label": "t:blocks.subheading.settings.icon.options__2.label"
+        },
+        {
+          "value": "star",
+          "label": "t:blocks.subheading.settings.icon.options__1.label"
+        },
+        {
+          "value": "heart",
+          "label": "t:blocks.subheading.settings.icon.options__3.label"
+        },
+        {
+          "value": "clock",
+          "label": "t:blocks.subheading.settings.icon.options__8.label"
+        },
+        {
+          "value": "lock",
+          "label": "t:blocks.subheading.settings.icon.options__7.label"
+        },
+        {
+          "value": "info",
+          "label": "t:blocks.subheading.settings.icon.options__12.label"
+        }
       ],
-      "default": "leaf",
+      "default": "molecule",
       "visible_if": "{{ block.settings.icon_source == 'icon' }}"
     },
     {
@@ -328,13 +536,28 @@
       "id": "icon_size",
       "label": "t:shared.icon_size.label",
       "options": [
-        { "value": "extra_small", "label": "t:shared.icon_size.options__1.label" },
-        { "value": "small", "label": "t:shared.icon_size.options__2.label" },
-        { "value": "medium", "label": "t:shared.icon_size.options__3.label" },
-        { "value": "large", "label": "t:shared.icon_size.options__4.label" },
-        { "value": "custom", "label": "t:shared.icon_size.options__6.label" }
+        {
+          "value": "extra_small",
+          "label": "t:shared.icon_size.options__1.label"
+        },
+        {
+          "value": "small",
+          "label": "t:shared.icon_size.options__2.label"
+        },
+        {
+          "value": "medium",
+          "label": "t:shared.icon_size.options__3.label"
+        },
+        {
+          "value": "large",
+          "label": "t:shared.icon_size.options__4.label"
+        },
+        {
+          "value": "custom",
+          "label": "t:shared.icon_size.options__6.label"
+        }
       ],
-      "default": "medium",
+      "default": "custom",
       "visible_if": "{{ block.settings.icon_source == 'icon' }}"
     },
     {
@@ -346,7 +569,7 @@
       "max": 48,
       "step": 1,
       "unit": "px",
-      "default": 22,
+      "default": 36,
       "visible_if": "{{ block.settings.icon_source == 'icon' and block.settings.icon_size == 'custom' }}"
     },
     {
@@ -355,18 +578,32 @@
       "label": "t:blocks.feature_icon.settings.icon_color.label",
       "visible_if": "{{ block.settings.icon_source == 'icon' }}"
     },
-
-    { "type": "header", "content": "t:blocks.feature_icon.headers.shape" },
-    { "type": "paragraph", "content": "t:shared.icon_mark.shape_paragraph" },
+    {
+      "type": "header",
+      "content": "t:blocks.feature_icon.headers.shape"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:shared.icon_mark.shape_paragraph"
+    },
     {
       "type": "select",
       "id": "shape",
       "label": "t:blocks.feature_icon.settings.shape.label",
       "info": "t:shared.icon_mark.shape_info",
       "options": [
-        { "value": "none", "label": "t:shared.options.none" },
-        { "value": "circle", "label": "t:shared.carousel.nav_shape.options__2.label" },
-        { "value": "square", "label": "t:shared.carousel.nav_shape.options__3.label" }
+        {
+          "value": "none",
+          "label": "t:shared.options.none"
+        },
+        {
+          "value": "circle",
+          "label": "t:shared.carousel.nav_shape.options__2.label"
+        },
+        {
+          "value": "square",
+          "label": "t:shared.carousel.nav_shape.options__3.label"
+        }
       ],
       "default": "circle"
     },
@@ -378,7 +615,7 @@
       "max": 160,
       "step": 2,
       "unit": "px",
-      "default": 92,
+      "default": 96,
       "visible_if": "{{ block.settings.shape != 'none' }}"
     },
     {
@@ -390,7 +627,7 @@
       "max": 160,
       "step": 2,
       "unit": "px",
-      "default": 72,
+      "default": 76,
       "visible_if": "{{ block.settings.shape != 'none' }}"
     },
     {
@@ -410,20 +647,37 @@
       "label": "t:blocks.feature_icon.settings.fill_color.label",
       "visible_if": "{{ block.settings.shape != 'none' }}"
     },
-
-    { "type": "header", "content": "t:blocks.feature_icon.headers.ring" },
-    { "type": "paragraph", "content": "t:blocks.feature_icon.paragraphs.ring" },
+    {
+      "type": "header",
+      "content": "t:blocks.feature_icon.headers.ring"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:blocks.feature_icon.paragraphs.ring"
+    },
     {
       "type": "select",
       "id": "ring_style",
       "label": "t:shared.border.style.label",
       "options": [
-        { "value": "none", "label": "t:shared.options.none" },
-        { "value": "solid", "label": "t:shared.options.solid" },
-        { "value": "dashed", "label": "t:shared.options.dashed" },
-        { "value": "dotted", "label": "t:shared.options.dotted" }
+        {
+          "value": "none",
+          "label": "t:shared.options.none"
+        },
+        {
+          "value": "solid",
+          "label": "t:shared.options.solid"
+        },
+        {
+          "value": "dashed",
+          "label": "t:shared.options.dashed"
+        },
+        {
+          "value": "dotted",
+          "label": "t:shared.options.dotted"
+        }
       ],
-      "default": "dotted"
+      "default": "dashed"
     },
     {
       "type": "range",
@@ -468,7 +722,7 @@
       "max": 24,
       "step": 1,
       "unit": "px",
-      "default": 8,
+      "default": 6,
       "visible_if": "{{ block.settings.ring_style == 'dashed' }}"
     },
     {
@@ -489,9 +743,14 @@
       "default": 0,
       "visible_if": "{{ block.settings.ring_style != 'none' }}"
     },
-
-    { "type": "header", "content": "t:blocks.featured_pills_step.headers.number" },
-    { "type": "paragraph", "content": "t:blocks.highlight_point.paragraphs.number" },
+    {
+      "type": "header",
+      "content": "t:blocks.featured_pills_step.headers.number"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:blocks.highlight_point.paragraphs.number"
+    },
     {
       "type": "range",
       "id": "number_size",
@@ -500,7 +759,7 @@
       "max": 48,
       "step": 2,
       "unit": "px",
-      "default": 26,
+      "default": 28,
       "visible_if": "{{ block.settings.number != blank }}"
     },
     {
@@ -515,67 +774,186 @@
       "label": "t:blocks.featured_pills_step.settings.number_color.label",
       "visible_if": "{{ block.settings.number != blank }}"
     },
-
-    { "type": "header", "content": "t:shared.typography.header" },
-    { "type": "paragraph", "content": "t:shared.typography.paragraph" },
     {
-      "type": "select", "id": "preset", "label": "t:shared.typography.preset.label", "info": "t:shared.typography.preset.info",
+      "type": "header",
+      "content": "t:shared.typography.header"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:shared.typography.paragraph"
+    },
+    {
+      "type": "select",
+      "id": "preset",
+      "label": "t:shared.typography.preset.label",
+      "info": "t:shared.typography.preset.info",
       "options": [
-        { "value": "default", "label": "t:shared.typography.preset.options__1.label" },
-        { "value": "paragraph", "label": "t:shared.typography.preset.options__2.label" },
-        { "value": "subheading", "label": "t:shared.typography.preset.options__3.label" },
-        { "value": "h4", "label": "t:shared.typography.preset.options__7.label" },
-        { "value": "h5", "label": "t:shared.typography.preset.options__8.label" },
-        { "value": "h6", "label": "t:shared.typography.preset.options__9.label" },
-        { "value": "custom", "label": "t:shared.typography.preset.options__10.label" }
+        {
+          "value": "default",
+          "label": "t:shared.typography.preset.options__1.label"
+        },
+        {
+          "value": "paragraph",
+          "label": "t:shared.typography.preset.options__2.label"
+        },
+        {
+          "value": "subheading",
+          "label": "t:shared.typography.preset.options__3.label"
+        },
+        {
+          "value": "h4",
+          "label": "t:shared.typography.preset.options__7.label"
+        },
+        {
+          "value": "h5",
+          "label": "t:shared.typography.preset.options__8.label"
+        },
+        {
+          "value": "h6",
+          "label": "t:shared.typography.preset.options__9.label"
+        },
+        {
+          "value": "custom",
+          "label": "t:shared.typography.preset.options__10.label"
+        }
       ],
       "default": "h6"
     },
     {
-      "type": "select", "id": "font_family", "label": "t:shared.typography.font_family.label",
+      "type": "select",
+      "id": "font_family",
+      "label": "t:shared.typography.font_family.label",
       "options": [
-        { "value": "body", "label": "t:shared.typography.font_family.options__2.label" },
-        { "value": "heading", "label": "t:shared.typography.font_family.options__1.label" },
-        { "value": "accent", "label": "t:shared.typography.font_family.options__3.label" }
+        {
+          "value": "body",
+          "label": "t:shared.typography.font_family.options__2.label"
+        },
+        {
+          "value": "heading",
+          "label": "t:shared.typography.font_family.options__1.label"
+        },
+        {
+          "value": "accent",
+          "label": "t:shared.typography.font_family.options__3.label"
+        }
       ],
       "default": "heading",
       "visible_if": "{{ block.settings.preset == 'custom' }}"
     },
     {
-      "type": "select", "id": "font_size", "label": "t:shared.typography.font_size.label",
+      "type": "select",
+      "id": "font_weight",
+      "label": "t:shared.typography.font_weight.label",
       "options": [
-        { "value": "12", "label": "12px" }, { "value": "14", "label": "14px" },
-        { "value": "16", "label": "16px" }, { "value": "18", "label": "18px" },
-        { "value": "20", "label": "20px" }, { "value": "24", "label": "24px" }
+        {
+          "value": "inherit",
+          "label": "t:shared.typography.font_weight.options__1.label"
+        },
+        { "value": "300", "label": "300" },
+        { "value": "400", "label": "400" },
+        { "value": "500", "label": "500" },
+        { "value": "600", "label": "600" },
+        { "value": "700", "label": "700" }
+      ],
+      "default": "inherit",
+      "visible_if": "{{ block.settings.preset == 'custom' }}"
+    },
+    {
+      "type": "select",
+      "id": "font_size",
+      "label": "t:shared.typography.font_size.label",
+      "options": [
+        {
+          "value": "12",
+          "label": "12px"
+        },
+        {
+          "value": "14",
+          "label": "14px"
+        },
+        {
+          "value": "16",
+          "label": "16px"
+        },
+        {
+          "value": "18",
+          "label": "18px"
+        },
+        {
+          "value": "20",
+          "label": "20px"
+        },
+        {
+          "value": "24",
+          "label": "24px"
+        }
       ],
       "default": "18",
       "visible_if": "{{ block.settings.preset == 'custom' }}"
     },
     {
-      "type": "select", "id": "font_size_mobile", "label": "t:shared.typography.font_size_mobile.label", "info": "t:shared.typography.font_size_mobile.info",
+      "type": "select",
+      "id": "font_size_mobile",
+      "label": "t:shared.typography.font_size_mobile.label",
+      "info": "t:shared.typography.font_size_mobile.info",
       "options": [
-        { "value": "12", "label": "12px" }, { "value": "14", "label": "14px" },
-        { "value": "16", "label": "16px" }, { "value": "18", "label": "18px" }
+        {
+          "value": "12",
+          "label": "12px"
+        },
+        {
+          "value": "14",
+          "label": "14px"
+        },
+        {
+          "value": "16",
+          "label": "16px"
+        },
+        {
+          "value": "18",
+          "label": "18px"
+        }
       ],
       "default": "16",
       "visible_if": "{{ block.settings.preset == 'custom' }}"
     },
     {
-      "type": "select", "id": "color", "label": "t:shared.typography.color.label", "info": "t:shared.typography.color.info",
+      "type": "select",
+      "id": "color",
+      "label": "t:shared.typography.color.label",
+      "info": "t:shared.typography.color.info",
       "options": [
-        { "value": "inherit", "label": "t:shared.typography.color.options__1.label" },
-        { "value": "muted", "label": "t:shared.typography.color.options__2.label" },
-        { "value": "custom", "label": "t:shared.typography.color.options__3.label" },
-        { "value": "gradient", "label": "t:shared.typography.color.options__4.label" }
+        {
+          "value": "inherit",
+          "label": "t:shared.typography.color.options__1.label"
+        },
+        {
+          "value": "muted",
+          "label": "t:shared.typography.color.options__2.label"
+        },
+        {
+          "value": "custom",
+          "label": "t:shared.typography.color.options__3.label"
+        },
+        {
+          "value": "gradient",
+          "label": "t:shared.typography.color.options__4.label"
+        }
       ],
       "default": "inherit"
     },
     {
-      "type": "color", "id": "text_color_custom", "label": "t:shared.typography.text_color.label", "info": "t:shared.typography.text_color.info",
+      "type": "color",
+      "id": "text_color_custom",
+      "label": "t:shared.typography.text_color.label",
+      "info": "t:shared.typography.text_color.info",
       "visible_if": "{{ block.settings.color == 'custom' }}"
     },
     {
-      "type": "color_background", "id": "text_gradient", "label": "t:shared.typography.text_gradient.label", "info": "t:shared.typography.text_gradient.info",
+      "type": "color_background",
+      "id": "text_gradient",
+      "label": "t:shared.typography.text_gradient.label",
+      "info": "t:shared.typography.text_gradient.info",
       "visible_if": "{{ block.settings.color == 'gradient' }}"
     },
     {
@@ -586,34 +964,125 @@
       "max": 24,
       "step": 1,
       "unit": "px",
-      "default": 14
+      "default": 16
     },
     {
       "type": "color",
       "id": "text_color",
       "label": "t:blocks.featured_pills_step.settings.text_color.label"
     },
-
-    { "type": "header", "content": "t:shared.spacing.block_header" },
-    { "type": "paragraph", "content": "t:shared.spacing.block_paragraph" },
+    {
+      "type": "header",
+      "content": "t:shared.spacing.block_header"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:shared.spacing.block_paragraph"
+    },
     {
       "type": "select",
       "id": "padding_device",
       "label": "t:shared.spacing.devices.label",
       "options": [
-        { "value": "desktop", "label": "t:shared.spacing.devices.options__1.label" },
-        { "value": "mobile", "label": "t:shared.spacing.devices.options__2.label" }
+        {
+          "value": "desktop",
+          "label": "t:shared.spacing.devices.options__1.label"
+        },
+        {
+          "value": "mobile",
+          "label": "t:shared.spacing.devices.options__2.label"
+        }
       ],
       "default": "desktop"
     },
-    { "type": "range", "id": "padding_top", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 100, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'desktop' }}" },
-    { "type": "range", "id": "padding_bottom", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 100, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'desktop' }}" },
-    { "type": "range", "id": "padding_left", "label": "t:shared.spacing.padding_left.label", "min": 0, "max": 100, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'desktop' }}" },
-    { "type": "range", "id": "padding_right", "label": "t:shared.spacing.padding_right.label", "min": 0, "max": 100, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'desktop' }}" },
-    { "type": "range", "id": "padding_top_mobile", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 100, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'mobile' }}" },
-    { "type": "range", "id": "padding_bottom_mobile", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 100, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'mobile' }}" },
-    { "type": "range", "id": "padding_left_mobile", "label": "t:shared.spacing.padding_left.label", "min": 0, "max": 100, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'mobile' }}" },
-    { "type": "range", "id": "padding_right_mobile", "label": "t:shared.spacing.padding_right.label", "min": 0, "max": 100, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'mobile' }}" }
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left_mobile",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right_mobile",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    }
   ]
 }
 {% endschema %}

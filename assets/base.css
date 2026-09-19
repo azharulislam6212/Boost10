@@ -7163,8 +7163,25 @@
     }
   }
 
-  /* ---- what the preset does and does not reach ---- */
-  .block-text:not(.block-text--default).rte :is(p, li, span, h1, h2, h3, h4, h5, h6) {
+  /* ---- what the preset does and does not reach ----
+     --------------------------------------------------------------------------
+     Richtext arrives with its own tags, and a merchant who picked a preset or a
+     colour means it for the words rather than for whatever the editor wrapped
+     them in. So both rules reach into the markup and flatten it.
+
+     `:not(:is(...))` is what keeps them off the block's *own* furniture.
+     `blocks/subheading.liquid` renders a `span` for the icon and a `span` for
+     the divider as siblings of the copy, and both carry a colour the merchant
+     set separately — so the colour rule was repainting the icon in the text's
+     colour and beating the icon's own rule on specificity while doing it. A
+     solid mark whose background the merchant had darkened lost its glyph
+     entirely: `--subheading-icon-color` was emitted, correct, and never won.
+
+     The exclusion is by class rather than by `> *` or `:scope`, because in a
+     plain **Text** block the copy *is* the direct children — a structural test
+     would tell the two apart in the subheading and get the Text block wrong. */
+  .block-text:not(.block-text--default).rte
+    :is(p, li, span, h1, h2, h3, h4, h5, h6):not(:is(.block-subheading__icon, .block-subheading__divider)) {
     font-family: inherit;
     font-size: inherit;
     font-weight: inherit;
@@ -7173,7 +7190,8 @@
     text-transform: inherit;
   }
 
-  .block-text--colored.rte :is(p, li, span, h1, h2, h3, h4, h5, h6) {
+  .block-text--colored.rte
+    :is(p, li, span, h1, h2, h3, h4, h5, h6):not(:is(.block-subheading__icon, .block-subheading__divider)) {
     color: inherit;
   }
 
@@ -11806,16 +11824,44 @@
 
   /* ---- the stage -----------------------------------------------------------
 
-     `blocks/_highlight-stage.liquid`. Above 990px it is a positioning context
-     with a picture in the middle and the points placed on top of it; below
-     that it is a picture with a grid of points under it. See the note in the
-     block on why those are two layouts rather than one scaled. */
+     `blocks/_highlight-stage.liquid`. Three columns above 990px — points, the
+     product, points — and the product owns the middle one outright.
 
-  .highlight-stage {
-    position: relative;
+     ## Why it is a grid and not placed coordinates
+
+     It used to be: each point carried an Across and a Down, and sat absolutely
+     over a shared box. Those two numbers are measured against the *stage*, and
+     the photograph is a separate layer inside it — so nothing connected the two
+     and a merchant who uploaded a taller bottle, or widened the picture, got
+     labels lying across it. The section cannot promise a clear product that
+     way, because the promise depends on numbers nobody re-checks.
+
+     A grid makes it structural instead. A point is in column 1 or column 3 and
+     the photograph is in column 2, so they cannot occupy the same space at any
+     picture size — there is no arithmetic to get wrong. **Gap from the product**
+     moves a point further out from the centre and never toward it, which is
+     what gives each row of the drawing its outward stagger.
+
+     Below 990px the columns collapse: the picture takes a row of its own and
+     the points follow it in source order. Same reasoning as before — a 390px
+     screen has no room for anything either side of a photograph, so the
+     placement is dropped rather than shrunk. */
+
+  .highlight-stage-motion {
     display: block;
     inline-size: 100%;
     min-inline-size: 0;
+  }
+
+  .highlight-stage {
+    display: grid;
+    inline-size: 100%;
+    min-inline-size: 0;
+    gap: var(--hps-gap-mobile, var(--space-4));
+
+    /* Phones: one column, the picture first. */
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
   }
 
   .highlight-stage__media {
@@ -11829,89 +11875,55 @@
     inline-size: 100%;
   }
 
-  .highlight-stage__points {
-    /* The list, not the layer. Markers and padding off; the element stays a
-       `<ul>` so it is still announced as a list of five. */
-    list-style: none;
-    margin: 0;
-    padding: 0;
-  }
-
-  /* ---- phones: one column under the picture ---- */
-
-  .highlight-stage__points-motion {
-    display: block;
-    inline-size: 100%;
-    margin-block-start: var(--hps-gap-mobile, var(--space-4));
-  }
-
-  .highlight-stage__points {
-    display: grid;
-    grid-template-columns: repeat(var(--hps-columns-mobile, 1), minmax(0, 1fr));
-    gap: var(--hps-gap-mobile, var(--space-4));
-    justify-items: center;
-  }
-
-  /* ---- tablets: the same stack, more columns ---- */
-
+  /* Tablets: the picture keeps its own row and the points pair up under it. */
   @media screen and (min-width: 750px) {
-    .highlight-stage__media {
-      inline-size: var(--hps-media-width-tablet, 46%);
-    }
-
-    .highlight-stage__points-motion {
-      margin-block-start: var(--hps-gap, var(--space-6));
-    }
-
-    .highlight-stage__points {
+    .highlight-stage {
       grid-template-columns: repeat(var(--hps-columns-tablet, 2), minmax(0, 1fr));
       gap: var(--hps-gap, var(--space-6));
     }
-  }
-
-  /* ---- desktop: the points are placed ---- */
-
-  @media screen and (min-width: 990px) {
-    .highlight-stage {
-      min-block-size: var(--hps-min-height, 560px);
-      display: grid;
-      place-items: center;
-    }
-
-    /* Both layers occupy the same grid cell, so the picture is centred in the
-       stage and the points layer covers the whole of it. `grid-area` rather
-       than absolute positioning for the media: an absolutely positioned
-       picture takes no room, and then the stage has no height of its own and
-       the minimum is the only thing holding it open. */
-    .highlight-stage__media,
-    .highlight-stage__points-motion {
-      grid-area: 1 / 1;
-    }
 
     .highlight-stage__media {
-      inline-size: var(--hps-media-width, 30%);
-      margin-inline: 0;
+      grid-column: 1 / -1;
+      inline-size: var(--hps-media-width-tablet, 46%);
+    }
+  }
+
+  /* Desktop: points, product, points. */
+  @media screen and (min-width: 990px) {
+    .highlight-stage {
+      grid-template-columns:
+        minmax(0, 1fr)
+        var(--hps-media-width, 24%)
+        minmax(0, 1fr);
+      align-items: start;
+      justify-items: stretch;
+      min-block-size: var(--hps-min-height, 560px);
+      column-gap: 0;
+      row-gap: var(--hps-gap, var(--space-6));
+
+      /* The rows have to be declared, not left implicit.
+
+         The product is placed with `grid-row: <start> / -1`, and -1 means the
+         last line of the **explicit** grid. With no track list there is no
+         explicit grid: -1 resolved to line 1, the product got
+         `grid-row: 2 / 1` — which a browser normalises to rows 1–2 — and it
+         landed on top of the centre point it was supposed to sit below. The
+         column was right and the row silently was not.
+
+         Naming the tracks makes -1 the bottom of the stage, which is what the
+         span was always meant to say. */
+      grid-template-rows: repeat(var(--hps-rows, 3), auto);
     }
 
-    .highlight-stage__points-motion {
-      position: relative;
-      align-self: stretch;
-      justify-self: stretch;
+    /* The middle column, from its row to the bottom of the stage. Nothing else
+       is ever placed in column 2 below `--hps-media-row`, which is the whole
+       guarantee this section makes. */
+    .highlight-stage__media {
+      grid-column: 2;
+      grid-row: var(--hps-media-row, 2) / -1;
       inline-size: 100%;
-      margin-block-start: 0;
-
-      /* Above the picture, stated rather than inherited from source order: the
-         two layers share one grid cell, and a merchant whose photograph carries
-         a stacking context of its own would otherwise paint it over the points
-         that are meant to sit on it. */
-      z-index: 1;
+      align-self: stretch;
     }
-
-    .highlight-stage__points {
-      display: block;
-      block-size: 100%;
-    }
-
   }
 
   /* ---- one point ---- */
@@ -11923,7 +11935,8 @@
     flex-direction: column;
     align-items: var(--hp-align, center);
     gap: var(--hp-gap, var(--space-3));
-    max-inline-size: 100%;
+    inline-size: 100%;
+    max-inline-size: var(--hp-width, 180px);
 
     text-align: var(--hp-text-align, center);
 
@@ -11942,29 +11955,66 @@
 
   /* The placement, and why it sits *after* the rules above.
      --------------------------------------------------------------------------
-     Each point is centred on its own pair of percentages, so a merchant moving
-     two sliders moves the mark, the name and the line together — which is what
-     "put this one on the cap" means. `translate` rather than negative margins:
-     it is a transform, so it never affects layout, and the point is out of flow
-     anyway.
+     A point is put in a column and a row, and **Gap from the product** is a
+     margin on the side facing the middle — so it only ever moves a point
+     further out. Mirrored by which column the point is in, which is why one
+     number gives the drawing's symmetric stagger without the merchant setting
+     a left value and a right value that have to agree.
 
-     This block used to come first, and its `position: absolute` lost to the
-     `position: relative` on `.highlight-point` below it — same specificity and
-     later in the file, so the later one won *inside the media query too*. The
-     points stayed in flow, took `inset-inline-start` as a relative offset from
-     wherever they already were, and pushed the document 276px wider than the
-     viewport.
-
-     Two things stop that coming back: it is written after the rules it has to
-     beat, and the selector names the list as well, so it wins on specificity
-     rather than on the order of two blocks in one file. */
+     Written after the base rules and keyed on the attribute as well as the
+     class, so it wins on specificity rather than on the order of two blocks in
+     one file — the mistake that put the old absolute placement behind
+     `position: relative` and pushed the document wider than the viewport. */
   @media screen and (min-width: 990px) {
-    .highlight-stage__points > .highlight-point {
-      position: absolute;
-      inset-inline-start: var(--hp-x, 50%);
-      inset-block-start: var(--hp-y, 50%);
-      translate: -50% -50%;
+    .highlight-stage > .highlight-point[data-column] {
+      grid-row: var(--hp-row, 2);
+      align-self: var(--hp-row-align, start);
       inline-size: var(--hp-width, 180px);
+    }
+
+    .highlight-stage > .highlight-point[data-column='left'] {
+      grid-column: 1;
+      justify-self: end;
+      margin-inline-end: var(--hp-offset, 40px);
+    }
+
+    .highlight-stage > .highlight-point[data-column='right'] {
+      grid-column: 3;
+      justify-self: start;
+      margin-inline-start: var(--hp-offset, 40px);
+    }
+
+    /* Above the picture, never beside it: column 2 is the product's from
+       `--hps-media-row` down, so a centre point belongs in the rows before it. */
+    .highlight-stage > .highlight-point[data-column='center'] {
+      grid-column: 2;
+      justify-self: center;
+      margin-inline: 0;
+    }
+
+    /* **Nudge up or down**, and why only the two outer columns have one.
+       ------------------------------------------------------------------------
+       A row is as tall as the tallest point in it — a mark, a name and a line —
+       and the drawing does not space its rows that way: the upper pair sits
+       level with the top of the picture, beside the first point's caption
+       rather than under it. Rows cannot give that, because a row that short
+       would cut the point above off.
+
+       So the row still reserves the point's full height and the nudge moves the
+       painted result out of it. `translate` and not a margin: a margin is read
+       when the row is sized, which would pull every row after it along and turn
+       one merchant's adjustment into a stage that changes height. This moves
+       nothing but the pixels, so the stage measures the same and
+       `<highlight-points>` reads the same box it always did.
+
+       It is refused to a centre point on purpose. Column 2 below
+       `--hps-media-row` is the product's, and a centre point nudged down is the
+       one way left in this layout to land a label on the picture — the whole
+       thing the columns exist to prevent. A point that wants to be lower
+       belongs in the left or right column. */
+    .highlight-stage > .highlight-point[data-column='left'],
+    .highlight-stage > .highlight-point[data-column='right'] {
+      translate: 0 var(--hp-nudge, 0px);
     }
   }
 
@@ -12000,6 +12050,78 @@
     color: var(--hps-active-ring-color, currentColor);
     opacity: var(--hps-active-ring-opacity, 1);
     transition: opacity var(--transition-base);
+  }
+
+  /* ---- the light arriving ---------------------------------------------------
+
+     The fill, the glyph colour and the size above are a *state*: they cross
+     once and stay. **When a point lights up** is the movement on top of it, and
+     it is the stage's setting for the same reason the colours are — "the light
+     lands like this" is a property of the run, not of a point, and five copies
+     of it are five places for one decision to drift.
+
+     Both styles are written against the properties the stage already
+     publishes, so a merchant who recoloured the lit mark has recoloured this
+     too and there is no second colour to keep in step.
+
+     `::after` and not a third element. The halo is a ring with nothing inside
+     it, so it can paint over the mark without hiding the glyph — which is what
+     lets it sit in the normal paint order instead of behind on a negative
+     z-index, where it would depend on an ancestor making a stacking context
+     that nothing here promises to make.
+
+     The animation restarts on its own. `data-highlight-active` arriving is what
+     matches the selector, so the element enters the rule with no animation
+     running and begins one; the attribute leaving takes it off again. Nothing
+     has to reset it between points. */
+  @keyframes highlight-point-halo {
+    from {
+      scale: 1;
+      opacity: var(--hps-halo-opacity, 0.5);
+    }
+
+    to {
+      scale: var(--hps-halo-scale, 1.55);
+      opacity: 0;
+    }
+  }
+
+  @keyframes highlight-point-pulse {
+    0%,
+    100% {
+      scale: var(--hps-active-scale, 1);
+    }
+
+    50% {
+      scale: calc(var(--hps-active-scale, 1) * 1.05);
+    }
+  }
+
+  .highlight-point__mark::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+
+    border: var(--hps-halo-width, 2px) solid
+      var(--hps-halo-color, var(--hps-active-ring-color, currentColor));
+    border-radius: inherit;
+
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .highlight-stage[data-active-motion='halo']
+    .highlight-point[data-highlight-active]
+    .highlight-point__mark::after {
+    animation: highlight-point-halo var(--hps-active-motion-duration, 900ms)
+      var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)) both;
+  }
+
+  .highlight-stage[data-active-motion='pulse']
+    .highlight-point[data-highlight-active]
+    .highlight-point__mark {
+    animation: highlight-point-pulse var(--hps-active-motion-duration, 900ms)
+      var(--ease-swap, cubic-bezier(0.65, 0, 0.35, 1)) infinite;
   }
 
   .highlight-point__body {
@@ -12059,18 +12181,25 @@
 
   /* The number on the mark. Positioned against it — `.icon-mark` is already a
      containing block — and out of flow, so a point with a number and one
-     without are the same height and sit on the same line in the grid. */
+     without are the same height and sit on the same line in the grid.
+
+     Flush into the mark's top-right corner, and not nudged out past it. The
+     mark is a circle inside a square box, so a badge in that corner already
+     straddles the ring at roughly 45° — which is where the drawing puts it —
+     while the point's own box stays exactly the mark's width. A badge pushed
+     further out widens the point by a quarter of its own size on one side
+     only, and on the left column that is a quarter of a badge closer to the
+     product. */
   .highlight-point__number {
     position: absolute;
     inset-block-start: 0;
     inset-inline-end: 0;
-    translate: 25% -10%;
     z-index: 2;
 
     display: grid;
     place-items: center;
-    min-inline-size: var(--hp-number-size, 26px);
-    block-size: var(--hp-number-size, 26px);
+    min-inline-size: var(--hp-number-size, 28px);
+    block-size: var(--hp-number-size, 28px);
     padding-inline: 0.4rem;
 
     border-radius: 999px;
@@ -12078,7 +12207,7 @@
     color: var(--hp-number-color, var(--color-background, #fff));
 
     font-family: var(--font-body-family);
-    font-size: calc(var(--hp-number-size, 26px) * 0.42);
+    font-size: calc(var(--hp-number-size, 28px) * 0.46);
     font-weight: 600;
     line-height: 1;
   }
@@ -12087,13 +12216,19 @@
      the size it was given. */
   .highlight-point__number--alone {
     position: static;
-    translate: none;
-    font-size: calc(var(--hp-number-size, 26px) * 0.5);
+    font-size: calc(var(--hp-number-size, 28px) * 0.5);
   }
 
   /* A lit point is a change of state, not a movement — so it still changes for
      anyone who asked for less motion, and only the travel between states is
-     dropped. */
+     dropped: which point is lit stays readable, and the halo, the breathing and
+     the grown mark do not run.
+
+     **Nudge up or down** is not in here. It is where the point *is* — a still
+     picture, the same one on every frame — and taking it away would rearrange
+     the section for the customer who asked for less movement rather than give
+     them less movement. The rule above is about what travels, not about what
+     is already at rest. */
   @media (prefers-reduced-motion: reduce) {
     .highlight-point,
     .highlight-point__mark,
@@ -12103,6 +12238,11 @@
 
     .highlight-point[data-highlight-active] .highlight-point__mark {
       scale: 1;
+      animation: none;
+    }
+
+    .highlight-point[data-highlight-active] .highlight-point__mark::after {
+      animation: none;
     }
   }
 }
