@@ -11700,3 +11700,409 @@
     min-inline-size: 0;
   }
 }
+
+/* ==========================================================================
+   Product highlight point
+   ========================================================================== */
+
+@layer components {
+  .product-highlight-point {
+    display: flex;
+    flex-direction: column;
+
+    border-radius: var(--product-highlight-point-radius, 0);
+
+    border-width: var(--product-highlight-point-border-width, 0px);
+    border-style: var(--product-highlight-point-border-style, solid);
+    border-color: var(--product-highlight-point-border-color, transparent);
+
+    margin-block-start: var(--product-highlight-point-margin-block-start, 0px);
+    margin-block-end: var(--product-highlight-point-margin-block-end, 0px);
+
+    min-block-size: var(--product-highlight-point-min-height, 0px);
+  }
+
+  @media screen and (max-width: 749px) {
+    .product-highlight-point {
+      border-radius: var(--product-highlight-point-radius-mobile, var(--product-highlight-point-radius, 0));
+      min-block-size: var(
+        --product-highlight-point-min-height-mobile,
+        var(--product-highlight-point-min-height, 0px)
+      );
+    }
+  }
+
+  .product-highlight-point.has-background-media {
+    overflow: hidden;
+  }
+
+  .product-highlight-point.has-background-media > :not(.background-media) {
+    position: relative;
+    z-index: 1;
+  }
+
+  .product-highlight-point__inner {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+  }
+
+  .product-highlight-point__content {
+    display: flex;
+    flex: 1 1 auto;
+    inline-size: 100%;
+    gap: var(--product-highlight-point-gap-y, var(--space-8))
+      var(--product-highlight-point-gap-x, var(--space-8));
+  }
+
+  .product-highlight-point__content--column {
+    flex-direction: column;
+    align-items: var(--product-highlight-point-inline, center);
+    justify-content: var(--product-highlight-point-block, start);
+  }
+
+  .product-highlight-point__content--row {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: var(--product-highlight-point-inline, center);
+    align-items: var(--product-highlight-point-block, start);
+  }
+
+  .product-highlight-point__content--row.product-highlight-point__content--reverse {
+    flex-direction: row-reverse;
+  }
+
+  .product-highlight-point__content--column:where([style*='--product-highlight-point-inline: center']) {
+    text-align: center;
+  }
+
+  .product-highlight-point__content--column:where([style*='--product-highlight-point-inline: end']) {
+    text-align: end;
+  }
+
+  @media screen and (max-width: 749px) {
+    .product-highlight-point__content {
+      gap: var(
+          --product-highlight-point-gap-y-mobile,
+          var(--product-highlight-point-gap-y, var(--space-8))
+        )
+        var(--product-highlight-point-gap-x-mobile, var(--product-highlight-point-gap-x, var(--space-8)));
+    }
+
+    /* `--…-align` and not `--…-inline`: the second legitimately carries
+       `space-between` on a desktop row, where it lands on `justify-content`.
+       Once stacked the same value would land on `align-items`, which is not
+       valid there — the declaration is dropped and the stack falls back to
+       `stretch`. */
+    .product-highlight-point__content--row.product-highlight-point__content--stack-mobile {
+      flex-direction: column;
+      justify-content: var(--product-highlight-point-block, start);
+      align-items: var(
+        --product-highlight-point-align,
+        var(--product-highlight-point-inline, center)
+      );
+    }
+  }
+
+  /* ---- the stage -----------------------------------------------------------
+
+     `blocks/_highlight-stage.liquid`. Above 990px it is a positioning context
+     with a picture in the middle and the points placed on top of it; below
+     that it is a picture with a grid of points under it. See the note in the
+     block on why those are two layouts rather than one scaled. */
+
+  .highlight-stage {
+    position: relative;
+    display: block;
+    inline-size: 100%;
+    min-inline-size: 0;
+  }
+
+  .highlight-stage__media {
+    display: block;
+    inline-size: var(--hps-media-width-mobile, 62%);
+    margin-inline: auto;
+  }
+
+  .highlight-stage__media-frame {
+    display: block;
+    inline-size: 100%;
+  }
+
+  .highlight-stage__points {
+    /* The list, not the layer. Markers and padding off; the element stays a
+       `<ul>` so it is still announced as a list of five. */
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* ---- phones: one column under the picture ---- */
+
+  .highlight-stage__points-motion {
+    display: block;
+    inline-size: 100%;
+    margin-block-start: var(--hps-gap-mobile, var(--space-4));
+  }
+
+  .highlight-stage__points {
+    display: grid;
+    grid-template-columns: repeat(var(--hps-columns-mobile, 1), minmax(0, 1fr));
+    gap: var(--hps-gap-mobile, var(--space-4));
+    justify-items: center;
+  }
+
+  /* ---- tablets: the same stack, more columns ---- */
+
+  @media screen and (min-width: 750px) {
+    .highlight-stage__media {
+      inline-size: var(--hps-media-width-tablet, 46%);
+    }
+
+    .highlight-stage__points-motion {
+      margin-block-start: var(--hps-gap, var(--space-6));
+    }
+
+    .highlight-stage__points {
+      grid-template-columns: repeat(var(--hps-columns-tablet, 2), minmax(0, 1fr));
+      gap: var(--hps-gap, var(--space-6));
+    }
+  }
+
+  /* ---- desktop: the points are placed ---- */
+
+  @media screen and (min-width: 990px) {
+    .highlight-stage {
+      min-block-size: var(--hps-min-height, 560px);
+      display: grid;
+      place-items: center;
+    }
+
+    /* Both layers occupy the same grid cell, so the picture is centred in the
+       stage and the points layer covers the whole of it. `grid-area` rather
+       than absolute positioning for the media: an absolutely positioned
+       picture takes no room, and then the stage has no height of its own and
+       the minimum is the only thing holding it open. */
+    .highlight-stage__media,
+    .highlight-stage__points-motion {
+      grid-area: 1 / 1;
+    }
+
+    .highlight-stage__media {
+      inline-size: var(--hps-media-width, 30%);
+      margin-inline: 0;
+    }
+
+    .highlight-stage__points-motion {
+      position: relative;
+      align-self: stretch;
+      justify-self: stretch;
+      inline-size: 100%;
+      margin-block-start: 0;
+
+      /* Above the picture, stated rather than inherited from source order: the
+         two layers share one grid cell, and a merchant whose photograph carries
+         a stacking context of its own would otherwise paint it over the points
+         that are meant to sit on it. */
+      z-index: 1;
+    }
+
+    .highlight-stage__points {
+      display: block;
+      block-size: 100%;
+    }
+
+  }
+
+  /* ---- one point ---- */
+
+  .highlight-point {
+    position: relative;
+
+    display: flex;
+    flex-direction: column;
+    align-items: var(--hp-align, center);
+    gap: var(--hp-gap, var(--space-3));
+    max-inline-size: 100%;
+
+    text-align: var(--hp-text-align, center);
+
+    /* Quieter until it is the one being talked about. At 100% — the default —
+       this resolves to no change at all, so a stage that never touched
+       **Unlit opacity** looks exactly as it did. */
+    opacity: var(--hps-idle-opacity, 1);
+    transition:
+      opacity var(--transition-base),
+      scale var(--transition-base);
+  }
+
+  .highlight-point[data-highlight-active] {
+    opacity: 1;
+  }
+
+  /* The placement, and why it sits *after* the rules above.
+     --------------------------------------------------------------------------
+     Each point is centred on its own pair of percentages, so a merchant moving
+     two sliders moves the mark, the name and the line together — which is what
+     "put this one on the cap" means. `translate` rather than negative margins:
+     it is a transform, so it never affects layout, and the point is out of flow
+     anyway.
+
+     This block used to come first, and its `position: absolute` lost to the
+     `position: relative` on `.highlight-point` below it — same specificity and
+     later in the file, so the later one won *inside the media query too*. The
+     points stayed in flow, took `inset-inline-start` as a relative offset from
+     wherever they already were, and pushed the document 276px wider than the
+     viewport.
+
+     Two things stop that coming back: it is written after the rules it has to
+     beat, and the selector names the list as well, so it wins on specificity
+     rather than on the order of two blocks in one file. */
+  @media screen and (min-width: 990px) {
+    .highlight-stage__points > .highlight-point {
+      position: absolute;
+      inset-inline-start: var(--hp-x, 50%);
+      inset-block-start: var(--hp-y, 50%);
+      translate: -50% -50%;
+      inline-size: var(--hp-width, 180px);
+    }
+  }
+
+  .highlight-point__mark {
+    flex: 0 0 auto;
+    transition:
+      scale var(--transition-base),
+      color var(--transition-base);
+  }
+
+  /* The lit mark.
+     --------------------------------------------------------------------------
+     `snippets/icon-mark.liquid` publishes its `--icon-mark-*` properties inline
+     on the mark, and an inline custom property beats every stylesheet — so the
+     lit state is written onto the painted result instead: `::before` is the
+     filled shape, `color` is the glyph, and the ring is an `<svg>` taking
+     `currentColor` through its own rule.
+
+     Exactly the arrangement `.tabs--pills` uses for the chosen option, and for
+     the same reason. Every value falls back to `transparent` / `inherit`, so a
+     stage that set none of them lights nothing and the mark keeps what it was
+     given. */
+  .highlight-point[data-highlight-active] .highlight-point__mark {
+    scale: var(--hps-active-scale, 1);
+    color: var(--hps-active-icon-color, inherit);
+  }
+
+  .highlight-point[data-highlight-active] .highlight-point__mark::before {
+    background: var(--hps-active-fill, transparent);
+  }
+
+  .highlight-point[data-highlight-active] .highlight-point__mark .icon-mark__ring {
+    color: var(--hps-active-ring-color, currentColor);
+    opacity: var(--hps-active-ring-opacity, 1);
+    transition: opacity var(--transition-base);
+  }
+
+  .highlight-point__body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--hp-stack-gap, var(--space-1));
+    inline-size: 100%;
+    min-inline-size: 0;
+  }
+
+  .highlight-point__title {
+    font-family: var(--block-font-family, var(--font-heading-family));
+    font-size: var(--block-font-size, var(--font-size-lg));
+    font-weight: var(--block-font-weight, inherit);
+    line-height: var(--block-line-height, 1.3);
+    letter-spacing: var(--block-letter-spacing, inherit);
+    text-transform: var(--block-text-transform, inherit);
+    color: var(--block-text-color, inherit);
+  }
+
+  /* A rule and not a second inline declaration: an inline `font-size` beats
+     every stylesheet, and a style attribute cannot carry a breakpoint. */
+  @media screen and (max-width: 749px) {
+    .highlight-point__title {
+      font-size: var(--block-font-size-mobile, var(--block-font-size, var(--font-size-lg)));
+    }
+  }
+
+  .highlight-point__title.block-text--gradient {
+    background-image: var(--block-text-gradient, var(--gradient-primary));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  @media (forced-colors: active) {
+    .highlight-point__title.block-text--gradient {
+      background-image: none;
+      color: CanvasText;
+    }
+  }
+
+  .highlight-point__text {
+    display: block;
+    font-size: var(--hp-text-size, var(--font-size-sm));
+    line-height: 1.5;
+    color: var(--hp-text-color, var(--color-accent-text, inherit));
+  }
+
+  .highlight-point__text > :first-child {
+    margin-block-start: 0;
+  }
+
+  .highlight-point__text > :last-child {
+    margin-block-end: 0;
+  }
+
+  /* The number on the mark. Positioned against it — `.icon-mark` is already a
+     containing block — and out of flow, so a point with a number and one
+     without are the same height and sit on the same line in the grid. */
+  .highlight-point__number {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-end: 0;
+    translate: 25% -10%;
+    z-index: 2;
+
+    display: grid;
+    place-items: center;
+    min-inline-size: var(--hp-number-size, 26px);
+    block-size: var(--hp-number-size, 26px);
+    padding-inline: 0.4rem;
+
+    border-radius: 999px;
+    background: var(--hp-number-background, var(--color-heading, #04160e));
+    color: var(--hp-number-color, var(--color-background, #fff));
+
+    font-family: var(--font-body-family);
+    font-size: calc(var(--hp-number-size, 26px) * 0.42);
+    font-weight: 600;
+    line-height: 1;
+  }
+
+  /* With no glyph to pin it to, the number *is* the mark: back into the flow at
+     the size it was given. */
+  .highlight-point__number--alone {
+    position: static;
+    translate: none;
+    font-size: calc(var(--hp-number-size, 26px) * 0.5);
+  }
+
+  /* A lit point is a change of state, not a movement — so it still changes for
+     anyone who asked for less motion, and only the travel between states is
+     dropped. */
+  @media (prefers-reduced-motion: reduce) {
+    .highlight-point,
+    .highlight-point__mark,
+    .highlight-point__mark .icon-mark__ring {
+      transition-duration: 1ms;
+    }
+
+    .highlight-point[data-highlight-active] .highlight-point__mark {
+      scale: 1;
+    }
+  }
+}

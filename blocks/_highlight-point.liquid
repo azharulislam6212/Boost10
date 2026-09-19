@@ -1,41 +1,42 @@
 {% doc %}
-  blocks/_featured-pills-step.liquid
+  blocks/_highlight-point.liquid
 
-  One card in a numbered sequence: a mark with a number pinned to it, and a
-  sentence about what happens at that point. Three of them side by side are the
-  *How it works* panel.
+  One thing worth saying about the product: a mark with a number on it, a name,
+  and a line under the name.
 
   ## Why it is not `blocks/badge-highlight.liquid`
 
-  The Highlight tile is a mark, a heading and a line of text in a box, and it is
-  the right block for three unordered benefits. This is an *ordered* set, and
-  the order is the content: the number is not decoration on the card, it is what
-  says this is the second of three and that the first one came before it.
+  The Highlight tile is a mark, a heading and a line of text in a box, and it
+  is the right block for three benefits in a row. Two things make this one
+  different, and neither could be a setting on that block.
 
-  A tile with the number typed into the heading would leave the sequence
-  invisible to a screen reader, unsortable by the merchant and out of step the
-  moment a step is inserted in the middle. Here it is its own field, pinned to
-  the mark by the stylesheet rather than by the copy, and it reads out as part
-  of the card.
+  It has a **position**: two percentages of the stage, which only mean anything
+  inside `blocks/_highlight-stage.liquid`. A tile placed at 73% across some
+  other section is a tile that has escaped its container.
 
-  Private — the leading underscore — because a step outside a sequence is a
-  tile, and the theme already has one of those. It is addable inside a **Pill**
-  and nowhere else.
+  And it has a **lit state** that something else drives. The mark fills in when
+  `<highlight-points>` puts `data-highlight-active` on it, and what it fills in
+  *to* is set once on the stage rather than five times here — see the note
+  there.
+
+  ## The number is content
+
+  It is a field rather than something typed into the name, so the order stays
+  the order of the blocks, a merchant reordering them does not have to retype
+  five numbers, and the sequence is announced to anyone not looking at it. It
+  rides on the mark, positioned against it, so switching it on never changes
+  the height of the point or moves its neighbours.
 
   ## The mark is the theme's
 
   Shape, Ring and the icon colours are `snippets/icon-mark.liquid`: the same
-  three groups with the same ids as the Feature icon, the Highlight tile and the
-  pill in the strip above. The dotted ring the design draws is that snippet's
-  `<circle>` with a round cap and no dash length — see the note there on why a
-  dotted ring cannot be a `border`.
+  three groups with the same ids as the Feature icon, the Highlight tile and
+  the pills in the other section. A merchant who has drawn one mark in this
+  theme has drawn this one.
 
-  ## The number sits on the ring, and the card does not grow to hold it
-
-  It is absolutely positioned against the mark, which is the containing block,
-  so the badge straddles the ring's edge without reserving a corner of the card
-  for itself. A card whose height changes when a badge is switched on is a card
-  that cannot be dropped into a row beside two that have not got one.
+  Private — the leading underscore — because a point with nothing to be a point
+  on is not a block. It is addable inside a **Highlight stage** and nowhere
+  else.
 {% enddoc %}
 
 {%- liquid
@@ -52,44 +53,19 @@
   assign icon_size = icon_px | plus: 0
 
   comment
-    ---- the frame ----
+    ---- where it sits ----
 
-    Resolved the way every border in this theme is: `none` emits nothing at all,
-    and with no colour picked the line is `currentColor` faded by `color-mix`,
-    because the colour filters cannot take an alpha channel from a keyword.
+    Percentages of the stage, and the point is centred on them: a merchant
+    moves two sliders and the whole thing — mark, name and line — travels
+    together, which is what "put this one on the cap" means.
+
+    Read on every breakpoint and used on one. `assets/base.css` ignores them
+    below 990px, where the points are a grid; emitting them unconditionally is
+    what lets a merchant lay out the desktop while previewing a phone, which is
+    the order the theme editor actually works in.
   endcomment
-  assign border_line = s.border_style | default: 'none'
-  assign border_width = 0
-  if border_line != 'none'
-    assign border_width = s.border_width | default: 1 | plus: 0
-
-    assign border_percent = s.border_opacity | default: 100 | plus: 0
-    if s.border_color == blank
-      assign border_paint = 'color-mix(in srgb, currentColor ' | append: border_percent | append: '%, transparent)'
-    else
-      assign border_alpha = border_percent | divided_by: 100.0
-      assign border_paint = s.border_color | color_modify: 'alpha', border_alpha
-    endif
-  endif
-
-  comment
-    Two properties, not one — `flex` only means anything to a flex item, and a
-    step card is one only when the panel around it is a flex row. Fill is the
-    default because a sequence is a row of equal cards, and a card sized to its
-    own sentence makes the shortest step look like the least important one.
-  endcomment
-  assign width_pct = s.width_custom | default: 33 | plus: 0
-  case s.width
-    when 'fit'
-      assign width_flex = '0 0 auto'
-      assign width_size = 'fit-content'
-    when 'custom'
-      assign width_flex = '0 0 ' | append: width_pct | append: '%'
-      assign width_size = width_pct | append: '%'
-    else
-      assign width_flex = '1 1 0%'
-      assign width_size = '100%'
-  endcase
+  assign pos_x = s.position_x | default: 50 | plus: 0
+  assign pos_y = s.position_y | default: 50 | plus: 0
 
   case s.alignment
     when 'start'
@@ -104,92 +80,109 @@
   endcase
 
   assign preset = s.preset | default: 'default'
-  assign heading_classes = 'featured-pills-step__heading block-text--' | append: preset
+  assign title_classes = 'highlight-point__title block-text--' | append: preset
   if s.color == 'gradient'
-    assign heading_classes = heading_classes | append: ' block-text--gradient'
+    assign title_classes = title_classes | append: ' block-text--gradient'
   endif
+
+  comment
+    Presence, not a value: `assets/highlight-points.js` reads the attribute with
+    `hasAttribute`, and an unchecked box has to emit nothing at all rather than
+    `data-highlight-active="false"`.
+
+    With the scroll run switched on this is only the starting state — the
+    component takes it over on the first frame. With the run off it is the
+    whole answer, and it is also what a customer sees if the module never
+    arrives.
+  endcomment
+  assign is_active = s.active | default: false
 -%}
 
 {%- capture icon_mark_style -%}
   {%- render 'icon-mark', block: s, declarations: true -%}
 {%- endcapture -%}
 
-{%- capture heading_style -%}
+{%- capture title_style -%}
   {%- render 'block-typography', block: s -%}
 {%- endcapture -%}
 
-{%- capture card_style -%}
+{%- capture point_style -%}
   {%- render 'spacing', block: s, declarations: true -%}
-  --fps-flex: {{ width_flex }};
-  --fps-width: {{ width_size }};
-  --fps-align: {{ align_axis }};
-  --fps-text-align: {{ text_align }};
-  --fps-gap: {{ s.gap | default: 16 | plus: 0 }}px;
-  --fps-gap-mobile: {{ s.gap_mobile | default: s.gap | default: 16 | plus: 0 }}px;
-  --fps-radius: {{ s.border_radius | default: 20 | plus: 0 }}px;
-  --fps-border-width: {{ border_width }}px;
-  {%- if border_width > 0 -%}
-    --fps-border-style: {{ border_line }};
-    --fps-border-color: {{ border_paint }};
-  {%- endif -%}
-  {%- if s.background != blank -%}
-    --fps-background: {{ s.background }};
-  {%- endif -%}
-  --fps-text-size: {{ s.text_size | default: 15 | plus: 0 | divided_by: 10.0 }}rem;
+  --hp-x: {{ pos_x }}%;
+  --hp-y: {{ pos_y }}%;
+  --hp-align: {{ align_axis }};
+  --hp-text-align: {{ text_align }};
+  --hp-width: {{ s.width | default: 180 | plus: 0 }}px;
+  --hp-gap: {{ s.gap | default: 12 | plus: 0 }}px;
+  --hp-stack-gap: {{ s.gap_vertical | default: 4 | plus: 0 }}px;
+  --hp-text-size: {{ s.text_size | default: 14 | plus: 0 | divided_by: 10.0 }}rem;
   {%- if s.text_color != blank -%}
-    --fps-text-color: {{ s.text_color }};
+    --hp-text-color: {{ s.text_color }};
   {%- endif -%}
-  --fps-number-size: {{ s.number_size | default: 22 | plus: 0 }}px;
+  --hp-number-size: {{ s.number_size | default: 26 | plus: 0 }}px;
   {%- if s.number_background != blank -%}
-    --fps-number-background: {{ s.number_background }};
+    --hp-number-background: {{ s.number_background }};
   {%- endif -%}
   {%- if s.number_color != blank -%}
-    --fps-number-color: {{ s.number_color }};
+    --hp-number-color: {{ s.number_color }};
   {%- endif -%}
 {%- endcapture -%}
 
-<div
-  class="featured-pills-step icon-mark-host"
+{%- comment -%}
+  `data-highlight-point` is what the component collects on, and it is a
+  data attribute rather than the class so a restyle cannot silently take the
+  behaviour with it.
+
+  `<li>`, because five points about one product is a list and announcing it as
+  one tells a screen reader how many there are before the first is read. The
+  stage's points layer is the `<ul>` — see `assets/base.css`, which strips the
+  markers and the padding rather than the element.
+{%- endcomment -%}
+<li
+  class="highlight-point icon-mark-host"
+  data-highlight-point
+  {% if is_active %}data-highlight-active aria-current="true"{% endif %}
   data-block-spacing
-  style="{{ card_style | strip_newlines | strip }}"
+  style="{{ point_style | strip_newlines | strip }}"
   {{ block.shopify_attributes }}
 >
   {%- if has_icon -%}
-    <span class="featured-pills-step__mark icon-mark" aria-hidden="true" style="{{ icon_mark_style | strip_newlines | strip }}">
+    <span class="highlight-point__mark icon-mark" aria-hidden="true" style="{{ icon_mark_style | strip_newlines | strip }}">
       {% render 'icon-mark', block: s %}
       {% render 'icon', icon: s.icon, size: icon_size %}
 
       {%- comment -%}
-        Inside the mark rather than beside it, because the mark is the box the
-        badge is positioned against. Not `aria-hidden`: the number is the step's
-        place in the sequence and reads out with the rest of the card — the
-        `aria-hidden` on the mark itself covers only the glyph and the ring,
-        which are decoration, so the badge carries `aria-hidden="false"` back.
+        Positioned against the mark, which `.icon-mark` already makes a
+        containing block, and out of flow — so a point with a number and one
+        without are the same height and sit on the same line in the grid.
+
+        `aria-hidden="false"` back on, because the mark around it is hidden and
+        the number is not decoration: it is this point's place in the run.
       {%- endcomment -%}
       {%- if s.number != blank -%}
-        <span class="featured-pills-step__number" aria-hidden="false">{{ s.number | escape }}</span>
+        <span class="highlight-point__number" aria-hidden="false">{{ s.number | escape }}</span>
       {%- endif -%}
     </span>
   {%- elsif s.number != blank -%}
     {%- comment -%}
-      A step with no glyph still has a number, and with no mark to pin it to it
-      becomes the mark. Same element, same settings, drawn on its own.
+      No glyph, so the number is the mark. Same element, same settings, drawn
+      on its own and back in the flow.
     {%- endcomment -%}
-    <span class="featured-pills-step__number featured-pills-step__number--alone">{{ s.number | escape }}</span>
+    <span class="highlight-point__number highlight-point__number--alone">{{ s.number | escape }}</span>
   {%- endif -%}
 
-  <span class="featured-pills-step__body">
-    {%- if s.heading != blank -%}
-      <span class="{{ heading_classes }}" style="{{ heading_style | strip_newlines | strip }}">
-        {{- s.heading | escape -}}
+  <span class="highlight-point__body">
+    {%- if s.title != blank -%}
+      <span class="{{ title_classes }}" style="{{ title_style | strip_newlines | strip }}">
+        {{- s.title | escape -}}
       </span>
     {%- endif -%}
 
     {%- if s.text != blank -%}
-      <span class="featured-pills-step__text">{{ s.text }}</span>
+      <span class="highlight-point__text">{{ s.text }}</span>
     {%- endif -%}
   </span>
-</div>
+</li>
 
 {%- comment -%}
   Every setting below is a control a merchant reaches in the editor, and the
@@ -199,52 +192,68 @@
 {% # theme-check-disable ExcessiveSettingsCount %}
 {% schema %}
 {
-  "name": "t:blocks.featured_pills_step.name",
+  "name": "t:blocks.highlight_point.name",
   "tag": null,
   "settings": [
     {
       "type": "text",
       "id": "number",
       "label": "t:blocks.featured_pills_step.settings.number.label",
-      "info": "t:blocks.featured_pills_step.settings.number.info",
+      "info": "t:blocks.highlight_point.settings.number.info",
       "default": "01"
     },
     {
       "type": "text",
-      "id": "heading",
+      "id": "title",
       "label": "t:shared.heading.label",
-      "info": "t:blocks.featured_pills_step.settings.heading.info"
+      "default": "Name the claim"
     },
     {
       "type": "richtext",
       "id": "text",
       "label": "t:shared.text.label",
-      "default": "<p>Say what happens at this step.</p>"
+      "default": "<p>One short line of proof.</p>"
+    },
+    {
+      "type": "checkbox",
+      "id": "active",
+      "label": "t:blocks.highlight_point.settings.active.label",
+      "info": "t:blocks.highlight_point.settings.active.info",
+      "default": false
     },
 
-    { "type": "header", "content": "t:blocks.group.headers.layout" },
-    {
-      "type": "select",
-      "id": "width",
-      "label": "t:blocks.group.settings.width.label",
-      "info": "t:blocks.group.settings.width.info",
-      "options": [
-        { "value": "fill", "label": "t:blocks.group.settings.width.options__2.label" },
-        { "value": "fit", "label": "t:blocks.group.settings.width.options__1.label" },
-        { "value": "custom", "label": "t:blocks.group.settings.width.options__3.label" }
-      ],
-      "default": "fill"
-    },
+    { "type": "header", "content": "t:blocks.highlight_point.headers.position" },
+    { "type": "paragraph", "content": "t:blocks.highlight_point.paragraphs.position" },
     {
       "type": "range",
-      "id": "width_custom",
-      "label": "t:blocks.group.settings.width_custom.label",
-      "min": 10,
+      "id": "position_x",
+      "label": "t:blocks.highlight_point.settings.position_x.label",
+      "min": 0,
       "max": 100,
       "step": 1,
       "unit": "%",
-      "default": 33,
-      "visible_if": "{{ block.settings.width == 'custom' }}"
+      "default": 50
+    },
+    {
+      "type": "range",
+      "id": "position_y",
+      "label": "t:blocks.highlight_point.settings.position_y.label",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "%",
+      "default": 50
+    },
+    {
+      "type": "range",
+      "id": "width",
+      "label": "t:blocks.highlight_point.settings.width.label",
+      "info": "t:blocks.highlight_point.settings.width.info",
+      "min": 100,
+      "max": 320,
+      "step": 10,
+      "unit": "px",
+      "default": 180
     },
     {
       "type": "select",
@@ -260,22 +269,22 @@
     {
       "type": "range",
       "id": "gap",
-      "label": "t:blocks.group.settings.gap_vertical.label",
+      "label": "t:blocks.highlight_point.settings.gap.label",
       "min": 0,
-      "max": 60,
-      "step": 2,
-      "unit": "px",
-      "default": 16
-    },
-    {
-      "type": "range",
-      "id": "gap_mobile",
-      "label": "t:blocks.image_card.settings.gap_vertical_mobile.label",
-      "min": 0,
-      "max": 60,
+      "max": 40,
       "step": 2,
       "unit": "px",
       "default": 12
+    },
+    {
+      "type": "range",
+      "id": "gap_vertical",
+      "label": "t:blocks.featured_pills_check.settings.gap_vertical.label",
+      "min": 0,
+      "max": 24,
+      "step": 1,
+      "unit": "px",
+      "default": 4
     },
 
     { "type": "header", "content": "t:blocks.subheading.headers.icon" },
@@ -294,22 +303,24 @@
       "id": "icon",
       "label": "t:blocks.subheading.settings.icon.label",
       "options": [
-        { "value": "clock", "label": "t:blocks.subheading.settings.icon.options__8.label" },
-        { "value": "brain", "label": "t:shared.icons.brain" },
-        { "value": "bolt", "label": "t:shared.icons.bolt" },
-        { "value": "droplet", "label": "t:shared.icons.droplet" },
         { "value": "leaf", "label": "t:shared.icons.leaf" },
+        { "value": "droplet", "label": "t:shared.icons.droplet" },
+        { "value": "bolt", "label": "t:shared.icons.bolt" },
+        { "value": "brain", "label": "t:shared.icons.brain" },
         { "value": "pulse", "label": "t:shared.icons.pulse" },
         { "value": "sparkle", "label": "t:shared.icons.sparkle" },
-        { "value": "moon", "label": "t:shared.icons.moon" },
         { "value": "sun", "label": "t:shared.icons.sun" },
+        { "value": "moon", "label": "t:shared.icons.moon" },
         { "value": "shield", "label": "t:blocks.icon_with_text.settings.icon.options__2" },
+        { "value": "grid", "label": "t:blocks.feature_icon.settings.icon.options__16" },
         { "value": "check", "label": "t:blocks.subheading.settings.icon.options__2.label" },
         { "value": "star", "label": "t:blocks.subheading.settings.icon.options__1.label" },
         { "value": "heart", "label": "t:blocks.subheading.settings.icon.options__3.label" },
+        { "value": "clock", "label": "t:blocks.subheading.settings.icon.options__8.label" },
+        { "value": "lock", "label": "t:blocks.subheading.settings.icon.options__7.label" },
         { "value": "info", "label": "t:blocks.subheading.settings.icon.options__12.label" }
       ],
-      "default": "clock",
+      "default": "leaf",
       "visible_if": "{{ block.settings.icon_source == 'icon' }}"
     },
     {
@@ -335,7 +346,7 @@
       "max": 48,
       "step": 1,
       "unit": "px",
-      "default": 20,
+      "default": 22,
       "visible_if": "{{ block.settings.icon_source == 'icon' and block.settings.icon_size == 'custom' }}"
     },
     {
@@ -363,11 +374,11 @@
       "type": "range",
       "id": "shape_size",
       "label": "t:blocks.feature_icon.settings.shape_size.label",
-      "min": 24,
-      "max": 140,
+      "min": 32,
+      "max": 160,
       "step": 2,
       "unit": "px",
-      "default": 56,
+      "default": 92,
       "visible_if": "{{ block.settings.shape != 'none' }}"
     },
     {
@@ -375,11 +386,11 @@
       "id": "shape_size_mobile",
       "label": "t:blocks.feature_icon.settings.shape_size_mobile.label",
       "info": "t:blocks.feature_icon.settings.shape_size_mobile.info",
-      "min": 24,
-      "max": 140,
+      "min": 32,
+      "max": 160,
       "step": 2,
       "unit": "px",
-      "default": 48,
+      "default": 72,
       "visible_if": "{{ block.settings.shape != 'none' }}"
     },
     {
@@ -390,7 +401,7 @@
       "max": 48,
       "step": 2,
       "unit": "px",
-      "default": 16,
+      "default": 20,
       "visible_if": "{{ block.settings.shape == 'square' }}"
     },
     {
@@ -420,7 +431,7 @@
       "label": "t:blocks.feature_icon.settings.ring_offset.label",
       "info": "t:blocks.feature_icon.settings.ring_offset.info",
       "min": 0,
-      "max": 32,
+      "max": 40,
       "step": 1,
       "unit": "px",
       "default": 0,
@@ -480,16 +491,16 @@
     },
 
     { "type": "header", "content": "t:blocks.featured_pills_step.headers.number" },
-    { "type": "paragraph", "content": "t:blocks.featured_pills_step.paragraphs.number" },
+    { "type": "paragraph", "content": "t:blocks.highlight_point.paragraphs.number" },
     {
       "type": "range",
       "id": "number_size",
       "label": "t:blocks.featured_pills_step.settings.number_size.label",
-      "min": 14,
+      "min": 16,
       "max": 48,
       "step": 2,
       "unit": "px",
-      "default": 22,
+      "default": 26,
       "visible_if": "{{ block.settings.number != blank }}"
     },
     {
@@ -503,62 +514,6 @@
       "id": "number_color",
       "label": "t:blocks.featured_pills_step.settings.number_color.label",
       "visible_if": "{{ block.settings.number != blank }}"
-    },
-
-    { "type": "header", "content": "t:shared.appearance.header" },
-    {
-      "type": "color_background",
-      "id": "background",
-      "label": "t:shared.appearance.background_color.label"
-    },
-    {
-      "type": "select",
-      "id": "border_style",
-      "label": "t:blocks.group.settings.border_style.label",
-      "options": [
-        { "value": "none", "label": "t:shared.options.none" },
-        { "value": "solid", "label": "t:shared.options.solid" },
-        { "value": "dashed", "label": "t:shared.options.dashed" }
-      ],
-      "default": "none"
-    },
-    {
-      "type": "range",
-      "id": "border_width",
-      "label": "t:shared.border.thickness.label",
-      "min": 1,
-      "max": 6,
-      "step": 1,
-      "unit": "px",
-      "default": 1,
-      "visible_if": "{{ block.settings.border_style != 'none' }}"
-    },
-    {
-      "type": "range",
-      "id": "border_opacity",
-      "label": "t:shared.border.opacity.label",
-      "min": 0,
-      "max": 100,
-      "step": 5,
-      "unit": "%",
-      "default": 100,
-      "visible_if": "{{ block.settings.border_style != 'none' }}"
-    },
-    {
-      "type": "color",
-      "id": "border_color",
-      "label": "t:blocks.group.settings.border_color.label",
-      "visible_if": "{{ block.settings.border_style != 'none' }}"
-    },
-    {
-      "type": "range",
-      "id": "border_radius",
-      "label": "t:blocks.group.settings.border_radius.label",
-      "min": 0,
-      "max": 60,
-      "step": 2,
-      "unit": "px",
-      "default": 20
     },
 
     { "type": "header", "content": "t:shared.typography.header" },
@@ -631,7 +586,7 @@
       "max": 24,
       "step": 1,
       "unit": "px",
-      "default": 15
+      "default": 14
     },
     {
       "type": "color",
@@ -651,94 +606,14 @@
       ],
       "default": "desktop"
     },
-    {
-      "type": "range",
-      "id": "padding_top",
-      "label": "t:shared.spacing.padding_top.label",
-      "min": 0,
-      "max": 100,
-      "step": 2,
-      "unit": "px",
-      "default": 28,
-      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
-    },
-    {
-      "type": "range",
-      "id": "padding_bottom",
-      "label": "t:shared.spacing.padding_bottom.label",
-      "min": 0,
-      "max": 100,
-      "step": 2,
-      "unit": "px",
-      "default": 28,
-      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
-    },
-    {
-      "type": "range",
-      "id": "padding_left",
-      "label": "t:shared.spacing.padding_left.label",
-      "min": 0,
-      "max": 100,
-      "step": 2,
-      "unit": "px",
-      "default": 24,
-      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
-    },
-    {
-      "type": "range",
-      "id": "padding_right",
-      "label": "t:shared.spacing.padding_right.label",
-      "min": 0,
-      "max": 100,
-      "step": 2,
-      "unit": "px",
-      "default": 24,
-      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
-    },
-    {
-      "type": "range",
-      "id": "padding_top_mobile",
-      "label": "t:shared.spacing.padding_top.label",
-      "min": 0,
-      "max": 100,
-      "step": 2,
-      "unit": "px",
-      "default": 20,
-      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
-    },
-    {
-      "type": "range",
-      "id": "padding_bottom_mobile",
-      "label": "t:shared.spacing.padding_bottom.label",
-      "min": 0,
-      "max": 100,
-      "step": 2,
-      "unit": "px",
-      "default": 20,
-      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
-    },
-    {
-      "type": "range",
-      "id": "padding_left_mobile",
-      "label": "t:shared.spacing.padding_left.label",
-      "min": 0,
-      "max": 100,
-      "step": 2,
-      "unit": "px",
-      "default": 16,
-      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
-    },
-    {
-      "type": "range",
-      "id": "padding_right_mobile",
-      "label": "t:shared.spacing.padding_right.label",
-      "min": 0,
-      "max": 100,
-      "step": 2,
-      "unit": "px",
-      "default": 16,
-      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
-    }
+    { "type": "range", "id": "padding_top", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 100, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'desktop' }}" },
+    { "type": "range", "id": "padding_bottom", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 100, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'desktop' }}" },
+    { "type": "range", "id": "padding_left", "label": "t:shared.spacing.padding_left.label", "min": 0, "max": 100, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'desktop' }}" },
+    { "type": "range", "id": "padding_right", "label": "t:shared.spacing.padding_right.label", "min": 0, "max": 100, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'desktop' }}" },
+    { "type": "range", "id": "padding_top_mobile", "label": "t:shared.spacing.padding_top.label", "min": 0, "max": 100, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'mobile' }}" },
+    { "type": "range", "id": "padding_bottom_mobile", "label": "t:shared.spacing.padding_bottom.label", "min": 0, "max": 100, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'mobile' }}" },
+    { "type": "range", "id": "padding_left_mobile", "label": "t:shared.spacing.padding_left.label", "min": 0, "max": 100, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'mobile' }}" },
+    { "type": "range", "id": "padding_right_mobile", "label": "t:shared.spacing.padding_right.label", "min": 0, "max": 100, "step": 2, "unit": "px", "default": 0, "visible_if": "{{ block.settings.padding_device == 'mobile' }}" }
   ]
 }
 {% endschema %}

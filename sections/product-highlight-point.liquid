@@ -1,0 +1,1497 @@
+{% comment %}
+  sections/product-highlight-point.liquid
+
+  One product, and the things worth saying about it pinned around it — each a
+  mark, a number, a name and a line, lighting up in turn as the section scrolls
+  past.
+
+  ## Why the points are placed and not laid out
+
+  A grid of five claims under a photograph is `sections/feature-cards.liquid`,
+  and it is the right shape when the claims are independent. These are not:
+  each one is about a *part* of the thing in the middle, and where it sits is
+  how the customer knows which part. "Nut free" beside the cap and "Nut free"
+  under the jar are two different sentences.
+
+  So on a desktop each point carries its own position — two percentages of the
+  stage — and the merchant puts it where the product is. Below 990px there is
+  no room either side of the photograph for that to mean anything, so the
+  positions are dropped entirely and the points become a grid under the
+  picture. See the note in `blocks/_highlight-stage.liquid` on why that is a
+  different layout rather than the same one scaled down.
+
+  ## The light moves with the scroll
+
+  `<highlight-points>` in `assets/highlight-points.js` reads the shared scroll
+  ticker — the same one the parallax backgrounds are on — and lights one point
+  at a time as the stage crosses the viewport. **Scroll window** is how much of
+  that crossing the run uses.
+
+  It degrades to a still picture: without the module every point renders and
+  the one the merchant marked stays lit, which is a complete section rather
+  than an empty one.
+
+  ## What this file is, and what it is not
+
+  It is the frame, the two axes and the background. Everything with content in
+  it is a block, and the two that only make sense here are private:
+
+    The stage       `blocks/_highlight-stage.liquid`
+    One point       `blocks/_highlight-point.liquid`
+
+  The heading cluster is a **Section header** holding a **Subheading** and two
+  **Text** blocks, and the pair of calls to action underneath is a **Group** of
+  **Button**s — none of which knows it is in this section.
+
+  ## The shell is `sections/product-highlight-point.liquid`'s, setting id for setting id
+
+  Container, colour scheme, background media, the four border widths, the eight
+  corner radii behind a Desktop/Mobile switch, the gaps behind another, the
+  minimum height, the margins, the stack layer and the whole spacing group —
+  every id here is one that section already carries, and both reach them
+  through `snippets/spacing.liquid`, `snippets/background-media.liquid` and
+  `snippets/container.liquid`.
+
+  The bottom corners ship at 0, in the schema and in the preset. A section is a
+  band that lifts away from what is above it and sits flush on what is below,
+  and a rounded bottom edge leaves two slivers of the page showing under it.
+{% endcomment %}
+
+{%- liquid
+  assign s = section.settings
+
+  comment
+    The background is the colour scheme's until the merchant says otherwise:
+    either a colour of their own — the soft wash the preset ships — or a picture
+    behind the whole section.
+
+    The colour is emitted as a real `background` declaration rather than a
+    custom property because `color-scheme-container` paints a background *and* a
+    gradient image, and only the shorthand clears both.
+  endcomment
+  assign background_media = s.background_media | default: 'none'
+  assign has_background_media = false
+  if background_media != 'none'
+    assign has_background_media = true
+  endif
+
+  assign background_paint = ''
+  if has_background_media == false
+    assign background_paint = s.background_color | default: ''
+  endif
+
+  comment
+    ---- the frame ----
+
+    One width per side rather than one for the box, summed into `border_any` so
+    the three properties are emitted only when at least one side is drawn — a
+    zero-width border with a colour on it is three declarations that paint
+    nothing.
+
+    Opacity goes into the colour rather than onto the element: `opacity` on the
+    section would fade the stage along with its frame. With no colour picked
+    the border is `currentColor`, which the colour filters cannot take an alpha
+    channel from, so `color-mix` does the same fade in the browser instead and
+    both paths honour the slider.
+
+    Identical to `sections/featured-offer.liquid` and
+    `sections/expert-quote.liquid` by construction, not by coincidence — same
+    ids, same resolution, same stylesheet shape.
+  endcomment
+  assign border_line = s.border_style | default: 'none'
+
+  assign bw_top = 0
+  assign bw_right = 0
+  assign bw_bottom = 0
+  assign bw_left = 0
+  assign border_any = 0
+
+  if border_line != 'none'
+    assign bw_top = s.border_width_top | default: 0 | plus: 0
+    assign bw_right = s.border_width_right | default: 0 | plus: 0
+    assign bw_bottom = s.border_width_bottom | default: 0 | plus: 0
+    assign bw_left = s.border_width_left | default: 0 | plus: 0
+    assign border_any = bw_top | plus: bw_right | plus: bw_bottom | plus: bw_left
+
+    assign border_percent = s.border_opacity | default: 100 | plus: 0
+    if s.border_color == blank
+      assign border_paint = 'color-mix(in srgb, currentColor ' | append: border_percent | append: '%, transparent)'
+    else
+      assign border_alpha = border_percent | divided_by: 100.0
+      assign border_paint = s.border_color | color_modify: 'alpha', border_alpha
+    endif
+  endif
+
+  comment
+    ---- corners ----
+
+    Four corners, twice — one set per device, behind the same Desktop/Mobile
+    switch the padding and the gaps already use.
+
+    They reach CSS as a single border-radius shorthand, in the order that
+    property takes — top-left, top-right, bottom-right, bottom-left. Nothing in
+    the stylesheet reads them as a bare number, which is what makes sending a
+    shorthand safe.
+
+    A phone gets its own four because the same number does not read the same at
+    both widths: 40px is a soft lift across 1400px and a heavy scoop out of a
+    390px screen. Each mobile corner falls back to its desktop value when the
+    setting is missing entirely, so a section saved before these existed keeps
+    one shape at every width.
+  endcomment
+  assign r_tl = s.border_radius_top_left | default: 40 | plus: 0
+  assign r_tr = s.border_radius_top_right | default: 40 | plus: 0
+  assign r_bl = s.border_radius_bottom_left | default: 0 | plus: 0
+  assign r_br = s.border_radius_bottom_right | default: 0 | plus: 0
+
+  assign r_tl_m = s.border_radius_top_left_mobile | default: r_tl | plus: 0
+  assign r_tr_m = s.border_radius_top_right_mobile | default: r_tr | plus: 0
+  assign r_bl_m = s.border_radius_bottom_left_mobile | default: r_bl | plus: 0
+  assign r_br_m = s.border_radius_bottom_right_mobile | default: r_br | plus: 0
+
+  assign margin_top = s.margin_top | default: 0 | plus: 0
+  assign margin_bottom = s.margin_bottom | default: 0 | plus: 0
+
+  comment
+    ---- the floor ----
+
+    A minimum, not a height. The section grows past it whenever the stage needs
+    the room — and the stage is a different height at every breakpoint, so
+    the floor is what keeps the section from collapsing around a photograph that
+    has not been uploaded yet.
+
+    Zero is the off switch and is what an untouched section carries, which is
+    why this is emitted unconditionally: `min-block-size: 0px` is what the box
+    would do anyway, so there is no state where writing it changes a layout that
+    was not asking for it.
+  endcomment
+  assign min_height = s.min_height | default: 0 | plus: 0
+  assign min_height_mobile = s.min_height_mobile | default: min_height | plus: 0
+
+  comment
+    ---- layout ----
+
+    The Group block's vocabulary rather than a second one invented here:
+    Alignment is always the horizontal axis and Position always the vertical,
+    and `assets/base.css` decides which CSS property reads which from the
+    direction. `snippets/group.liquid` sets out why that swap lives in one place.
+
+    This file does not guess which child is which. Horizontal is a flex row of
+    the section's own children, so the heading cluster and the stage sit side by
+    side because they are siblings.
+  endcomment
+  assign direction = s.direction | default: 'column'
+  assign is_row = false
+  if direction == 'row'
+    assign is_row = true
+  endif
+
+  comment
+    Two settings, one control. The horizontal list carries the distribution
+    options on top of the three alignments, because on a row they land on the
+    same `justify-content` and only one of the two could win. On a column they
+    would be inert, so that list is the plain three and the merchant never sees
+    an option that does nothing.
+  endcomment
+  if is_row
+    assign alignment_setting = s.alignment_row | default: 'center'
+  else
+    assign alignment_setting = s.alignment | default: 'center'
+  endif
+
+  case alignment_setting
+    when 'center'
+      assign alignment_axis = 'center'
+    when 'end'
+      assign alignment_axis = 'end'
+    else
+      assign alignment_axis = 'start'
+  endcase
+
+  comment
+    The alignment with the distribution folded in, and the plain one beside it.
+    They differ exactly when a distribution is chosen, and the phone stack needs
+    the plain one: `space-between` is valid on the `justify-content` it feeds on
+    a desktop row and invalid on the `align-items` it would feed once stacked.
+  endcomment
+  assign inline_axis = alignment_axis
+  if is_row
+    case alignment_setting
+      when 'space-between', 'space-around', 'space-evenly'
+        assign inline_axis = alignment_setting
+    endcase
+  endif
+
+  case s.position
+    when 'center'
+      assign block_axis = 'center'
+    when 'end'
+      assign block_axis = 'end'
+    when 'stretch'
+      assign block_axis = 'stretch'
+    else
+      assign block_axis = 'start'
+  endcase
+
+  comment
+    ---- the gaps ----
+
+    A Desktop/Mobile pair behind one switch, the shape every other section in
+    the theme uses. Both pairs are published unconditionally and
+    `assets/base.css` picks which applies at a given width, because the pair the
+    merchant is not looking at in the editor is still the pair the other
+    breakpoint renders.
+
+    `plus: 0` rather than `default` alone, which would replace a deliberate 0 —
+    a gap a merchant can legitimately want when the stage is meant to sit flush
+    under the heading. Each mobile axis falls back to its desktop value when the
+    setting is absent entirely, so a section saved before the mobile pair existed
+    renders as it did; one added since gets the schema default, which is half the
+    desktop one.
+  endcomment
+  assign gap_x = s.gap_horizontal | default: 40 | plus: 0
+  assign gap_y = s.gap_vertical | default: 40 | plus: 0
+  assign gap_x_mobile = s.gap_horizontal_mobile | default: gap_x | plus: 0
+  assign gap_y_mobile = s.gap_vertical_mobile | default: gap_y | plus: 0
+
+  assign content_classes = 'product-highlight-point__content product-highlight-point__content--' | append: direction
+  if is_row and s.stack_on_mobile
+    assign content_classes = content_classes | append: ' product-highlight-point__content--stack-mobile'
+  endif
+
+  comment
+    Reverse is `flex-direction: row-reverse`, not a second ordering of the
+    blocks — the markup stays in the order a screen reader and a keyboard read
+    it, and only the paint order changes. That is also why it is row-only: a
+    reversed *column* would put the points above the heading that names them for
+    everybody using the page without sight of it.
+  endcomment
+  if is_row and s.reverse
+    assign content_classes = content_classes | append: ' product-highlight-point__content--reverse'
+  endif
+-%}
+
+{%- capture content_style -%}
+  --product-highlight-point-gap-x: {{ gap_x }}px;
+  --product-highlight-point-gap-y: {{ gap_y }}px;
+  --product-highlight-point-gap-x-mobile: {{ gap_x_mobile }}px;
+  --product-highlight-point-gap-y-mobile: {{ gap_y_mobile }}px;
+  --product-highlight-point-inline: {{ inline_axis }};
+  --product-highlight-point-align: {{ alignment_axis }};
+  --product-highlight-point-block: {{ block_axis }};
+{%- endcapture -%}
+
+{%- capture section_style -%}
+  {%- render 'spacing', section: s, declarations: true -%}
+  --product-highlight-point-radius: {{ r_tl }}px {{ r_tr }}px {{ r_br }}px {{ r_bl }}px;
+  --product-highlight-point-radius-mobile: {{ r_tl_m }}px {{ r_tr_m }}px {{ r_br_m }}px {{ r_bl_m }}px;
+  --product-highlight-point-margin-block-start: {{ margin_top }}px;
+  --product-highlight-point-margin-block-end: {{ margin_bottom }}px;
+  --product-highlight-point-min-height: {{ min_height }}px;
+  --product-highlight-point-min-height-mobile: {{ min_height_mobile }}px;
+  {%- if border_any > 0 -%}
+    --product-highlight-point-border-width: {{ bw_top }}px {{ bw_right }}px {{ bw_bottom }}px {{ bw_left }}px;
+    --product-highlight-point-border-style: {{ border_line }};
+    --product-highlight-point-border-color: {{ border_paint }};
+  {%- endif -%}
+  {%- if background_paint != '' -%}
+    background: {{ background_paint }};
+  {%- endif -%}
+{%- endcapture -%}
+
+<div
+  class="product-highlight-point color-scheme-container color-{{ s.color_scheme | default: 'scheme-1' }}{% if has_background_media %} has-background-media{% endif %}"
+  data-section-spacing
+  {%- if s.stack_layer != blank and s.stack_layer != 'default' %} data-section-layer="{{ s.stack_layer }}"{% endif %}
+  data-section-id="{{ section.id }}"
+  style="{{ section_style | strip_newlines | strip }}"
+>
+  {%- if has_background_media -%}
+    {% render 'background-media', settings: s %}
+  {%- endif -%}
+
+  <div class="product-highlight-point__inner {% render 'container', width: s.container_width %}">
+    {%- comment -%}
+      `children: true` staggers the direct children — the heading cluster, then
+      the stage, then the buttons — so the section arrives as one cascade rather
+      than as a wall
+      that appears at once. The stagger is a setting; at its default of 0 they
+      simply arrive together.
+    {%- endcomment -%}
+    <motion-effect
+      class="{{ content_classes }}"
+      data-easing="outQuint"
+      style="{{ content_style | strip_newlines | strip }}"
+      {% render 'motion-attrs', kind: 'text', section: s, children: true %}
+    >
+      {% content_for 'blocks' %}
+    </motion-effect>
+  </div>
+</div>
+
+{%- comment -%}
+  Every setting below is a control a merchant reaches in the editor, and the
+  schema is one element's styling surface: splitting it to get under Theme
+  Check's count of 40 would split the thing the settings style.
+{%- endcomment -%}
+{% # theme-check-disable ExcessiveSettingsCount %}
+{% schema %}
+{
+  "name": "t:sections.product_highlight_point.name",
+  "tag": "section",
+  "class": "section",
+  "blocks": [
+    {
+      "type": "_highlight-stage"
+    },
+    {
+      "type": "@theme"
+    },
+    {
+      "type": "@app"
+    }
+  ],
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "t:sections.product_highlight_point.paragraphs.blocks"
+    },
+    {
+      "type": "select",
+      "id": "container_width",
+      "label": "t:shared.container.width.label",
+      "info": "t:shared.container.width.info",
+      "options": [
+        {
+          "value": "edge",
+          "label": "t:shared.container.width.options__1.label"
+        },
+        {
+          "value": "wide",
+          "label": "t:shared.container.width.options__2.label"
+        },
+        {
+          "value": "standard",
+          "label": "t:shared.container.width.options__3.label"
+        },
+        {
+          "value": "compact",
+          "label": "t:shared.container.width.options__4.label"
+        },
+        {
+          "value": "custom",
+          "label": "t:shared.container.width.options__5.label"
+        }
+      ],
+      "default": "standard"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.group.headers.layout"
+    },
+    {
+      "type": "select",
+      "id": "direction",
+      "label": "t:blocks.group.settings.direction.label",
+      "options": [
+        {
+          "value": "column",
+          "label": "t:blocks.group.settings.direction.options__1.label"
+        },
+        {
+          "value": "row",
+          "label": "t:blocks.group.settings.direction.options__2.label"
+        }
+      ],
+      "default": "column"
+    },
+    {
+      "type": "checkbox",
+      "id": "reverse",
+      "label": "t:sections.featured_offer.settings.reverse.label",
+      "info": "t:sections.featured_offer.settings.reverse.info",
+      "default": false,
+      "visible_if": "{{ section.settings.direction == 'row' }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "stack_on_mobile",
+      "label": "t:blocks.group.settings.stack_on_mobile.label",
+      "info": "t:blocks.group.settings.stack_on_mobile.info",
+      "default": true,
+      "visible_if": "{{ section.settings.direction == 'row' }}"
+    },
+    {
+      "type": "select",
+      "id": "alignment",
+      "label": "t:blocks.group.settings.alignment.label",
+      "options": [
+        {
+          "value": "start",
+          "label": "t:blocks.group.settings.alignment.options__1.label"
+        },
+        {
+          "value": "center",
+          "label": "t:blocks.group.settings.alignment.options__2.label"
+        },
+        {
+          "value": "end",
+          "label": "t:blocks.group.settings.alignment.options__3.label"
+        }
+      ],
+      "default": "center",
+      "visible_if": "{{ section.settings.direction == 'column' }}"
+    },
+    {
+      "type": "select",
+      "id": "alignment_row",
+      "label": "t:blocks.group.settings.alignment.label",
+      "options": [
+        {
+          "value": "start",
+          "label": "t:blocks.group.settings.alignment.options__1.label"
+        },
+        {
+          "value": "center",
+          "label": "t:blocks.group.settings.alignment.options__2.label"
+        },
+        {
+          "value": "end",
+          "label": "t:blocks.group.settings.alignment.options__3.label"
+        },
+        {
+          "value": "space-between",
+          "label": "t:blocks.group.settings.distribution.options__2.label"
+        },
+        {
+          "value": "space-around",
+          "label": "t:blocks.group.settings.distribution.options__3.label"
+        },
+        {
+          "value": "space-evenly",
+          "label": "t:blocks.group.settings.distribution.options__4.label"
+        }
+      ],
+      "default": "center",
+      "visible_if": "{{ section.settings.direction == 'row' }}"
+    },
+    {
+      "type": "select",
+      "id": "position",
+      "label": "t:blocks.group.settings.position.label",
+      "options": [
+        {
+          "value": "start",
+          "label": "t:blocks.group.settings.position.options__1.label"
+        },
+        {
+          "value": "center",
+          "label": "t:blocks.group.settings.position.options__2.label"
+        },
+        {
+          "value": "end",
+          "label": "t:blocks.group.settings.position.options__3.label"
+        },
+        {
+          "value": "stretch",
+          "label": "t:sections.featured_offer.settings.position.options__4.label"
+        }
+      ],
+      "default": "start",
+      "visible_if": "{{ section.settings.direction == 'row' }}"
+    },
+    {
+      "type": "select",
+      "id": "gap_device",
+      "label": "t:shared.gap.label",
+      "options": [
+        {
+          "value": "desktop",
+          "label": "t:shared.spacing.devices.options__1.label"
+        },
+        {
+          "value": "mobile",
+          "label": "t:shared.spacing.devices.options__2.label"
+        }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "gap_horizontal",
+      "label": "t:shared.gap.horizontal.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 40,
+      "visible_if": "{{ section.settings.gap_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "gap_vertical",
+      "label": "t:shared.gap.vertical.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 40,
+      "visible_if": "{{ section.settings.gap_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "gap_horizontal_mobile",
+      "label": "t:shared.gap.horizontal.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 20,
+      "visible_if": "{{ section.settings.gap_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "gap_vertical_mobile",
+      "label": "t:shared.gap.vertical.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 20,
+      "visible_if": "{{ section.settings.gap_device == 'mobile' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:sections.featured_offer.headers.height"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:sections.featured_offer.paragraphs.height"
+    },
+    {
+      "type": "range",
+      "id": "min_height",
+      "label": "t:sections.featured_offer.settings.min_height.label",
+      "min": 0,
+      "max": 1000,
+      "step": 20,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "min_height_mobile",
+      "label": "t:sections.featured_offer.settings.min_height_mobile.label",
+      "info": "t:sections.featured_offer.settings.min_height_mobile.info",
+      "min": 0,
+      "max": 1000,
+      "step": 20,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "header",
+      "content": "t:shared.appearance.header"
+    },
+    {
+      "type": "color_scheme",
+      "id": "color_scheme",
+      "label": "t:shared.color_scheme.label",
+      "default": "scheme-1"
+    },
+    {
+      "type": "select",
+      "id": "background_media",
+      "label": "t:shared.background.media.label",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.background.media.options__1.label"
+        },
+        {
+          "value": "image",
+          "label": "t:shared.background.media.options__2.label"
+        },
+        {
+          "value": "video",
+          "label": "t:shared.background.media.options__3.label"
+        }
+      ],
+      "default": "none"
+    },
+    {
+      "type": "color_background",
+      "id": "background_color",
+      "label": "t:shared.background.color.label",
+      "info": "t:shared.background.color.info",
+      "visible_if": "{{ section.settings.background_media == 'none' }}"
+    },
+    {
+      "type": "image_picker",
+      "id": "image",
+      "label": "t:shared.background.image.label",
+      "visible_if": "{{ section.settings.background_media == 'image' }}"
+    },
+    {
+      "type": "image_picker",
+      "id": "image_mobile",
+      "label": "t:shared.background.image_mobile.label",
+      "info": "t:shared.background.image_mobile.info",
+      "visible_if": "{{ section.settings.background_media == 'image' }}"
+    },
+    {
+      "type": "select",
+      "id": "image_position",
+      "label": "t:shared.background.image_position.label",
+      "info": "t:shared.background.image_position.info",
+      "options": [
+        {
+          "value": "cover",
+          "label": "t:shared.background.image_position.options__1.label"
+        },
+        {
+          "value": "fit",
+          "label": "t:shared.background.image_position.options__2.label"
+        }
+      ],
+      "default": "cover",
+      "visible_if": "{{ section.settings.background_media == 'image' }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "image_parallax",
+      "label": "t:shared.background.image_parallax.label",
+      "info": "t:shared.background.image_parallax.info",
+      "default": false,
+      "visible_if": "{{ section.settings.background_media == 'image' }}"
+    },
+    {
+      "type": "range",
+      "id": "image_parallax_speed",
+      "label": "t:shared.background.image_parallax_speed.label",
+      "info": "t:shared.background.image_parallax_speed.info",
+      "min": 5,
+      "max": 40,
+      "step": 5,
+      "unit": "%",
+      "default": 15,
+      "visible_if": "{{ section.settings.background_media == 'image' and section.settings.image_parallax }}"
+    },
+    {
+      "type": "video",
+      "id": "video",
+      "label": "t:shared.background.video.label",
+      "info": "t:shared.background.video.info",
+      "visible_if": "{{ section.settings.background_media == 'video' }}"
+    },
+    {
+      "type": "video_url",
+      "id": "video_url",
+      "label": "t:shared.background.video_url.label",
+      "info": "t:shared.background.video_url.info",
+      "accept": [
+        "youtube",
+        "vimeo"
+      ],
+      "visible_if": "{{ section.settings.background_media == 'video' }}"
+    },
+    {
+      "type": "image_picker",
+      "id": "video_poster",
+      "label": "t:shared.background.video_poster.label",
+      "info": "t:shared.background.video_poster.info",
+      "visible_if": "{{ section.settings.background_media == 'video' }}"
+    },
+    {
+      "type": "select",
+      "id": "video_position",
+      "label": "t:shared.background.video_position.label",
+      "options": [
+        {
+          "value": "cover",
+          "label": "t:shared.background.video_position.options__1.label"
+        },
+        {
+          "value": "contain",
+          "label": "t:shared.background.video_position.options__2.label"
+        }
+      ],
+      "default": "cover",
+      "visible_if": "{{ section.settings.background_media == 'video' }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "video_loop",
+      "label": "t:shared.background.video_loop.label",
+      "default": true,
+      "visible_if": "{{ section.settings.background_media == 'video' }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "overlay_enabled",
+      "label": "t:shared.background.overlay_enabled.label",
+      "info": "t:shared.background.overlay_enabled.info",
+      "default": false,
+      "visible_if": "{{ section.settings.background_media != 'none' }}"
+    },
+    {
+      "type": "select",
+      "id": "overlay_style",
+      "label": "t:shared.background.overlay_style.label",
+      "info": "t:shared.background.overlay_style.info",
+      "options": [
+        {
+          "value": "solid",
+          "label": "t:shared.background.overlay_style.options__1.label"
+        },
+        {
+          "value": "gradient",
+          "label": "t:shared.background.overlay_style.options__2.label"
+        }
+      ],
+      "default": "solid",
+      "visible_if": "{{ section.settings.background_media != 'none' and section.settings.overlay_enabled }}"
+    },
+    {
+      "type": "color",
+      "id": "overlay_color",
+      "label": "t:shared.background.overlay_color.label",
+      "default": "#000000",
+      "visible_if": "{{ section.settings.background_media != 'none' and section.settings.overlay_enabled and section.settings.overlay_style == 'solid' }}"
+    },
+    {
+      "type": "color_background",
+      "id": "overlay_gradient",
+      "label": "t:shared.background.overlay_gradient.label",
+      "info": "t:shared.background.overlay_gradient.info",
+      "default": "linear-gradient(180deg, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 1) 100%)",
+      "visible_if": "{{ section.settings.background_media != 'none' and section.settings.overlay_enabled and section.settings.overlay_style == 'gradient' }}"
+    },
+    {
+      "type": "range",
+      "id": "overlay_opacity",
+      "label": "t:shared.background.overlay_opacity.label",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 40,
+      "visible_if": "{{ section.settings.background_media != 'none' and section.settings.overlay_enabled }}"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.group.headers.borders"
+    },
+    {
+      "type": "select",
+      "id": "border_style",
+      "label": "t:blocks.group.settings.border_style.label",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.options.none"
+        },
+        {
+          "value": "solid",
+          "label": "t:shared.options.solid"
+        },
+        {
+          "value": "dashed",
+          "label": "t:shared.border.style.options__2.label"
+        }
+      ],
+      "default": "none"
+    },
+    {
+      "type": "range",
+      "id": "border_width_top",
+      "label": "t:shared.border.sides.top.label",
+      "info": "t:shared.border.sides.info",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 1,
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_width_right",
+      "label": "t:shared.border.sides.right.label",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_width_bottom",
+      "label": "t:shared.border.sides.bottom.label",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_width_left",
+      "label": "t:shared.border.sides.left.label",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_opacity",
+      "label": "t:shared.border.opacity.label",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 100,
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "color",
+      "id": "border_color",
+      "label": "t:blocks.group.settings.border_color.label",
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.corners.header"
+    },
+    {
+      "type": "select",
+      "id": "radius_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        {
+          "value": "desktop",
+          "label": "t:shared.spacing.devices.options__1.label"
+        },
+        {
+          "value": "mobile",
+          "label": "t:shared.spacing.devices.options__2.label"
+        }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_top_left",
+      "label": "t:shared.corners.top_left.label",
+      "info": "t:shared.corners.paragraph",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 40,
+      "visible_if": "{{ section.settings.radius_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_top_right",
+      "label": "t:shared.corners.top_right.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 40,
+      "visible_if": "{{ section.settings.radius_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_bottom_left",
+      "label": "t:shared.corners.bottom_left.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.radius_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_bottom_right",
+      "label": "t:shared.corners.bottom_right.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.radius_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_top_left_mobile",
+      "label": "t:shared.corners.top_left.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 24,
+      "visible_if": "{{ section.settings.radius_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_top_right_mobile",
+      "label": "t:shared.corners.top_right.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 24,
+      "visible_if": "{{ section.settings.radius_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_bottom_left_mobile",
+      "label": "t:shared.corners.bottom_left.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.radius_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_bottom_right_mobile",
+      "label": "t:shared.corners.bottom_right.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.radius_device == 'mobile' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.animation.header"
+    },
+    {
+      "type": "select",
+      "id": "animation_text",
+      "label": "t:shared.animation.animation_text.label",
+      "options": [
+        {
+          "value": "inherit",
+          "label": "t:shared.animation.animation_text.options__1.label"
+        },
+        {
+          "value": "none",
+          "label": "t:shared.animation.animation_text.options__2.label"
+        },
+        {
+          "value": "fade-in",
+          "label": "t:shared.animation.animation_text.options__3.label"
+        },
+        {
+          "value": "fade-up",
+          "label": "t:shared.animation.animation_text.options__4.label"
+        },
+        {
+          "value": "slide-up",
+          "label": "t:shared.animation.animation_text.options__5.label"
+        }
+      ],
+      "default": "inherit"
+    },
+    {
+      "type": "range",
+      "id": "animation_duration",
+      "label": "t:shared.animation.animation_duration.label",
+      "info": "t:shared.animation.animation_duration.info",
+      "min": 0,
+      "max": 2000,
+      "step": 100,
+      "unit": "ms",
+      "default": 1000
+    },
+    {
+      "type": "range",
+      "id": "animation_stagger",
+      "label": "t:shared.animation.animation_stagger.label",
+      "info": "t:shared.animation.animation_stagger.info",
+      "min": 0,
+      "max": 300,
+      "step": 10,
+      "unit": "ms",
+      "default": 0
+    },
+    {
+      "type": "header",
+      "content": "t:shared.spacing.section_header"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:shared.spacing.section_paragraph"
+    },
+    {
+      "type": "select",
+      "id": "padding_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        {
+          "value": "desktop",
+          "label": "t:shared.spacing.devices.options__1.label"
+        },
+        {
+          "value": "mobile",
+          "label": "t:shared.spacing.devices.options__2.label"
+        }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 160,
+      "step": 2,
+      "unit": "px",
+      "default": 100,
+      "visible_if": "{{ section.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 160,
+      "step": 2,
+      "unit": "px",
+      "default": 100,
+      "visible_if": "{{ section.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 160,
+      "step": 2,
+      "unit": "px",
+      "default": 50,
+      "visible_if": "{{ section.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 160,
+      "step": 2,
+      "unit": "px",
+      "default": 50,
+      "visible_if": "{{ section.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "margin_top",
+      "label": "t:shared.spacing.margin_top.label",
+      "info": "t:shared.spacing.margin_negative.info",
+      "min": -160,
+      "max": 160,
+      "step": 4,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "margin_bottom",
+      "label": "t:shared.spacing.margin_bottom.label",
+      "info": "t:shared.spacing.margin_negative.info",
+      "min": -160,
+      "max": 160,
+      "step": 4,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "select",
+      "id": "stack_layer",
+      "label": "t:shared.spacing.stack_layer.label",
+      "info": "t:shared.spacing.stack_layer.info",
+      "options": [
+        {
+          "value": "under",
+          "label": "t:shared.spacing.stack_layer.options__1.label"
+        },
+        {
+          "value": "default",
+          "label": "t:shared.spacing.stack_layer.options__2.label"
+        },
+        {
+          "value": "over",
+          "label": "t:shared.spacing.stack_layer.options__3.label"
+        }
+      ],
+      "default": "default"
+    }
+  ],
+  "presets": [
+    {
+      "name": "t:sections.product_highlight_point.presets.default.name",
+      "category": "t:categories.products",
+      "settings": {
+        "container_width": "standard",
+        "direction": "column",
+        "alignment": "center",
+        "gap_device": "desktop",
+        "gap_horizontal": 40,
+        "gap_vertical": 40,
+        "gap_horizontal_mobile": 20,
+        "gap_vertical_mobile": 24,
+        "min_height": 0,
+        "min_height_mobile": 0,
+        "color_scheme": "scheme-1",
+        "background_media": "none",
+        "background_color": "linear-gradient(180deg, rgba(238, 246, 242, 1) 0%, rgba(250, 253, 251, 1) 100%)",
+        "border_style": "dashed",
+        "border_width_top": 1,
+        "border_width_right": 1,
+        "border_width_bottom": 1,
+        "border_width_left": 1,
+        "border_opacity": 20,
+        "border_color": "#0d2f26",
+        "radius_device": "desktop",
+        "border_radius_top_left": 40,
+        "border_radius_top_right": 40,
+        "border_radius_bottom_left": 0,
+        "border_radius_bottom_right": 0,
+        "border_radius_top_left_mobile": 24,
+        "border_radius_top_right_mobile": 24,
+        "border_radius_bottom_left_mobile": 0,
+        "border_radius_bottom_right_mobile": 0,
+        "animation_text": "inherit",
+        "animation_duration": 1000,
+        "animation_stagger": 80,
+        "padding_device": "desktop",
+        "padding_top": 90,
+        "padding_bottom": 90,
+        "padding_top_mobile": 48,
+        "padding_bottom_mobile": 48,
+        "margin_top": 0,
+        "margin_bottom": 0
+      },
+      "blocks": [
+        {
+          "type": "section-header",
+          "settings": {
+            "inherit_color_scheme": true,
+            "direction": "column",
+            "alignment": "center",
+            "position": "start",
+            "gap": 14,
+            "gap_horizontal": 14,
+            "gap_vertical": 14,
+            "gap_horizontal_mobile": 10,
+            "gap_vertical_mobile": 10,
+            "width": "fill",
+            "border_style": "none"
+          },
+          "blocks": [
+            {
+              "type": "subheading",
+              "settings": {
+                "text": "<p>Pure standards</p>",
+                "icon_source": "icon",
+                "icon": "leaf",
+                "icon_size": "small",
+                "icon_style": "solid",
+                "icon_background": "#0d2f26",
+                "icon_color": "#00c853",
+                "icon_width": 30,
+                "icon_height": 30,
+                "icon_border_style": "none",
+                "icon_border_radius": 50,
+                "show_divider": true,
+                "gap": 10,
+                "preset": "subheading",
+                "font_size": "14",
+                "font_size_mobile": "13",
+                "letter_spacing": "normal",
+                "color": "custom",
+                "text_color_custom": "#0d2f26",
+                "background": "custom",
+                "background_color": "linear-gradient(rgba(255, 255, 255, 1), rgba(255, 255, 255, 1))",
+                "border_style": "dashed",
+                "border_thickness": 1,
+                "border_color": "#0d2f26",
+                "border_radius": 40,
+                "width": "fit",
+                "alignment": "center",
+                "padding_top": 4,
+                "padding_bottom": 4,
+                "padding_left": 4,
+                "padding_right": 16
+              }
+            },
+            {
+              "type": "text",
+              "name": "t:blocks.text.presets.heading.name",
+              "settings": {
+                "text": "<p>Real ingredients. <em>Real results.</em></p>",
+                "preset": "h2",
+                "highlight_style": "standard",
+                "highlight_target": "em",
+                "highlight_color": "#1c6b47",
+                "width": "fill",
+                "max_width": "normal",
+                "alignment": "center",
+                "width_mobile": "fill",
+                "alignment_mobile": "center"
+              }
+            },
+            {
+              "type": "text",
+              "settings": {
+                "text": "<p>Our formulas are intentionally crafted to meet the highest standards of purity, safety, and conscious sourcing.</p>",
+                "preset": "paragraph",
+                "color": "muted",
+                "width": "fill",
+                "max_width": "normal",
+                "alignment": "center",
+                "width_mobile": "fill",
+                "alignment_mobile": "center"
+              }
+            }
+          ]
+        },
+        {
+          "type": "_highlight-stage",
+          "settings": {
+            "image_ratio": "aspect-ratio",
+            "image_ratio_mobile": "",
+            "priority": false,
+            "media_width": 30,
+            "media_width_tablet": 46,
+            "media_width_mobile": 62,
+            "min_height": 560,
+            "min_height_mobile": 0,
+            "columns_tablet": 2,
+            "columns_mobile": 1,
+            "gap": 24,
+            "gap_mobile": 16,
+            "activate_on_scroll": true,
+            "scroll_window": 60,
+            "active_fill": "linear-gradient(180deg, #00C853 0%, #23FF96 100%)",
+            "active_icon_color": "#04160E",
+            "active_keep_ring": false,
+            "active_scale": 108,
+            "idle_opacity": 100,
+            "animation_image": "inherit",
+            "animation_text": "inherit",
+            "animation_duration": 1000,
+            "animation_stagger": 90
+          },
+          "blocks": [
+            {
+              "type": "_highlight-point",
+              "settings": {
+                "number": "01",
+                "title": "Dairy free",
+                "text": "<p>Zero milk or lactose.</p>",
+                "position_x": 50,
+                "position_y": 15,
+                "width": 180,
+                "alignment": "center",
+                "gap": 12,
+                "icon_source": "icon",
+                "icon": "droplet",
+                "icon_size": "medium",
+                "icon_color": "#0d2f26",
+                "shape": "circle",
+                "shape_size": 92,
+                "shape_size_mobile": 72,
+                "ring_style": "dotted",
+                "ring_width": 1,
+                "ring_offset": 0,
+                "ring_color": "#0d2f26",
+                "number_size": 26,
+                "number_background": "#0d2f26",
+                "number_color": "#FFFFFF",
+                "preset": "h6",
+                "text_size": 14
+              }
+            },
+            {
+              "type": "_highlight-point",
+              "settings": {
+                "number": "02",
+                "title": "Sugar free",
+                "text": "<p>No added sweeteners.</p>",
+                "position_x": 32,
+                "position_y": 32,
+                "width": 180,
+                "alignment": "center",
+                "gap": 12,
+                "icon_source": "icon",
+                "icon": "sparkle",
+                "icon_size": "medium",
+                "icon_color": "#0d2f26",
+                "shape": "circle",
+                "shape_size": 92,
+                "shape_size_mobile": 72,
+                "ring_style": "dotted",
+                "ring_width": 1,
+                "ring_offset": 0,
+                "ring_color": "#0d2f26",
+                "number_size": 26,
+                "number_background": "#0d2f26",
+                "number_color": "#FFFFFF",
+                "preset": "h6",
+                "text_size": 14
+              }
+            },
+            {
+              "type": "_highlight-point",
+              "settings": {
+                "number": "03",
+                "title": "Zero fillers",
+                "text": "<p>No artificial binders.</p>",
+                "active": true,
+                "position_x": 68,
+                "position_y": 30,
+                "width": 180,
+                "alignment": "center",
+                "gap": 12,
+                "icon_source": "icon",
+                "icon": "shield",
+                "icon_size": "medium",
+                "icon_color": "#0d2f26",
+                "shape": "circle",
+                "shape_size": 92,
+                "shape_size_mobile": 72,
+                "ring_style": "dotted",
+                "ring_width": 1,
+                "ring_offset": 0,
+                "ring_color": "#0d2f26",
+                "number_size": 26,
+                "number_background": "#0d2f26",
+                "number_color": "#FFFFFF",
+                "preset": "h6",
+                "text_size": 14
+              }
+            },
+            {
+              "type": "_highlight-point",
+              "settings": {
+                "number": "04",
+                "title": "Nut free",
+                "text": "<p>100% peanut-free.</p>",
+                "position_x": 27,
+                "position_y": 67,
+                "width": 180,
+                "alignment": "center",
+                "gap": 12,
+                "icon_source": "icon",
+                "icon": "sun",
+                "icon_size": "medium",
+                "icon_color": "#0d2f26",
+                "shape": "circle",
+                "shape_size": 92,
+                "shape_size_mobile": 72,
+                "ring_style": "dotted",
+                "ring_width": 1,
+                "ring_offset": 0,
+                "ring_color": "#0d2f26",
+                "number_size": 26,
+                "number_background": "#0d2f26",
+                "number_color": "#FFFFFF",
+                "preset": "h6",
+                "text_size": 14
+              }
+            },
+            {
+              "type": "_highlight-point",
+              "settings": {
+                "number": "05",
+                "title": "Keto friendly",
+                "text": "<p>Low carb, clean energy.</p>",
+                "position_x": 73,
+                "position_y": 69,
+                "width": 180,
+                "alignment": "center",
+                "gap": 12,
+                "icon_source": "icon",
+                "icon": "bolt",
+                "icon_size": "medium",
+                "icon_color": "#0d2f26",
+                "shape": "circle",
+                "shape_size": 92,
+                "shape_size_mobile": 72,
+                "ring_style": "dotted",
+                "ring_width": 1,
+                "ring_offset": 0,
+                "ring_color": "#0d2f26",
+                "number_size": 26,
+                "number_background": "#0d2f26",
+                "number_color": "#FFFFFF",
+                "preset": "h6",
+                "text_size": 14
+              }
+            }
+          ]
+        },
+        {
+          "type": "group",
+          "settings": {
+            "inherit_color_scheme": true,
+            "direction": "row",
+            "stack_on_mobile": true,
+            "alignment": "center",
+            "position": "center",
+            "gap": 12,
+            "gap_horizontal": 12,
+            "gap_vertical": 10,
+            "gap_horizontal_mobile": 8,
+            "gap_vertical_mobile": 8,
+            "width": "fill",
+            "border_style": "none"
+          },
+          "blocks": [
+            {
+              "type": "button",
+              "settings": {
+                "label": "Claim 10% off risk-free",
+                "link": "shopify://collections/all",
+                "style": "primary",
+                "icon": "arrow-right",
+                "icon_style": "solid",
+                "icon_position": "end",
+                "corner_radius": 40,
+                "width": "auto"
+              }
+            },
+            {
+              "type": "button",
+              "settings": {
+                "label": "Get started risk-free",
+                "link": "shopify://collections/all",
+                "style": "outline",
+                "border_style": "dashed",
+                "icon": "arrow-right",
+                "icon_style": "solid",
+                "icon_position": "end",
+                "corner_radius": 40,
+                "width": "auto"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+{% endschema %}

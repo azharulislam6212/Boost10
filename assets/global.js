@@ -105,6 +105,11 @@ const LAZY_MODULES = [
 
   { specifier: '@theme/carousel', tags: ['carousel-slider'] },
   { specifier: '@theme/testimonial-product', tags: ['testimonial-product'] },
+  // The lit point on the Product highlight point section, advanced by the
+  // shared scroll ticker. Lazy like the rest: a page without the section never
+  // fetches it, and without it every point still renders with the one the
+  // merchant marked lit.
+  { specifier: '@theme/highlight-points', tags: ['highlight-points'] },
 
   // `<button-swap>` is only emitted for buttons whose hover effect actually
   // needs a duplicated track, so a page of ordinary buttons never fetches this.
