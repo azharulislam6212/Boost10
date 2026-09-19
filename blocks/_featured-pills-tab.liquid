@@ -1,0 +1,1117 @@
+{% doc %}
+  blocks/_featured-pills-tab.liquid
+
+  One option in a **Pill tabs** strip: the pill the customer presses, and the
+  panel of blocks it opens.
+
+  ## The pill is built from a template, not from a string
+
+  The pill belongs in the rail and the panel belongs in the panel area, and
+  `{% content_for 'blocks' %}` emits one stream into one container — so the
+  pill travels with the panel and `<tab-group>` in `assets/tabs.js` moves it.
+
+  It travels as a `<template>` rather than as text on a `data-` attribute,
+  because the pill has a mark in it: a glyph, a filled shape behind it and a
+  ring around that, drawn by `snippets/icon-mark.liquid`. An SVG escaped into an
+  attribute is markup that no longer looks like markup — nothing formats it,
+  nothing checks it, and the shared mark snippet could not be used to produce
+  it. A template is inert markup the browser has already parsed, and `tabs.js`
+  clones it.
+
+  `data-tab-label` stays, and stays authoritative: it is what a panel with no
+  template falls back to, and it is the accessible name either way.
+
+  ## The mark is the theme's, not this block's
+
+  Shape, Ring and the icon colours are `snippets/icon-mark.liquid` — the same
+  three groups the Feature icon, the Highlight tile, the Accordion row and the
+  footer's Utility item offer, with the same ids. A merchant who has drawn one
+  mark in this theme has drawn this one.
+
+  What is *not* here is what the mark becomes when its option is chosen. That
+  lives on the strip, because "the selected one fills in" is a property of the
+  set rather than of any member of it — see the note in
+  `blocks/_featured-pills-tabs.liquid`.
+
+  ## The tick is markup, not a pseudo-element
+
+  The small check that appears on the chosen option's mark is a real span in the
+  template, hidden by CSS until `aria-selected` says otherwise. A
+  `::after` carrying a glyph would be a character no screen reader can be told
+  to ignore and no merchant can recolour without a second stylesheet; this one
+  is `aria-hidden`, coloured by two settings on the strip, and simply not
+  rendered when the merchant switches it off.
+
+  ## The panel holds blocks, not a field
+
+  Anything the theme has goes inside, plus the two private blocks this section
+  adds — a **Checklist row** and a **Step card**. A panel that could only hold
+  prose would be a panel that cannot hold the composition it was drawn for.
+
+  Private — the leading underscore — because a panel outside a strip is a
+  `role="tabpanel"` with no tab, which is markup a screen reader has to
+  apologise for. It is addable inside **Pill tabs** and nowhere else.
+{% enddoc %}
+
+{%- liquid
+  assign s = block.settings
+  assign label = s.label | default: 'Tab'
+
+  comment
+    Icons only, no uploads. The pill is a few characters wide sitting in a
+    track, and an image in it is a second thing to size, crop and describe for a
+    slot where the theme's glyph set already covers what an option means.
+  endcomment
+  assign has_icon = false
+  if s.icon_source == 'icon' and s.icon != blank
+    assign has_icon = true
+  endif
+
+  capture icon_px
+    render 'icon-size', size: s.icon_size, custom: s.icon_size_custom
+  endcapture
+  assign icon_size = icon_px | plus: 0
+
+  comment
+    The space between the blocks stacked in the panel.
+
+    `gap_vertical` / `gap_vertical_mobile` rather than a name of this block's
+    own, because that is the pair `blocks/card-content.liquid`,
+    `blocks/image-card.liquid` and `blocks/_tab.liquid` already use for exactly
+    this — one stack, one value per breakpoint — and a merchant who has spaced
+    one of those has spaced this.
+
+    The mobile value falls back to the desktop one rather than to a constant, so
+    a panel saved before the setting existed keeps a single consistent stack
+    instead of tightening at 749px for no reason the merchant chose.
+
+    `| default: | plus: 0` and not a blank test: an unset range is nil in
+    Shopify and Undefined elsewhere, and only one of those is blank — the
+    difference that emits `--tab-content-gap:px` and takes the whole style
+    attribute down with it.
+  endcomment
+  assign gap_block = s.gap_vertical | default: 24 | plus: 0
+  assign gap_block_mobile = s.gap_vertical_mobile | default: gap_block | plus: 0
+
+  comment
+    ## The option's typography rides in the template
+
+    The same three-part arrangement every text block in this theme uses — the
+    named presets are `.block-text--*` classes in `assets/base.css` pointing at
+    the tokens Theme settings › Typography writes, `block-typography` emits only
+    the Custom preset and the colour, and `.tabs__tab-label` in
+    `assets/header.css` reads the properties both of them set.
+
+    It works here for the same reason the mark does: `tabs.js` clones the
+    `<template>` into the button, and a clone carries its classes and its style
+    attribute with it.
+
+    Not `.block-text` itself — that class also sets `flex` and `inline-size`,
+    and this span is a run of words inside a button, not a box. The typography
+    is the part worth sharing.
+  endcomment
+  assign preset = s.preset | default: 'default'
+
+  assign label_classes = 'tabs__tab-label block-text--' | append: preset
+  if s.color == 'gradient'
+    assign label_classes = label_classes | append: ' block-text--gradient'
+  endif
+-%}
+
+{%- capture label_style -%}
+  {%- render 'block-typography', block: s -%}
+{%- endcapture -%}
+
+{%- capture icon_mark_style -%}
+  {%- render 'icon-mark', block: s, declarations: true -%}
+{%- endcapture -%}
+
+{%- capture pill_style -%}
+  {%- if s.pill_background != blank -%}
+    --tabs-tab-pill-background: {{ s.pill_background }};
+  {%- endif -%}
+  {%- if s.pill_color != blank -%}
+    --tabs-tab-pill-color: {{ s.pill_color }};
+  {%- endif -%}
+{%- endcapture -%}
+
+{%- capture panel_style -%}
+  {%- render 'spacing', block: s, declarations: true -%}
+  --tab-content-gap: {{ gap_block }}px;
+  --tab-content-gap-mobile: {{ gap_block_mobile }}px;
+{%- endcapture -%}
+
+{%- comment -%}
+  `tabindex="0"` because the panel is a scroll container of its own once the
+  content is long enough, and a scrollable region has to be reachable from the
+  keyboard. `id`, `aria-labelledby` and `hidden` are set by `tabs.js` as it
+  builds the buttons, so they are not written twice here.
+{%- endcomment -%}
+<div
+  class="tabs__panel featured-pills__panel"
+  role="tabpanel"
+  id="Tab-{{ block.id }}"
+  data-tab-label="{{ label | escape }}"
+  {%- comment -%}
+    Presence, not a value: `tabs.js` tests the attribute with `!= null`, so an
+    unchecked box has to emit nothing at all rather than
+    `data-tab-selected="false"`. Only the first panel carrying it wins, which is
+    what makes two merchants ticking two boxes a harmless setting rather than a
+    broken strip.
+  {%- endcomment -%}
+  {% if s.selected %}data-tab-selected{% endif %}
+  tabindex="0"
+  data-block-spacing
+  style="{{ panel_style | strip_newlines | strip }}"
+  {{ block.shopify_attributes }}
+>
+  <template data-tab-button>
+    {%- if has_icon -%}
+      <span class="featured-pills__tab-mark icon-mark" aria-hidden="true" style="{{ icon_mark_style | strip_newlines | strip }}">
+        {% render 'icon-mark', block: s %}
+        {% render 'icon', icon: s.icon, size: icon_size %}
+        {%- comment -%}
+          Shown only while this option is the chosen one — `assets/header.css`
+          keys that off the button's own `aria-selected`, so nothing has to be
+          added or removed as the customer moves along the strip.
+        {%- endcomment -%}
+        {%- if s.show_check -%}
+          <span class="featured-pills__tab-check">{% render 'icon', icon: 'check', size: 10 %}</span>
+        {%- endif -%}
+      </span>
+    {%- elsif s.show_check -%}
+      {%- comment -%}
+        The same tick with nothing to pin it to. An option with no glyph still
+        wants to say it is the chosen one — the numbered routine chooser in the
+        *How it works* panel is exactly that — so the badge falls back to the
+        button's own corner, which `.tabs__tab` is already `position: relative`
+        for. One element, one pair of colours, two places it can land.
+      {%- endcomment -%}
+      <span class="featured-pills__tab-check featured-pills__tab-check--alone" aria-hidden="true">
+        {% render 'icon', icon: 'check', size: 10 %}
+      </span>
+    {%- endif -%}
+
+    {%- comment -%}
+      A number before the name — "01 Morning Recovery". It is part of the
+      accessible name deliberately, unlike the flag below: a strip of steps read
+      out without its numbering is a strip whose order is invisible to anyone
+      not looking at it.
+    {%- endcomment -%}
+    {%- if s.number != blank -%}
+      <span class="featured-pills__tab-number">{{ s.number | escape }}</span>
+    {%- endif -%}
+
+    <span class="{{ label_classes }}" style="{{ label_style | strip_newlines | strip }}">
+      {{- label | escape -}}
+    </span>
+
+    {%- comment -%}
+      The flag above the option — "Most Popular" on a plan chooser, "New" on a
+      collection strip. It rides in the same template as the name because it
+      belongs to the button, not to the panel: it is what the strip says about
+      the option before the option is chosen.
+
+      `aria-hidden` and not part of the accessible name. The name is the facet,
+      and a screen reader announcing "Most Popular Ingredients" as one string
+      turns a marketing flag into part of the choice.
+    {%- endcomment -%}
+    {%- if s.pill != blank -%}
+      <span class="tabs__tab-pill" style="{{ pill_style | strip_newlines | strip }}" aria-hidden="true">
+        {{- s.pill | escape -}}
+      </span>
+    {%- endif -%}
+  </template>
+
+  {%- comment -%}
+    The animation goes on a layer inside the panel, not on the panel itself.
+    A panel already animates when the option changes — `tab-panel-rise` in
+    `assets/header.css`, which fires because `hidden` is `display: none` and a
+    box that starts being rendered starts its animations. Two animations on one
+    element is one of them winning per frame, so this one takes the layer under
+    it and staggers the blocks, which is what **Stagger between items** offers.
+  {%- endcomment -%}
+  <motion-effect
+    class="tabs__panel-content featured-pills__panel-content"
+    {% render 'motion-attrs', kind: 'text', block: s, children: true %}
+  >
+    {% content_for 'blocks' %}
+  </motion-effect>
+</div>
+
+{%- comment -%}
+  Every setting below is a control a merchant reaches in the editor, and the
+  schema is one element's styling surface: splitting it to get under Theme
+  Check's count of 40 would split the thing the settings style.
+{%- endcomment -%}
+{% # theme-check-disable ExcessiveSettingsCount %}
+{% schema %}
+{
+  "name": "t:blocks.featured_pills_tab.name",
+  "tag": null,
+  "blocks": [
+    {
+      "type": "_featured-pills-group"
+    },
+    {
+      "type": "_featured-pills-carousel"
+    },
+    {
+      "type": "_featured-pills-check"
+    },
+    {
+      "type": "_featured-pills-step"
+    },
+    {
+      "type": "_featured-pills-tabs"
+    },
+    {
+      "type": "@theme"
+    },
+    {
+      "type": "@app"
+    }
+  ],
+  "settings": [
+    {
+      "type": "text",
+      "id": "label",
+      "label": "t:blocks.tab.settings.label.label",
+      "info": "t:blocks.tab.settings.label.info",
+      "default": "Tab"
+    },
+    {
+      "type": "text",
+      "id": "number",
+      "label": "t:blocks.featured_pills_tab.settings.number.label",
+      "info": "t:blocks.featured_pills_tab.settings.number.info"
+    },
+    {
+      "type": "text",
+      "id": "pill",
+      "label": "t:blocks.tab.settings.pill.label",
+      "info": "t:blocks.tab.settings.pill.info"
+    },
+    {
+      "type": "color",
+      "id": "pill_background",
+      "label": "t:blocks.tab.settings.pill_background.label",
+      "visible_if": "{{ block.settings.pill != blank }}"
+    },
+    {
+      "type": "color",
+      "id": "pill_color",
+      "label": "t:blocks.tab.settings.pill_color.label",
+      "visible_if": "{{ block.settings.pill != blank }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "selected",
+      "label": "t:blocks.tab.settings.selected.label",
+      "info": "t:blocks.tab.settings.selected.info",
+      "default": false
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.group.headers.layout"
+    },
+    {
+      "type": "range",
+      "id": "gap_vertical",
+      "label": "t:blocks.group.settings.gap_vertical.label",
+      "info": "t:blocks.tab.settings.gap_vertical.info",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 24
+    },
+    {
+      "type": "range",
+      "id": "gap_vertical_mobile",
+      "label": "t:blocks.image_card.settings.gap_vertical_mobile.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 16
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.subheading.headers.icon"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:blocks.featured_pills_tab.paragraphs.icon"
+    },
+    {
+      "type": "select",
+      "id": "icon_source",
+      "label": "t:blocks.subheading.settings.icon_source.label",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.none.label"
+        },
+        {
+          "value": "icon",
+          "label": "t:blocks.subheading.settings.icon_source.options__2.label"
+        }
+      ],
+      "default": "icon"
+    },
+    {
+      "type": "select",
+      "id": "icon",
+      "label": "t:blocks.subheading.settings.icon.label",
+      "options": [
+        {
+          "value": "pulse",
+          "label": "t:blocks.featured_pills_tab.icons.pulse"
+        },
+        {
+          "value": "leaf",
+          "label": "t:blocks.featured_pills_tab.icons.leaf"
+        },
+        {
+          "value": "droplet",
+          "label": "t:blocks.featured_pills_tab.icons.droplet"
+        },
+        {
+          "value": "bolt",
+          "label": "t:blocks.featured_pills_tab.icons.bolt"
+        },
+        {
+          "value": "brain",
+          "label": "t:blocks.featured_pills_tab.icons.brain"
+        },
+        {
+          "value": "sparkle",
+          "label": "t:blocks.featured_pills_tab.icons.sparkle"
+        },
+        {
+          "value": "sun",
+          "label": "t:blocks.featured_pills_tab.icons.sun"
+        },
+        {
+          "value": "moon",
+          "label": "t:blocks.featured_pills_tab.icons.moon"
+        },
+        {
+          "value": "shield",
+          "label": "t:blocks.icon_with_text.settings.icon.options__2"
+        },
+        {
+          "value": "grid",
+          "label": "t:blocks.feature_icon.settings.icon.options__16"
+        },
+        {
+          "value": "star",
+          "label": "t:blocks.subheading.settings.icon.options__1.label"
+        },
+        {
+          "value": "check",
+          "label": "t:blocks.subheading.settings.icon.options__2.label"
+        },
+        {
+          "value": "heart",
+          "label": "t:blocks.subheading.settings.icon.options__3.label"
+        },
+        {
+          "value": "tag",
+          "label": "t:blocks.subheading.settings.icon.options__4.label"
+        },
+        {
+          "value": "truck",
+          "label": "t:blocks.subheading.settings.icon.options__5.label"
+        },
+        {
+          "value": "refresh",
+          "label": "t:blocks.subheading.settings.icon.options__6.label"
+        },
+        {
+          "value": "lock",
+          "label": "t:blocks.subheading.settings.icon.options__7.label"
+        },
+        {
+          "value": "clock",
+          "label": "t:blocks.subheading.settings.icon.options__8.label"
+        },
+        {
+          "value": "note",
+          "label": "t:blocks.subheading.settings.icon.options__11.label"
+        },
+        {
+          "value": "info",
+          "label": "t:blocks.subheading.settings.icon.options__12.label"
+        }
+      ],
+      "default": "leaf",
+      "visible_if": "{{ block.settings.icon_source == 'icon' }}"
+    },
+    {
+      "type": "select",
+      "id": "icon_size",
+      "label": "t:shared.icon_size.label",
+      "options": [
+        {
+          "value": "extra_small",
+          "label": "t:shared.icon_size.options__1.label"
+        },
+        {
+          "value": "small",
+          "label": "t:shared.icon_size.options__2.label"
+        },
+        {
+          "value": "medium",
+          "label": "t:shared.icon_size.options__3.label"
+        },
+        {
+          "value": "large",
+          "label": "t:shared.icon_size.options__4.label"
+        },
+        {
+          "value": "extra_large",
+          "label": "t:shared.icon_size.options__5.label"
+        },
+        {
+          "value": "custom",
+          "label": "t:shared.icon_size.options__6.label"
+        }
+      ],
+      "default": "small",
+      "visible_if": "{{ block.settings.icon_source == 'icon' }}"
+    },
+    {
+      "type": "range",
+      "id": "icon_size_custom",
+      "label": "t:shared.icon_size.custom.label",
+      "info": "t:shared.icon_size.custom.info",
+      "min": 10,
+      "max": 40,
+      "step": 1,
+      "unit": "px",
+      "default": 16,
+      "visible_if": "{{ block.settings.icon_source == 'icon' and block.settings.icon_size == 'custom' }}"
+    },
+    {
+      "type": "color",
+      "id": "icon_color",
+      "label": "t:blocks.feature_icon.settings.icon_color.label",
+      "visible_if": "{{ block.settings.icon_source == 'icon' }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_check",
+      "label": "t:blocks.featured_pills_tab.settings.show_check.label",
+      "info": "t:blocks.featured_pills_tab.settings.show_check.info",
+      "default": true
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.feature_icon.headers.shape"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:shared.icon_mark.shape_paragraph"
+    },
+    {
+      "type": "select",
+      "id": "shape",
+      "label": "t:blocks.feature_icon.settings.shape.label",
+      "info": "t:shared.icon_mark.shape_info",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.options.none"
+        },
+        {
+          "value": "circle",
+          "label": "t:shared.carousel.nav_shape.options__2.label"
+        },
+        {
+          "value": "square",
+          "label": "t:shared.carousel.nav_shape.options__3.label"
+        }
+      ],
+      "default": "circle"
+    },
+    {
+      "type": "range",
+      "id": "shape_size",
+      "label": "t:blocks.feature_icon.settings.shape_size.label",
+      "min": 16,
+      "max": 96,
+      "step": 2,
+      "unit": "px",
+      "default": 40,
+      "visible_if": "{{ block.settings.shape != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "shape_size_mobile",
+      "label": "t:blocks.feature_icon.settings.shape_size_mobile.label",
+      "info": "t:blocks.feature_icon.settings.shape_size_mobile.info",
+      "min": 16,
+      "max": 96,
+      "step": 2,
+      "unit": "px",
+      "default": 34,
+      "visible_if": "{{ block.settings.shape != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "shape_radius",
+      "label": "t:shared.corners.radius.label",
+      "min": 0,
+      "max": 48,
+      "step": 2,
+      "unit": "px",
+      "default": 12,
+      "visible_if": "{{ block.settings.shape == 'square' }}"
+    },
+    {
+      "type": "color_background",
+      "id": "fill_color",
+      "label": "t:blocks.feature_icon.settings.fill_color.label",
+      "visible_if": "{{ block.settings.shape != 'none' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.feature_icon.headers.ring"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:blocks.feature_icon.paragraphs.ring"
+    },
+    {
+      "type": "select",
+      "id": "ring_style",
+      "label": "t:shared.border.style.label",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.options.none"
+        },
+        {
+          "value": "solid",
+          "label": "t:shared.options.solid"
+        },
+        {
+          "value": "dashed",
+          "label": "t:shared.options.dashed"
+        },
+        {
+          "value": "dotted",
+          "label": "t:shared.options.dotted"
+        }
+      ],
+      "default": "dotted"
+    },
+    {
+      "type": "range",
+      "id": "ring_offset",
+      "label": "t:blocks.feature_icon.settings.ring_offset.label",
+      "info": "t:blocks.feature_icon.settings.ring_offset.info",
+      "min": 0,
+      "max": 24,
+      "step": 1,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.ring_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "ring_width",
+      "label": "t:shared.border.thickness.label",
+      "min": 1,
+      "max": 6,
+      "step": 1,
+      "unit": "px",
+      "default": 1,
+      "visible_if": "{{ block.settings.ring_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "ring_dash",
+      "label": "t:blocks.feature_icon.settings.ring_dash.label",
+      "info": "t:blocks.feature_icon.settings.ring_dash.info",
+      "min": 1,
+      "max": 20,
+      "step": 1,
+      "unit": "px",
+      "default": 2,
+      "visible_if": "{{ block.settings.ring_style == 'dashed' }}"
+    },
+    {
+      "type": "range",
+      "id": "ring_dash_gap",
+      "label": "t:blocks.feature_icon.settings.ring_dash_gap.label",
+      "min": 1,
+      "max": 24,
+      "step": 1,
+      "unit": "px",
+      "default": 8,
+      "visible_if": "{{ block.settings.ring_style == 'dashed' }}"
+    },
+    {
+      "type": "color",
+      "id": "ring_color",
+      "label": "t:shared.border.color.label",
+      "visible_if": "{{ block.settings.ring_style != 'none' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.typography.header"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:shared.typography.paragraph"
+    },
+    {
+      "type": "select",
+      "id": "preset",
+      "label": "t:shared.typography.preset.label",
+      "info": "t:shared.typography.preset.info",
+      "options": [
+        {
+          "value": "default",
+          "label": "t:shared.typography.preset.options__1.label"
+        },
+        {
+          "value": "paragraph",
+          "label": "t:shared.typography.preset.options__2.label"
+        },
+        {
+          "value": "subheading",
+          "label": "t:shared.typography.preset.options__3.label"
+        },
+        {
+          "value": "h4",
+          "label": "t:shared.typography.preset.options__7.label"
+        },
+        {
+          "value": "h5",
+          "label": "t:shared.typography.preset.options__8.label"
+        },
+        {
+          "value": "h6",
+          "label": "t:shared.typography.preset.options__9.label"
+        },
+        {
+          "value": "custom",
+          "label": "t:shared.typography.preset.options__10.label"
+        }
+      ],
+      "default": "default"
+    },
+    {
+      "type": "select",
+      "id": "font_family",
+      "label": "t:shared.typography.font_family.label",
+      "options": [
+        {
+          "value": "body",
+          "label": "t:shared.typography.font_family.options__2.label"
+        },
+        {
+          "value": "heading",
+          "label": "t:shared.typography.font_family.options__1.label"
+        },
+        {
+          "value": "accent",
+          "label": "t:shared.typography.font_family.options__3.label"
+        }
+      ],
+      "default": "heading",
+      "visible_if": "{{ block.settings.preset == 'custom' }}"
+    },
+    {
+      "type": "select",
+      "id": "font_weight",
+      "label": "t:shared.typography.font_weight.label",
+      "options": [
+        {
+          "value": "inherit",
+          "label": "t:shared.typography.font_weight.options__1.label"
+        },
+        {
+          "value": "300",
+          "label": "300"
+        },
+        {
+          "value": "400",
+          "label": "400"
+        },
+        {
+          "value": "500",
+          "label": "500"
+        },
+        {
+          "value": "600",
+          "label": "600"
+        },
+        {
+          "value": "700",
+          "label": "700"
+        },
+        {
+          "value": "800",
+          "label": "800"
+        },
+        {
+          "value": "900",
+          "label": "900"
+        }
+      ],
+      "default": "inherit",
+      "visible_if": "{{ block.settings.preset == 'custom' }}"
+    },
+    {
+      "type": "select",
+      "id": "font_size",
+      "label": "t:shared.typography.font_size.label",
+      "options": [
+        {
+          "value": "12",
+          "label": "12px"
+        },
+        {
+          "value": "14",
+          "label": "14px"
+        },
+        {
+          "value": "16",
+          "label": "16px"
+        },
+        {
+          "value": "18",
+          "label": "18px"
+        },
+        {
+          "value": "20",
+          "label": "20px"
+        },
+        {
+          "value": "24",
+          "label": "24px"
+        }
+      ],
+      "default": "16",
+      "visible_if": "{{ block.settings.preset == 'custom' }}"
+    },
+    {
+      "type": "select",
+      "id": "font_size_mobile",
+      "label": "t:shared.typography.font_size_mobile.label",
+      "info": "t:shared.typography.font_size_mobile.info",
+      "options": [
+        {
+          "value": "12",
+          "label": "12px"
+        },
+        {
+          "value": "13",
+          "label": "13px"
+        },
+        {
+          "value": "14",
+          "label": "14px"
+        },
+        {
+          "value": "15",
+          "label": "15px"
+        },
+        {
+          "value": "16",
+          "label": "16px"
+        },
+        {
+          "value": "18",
+          "label": "18px"
+        }
+      ],
+      "default": "14",
+      "visible_if": "{{ block.settings.preset == 'custom' }}"
+    },
+    {
+      "type": "select",
+      "id": "line_height",
+      "label": "t:shared.typography.line_height.label",
+      "options": [
+        {
+          "value": "tight",
+          "label": "t:shared.typography.line_height.options__1.label"
+        },
+        {
+          "value": "normal",
+          "label": "t:shared.typography.line_height.options__2.label"
+        },
+        {
+          "value": "loose",
+          "label": "t:shared.typography.line_height.options__3.label"
+        }
+      ],
+      "default": "normal",
+      "visible_if": "{{ block.settings.preset == 'custom' }}"
+    },
+    {
+      "type": "select",
+      "id": "letter_spacing",
+      "label": "t:shared.typography.letter_spacing.label",
+      "options": [
+        {
+          "value": "tight",
+          "label": "t:shared.typography.letter_spacing.options__1.label"
+        },
+        {
+          "value": "normal",
+          "label": "t:shared.typography.letter_spacing.options__2.label"
+        },
+        {
+          "value": "wide",
+          "label": "t:shared.typography.letter_spacing.options__3.label"
+        }
+      ],
+      "default": "normal",
+      "visible_if": "{{ block.settings.preset == 'custom' }}"
+    },
+    {
+      "type": "select",
+      "id": "text_transform",
+      "label": "t:shared.typography.text_transform.label",
+      "options": [
+        {
+          "value": "inherit",
+          "label": "t:shared.typography.text_transform.options__1.label"
+        },
+        {
+          "value": "none",
+          "label": "t:shared.typography.text_transform.options__2.label"
+        },
+        {
+          "value": "capitalize",
+          "label": "t:shared.typography.text_transform.options__3.label"
+        },
+        {
+          "value": "uppercase",
+          "label": "t:shared.typography.text_transform.options__4.label"
+        },
+        {
+          "value": "lowercase",
+          "label": "t:shared.typography.text_transform.options__5.label"
+        }
+      ],
+      "default": "inherit",
+      "visible_if": "{{ block.settings.preset == 'custom' }}"
+    },
+    {
+      "type": "select",
+      "id": "color",
+      "label": "t:shared.typography.color.label",
+      "info": "t:shared.typography.color.info",
+      "options": [
+        {
+          "value": "inherit",
+          "label": "t:shared.typography.color.options__1.label"
+        },
+        {
+          "value": "muted",
+          "label": "t:shared.typography.color.options__2.label"
+        },
+        {
+          "value": "custom",
+          "label": "t:shared.typography.color.options__3.label"
+        },
+        {
+          "value": "gradient",
+          "label": "t:shared.typography.color.options__4.label"
+        }
+      ],
+      "default": "inherit"
+    },
+    {
+      "type": "color",
+      "id": "text_color_custom",
+      "label": "t:shared.typography.text_color.label",
+      "info": "t:shared.typography.text_color.info",
+      "visible_if": "{{ block.settings.color == 'custom' }}"
+    },
+    {
+      "type": "color_background",
+      "id": "text_gradient",
+      "label": "t:shared.typography.text_gradient.label",
+      "info": "t:shared.typography.text_gradient.info",
+      "visible_if": "{{ block.settings.color == 'gradient' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.animation.header"
+    },
+    {
+      "type": "select",
+      "id": "animation_text",
+      "label": "t:shared.animation.animation_text.label",
+      "options": [
+        {
+          "value": "inherit",
+          "label": "t:shared.animation.animation_text.options__1.label"
+        },
+        {
+          "value": "none",
+          "label": "t:shared.animation.animation_text.options__2.label"
+        },
+        {
+          "value": "fade-in",
+          "label": "t:shared.animation.animation_text.options__3.label"
+        },
+        {
+          "value": "fade-up",
+          "label": "t:shared.animation.animation_text.options__4.label"
+        },
+        {
+          "value": "slide-up",
+          "label": "t:shared.animation.animation_text.options__5.label"
+        }
+      ],
+      "default": "inherit"
+    },
+    {
+      "type": "range",
+      "id": "animation_duration",
+      "label": "t:shared.animation.animation_duration.label",
+      "info": "t:shared.animation.animation_duration.info",
+      "min": 0,
+      "max": 2000,
+      "step": 100,
+      "unit": "ms",
+      "default": 1000,
+      "visible_if": "{{ block.settings.animation_text != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "animation_stagger",
+      "label": "t:shared.animation.animation_stagger.label",
+      "info": "t:shared.animation.animation_stagger.info",
+      "min": 0,
+      "max": 300,
+      "step": 10,
+      "unit": "ms",
+      "default": 0,
+      "visible_if": "{{ block.settings.animation_text != 'none' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.spacing.block_header"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:shared.spacing.block_paragraph"
+    },
+    {
+      "type": "select",
+      "id": "padding_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        {
+          "value": "desktop",
+          "label": "t:shared.spacing.devices.options__1.label"
+        },
+        {
+          "value": "mobile",
+          "label": "t:shared.spacing.devices.options__2.label"
+        }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left_mobile",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right_mobile",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    }
+  ]
+}
+{% endschema %}

@@ -219,9 +219,30 @@ export class TabGroup extends BaseComponent {
     return /** @type {HTMLElement[]} */ ([...this.refs.list.querySelectorAll('[role="tab"]')]);
   }
 
-  /** @returns {HTMLElement[]} */
+  /**
+   * This group's panels, and not the panels of a group nested inside one of
+   * them.
+   *
+   * `querySelectorAll` is a descendant query, so a strip with a second strip in
+   * one of its panels used to collect both sets. Everything downstream follows
+   * the count: `#buildTabs()` builds a button for every panel it is handed and
+   * appends them all to *this* rail, so the inner group's options appeared in
+   * the outer strip, in source order — wedged between the panel that contains
+   * them and the one after it. `#buildTabs()`'s `:scope >` on the button
+   * template was already guarding the same boundary one level down; this is the
+   * same rule applied to the set itself.
+   *
+   * `closest` walks up from the panel and stops at the first `<tab-group>`,
+   * which is the group the panel belongs to by definition. Comparing that to
+   * `this` keeps the nesting depth out of it — a panel three strips deep
+   * answers for exactly one of them.
+   *
+   * @returns {HTMLElement[]}
+   */
   get panels() {
-    return /** @type {HTMLElement[]} */ ([...this.querySelectorAll('[role="tabpanel"]')]);
+    return /** @type {HTMLElement[]} */ ([...this.querySelectorAll('[role="tabpanel"]')]).filter(
+      (panel) => panel.closest('tab-group') === this
+    );
   }
 
   /** @returns {number} */

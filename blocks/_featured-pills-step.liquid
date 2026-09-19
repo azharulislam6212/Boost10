@@ -1,0 +1,744 @@
+{% doc %}
+  blocks/_featured-pills-step.liquid
+
+  One card in a numbered sequence: a mark with a number pinned to it, and a
+  sentence about what happens at that point. Three of them side by side are the
+  *How it works* panel.
+
+  ## Why it is not `blocks/badge-highlight.liquid`
+
+  The Highlight tile is a mark, a heading and a line of text in a box, and it is
+  the right block for three unordered benefits. This is an *ordered* set, and
+  the order is the content: the number is not decoration on the card, it is what
+  says this is the second of three and that the first one came before it.
+
+  A tile with the number typed into the heading would leave the sequence
+  invisible to a screen reader, unsortable by the merchant and out of step the
+  moment a step is inserted in the middle. Here it is its own field, pinned to
+  the mark by the stylesheet rather than by the copy, and it reads out as part
+  of the card.
+
+  Private — the leading underscore — because a step outside a sequence is a
+  tile, and the theme already has one of those. It is addable inside a **Pill**
+  and nowhere else.
+
+  ## The mark is the theme's
+
+  Shape, Ring and the icon colours are `snippets/icon-mark.liquid`: the same
+  three groups with the same ids as the Feature icon, the Highlight tile and the
+  pill in the strip above. The dotted ring the design draws is that snippet's
+  `<circle>` with a round cap and no dash length — see the note there on why a
+  dotted ring cannot be a `border`.
+
+  ## The number sits on the ring, and the card does not grow to hold it
+
+  It is absolutely positioned against the mark, which is the containing block,
+  so the badge straddles the ring's edge without reserving a corner of the card
+  for itself. A card whose height changes when a badge is switched on is a card
+  that cannot be dropped into a row beside two that have not got one.
+{% enddoc %}
+
+{%- liquid
+  assign s = block.settings
+
+  assign has_icon = false
+  if s.icon_source == 'icon' and s.icon != blank
+    assign has_icon = true
+  endif
+
+  capture icon_px
+    render 'icon-size', size: s.icon_size, custom: s.icon_size_custom
+  endcapture
+  assign icon_size = icon_px | plus: 0
+
+  comment
+    ---- the frame ----
+
+    Resolved the way every border in this theme is: `none` emits nothing at all,
+    and with no colour picked the line is `currentColor` faded by `color-mix`,
+    because the colour filters cannot take an alpha channel from a keyword.
+  endcomment
+  assign border_line = s.border_style | default: 'none'
+  assign border_width = 0
+  if border_line != 'none'
+    assign border_width = s.border_width | default: 1 | plus: 0
+
+    assign border_percent = s.border_opacity | default: 100 | plus: 0
+    if s.border_color == blank
+      assign border_paint = 'color-mix(in srgb, currentColor ' | append: border_percent | append: '%, transparent)'
+    else
+      assign border_alpha = border_percent | divided_by: 100.0
+      assign border_paint = s.border_color | color_modify: 'alpha', border_alpha
+    endif
+  endif
+
+  comment
+    Two properties, not one — `flex` only means anything to a flex item, and a
+    step card is one only when the panel around it is a flex row. Fill is the
+    default because a sequence is a row of equal cards, and a card sized to its
+    own sentence makes the shortest step look like the least important one.
+  endcomment
+  assign width_pct = s.width_custom | default: 33 | plus: 0
+  case s.width
+    when 'fit'
+      assign width_flex = '0 0 auto'
+      assign width_size = 'fit-content'
+    when 'custom'
+      assign width_flex = '0 0 ' | append: width_pct | append: '%'
+      assign width_size = width_pct | append: '%'
+    else
+      assign width_flex = '1 1 0%'
+      assign width_size = '100%'
+  endcase
+
+  case s.alignment
+    when 'start'
+      assign align_axis = 'start'
+      assign text_align = 'start'
+    when 'end'
+      assign align_axis = 'end'
+      assign text_align = 'end'
+    else
+      assign align_axis = 'center'
+      assign text_align = 'center'
+  endcase
+
+  assign preset = s.preset | default: 'default'
+  assign heading_classes = 'featured-pills-step__heading block-text--' | append: preset
+  if s.color == 'gradient'
+    assign heading_classes = heading_classes | append: ' block-text--gradient'
+  endif
+-%}
+
+{%- capture icon_mark_style -%}
+  {%- render 'icon-mark', block: s, declarations: true -%}
+{%- endcapture -%}
+
+{%- capture heading_style -%}
+  {%- render 'block-typography', block: s -%}
+{%- endcapture -%}
+
+{%- capture card_style -%}
+  {%- render 'spacing', block: s, declarations: true -%}
+  --fps-flex: {{ width_flex }};
+  --fps-width: {{ width_size }};
+  --fps-align: {{ align_axis }};
+  --fps-text-align: {{ text_align }};
+  --fps-gap: {{ s.gap | default: 16 | plus: 0 }}px;
+  --fps-gap-mobile: {{ s.gap_mobile | default: s.gap | default: 16 | plus: 0 }}px;
+  --fps-radius: {{ s.border_radius | default: 20 | plus: 0 }}px;
+  --fps-border-width: {{ border_width }}px;
+  {%- if border_width > 0 -%}
+    --fps-border-style: {{ border_line }};
+    --fps-border-color: {{ border_paint }};
+  {%- endif -%}
+  {%- if s.background != blank -%}
+    --fps-background: {{ s.background }};
+  {%- endif -%}
+  --fps-text-size: {{ s.text_size | default: 15 | plus: 0 | divided_by: 10.0 }}rem;
+  {%- if s.text_color != blank -%}
+    --fps-text-color: {{ s.text_color }};
+  {%- endif -%}
+  --fps-number-size: {{ s.number_size | default: 22 | plus: 0 }}px;
+  {%- if s.number_background != blank -%}
+    --fps-number-background: {{ s.number_background }};
+  {%- endif -%}
+  {%- if s.number_color != blank -%}
+    --fps-number-color: {{ s.number_color }};
+  {%- endif -%}
+{%- endcapture -%}
+
+<div
+  class="featured-pills-step icon-mark-host"
+  data-block-spacing
+  style="{{ card_style | strip_newlines | strip }}"
+  {{ block.shopify_attributes }}
+>
+  {%- if has_icon -%}
+    <span class="featured-pills-step__mark icon-mark" aria-hidden="true" style="{{ icon_mark_style | strip_newlines | strip }}">
+      {% render 'icon-mark', block: s %}
+      {% render 'icon', icon: s.icon, size: icon_size %}
+
+      {%- comment -%}
+        Inside the mark rather than beside it, because the mark is the box the
+        badge is positioned against. Not `aria-hidden`: the number is the step's
+        place in the sequence and reads out with the rest of the card — the
+        `aria-hidden` on the mark itself covers only the glyph and the ring,
+        which are decoration, so the badge carries `aria-hidden="false"` back.
+      {%- endcomment -%}
+      {%- if s.number != blank -%}
+        <span class="featured-pills-step__number" aria-hidden="false">{{ s.number | escape }}</span>
+      {%- endif -%}
+    </span>
+  {%- elsif s.number != blank -%}
+    {%- comment -%}
+      A step with no glyph still has a number, and with no mark to pin it to it
+      becomes the mark. Same element, same settings, drawn on its own.
+    {%- endcomment -%}
+    <span class="featured-pills-step__number featured-pills-step__number--alone">{{ s.number | escape }}</span>
+  {%- endif -%}
+
+  <span class="featured-pills-step__body">
+    {%- if s.heading != blank -%}
+      <span class="{{ heading_classes }}" style="{{ heading_style | strip_newlines | strip }}">
+        {{- s.heading | escape -}}
+      </span>
+    {%- endif -%}
+
+    {%- if s.text != blank -%}
+      <span class="featured-pills-step__text">{{ s.text }}</span>
+    {%- endif -%}
+  </span>
+</div>
+
+{%- comment -%}
+  Every setting below is a control a merchant reaches in the editor, and the
+  schema is one element's styling surface: splitting it to get under Theme
+  Check's count of 40 would split the thing the settings style.
+{%- endcomment -%}
+{% # theme-check-disable ExcessiveSettingsCount %}
+{% schema %}
+{
+  "name": "t:blocks.featured_pills_step.name",
+  "tag": null,
+  "settings": [
+    {
+      "type": "text",
+      "id": "number",
+      "label": "t:blocks.featured_pills_step.settings.number.label",
+      "info": "t:blocks.featured_pills_step.settings.number.info",
+      "default": "01"
+    },
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "t:shared.heading.label",
+      "info": "t:blocks.featured_pills_step.settings.heading.info"
+    },
+    {
+      "type": "richtext",
+      "id": "text",
+      "label": "t:shared.text.label",
+      "default": "<p>Say what happens at this step.</p>"
+    },
+
+    { "type": "header", "content": "t:blocks.group.headers.layout" },
+    {
+      "type": "select",
+      "id": "width",
+      "label": "t:blocks.group.settings.width.label",
+      "info": "t:blocks.group.settings.width.info",
+      "options": [
+        { "value": "fill", "label": "t:blocks.group.settings.width.options__2.label" },
+        { "value": "fit", "label": "t:blocks.group.settings.width.options__1.label" },
+        { "value": "custom", "label": "t:blocks.group.settings.width.options__3.label" }
+      ],
+      "default": "fill"
+    },
+    {
+      "type": "range",
+      "id": "width_custom",
+      "label": "t:blocks.group.settings.width_custom.label",
+      "min": 10,
+      "max": 100,
+      "step": 1,
+      "unit": "%",
+      "default": 33,
+      "visible_if": "{{ block.settings.width == 'custom' }}"
+    },
+    {
+      "type": "select",
+      "id": "alignment",
+      "label": "t:blocks.group.settings.alignment.label",
+      "options": [
+        { "value": "start", "label": "t:blocks.group.settings.alignment.options__1.label" },
+        { "value": "center", "label": "t:blocks.group.settings.alignment.options__2.label" },
+        { "value": "end", "label": "t:blocks.group.settings.alignment.options__3.label" }
+      ],
+      "default": "center"
+    },
+    {
+      "type": "range",
+      "id": "gap",
+      "label": "t:blocks.group.settings.gap_vertical.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 16
+    },
+    {
+      "type": "range",
+      "id": "gap_mobile",
+      "label": "t:blocks.image_card.settings.gap_vertical_mobile.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 12
+    },
+
+    { "type": "header", "content": "t:blocks.subheading.headers.icon" },
+    {
+      "type": "select",
+      "id": "icon_source",
+      "label": "t:blocks.subheading.settings.icon_source.label",
+      "options": [
+        { "value": "none", "label": "t:shared.options.none" },
+        { "value": "icon", "label": "t:blocks.subheading.settings.icon_source.options__2.label" }
+      ],
+      "default": "icon"
+    },
+    {
+      "type": "select",
+      "id": "icon",
+      "label": "t:blocks.subheading.settings.icon.label",
+      "options": [
+        { "value": "clock", "label": "t:blocks.subheading.settings.icon.options__8.label" },
+        { "value": "brain", "label": "t:blocks.featured_pills_tab.icons.brain" },
+        { "value": "bolt", "label": "t:blocks.featured_pills_tab.icons.bolt" },
+        { "value": "droplet", "label": "t:blocks.featured_pills_tab.icons.droplet" },
+        { "value": "leaf", "label": "t:blocks.featured_pills_tab.icons.leaf" },
+        { "value": "pulse", "label": "t:blocks.featured_pills_tab.icons.pulse" },
+        { "value": "sparkle", "label": "t:blocks.featured_pills_tab.icons.sparkle" },
+        { "value": "moon", "label": "t:blocks.featured_pills_tab.icons.moon" },
+        { "value": "sun", "label": "t:blocks.featured_pills_tab.icons.sun" },
+        { "value": "shield", "label": "t:blocks.icon_with_text.settings.icon.options__2" },
+        { "value": "check", "label": "t:blocks.subheading.settings.icon.options__2.label" },
+        { "value": "star", "label": "t:blocks.subheading.settings.icon.options__1.label" },
+        { "value": "heart", "label": "t:blocks.subheading.settings.icon.options__3.label" },
+        { "value": "info", "label": "t:blocks.subheading.settings.icon.options__12.label" }
+      ],
+      "default": "clock",
+      "visible_if": "{{ block.settings.icon_source == 'icon' }}"
+    },
+    {
+      "type": "select",
+      "id": "icon_size",
+      "label": "t:shared.icon_size.label",
+      "options": [
+        { "value": "extra_small", "label": "t:shared.icon_size.options__1.label" },
+        { "value": "small", "label": "t:shared.icon_size.options__2.label" },
+        { "value": "medium", "label": "t:shared.icon_size.options__3.label" },
+        { "value": "large", "label": "t:shared.icon_size.options__4.label" },
+        { "value": "custom", "label": "t:shared.icon_size.options__6.label" }
+      ],
+      "default": "medium",
+      "visible_if": "{{ block.settings.icon_source == 'icon' }}"
+    },
+    {
+      "type": "range",
+      "id": "icon_size_custom",
+      "label": "t:shared.icon_size.custom.label",
+      "info": "t:shared.icon_size.custom.info",
+      "min": 10,
+      "max": 48,
+      "step": 1,
+      "unit": "px",
+      "default": 20,
+      "visible_if": "{{ block.settings.icon_source == 'icon' and block.settings.icon_size == 'custom' }}"
+    },
+    {
+      "type": "color",
+      "id": "icon_color",
+      "label": "t:blocks.feature_icon.settings.icon_color.label",
+      "visible_if": "{{ block.settings.icon_source == 'icon' }}"
+    },
+
+    { "type": "header", "content": "t:blocks.feature_icon.headers.shape" },
+    { "type": "paragraph", "content": "t:shared.icon_mark.shape_paragraph" },
+    {
+      "type": "select",
+      "id": "shape",
+      "label": "t:blocks.feature_icon.settings.shape.label",
+      "info": "t:shared.icon_mark.shape_info",
+      "options": [
+        { "value": "none", "label": "t:shared.options.none" },
+        { "value": "circle", "label": "t:shared.carousel.nav_shape.options__2.label" },
+        { "value": "square", "label": "t:shared.carousel.nav_shape.options__3.label" }
+      ],
+      "default": "circle"
+    },
+    {
+      "type": "range",
+      "id": "shape_size",
+      "label": "t:blocks.feature_icon.settings.shape_size.label",
+      "min": 24,
+      "max": 140,
+      "step": 2,
+      "unit": "px",
+      "default": 56,
+      "visible_if": "{{ block.settings.shape != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "shape_size_mobile",
+      "label": "t:blocks.feature_icon.settings.shape_size_mobile.label",
+      "info": "t:blocks.feature_icon.settings.shape_size_mobile.info",
+      "min": 24,
+      "max": 140,
+      "step": 2,
+      "unit": "px",
+      "default": 48,
+      "visible_if": "{{ block.settings.shape != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "shape_radius",
+      "label": "t:shared.corners.radius.label",
+      "min": 0,
+      "max": 48,
+      "step": 2,
+      "unit": "px",
+      "default": 16,
+      "visible_if": "{{ block.settings.shape == 'square' }}"
+    },
+    {
+      "type": "color_background",
+      "id": "fill_color",
+      "label": "t:blocks.feature_icon.settings.fill_color.label",
+      "visible_if": "{{ block.settings.shape != 'none' }}"
+    },
+
+    { "type": "header", "content": "t:blocks.feature_icon.headers.ring" },
+    { "type": "paragraph", "content": "t:blocks.feature_icon.paragraphs.ring" },
+    {
+      "type": "select",
+      "id": "ring_style",
+      "label": "t:shared.border.style.label",
+      "options": [
+        { "value": "none", "label": "t:shared.options.none" },
+        { "value": "solid", "label": "t:shared.options.solid" },
+        { "value": "dashed", "label": "t:shared.options.dashed" },
+        { "value": "dotted", "label": "t:shared.options.dotted" }
+      ],
+      "default": "dotted"
+    },
+    {
+      "type": "range",
+      "id": "ring_offset",
+      "label": "t:blocks.feature_icon.settings.ring_offset.label",
+      "info": "t:blocks.feature_icon.settings.ring_offset.info",
+      "min": 0,
+      "max": 32,
+      "step": 1,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.ring_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "ring_width",
+      "label": "t:shared.border.thickness.label",
+      "min": 1,
+      "max": 6,
+      "step": 1,
+      "unit": "px",
+      "default": 1,
+      "visible_if": "{{ block.settings.ring_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "ring_dash",
+      "label": "t:blocks.feature_icon.settings.ring_dash.label",
+      "info": "t:blocks.feature_icon.settings.ring_dash.info",
+      "min": 1,
+      "max": 20,
+      "step": 1,
+      "unit": "px",
+      "default": 2,
+      "visible_if": "{{ block.settings.ring_style == 'dashed' }}"
+    },
+    {
+      "type": "range",
+      "id": "ring_dash_gap",
+      "label": "t:blocks.feature_icon.settings.ring_dash_gap.label",
+      "min": 1,
+      "max": 24,
+      "step": 1,
+      "unit": "px",
+      "default": 8,
+      "visible_if": "{{ block.settings.ring_style == 'dashed' }}"
+    },
+    {
+      "type": "color",
+      "id": "ring_color",
+      "label": "t:shared.border.color.label",
+      "visible_if": "{{ block.settings.ring_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "ring_spin",
+      "label": "t:blocks.feature_icon.settings.ring_spin.label",
+      "info": "t:blocks.feature_icon.settings.ring_spin.info",
+      "min": 0,
+      "max": 360,
+      "step": 15,
+      "unit": "°",
+      "default": 0,
+      "visible_if": "{{ block.settings.ring_style != 'none' }}"
+    },
+
+    { "type": "header", "content": "t:blocks.featured_pills_step.headers.number" },
+    { "type": "paragraph", "content": "t:blocks.featured_pills_step.paragraphs.number" },
+    {
+      "type": "range",
+      "id": "number_size",
+      "label": "t:blocks.featured_pills_step.settings.number_size.label",
+      "min": 14,
+      "max": 48,
+      "step": 2,
+      "unit": "px",
+      "default": 22,
+      "visible_if": "{{ block.settings.number != blank }}"
+    },
+    {
+      "type": "color_background",
+      "id": "number_background",
+      "label": "t:blocks.featured_pills_step.settings.number_background.label",
+      "visible_if": "{{ block.settings.number != blank }}"
+    },
+    {
+      "type": "color",
+      "id": "number_color",
+      "label": "t:blocks.featured_pills_step.settings.number_color.label",
+      "visible_if": "{{ block.settings.number != blank }}"
+    },
+
+    { "type": "header", "content": "t:shared.appearance.header" },
+    {
+      "type": "color_background",
+      "id": "background",
+      "label": "t:shared.appearance.background_color.label"
+    },
+    {
+      "type": "select",
+      "id": "border_style",
+      "label": "t:blocks.group.settings.border_style.label",
+      "options": [
+        { "value": "none", "label": "t:shared.options.none" },
+        { "value": "solid", "label": "t:shared.options.solid" },
+        { "value": "dashed", "label": "t:shared.options.dashed" }
+      ],
+      "default": "none"
+    },
+    {
+      "type": "range",
+      "id": "border_width",
+      "label": "t:shared.border.thickness.label",
+      "min": 1,
+      "max": 6,
+      "step": 1,
+      "unit": "px",
+      "default": 1,
+      "visible_if": "{{ block.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_opacity",
+      "label": "t:shared.border.opacity.label",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 100,
+      "visible_if": "{{ block.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "color",
+      "id": "border_color",
+      "label": "t:blocks.group.settings.border_color.label",
+      "visible_if": "{{ block.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius",
+      "label": "t:blocks.group.settings.border_radius.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 20
+    },
+
+    { "type": "header", "content": "t:shared.typography.header" },
+    { "type": "paragraph", "content": "t:shared.typography.paragraph" },
+    {
+      "type": "select", "id": "preset", "label": "t:shared.typography.preset.label", "info": "t:shared.typography.preset.info",
+      "options": [
+        { "value": "default", "label": "t:shared.typography.preset.options__1.label" },
+        { "value": "paragraph", "label": "t:shared.typography.preset.options__2.label" },
+        { "value": "subheading", "label": "t:shared.typography.preset.options__3.label" },
+        { "value": "h4", "label": "t:shared.typography.preset.options__7.label" },
+        { "value": "h5", "label": "t:shared.typography.preset.options__8.label" },
+        { "value": "h6", "label": "t:shared.typography.preset.options__9.label" },
+        { "value": "custom", "label": "t:shared.typography.preset.options__10.label" }
+      ],
+      "default": "h6"
+    },
+    {
+      "type": "select", "id": "font_family", "label": "t:shared.typography.font_family.label",
+      "options": [
+        { "value": "body", "label": "t:shared.typography.font_family.options__2.label" },
+        { "value": "heading", "label": "t:shared.typography.font_family.options__1.label" },
+        { "value": "accent", "label": "t:shared.typography.font_family.options__3.label" }
+      ],
+      "default": "heading",
+      "visible_if": "{{ block.settings.preset == 'custom' }}"
+    },
+    {
+      "type": "select", "id": "font_size", "label": "t:shared.typography.font_size.label",
+      "options": [
+        { "value": "12", "label": "12px" }, { "value": "14", "label": "14px" },
+        { "value": "16", "label": "16px" }, { "value": "18", "label": "18px" },
+        { "value": "20", "label": "20px" }, { "value": "24", "label": "24px" }
+      ],
+      "default": "18",
+      "visible_if": "{{ block.settings.preset == 'custom' }}"
+    },
+    {
+      "type": "select", "id": "font_size_mobile", "label": "t:shared.typography.font_size_mobile.label", "info": "t:shared.typography.font_size_mobile.info",
+      "options": [
+        { "value": "12", "label": "12px" }, { "value": "14", "label": "14px" },
+        { "value": "16", "label": "16px" }, { "value": "18", "label": "18px" }
+      ],
+      "default": "16",
+      "visible_if": "{{ block.settings.preset == 'custom' }}"
+    },
+    {
+      "type": "select", "id": "color", "label": "t:shared.typography.color.label", "info": "t:shared.typography.color.info",
+      "options": [
+        { "value": "inherit", "label": "t:shared.typography.color.options__1.label" },
+        { "value": "muted", "label": "t:shared.typography.color.options__2.label" },
+        { "value": "custom", "label": "t:shared.typography.color.options__3.label" },
+        { "value": "gradient", "label": "t:shared.typography.color.options__4.label" }
+      ],
+      "default": "inherit"
+    },
+    {
+      "type": "color", "id": "text_color_custom", "label": "t:shared.typography.text_color.label", "info": "t:shared.typography.text_color.info",
+      "visible_if": "{{ block.settings.color == 'custom' }}"
+    },
+    {
+      "type": "color_background", "id": "text_gradient", "label": "t:shared.typography.text_gradient.label", "info": "t:shared.typography.text_gradient.info",
+      "visible_if": "{{ block.settings.color == 'gradient' }}"
+    },
+    {
+      "type": "range",
+      "id": "text_size",
+      "label": "t:blocks.featured_pills_step.settings.text_size.label",
+      "min": 10,
+      "max": 24,
+      "step": 1,
+      "unit": "px",
+      "default": 15
+    },
+    {
+      "type": "color",
+      "id": "text_color",
+      "label": "t:blocks.featured_pills_step.settings.text_color.label"
+    },
+
+    { "type": "header", "content": "t:shared.spacing.block_header" },
+    { "type": "paragraph", "content": "t:shared.spacing.block_paragraph" },
+    {
+      "type": "select",
+      "id": "padding_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        { "value": "desktop", "label": "t:shared.spacing.devices.options__1.label" },
+        { "value": "mobile", "label": "t:shared.spacing.devices.options__2.label" }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 28,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 28,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 24,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 24,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 20,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 20,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left_mobile",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 16,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right_mobile",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 16,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    }
+  ]
+}
+{% endschema %}

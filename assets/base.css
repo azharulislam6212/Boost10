@@ -11253,3 +11253,450 @@
     border-radius: 50%;
   }
 }
+
+/* ==========================================================================
+   Featured pills
+   ========================================================================== */
+
+@layer components {
+  .featured-pills {
+    display: flex;
+    flex-direction: column;
+
+    border-radius: var(--featured-pills-radius, 0);
+
+    border-width: var(--featured-pills-border-width, 0px);
+    border-style: var(--featured-pills-border-style, solid);
+    border-color: var(--featured-pills-border-color, transparent);
+
+    margin-block-start: var(--featured-pills-margin-block-start, 0px);
+    margin-block-end: var(--featured-pills-margin-block-end, 0px);
+
+    min-block-size: var(--featured-pills-min-height, 0px);
+  }
+
+  @media screen and (max-width: 749px) {
+    .featured-pills {
+      border-radius: var(--featured-pills-radius-mobile, var(--featured-pills-radius, 0));
+      min-block-size: var(--featured-pills-min-height-mobile, var(--featured-pills-min-height, 0px));
+    }
+  }
+
+  .featured-pills.has-background-media {
+    overflow: hidden;
+  }
+
+  .featured-pills.has-background-media > :not(.background-media) {
+    position: relative;
+    z-index: 1;
+  }
+
+  .featured-pills__inner {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+  }
+
+  /* The section's own children, laid out. Which CSS property reads which custom
+     property is decided here rather than in Liquid, for the reason
+     `snippets/group.liquid` sets out: Alignment always means the horizontal axis
+     and Position always the vertical, and one file knows about the swap. */
+  .featured-pills__content {
+    display: flex;
+    flex: 1 1 auto;
+    inline-size: 100%;
+    gap: var(--featured-pills-gap-y, var(--space-8)) var(--featured-pills-gap-x, var(--space-8));
+  }
+
+  .featured-pills__content--column {
+    flex-direction: column;
+    align-items: var(--featured-pills-inline, center);
+    justify-content: var(--featured-pills-block, start);
+  }
+
+  .featured-pills__content--row {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: var(--featured-pills-inline, center);
+    align-items: var(--featured-pills-block, start);
+  }
+
+  .featured-pills__content--row.featured-pills__content--reverse {
+    flex-direction: row-reverse;
+  }
+
+  /* A centred column centres its text too. Matched on the emitted property
+     rather than on a second class, so there is one place the alignment is
+     stored and no way for the two to disagree. */
+  .featured-pills__content--column:where([style*='--featured-pills-inline: center']) {
+    text-align: center;
+  }
+
+  .featured-pills__content--column:where([style*='--featured-pills-inline: end']) {
+    text-align: end;
+  }
+
+  @media screen and (max-width: 749px) {
+    .featured-pills__content {
+      gap: var(--featured-pills-gap-y-mobile, var(--featured-pills-gap-y, var(--space-8)))
+        var(--featured-pills-gap-x-mobile, var(--featured-pills-gap-x, var(--space-8)));
+    }
+
+    /* `--featured-pills-align` and not `--featured-pills-inline`: the second
+       legitimately carries `space-between` on a desktop row, where it lands on
+       `justify-content`. Once stacked the same value would land on
+       `align-items`, which is not valid there — the declaration is dropped and
+       the stack falls back to `stretch`, which is how a centred heading ends up
+       spanning the full width on a phone. */
+    .featured-pills__content--row.featured-pills__content--stack-mobile {
+      flex-direction: column;
+      justify-content: var(--featured-pills-block, start);
+      align-items: var(--featured-pills-align, var(--featured-pills-inline, center));
+    }
+  }
+
+  /* The strip and its panels always take the section's width, whatever the
+     track inside them is doing. See the note on Width in
+     `blocks/_featured-pills-tabs.liquid`. */
+  .featured-pills__tabs-motion,
+  .featured-pills__tabs {
+    inline-size: 100%;
+    min-inline-size: 0;
+  }
+
+  /* ---- one row of a checklist ---------------------------------------------
+
+     `blocks/_featured-pills-check.liquid`. A mark, a label and an optional
+     sentence, on a surface that changes when the row is the highlighted one.
+
+     The surface is the row's own box rather than a pseudo-element, because the
+     row has to be able to draw a border as well as a fill and a merchant sets
+     both in the same panel. */
+  .featured-pills-check {
+    position: relative;
+
+    display: flex;
+    align-items: center;
+    flex: var(--fpc-flex, 1 1 auto);
+    inline-size: var(--fpc-width, 100%);
+    min-inline-size: 0;
+    gap: var(--fpc-gap, var(--space-4));
+
+    border-radius: var(--fpc-radius, 16px);
+    border-width: var(--fpc-border-width, 0px);
+    border-style: var(--fpc-border-style, solid);
+    border-color: var(--fpc-border-color, transparent);
+    background: var(--fpc-background, transparent);
+    color: var(--fpc-text, inherit);
+
+    transition:
+      background var(--transition-base),
+      border-color var(--transition-base);
+  }
+
+  /* The mark is a flex item that must not be squeezed by a long label. Its size
+     is `snippets/icon-mark.liquid`'s, so nothing here states one. */
+  .featured-pills-check__mark {
+    flex: 0 0 auto;
+  }
+
+  .featured-pills-check__body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fpc-stack-gap, var(--space-1));
+    min-inline-size: 0;
+  }
+
+  .featured-pills-check__label {
+    font-family: var(--block-font-family, var(--font-heading-family));
+    font-size: var(--block-font-size, var(--font-size-md));
+    font-weight: var(--block-font-weight, inherit);
+    line-height: var(--block-line-height, 1.4);
+    letter-spacing: var(--block-letter-spacing, inherit);
+    text-transform: var(--block-text-transform, inherit);
+    color: var(--block-text-color, inherit);
+  }
+
+  /* A rule and not a second inline declaration: an inline `font-size` beats
+     every stylesheet, and a style attribute cannot carry a breakpoint. */
+  @media screen and (max-width: 749px) {
+    .featured-pills-check__label {
+      font-size: var(--block-font-size-mobile, var(--block-font-size, var(--font-size-md)));
+    }
+  }
+
+  .featured-pills-check__label.block-text--gradient {
+    background-image: var(--block-text-gradient, var(--gradient-primary));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  @media (forced-colors: active) {
+    .featured-pills-check__label.block-text--gradient {
+      background-image: none;
+      color: CanvasText;
+    }
+  }
+
+  /* Rich text, so the merchant's own paragraph tags land here. `:first-child`
+     and `:last-child` rather than a blanket reset: a two-paragraph description
+     should still have space between its paragraphs. */
+  .featured-pills-check__text {
+    display: block;
+    font-size: var(--fpc-description-size, var(--font-size-sm));
+    line-height: 1.5;
+    color: var(--fpc-description-color, var(--color-accent-text, inherit));
+  }
+
+  .featured-pills-check__text > :first-child {
+    margin-block-start: 0;
+  }
+
+  .featured-pills-check__text > :last-child {
+    margin-block-end: 0;
+  }
+
+  /* The row is a link without being an `<a>` — see the note in the block on why
+     an anchor around blocks is markup a browser recovers from unpredictably. */
+  .featured-pills-check__link {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    border-radius: inherit;
+  }
+
+  .featured-pills-check__link:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: -2px;
+  }
+
+  /* ---- one card in a numbered sequence ------------------------------------
+
+     `blocks/_featured-pills-step.liquid`. */
+  .featured-pills-step {
+    position: relative;
+
+    display: flex;
+    flex-direction: column;
+    align-items: var(--fps-align, center);
+    flex: var(--fps-flex, 1 1 0%);
+    inline-size: var(--fps-width, 100%);
+    min-inline-size: 0;
+    gap: var(--fps-gap, var(--space-4));
+
+    border-radius: var(--fps-radius, 20px);
+    border-width: var(--fps-border-width, 0px);
+    border-style: var(--fps-border-style, solid);
+    border-color: var(--fps-border-color, transparent);
+    background: var(--fps-background, transparent);
+
+    text-align: var(--fps-text-align, center);
+  }
+
+  @media screen and (max-width: 749px) {
+    .featured-pills-step {
+      gap: var(--fps-gap-mobile, var(--fps-gap, var(--space-4)));
+    }
+  }
+
+  .featured-pills-step__mark {
+    flex: 0 0 auto;
+  }
+
+  .featured-pills-step__body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    inline-size: 100%;
+    min-inline-size: 0;
+  }
+
+  .featured-pills-step__heading {
+    font-family: var(--block-font-family, var(--font-heading-family));
+    font-size: var(--block-font-size, var(--font-size-lg));
+    font-weight: var(--block-font-weight, inherit);
+    line-height: var(--block-line-height, 1.3);
+    letter-spacing: var(--block-letter-spacing, inherit);
+    text-transform: var(--block-text-transform, inherit);
+    color: var(--block-text-color, inherit);
+  }
+
+  @media screen and (max-width: 749px) {
+    .featured-pills-step__heading {
+      font-size: var(--block-font-size-mobile, var(--block-font-size, var(--font-size-lg)));
+    }
+  }
+
+  .featured-pills-step__heading.block-text--gradient {
+    background-image: var(--block-text-gradient, var(--gradient-primary));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  @media (forced-colors: active) {
+    .featured-pills-step__heading.block-text--gradient {
+      background-image: none;
+      color: CanvasText;
+    }
+  }
+
+  .featured-pills-step__text {
+    display: block;
+    font-size: var(--fps-text-size, var(--font-size-sm));
+    line-height: 1.6;
+    color: var(--fps-text-color, inherit);
+  }
+
+  .featured-pills-step__text > :first-child {
+    margin-block-start: 0;
+  }
+
+  .featured-pills-step__text > :last-child {
+    margin-block-end: 0;
+  }
+
+  /* The badge straddles the ring rather than reserving a corner of the card:
+     it is positioned against the mark, which is `position: relative` through
+     `.icon-mark`, and it is out of flow entirely. A card whose height changes
+     when a number is switched on is a card that cannot sit in a row beside two
+     that have not got one. */
+  .featured-pills-step__number {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-end: 0;
+    translate: 35% -25%;
+    z-index: 2;
+
+    display: grid;
+    place-items: center;
+    min-inline-size: var(--fps-number-size, 22px);
+    block-size: var(--fps-number-size, 22px);
+    padding-inline: 0.4rem;
+
+    border-radius: 999px;
+    background: var(--fps-number-background, var(--color-heading, #04160e));
+    color: var(--fps-number-color, var(--color-background, #fff));
+
+    font-family: var(--font-body-family);
+    font-size: calc(var(--fps-number-size, 22px) * 0.45);
+    font-weight: 600;
+    line-height: 1;
+  }
+
+  /* With no glyph to pin it to, the number *is* the mark: back into the flow,
+     at the size it was given, wherever the card's alignment puts it. */
+  .featured-pills-step__number--alone {
+    position: static;
+    translate: none;
+    font-size: calc(var(--fps-number-size, 22px) * 0.5);
+  }
+}
+
+/* ==========================================================================
+   Featured pills — the slideshow in a panel
+   ==========================================================================
+   `blocks/_featured-pills-carousel.liquid`. Everything about how the track
+   moves is `assets/carousel.css`; this is the frame around it and where the
+   control bar lands.
+   ========================================================================== */
+
+@layer components {
+  .featured-pills-carousel {
+    position: relative;
+    display: block;
+    inline-size: 100%;
+    min-inline-size: 0;
+  }
+
+  /* The radius is the frame's, and it has to clip: a slide is a photograph that
+     fills its slot, so a rounded frame with an unclipped track is a square
+     picture sitting in a rounded box with four corners poking out.
+
+     `overflow: hidden` on the element that *is* the carousel would break the
+     component — the track measures and translates inside it — so the radius
+     and the clip go on the shell, which is the viewport the component already
+     clips to. */
+  .featured-pills-carousel__shell {
+    border-radius: var(--fpx-radius, 28px);
+    overflow: hidden;
+  }
+
+  .featured-pills-carousel__track {
+    --carousel-gap: var(--fpx-gap, var(--space-4));
+  }
+
+  /* ---- the control bar ---- */
+
+  .featured-pills-carousel__controls {
+    display: flex;
+    justify-content: center;
+    inline-size: 100%;
+  }
+
+  .featured-pills-carousel--below .featured-pills-carousel__controls {
+    margin-block-start: var(--space-4);
+  }
+
+  /* Over the slides: out of flow entirely, so the bar cannot change a slide's
+     height and a carousel with the bar switched to Below is the same height as
+     one with it on top of the picture.
+
+     `inset-inline: 0` plus a centred flex line rather than `left: 50%` and a
+     translate: the bar is as wide as its own content and the arithmetic for
+     centring it is the browser's either way, but this one also honours the
+     alignment `carousel-controls` was given. */
+  .featured-pills-carousel--over .featured-pills-carousel__controls {
+    position: absolute;
+    inset-inline: var(--fpx-controls-inset, 24px);
+    inset-block-end: var(--fpx-controls-inset, 24px);
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  /* The bar itself takes the pointer back. The wrapper does not, so the part of
+     the picture either side of a centred bar is still the picture — draggable,
+     and not a dead strip across the bottom of the slide. */
+  .featured-pills-carousel--over .featured-pills-carousel__controls > * {
+    pointer-events: auto;
+    padding: var(--fpx-controls-padding, 8px);
+    border-radius: var(--fpx-controls-radius, 50px);
+    background: var(--fpx-controls-background, none);
+  }
+
+  /* A bar on a photograph reads against whatever the photograph is doing, so
+     the arrows and the numbers take the scheme's background as their surface
+     and its heading colour as their ink — the same pair `carousel-controls`
+     resolves from a colour scheme, applied here as a local default rather than
+     as a second set of settings. **Controls color scheme** on the block
+     overrides all of it, which is why none of this is `!important`. */
+  .featured-pills-carousel--over .carousel-controls__position,
+  .featured-pills-carousel--over .carousel-controls__total {
+    font-variant-numeric: tabular-nums;
+  }
+
+  @media screen and (max-width: 749px) {
+    /* A bar inset 24px from a 390px frame leaves 342px for two arrows, two
+       numbers and a progress line. It fits, but only just, and the first thing
+       a long total does is push an arrow off the picture. Half the inset is the
+       cheapest way to keep the whole control on the slide. */
+    .featured-pills-carousel--over .featured-pills-carousel__controls {
+      inset-inline: calc(var(--fpx-controls-inset, 24px) / 2);
+      inset-block-end: calc(var(--fpx-controls-inset, 24px) / 2);
+    }
+  }
+
+  /* ---- one slide ---- */
+
+  /* The slide is `blocks/image-card.liquid` with a slide's class on it, so its
+     layout is that block's and nothing is restated here. What a slide needs and
+     a card does not is a floor under its width: the track is a flex line, and a
+     flex item with a picture background and no intrinsic width collapses to
+     nothing before the component has set a basis on it. `min-inline-size: 0`
+     is what the track's children already get for shrinking; this is the other
+     half. */
+  .featured-pills-slide {
+    min-inline-size: 0;
+  }
+}

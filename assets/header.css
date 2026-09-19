@@ -1585,6 +1585,297 @@
   }
 
   /* --------------------------------------------------------------------------
+     Pills — an outlined track, and a rule that travels under the chosen option
+     --------------------------------------------------------------------------
+     `blocks/_featured-pills-tabs.liquid`'s look, and the third modifier on this
+     one component. Nothing below re-implements a tab: the marker is still
+     measured and still travels, the keyboard still walks the strip, the ARIA is
+     still the tablist's. What changes is where the outline is drawn, how the
+     track is sized against the section, and what the chosen option's mark does.
+
+     Every `--tabs-*` below is that block's setting and every one has a fallback
+     here, so the look is complete before a merchant touches anything.
+
+     ## The track is sized apart from the group
+
+     The group is always full width, because it holds the panels as well as the
+     strip and a panel as wide as four option names is not a layout anybody
+     asked for. So the rail is the flex container that positions the track, and
+     `--tabs-track-*` sizes the track inside it. A fit track sits wherever
+     **Alignment** puts it; a fill track spans the section.
+
+     ## The track must not be the thing that scrolls
+
+     The marker is measured against the list's box, so a scrolled list leaves it
+     behind by exactly the scroll offset — the same constraint the segmented
+     switch documents above, and the same answer: `overflow: visible`, and the
+     options wrap onto a second line on a phone rather than running off the
+     edge. A wrapped *track* is still one control, which is what makes wrapping
+     safe here and not on the plain strip.
+     -------------------------------------------------------------------------- */
+
+  .tabs--pills {
+    gap: var(--tabs-gap, var(--space-8));
+  }
+
+  .tabs--pills .tabs__rail {
+    display: flex;
+    justify-content: var(--tabs-rail-justify, center);
+    min-inline-size: 0;
+  }
+
+  /* Before the element upgrades, show the panel that will open — not all of them.
+     --------------------------------------------------------------------------
+     `tabs.js` writes `hidden` onto the panels it is not showing, and until the
+     module arrives none of them carries it. That is the theme's no-JS answer
+     and it is the right one for a strip of short answers: four paragraphs
+     stacked is a readable page.
+
+     It is the wrong one here. Each panel in this section is a whole
+     composition — a photograph, a card, a column of rows — so four of them
+     stacked is four screens of content that resolves to one, and the theme
+     editor re-renders the section on every setting change, which replays that
+     wall each time. A merchant adding the section sees the stack, not the
+     design.
+
+     So the pre-upgrade state is the *selected* panel alone. `:not(:defined)`
+     scopes it exactly: the moment `<tab-group>` is registered the rule stops
+     matching and `tabs.js` owns visibility again, with nothing to undo.
+
+     `display`, not `hidden`: the attribute is the component's and writing it
+     from Liquid would be state in two places. The third rule is the fallback
+     for a strip where no option was marked — `tabs.js` opens the first one, so
+     that is the one to show.
+
+     Scoped to this section's own class. `blocks/tabs.liquid` keeps the stacked
+     fallback, which is still right for what it holds.
+
+     With JavaScript genuinely off there is no upgrade and no strip, so the
+     `<noscript>` block in `blocks/_featured-pills-tabs.liquid` puts every panel
+     back — unlayered, so it beats this. */
+  tab-group.featured-pills__tabs:not(:defined) .tabs__panel {
+    display: none;
+  }
+
+  tab-group.featured-pills__tabs:not(:defined) .tabs__panel[data-tab-selected] {
+    display: block;
+  }
+
+  tab-group.featured-pills__tabs:not(:defined)
+    .tabs__panels:not(:has(> [data-tab-selected]))
+    > .tabs__panel:first-child {
+    display: block;
+  }
+
+  .tabs--pills .tabs__list {
+    flex: var(--tabs-track-flex, 0 1 auto);
+    inline-size: var(--tabs-track-width, auto);
+    max-inline-size: 100%;
+    gap: var(--tabs-tab-gap, 0px);
+    padding: var(--tabs-track-padding, 8px);
+    border: var(--tabs-track-border-width, 1px) var(--tabs-track-border-style, dashed)
+      var(--tabs-track-border-color, color-mix(in srgb, currentColor 40%, transparent));
+    border-radius: var(--tabs-track-radius, 50px);
+    background: var(--tabs-track-background, transparent);
+    overflow: visible;
+  }
+
+  .tabs--block.tabs--pills .tabs__tab {
+    gap: var(--space-3);
+    padding: var(--tabs-tab-padding-block, 10px) var(--tabs-tab-padding-inline, 20px);
+    border-radius: var(--tabs-track-radius, 50px);
+
+    /* **Option background**. Empty by default, which is the arrangement the
+       main strip uses: the track is painted and the options read as regions of
+       it. A strip with no track paints its options instead — see the note in
+       the block. */
+    background: var(--tabs-tab-background, none);
+  }
+
+  /* Only when the merchant gave a second colour; otherwise the chosen option
+     keeps the first, because a strip whose selection is already said by a rule
+     or a filled mark does not need its pill to change as well. */
+  .tabs.tabs--block.tabs--pills .tabs__tab[aria-selected='true'] {
+    background: var(--tabs-tab-background-active, var(--tabs-tab-background, none));
+  }
+
+  /* Quieter than the plain strip's 0.65 but not by much: these options carry a
+     mark as well as a name, and a mark at 0.65 reads as disabled rather than as
+     available. Set **Tab color** and the block publishes 1 here instead — a
+     merchant who has named the colour has answered the question this was
+     guessing at. */
+  .tabs--pills .tabs__tab[aria-selected='false'] {
+    opacity: var(--tabs-tab-idle-opacity, 0.75);
+  }
+
+  /* `.tabs--block .tabs__tab[aria-selected='true']` further down falls back to
+     the primary button's *text* colour, because on that strip the marker behind
+     the selected tab is the primary button's fill. Here it is a rule or nothing
+     at all, so that guarantee does not hold and white-on-mint is exactly wrong.
+     The heading colour is what a chosen word on the page's own background wants;
+     **Selected tab text color** overrides it.
+
+     Note what this rule does *not* do: it does not clear the option's own
+     border. That rule belongs to the filled marker alone — see below.
+
+     ## Why `.tabs` is in the selector
+
+     `.tabs--block .tabs__tab[aria-selected='true']` further down is (0,3,0) and
+     *later in this file*, so a pills rule written at (0,3,0) loses the tie on
+     source order and every declaration here is silently discarded — which is
+     how the chosen option came out with no border at all. Naming the class the
+     element already carries takes these to (0,5,0) and settles it on
+     specificity, which is stable whatever order these blocks end up in. */
+  .tabs.tabs--block.tabs--pills .tabs__tab[aria-selected='true'] {
+    color: var(--tabs-tab-active-color, var(--color-heading, inherit));
+  }
+
+  /* A filled marker slides in behind the selected option, so the option's own
+     outline has to get out of the way: two rings, one inside the other, is what
+     a border left on looks like. Only the filled marker has that problem — a
+     rule sits on the edges and nothing is drawn behind the option at all. */
+  .tabs.tabs--block.tabs--pills-marker-fill .tabs__tab[aria-selected='true'] {
+    border-color: transparent;
+  }
+
+  /* With no marker, the option's own outline *is* the marker.
+     `blocks/_featured-pills-tabs.liquid` offers None for a strip that says which
+     option is chosen with its own mark and colour — and a strip of outlined
+     pills where every one is outlined says nothing. So the border is drawn on
+     the chosen option and cleared on the rest, which is the numbered routine
+     chooser in the *How it works* panel. A strip that sets no border style
+     emits a zero width and none of this paints. */
+  .tabs.tabs--block.tabs--pills-marker-none .tabs__tab[aria-selected='true'] {
+    border-color: var(--tabs-tab-border-color, var(--color-border));
+  }
+
+  .tabs.tabs--block.tabs--pills-marker-none .tabs__tab[aria-selected='false'] {
+    border-color: transparent;
+  }
+
+  /* The marker, three ways.
+     --------------------------------------------------------------------------
+     Still one element that travels, in every one of them. **Rule** is the drawn
+     design — a line above and below the chosen option, which reads as a page
+     selected out of a set rather than as a button pressed. **Fill** is the pill
+     every other strip in the theme draws. **None** hands the whole job to the
+     option's own mark and colour.
+
+     Doubled class, so each beats `.tabs--block .tabs__marker` at (0,2,0) on
+     specificity rather than on source order. */
+  .tabs--block.tabs--pills .tabs__marker {
+    background-color: transparent;
+    background-image: none;
+    box-shadow: none;
+  }
+
+  .tabs--block.tabs--pills-marker-rule .tabs__marker {
+    border-block: var(--tabs-marker-rule-width, 2px) solid
+      var(--tabs-marker-rule-color, currentColor);
+    border-radius: 0;
+  }
+
+  .tabs--block.tabs--pills-marker-fill .tabs__marker {
+    background: var(--tabs-marker-background, var(--color-primary-button-background));
+    border-radius: var(--tabs-marker-radius, 50px);
+  }
+
+  .tabs--block.tabs--pills-marker-none .tabs__marker {
+    display: none;
+  }
+
+  /* The mark inside an option.
+     --------------------------------------------------------------------------
+     `snippets/icon-mark.liquid` drew it and `blocks/_featured-pills-tab.liquid`
+     published its `--icon-mark-*` properties **inline on the mark itself**,
+     which is what makes the rules below target the painted result rather than
+     those properties: an inline custom property beats every stylesheet, so
+     redeclaring `--icon-mark-fill` from here would change nothing at all.
+
+     `::before` is the filled shape and `color` is the glyph — both ordinary
+     properties, neither set inline, both reachable. The strip publishes what
+     they become on its own root, so "the chosen one fills in" is one setting on
+     the set rather than four settings that can disagree. */
+  .featured-pills__tab-mark {
+    position: relative;
+    flex: 0 0 auto;
+  }
+
+  .tabs--pills .tabs__tab[aria-selected='true'] .featured-pills__tab-mark {
+    color: var(--tabs-mark-active-color, inherit);
+  }
+
+  .tabs--pills .tabs__tab[aria-selected='true'] .featured-pills__tab-mark::before {
+    background: var(--tabs-mark-active-fill, transparent);
+  }
+
+  /* The ring has nothing left to do once the mark is a filled disc, so it fades
+     rather than sitting as a dotted outline around a solid shape. **Keep the
+     ring on the chosen option** publishes 1 here and it stays. */
+  .tabs--pills .tabs__tab[aria-selected='true'] .featured-pills__tab-mark .icon-mark__ring {
+    opacity: var(--tabs-mark-active-ring-opacity, 1);
+    transition: opacity var(--header-speed) var(--header-ease);
+  }
+
+  /* The tick on the chosen option's mark.
+     Real markup rather than a `::after` glyph: it is `aria-hidden` in the
+     template, it takes two colours from the strip, and a merchant who does not
+     want it gets no element at all instead of a rule fighting one. */
+  .featured-pills__tab-check {
+    position: absolute;
+    inset-block-start: -2px;
+    inset-inline-end: -2px;
+    z-index: 2;
+    display: none;
+    place-items: center;
+    inline-size: 1.6rem;
+    block-size: 1.6rem;
+    border-radius: 999px;
+    background: var(--tabs-mark-check-background, var(--color-heading, #04160e));
+    color: var(--tabs-mark-check-color, #fff);
+  }
+
+  .tabs__tab[aria-selected='true'] .featured-pills__tab-check {
+    display: grid;
+  }
+
+  /* An option with no mark pins the tick to the button instead. `.tabs__tab` is
+     already `position: relative` — it has to be, for the marker's z-index to
+     work against it — so there is nothing to add there, and the badge straddles
+     the pill's corner the way it straddles the mark's. */
+  .featured-pills__tab-check--alone {
+    inset-block-start: -6px;
+    inset-inline-end: -6px;
+  }
+
+  /* The number before an option's name — "01 Morning Recovery". Part of the
+     accessible name deliberately; see the note in the block. */
+  .featured-pills__tab-number {
+    flex: 0 0 auto;
+    font-family: var(--font-body-family);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    line-height: 1;
+    opacity: 0.55;
+  }
+
+  @media screen and (max-width: 749px) {
+    .tabs--pills {
+      gap: var(--tabs-gap-mobile, var(--tabs-gap, var(--space-8)));
+    }
+
+    /* Four options at 390px are four names running off the edge. The track keeps
+       its shape and the options wrap inside it, and the marker follows without
+       any change here because it is measured from whatever box the selected
+       option ends up with. */
+    .tabs--pills .tabs__list {
+      flex-wrap: wrap;
+      justify-content: center;
+      border-radius: var(--tabs-track-radius-mobile, var(--tabs-track-radius, 28px));
+    }
+  }
+
+  /* --------------------------------------------------------------------------
      The panel rises when the tab changes
      --------------------------------------------------------------------------
      An `animation`, not a `transition`, and that is the whole reason this works.
