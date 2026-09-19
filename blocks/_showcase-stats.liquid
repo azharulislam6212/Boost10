@@ -1,0 +1,218 @@
+{% doc %}
+  blocks/_showcase-stats.liquid — private to `sections/testimonials-showcase.liquid`.
+
+  The row of proof cards under the copy: how many customers, how long the
+  guarantee runs, what the average score is.
+
+  ## Why it is a block rather than a list inside `_showcase-intro`
+
+  The intro column ends with `{% content_for 'blocks' %}`, and anything dropped
+  there lands in one flow. The stats are a *row* with its own column rule, its
+  own gap and its own wrap — put them in that flow and either the buttons join
+  the grid or the stats leave it.
+
+  Two static blocks instead means each one is a panel in the editor with its own
+  name, and a merchant switching the stats off switches off a thing they can
+  see, rather than deleting three blocks out of a list.
+
+  ## The columns are a number, not a guess
+
+  `auto-fit` with a minimum width reads well until three cards become four on a
+  1440px screen because one label got longer. So the count is a setting per
+  breakpoint, the way every other grid in the theme states it, and the cards
+  stretch to fill whatever share that leaves them.
+{% enddoc %}
+
+{%- liquid
+  assign s = block.settings
+
+  assign columns = s.columns | default: 3 | plus: 0
+  assign columns_mobile = s.columns_mobile | default: 1 | plus: 0
+
+  assign gap = s.gap | default: 10 | plus: 0
+  assign gap_mobile = s.gap_mobile | plus: 0
+  if s.gap_mobile == nil
+    assign gap_mobile = 8
+  endif
+-%}
+
+{%- capture stats_style -%}
+  {%- render 'spacing', block: s, declarations: true -%}
+  --sv-stats-columns: {{ columns }};
+  --sv-stats-columns-mobile: {{ columns_mobile }};
+  --sv-stats-gap: {{ gap }}px;
+  --sv-stats-gap-mobile: {{ gap_mobile }}px;
+{%- endcapture -%}
+
+<div
+  class="showcase-stats"
+  data-block-spacing
+  style="{{ stats_style | strip_newlines | strip }}"
+  {{ block.shopify_attributes }}
+>
+  {% content_for 'blocks' %}
+</div>
+
+{% schema %}
+{
+  "name": "t:blocks.showcase_stats.name",
+  "tag": null,
+  "blocks": [
+    {
+      "type": "_showcase-stat"
+    },
+    {
+      "type": "@theme"
+    },
+    {
+      "type": "@app"
+    }
+  ],
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "t:blocks.showcase_stats.paragraph"
+    },
+    {
+      "type": "range",
+      "id": "columns",
+      "label": "t:shared.columns.desktop.label",
+      "min": 1,
+      "max": 5,
+      "step": 1,
+      "default": 3
+    },
+    {
+      "type": "range",
+      "id": "columns_mobile",
+      "label": "t:blocks.showcase_stats.settings.columns_mobile.label",
+      "min": 1,
+      "max": 3,
+      "step": 1,
+      "default": 1
+    },
+    {
+      "type": "range",
+      "id": "gap",
+      "label": "t:shared.gap.label",
+      "min": 0,
+      "max": 48,
+      "step": 2,
+      "unit": "px",
+      "default": 10
+    },
+    {
+      "type": "range",
+      "id": "gap_mobile",
+      "label": "t:blocks.showcase_stats.settings.gap_mobile.label",
+      "min": 0,
+      "max": 40,
+      "step": 2,
+      "unit": "px",
+      "default": 8
+    },
+    {
+      "type": "header",
+      "content": "t:shared.spacing.block_header"
+    },
+    {
+      "type": "select",
+      "id": "padding_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        { "value": "desktop", "label": "t:shared.spacing.devices.options__1.label" },
+        { "value": "mobile", "label": "t:shared.spacing.devices.options__2.label" }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 120,
+      "step": 2,
+      "unit": "px",
+      "default": 24,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 120,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 120,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 120,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 120,
+      "step": 2,
+      "unit": "px",
+      "default": 20,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 120,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left_mobile",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 120,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right_mobile",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 120,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    }
+  ]
+}
+{% endschema %}

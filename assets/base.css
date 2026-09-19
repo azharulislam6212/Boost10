@@ -12246,3 +12246,846 @@
     }
   }
 }
+
+/* ==========================================================================
+   Testimonials showcase — the section frame
+   ==========================================================================
+
+   `sections/testimonials-showcase.liquid`. Nothing in here is shared with the
+   Testimonials section above: that one is `.testimonials*` / `.testimonial-*`
+   and this one is `.testimonial-showcase` / `.showcase-*`, so the two can sit
+   on one page without either recolouring the other.
+
+   Every custom property is namespaced `--sv-*`. The section root publishes the
+   ones the whole thing shares, each block publishes its own, and the modal —
+   which is a sibling of the section rather than a descendant — is handed the
+   badge's set directly, because properties inherit down a tree and not across
+   one. */
+
+@layer overrides {
+  .testimonial-showcase {
+    position: relative;
+
+    border-radius: var(--showcase-radius, 0);
+
+    border-width: var(--showcase-border-width, 0px);
+    border-style: var(--showcase-border-style, solid);
+    border-color: var(--showcase-border-color, transparent);
+
+    margin-block-start: var(--showcase-margin-block-start, 0px);
+    margin-block-end: var(--showcase-margin-block-end, 0px);
+  }
+
+  @media screen and (max-width: 749px) {
+    .testimonial-showcase {
+      border-radius: var(--showcase-radius-mobile, var(--showcase-radius, 0));
+    }
+  }
+
+  .testimonial-showcase.has-background-media { overflow: hidden; }
+
+  .testimonial-showcase.has-background-media > :not(.background-media) {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ---- the two columns ---- */
+
+  .showcase__layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sv-gap-y, 40px);
+    align-items: var(--sv-align, center);
+  }
+
+  @media screen and (max-width: 749px) {
+    .showcase__layout { gap: var(--sv-gap-y-mobile, 20px); }
+  }
+
+  /* 990px rather than 750px: this is two columns of prose and photographs, and
+     a tablet in portrait has room for one of them at a readable width. Below
+     it the copy sits above the lanes, which is also the order a screen reader
+     has always had. */
+  @media screen and (min-width: 990px) {
+    .showcase__layout--split {
+      grid-template-columns: var(--sv-intro-col, minmax(0, 1fr)) minmax(0, 1fr);
+      column-gap: var(--sv-gap-x, 56px);
+    }
+
+    /* `order` rather than a second `grid-template-columns`: the source order is
+       copy first, which is the order it should be read in whichever side it is
+       drawn on. */
+    .showcase__layout--media-start .showcase__intro { order: 2; }
+    .showcase__layout--media-start .showcase__media { order: 1; }
+  }
+
+  .showcase__intro,
+  .showcase__media { min-inline-size: 0; }
+
+  .showcase__intro {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ==========================================================================
+     The lanes
+     ========================================================================== */
+
+  .showcase__lanes {
+    display: flex;
+    align-items: stretch;
+    gap: var(--sv-lanes-gap, 24px);
+    min-inline-size: 0;
+  }
+
+  @media screen and (max-width: 749px) {
+    .showcase__lanes {
+      flex-direction: column;
+      gap: var(--sv-lanes-gap-mobile, 12px);
+    }
+  }
+
+  .showcase-lane {
+    position: relative;
+
+    /* A width switches the growth off and becomes the basis — see the note in
+       `blocks/_showcase-column.liquid`, where both are written. */
+    flex: var(--sv-lane-grow, 1) 1 var(--sv-lane-basis, 0);
+    min-inline-size: 0;
+
+    block-size: var(--sv-lane-height, auto);
+
+    /* The clip is the effect. A lane that never cuts a card off at the top or
+       the bottom is a list, not a loop. */
+    overflow: hidden;
+  }
+
+  .showcase-lane__track {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sv-lane-gap, 24px);
+    will-change: transform;
+  }
+
+  /* ---- a row, not a column ---- */
+
+  @media screen and (max-width: 749px) {
+    .showcase-lane {
+      /* The lanes stack, so the flex axis is now vertical and `flex-basis` is a
+         *height*. Left at the desktop `0` with `flex-grow: 1`, every lane asked
+         to be zero pixels tall and then to grow into a container that is itself
+         only as tall as its contents — which is nothing. Back to the content's
+         own height, which is what a stacked row wants. */
+      flex: 0 0 auto;
+      block-size: auto;
+
+      /* The row runs to the screen edge, so a card is half visible at the end
+         of it and the lane reads as continuing rather than as ending. */
+      margin-inline: calc(var(--container-gutter) * -1);
+      padding-inline: var(--container-gutter);
+    }
+
+    .showcase-lane--desktop-only { display: none; }
+
+    .showcase-lane__track {
+      flex-direction: row;
+      gap: var(--sv-lane-gap-mobile, 12px);
+    }
+
+    .showcase-lane__track > * {
+      flex: 0 0 var(--sv-lane-card-mobile, 260px);
+      inline-size: var(--sv-lane-card-mobile, 260px);
+    }
+  }
+
+  /* ---- the fade at each end ---- */
+
+  .showcase-lane--faded {
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      transparent 0,
+      #000 var(--sv-lane-fade, 0px),
+      #000 calc(100% - var(--sv-lane-fade, 0px)),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to bottom,
+      transparent 0,
+      #000 var(--sv-lane-fade, 0px),
+      #000 calc(100% - var(--sv-lane-fade, 0px)),
+      transparent 100%
+    );
+  }
+
+  @media screen and (max-width: 749px) {
+    .showcase-lane--faded {
+      -webkit-mask-image: linear-gradient(
+        to right,
+        transparent 0,
+        #000 var(--sv-lane-fade, 0px),
+        #000 calc(100% - var(--sv-lane-fade, 0px)),
+        transparent 100%
+      );
+      mask-image: linear-gradient(
+        to right,
+        transparent 0,
+        #000 var(--sv-lane-fade, 0px),
+        #000 calc(100% - var(--sv-lane-fade, 0px)),
+        transparent 100%
+      );
+    }
+  }
+
+  /* ---- and the customer who asked for less movement ----
+
+     `assets/testimonial-showcase.js` sets this attribute instead of animating.
+     The reviews are still all there; they are a list the customer scrolls
+     themselves. `data-lenis-prevent` is set here rather than in Liquid because
+     the lane is only ever scrollable in this one state, and Lenis would
+     otherwise swallow the wheel event over it. */
+  .showcase-lane[data-showcase-static] {
+    overflow: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+
+  .showcase-lane[data-showcase-static] .showcase-lane__track {
+    transform: none;
+    will-change: auto;
+  }
+}
+
+/* ==========================================================================
+   One video review
+   ========================================================================== */
+
+@layer overrides {
+  .showcase-card {
+    position: relative;
+    isolation: isolate;
+
+    /* One cell, and everything in it. The row is as tall as the taller of the
+       picture and the words, so a long quote grows the card rather than
+       spilling out of a fixed frame. */
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+
+    border-radius: var(--sv-card-radius, 20px);
+    overflow: hidden;
+
+    background-color: var(--color-secondary-background);
+    color: var(--sv-card-text, #ffffff);
+    box-shadow: var(--sv-card-glow, none);
+  }
+
+  @media screen and (max-width: 749px) {
+    .showcase-card {
+      border-radius: var(--sv-card-radius-mobile, var(--sv-card-radius, 20px));
+    }
+  }
+
+  /* The frame, drawn on a pseudo-element rather than as a real border.
+
+     A border on the card would inset the photograph by its own width, and the
+     design has the picture running to the corners with a hairline over it. It
+     is also the only way the gradient option can work at all: a border takes a
+     colour, and `border-image` cannot be given a radius. */
+  .showcase-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+
+    border-radius: inherit;
+    pointer-events: none;
+
+    border-width: var(--sv-card-border-width, 0px);
+    border-style: var(--sv-card-border-style, solid);
+    border-color: var(--sv-card-border-color, transparent);
+  }
+
+  /* The gradient stroke: a filled box with its middle masked out, which is the
+     one technique that gives a rounded gradient outline without a second
+     element inside the card. */
+  .showcase-card--gradient-border::after {
+    border: 0;
+    padding: var(--sv-card-border-width, 1px);
+    background: var(--sv-card-border-image, none);
+
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask-composite: exclude;
+  }
+
+  .showcase-card__media {
+    grid-area: 1 / 1;
+    aspect-ratio: var(--sv-card-ratio, 3 / 4);
+    min-block-size: 0;
+  }
+
+  .showcase-card__media .showcase-card__frame,
+  .showcase-card__media responsive-image {
+    display: block;
+    inline-size: 100%;
+    block-size: 100%;
+  }
+
+  .showcase-card__image {
+    inline-size: 100%;
+    block-size: 100%;
+    object-fit: cover;
+  }
+
+  /* Decoration, and the words above it are the content. A gradient rather than
+     a flat tint, and a height rather than a full cover: the quote needs a dark
+     floor and the face above it does not need dimming. */
+  .showcase-card__scrim {
+    grid-area: 1 / 1;
+    z-index: 1;
+    pointer-events: none;
+
+    background: linear-gradient(
+      to top,
+      var(--sv-scrim, rgba(15, 46, 47, 0.9)) 0%,
+      color-mix(in srgb, var(--sv-scrim, rgba(15, 46, 47, 0.9)) 45%, transparent)
+        calc(var(--sv-scrim-height, 62%) * 0.55),
+      transparent var(--sv-scrim-height, 62%)
+    );
+  }
+
+  .showcase-card__body {
+    grid-area: 1 / 1;
+    z-index: 2;
+    align-self: end;
+
+    display: flex;
+    flex-direction: column;
+    gap: var(--sv-card-gap, 8px);
+
+    min-inline-size: 0;
+  }
+
+  /* ---- the play control ---- */
+
+  .showcase-card__play {
+    grid-area: 1 / 1;
+    z-index: 3;
+    place-self: center;
+
+    inline-size: var(--sv-play-size, 48px);
+    block-size: var(--sv-play-size, 48px);
+
+    display: grid;
+    place-items: center;
+
+    appearance: none;
+    border: 0;
+    padding: 0;
+    border-radius: 50%;
+    cursor: pointer;
+
+    background-color: var(--sv-play-background, rgba(255, 255, 255, 0.82));
+    color: var(--sv-play-icon, #0f2e2f);
+
+    transition:
+      transform var(--duration-base, 250ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+      background-color var(--duration-base, 250ms) ease;
+  }
+
+  .showcase-card__play-glyph {
+    display: grid;
+    place-items: center;
+    /* The glyph sits a hair to the right of centre, because a triangle's
+       optical centre is not its bounding box's. */
+    margin-inline-start: 0.1em;
+  }
+
+  @media (hover: hover) {
+    .showcase-card:hover .showcase-card__play,
+    .showcase-card__play:focus-visible {
+      transform: scale(1.08);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .showcase-card__play { transition-duration: 1ms; }
+
+    .showcase-card:hover .showcase-card__play,
+    .showcase-card__play:focus-visible { transform: none; }
+  }
+
+  /* ---- who said it ---- */
+
+  .showcase-card__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.8rem;
+  }
+
+  .showcase-card__identity {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.8rem;
+    min-inline-size: 0;
+  }
+
+  .showcase-card__seal {
+    flex: 0 0 auto;
+    inline-size: calc(var(--sv-name-size, 18px) * 0.95);
+    block-size: calc(var(--sv-name-size, 18px) * 0.95);
+    color: var(--sv-verified, #f9f871);
+  }
+
+  .showcase-card__name {
+    font-style: normal;
+    font-size: var(--sv-name-size, 18px);
+    font-weight: 500;
+    line-height: 1.2;
+    color: inherit;
+  }
+
+  /* The stars sit in a chip, which is what makes them legible over a
+     photograph rather than over a colour somebody chose. */
+  .showcase-card__rating {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+
+    padding: 0.4rem 0.9rem;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, currentColor 28%, transparent);
+    background-color: color-mix(in srgb, currentColor 12%, transparent);
+  }
+
+  /* Scoped to this card, so `snippets/rating-stars.liquid` keeps drawing
+     outlined stars everywhere else in the theme. */
+  .showcase-card__rating .rating-stars__star--full,
+  .showcase-card__rating .rating-stars__star--half {
+    color: var(--sv-star-color, #f9f871);
+    fill: currentColor;
+  }
+
+  .showcase-card__rating .rating-stars__star--empty {
+    color: var(--sv-star-color, #f9f871);
+    fill: none;
+    opacity: 0.35;
+  }
+
+  .showcase-card__headline {
+    margin: 0;
+    font-size: var(--sv-headline-size, 15px);
+    font-weight: 600;
+    line-height: 1.35;
+  }
+
+  .showcase-card__quote {
+    margin: 0;
+    font-size: var(--sv-quote-size, 15px);
+    line-height: 1.5;
+    color: color-mix(in srgb, currentColor 88%, transparent);
+  }
+
+  .showcase-card__quote > :first-child { margin-block-start: 0; }
+  .showcase-card__quote > :last-child { margin-block-end: 0; }
+}
+
+/* ==========================================================================
+   The intro column
+   ========================================================================== */
+
+@layer overrides {
+  .showcase-intro {
+    display: flex;
+    flex-direction: column;
+    align-items: var(--sv-intro-align, center);
+    text-align: var(--sv-intro-align, center);
+    gap: var(--sv-intro-gap, 16px);
+
+    inline-size: 100%;
+    max-inline-size: var(--sv-intro-width, none);
+    margin-inline: auto;
+  }
+
+  @media screen and (max-width: 749px) {
+    .showcase-intro {
+      align-items: var(--sv-intro-align-mobile, var(--sv-intro-align, center));
+      text-align: var(--sv-intro-align-mobile, var(--sv-intro-align, center));
+    }
+  }
+
+  .showcase-intro__score {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1.2rem;
+  }
+
+  .showcase-intro__chips {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sv-chip-gap, 8px);
+  }
+
+  .showcase-intro__chip {
+    display: grid;
+    place-items: center;
+
+    inline-size: var(--sv-chip-size, 19px);
+    block-size: var(--sv-chip-size, 19px);
+    border-radius: var(--sv-chip-radius, 2px);
+
+    background-color: var(--sv-chip-background, #f9f871);
+    color: var(--sv-chip-star, #0f2e2f);
+  }
+
+  .showcase-intro__chip--empty {
+    background-color: var(--sv-chip-empty, color-mix(in srgb, currentColor 18%, transparent));
+  }
+
+  /* The chip is the shape and the star is knocked out of it, so the glyph is
+     filled rather than stroked — which is the whole difference between this
+     row and `blocks/rating-badge.liquid`'s. */
+  .showcase-intro__chip-star {
+    fill: currentColor;
+    stroke: none;
+  }
+
+  .showcase-intro__score-value {
+    font-size: var(--sv-score-size, 18px);
+    font-weight: 600;
+    line-height: 1;
+    color: var(--sv-score-color, inherit);
+  }
+
+  .showcase-intro__caption {
+    margin: 0;
+    font-size: var(--sv-caption-size, 15px);
+    line-height: 1.45;
+    color: var(--sv-caption-color, inherit);
+  }
+
+  .showcase-intro__heading {
+    margin: 0;
+    font-size: var(--sv-intro-heading-size, 44px);
+    line-height: 1.12;
+    color: var(--sv-intro-heading-color, inherit);
+  }
+
+  @media screen and (max-width: 749px) {
+    .showcase-intro__heading {
+      font-size: var(--sv-intro-heading-size-mobile, var(--sv-intro-heading-size, 44px));
+    }
+  }
+
+  .showcase-intro__text {
+    font-size: var(--sv-intro-text-size, 16px);
+    line-height: 1.55;
+    color: var(--sv-intro-text-color, inherit);
+  }
+
+  .showcase-intro__text > :first-child { margin-block-start: 0; }
+  .showcase-intro__text > :last-child { margin-block-end: 0; }
+
+  .showcase-intro__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: var(--sv-intro-align, center);
+    gap: var(--sv-intro-actions-gap, 12px);
+
+    inline-size: 100%;
+    margin-block-start: var(--sv-intro-actions-space, 36px);
+  }
+
+  /* `:empty` cannot be used: `{% content_for 'blocks' %}` leaves whitespace
+     behind even when it renders nothing, and whitespace is a child node. */
+  .showcase-intro__actions:not(:has(*)) { display: none; }
+
+  @media screen and (max-width: 749px) {
+    .showcase-intro__actions {
+      justify-content: var(--sv-intro-align-mobile, var(--sv-intro-align, center));
+    }
+  }
+}
+
+/* ==========================================================================
+   The proof row
+   ========================================================================== */
+
+@layer overrides {
+  .showcase-stats {
+    display: grid;
+    grid-template-columns: repeat(var(--sv-stats-columns, 3), minmax(0, 1fr));
+    gap: var(--sv-stats-gap, 10px);
+    inline-size: 100%;
+  }
+
+  @media screen and (max-width: 749px) {
+    .showcase-stats {
+      grid-template-columns: repeat(var(--sv-stats-columns-mobile, 1), minmax(0, 1fr));
+      gap: var(--sv-stats-gap-mobile, 8px);
+    }
+  }
+
+  .showcase-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: var(--sv-stat-gap, 8px);
+
+    block-size: 100%;
+
+    border-radius: var(--sv-stat-radius, 16px);
+    border-width: var(--sv-stat-border-width, 0px);
+    border-style: var(--sv-stat-border-style, solid);
+    border-color: var(--sv-stat-border-color, transparent);
+
+    background: var(--sv-stat-background, transparent);
+  }
+
+  @media screen and (max-width: 749px) {
+    .showcase-stat {
+      border-radius: var(--sv-stat-radius-mobile, var(--sv-stat-radius, 16px));
+    }
+  }
+
+  /* The glyph's own distance from the number, on top of the stack's gap rather
+     than instead of it — so setting them equal is not a special case. */
+  .showcase-stat__icon {
+    display: grid;
+    place-items: center;
+    color: var(--sv-stat-icon-color, var(--sv-accent, currentColor));
+    margin-block-end: max(0px, calc(var(--sv-stat-icon-gap, 14px) - var(--sv-stat-gap, 8px)));
+  }
+
+  .showcase-stat__icon-image,
+  .showcase-stat__icon responsive-image {
+    inline-size: var(--sv-stat-icon-size, 2.8rem);
+    block-size: auto;
+  }
+
+  .showcase-stat__value {
+    font-size: var(--sv-stat-value-size, 22px);
+    line-height: 1.15;
+    color: var(--sv-stat-value-color, inherit);
+  }
+
+  .showcase-stat__label {
+    font-size: var(--sv-stat-label-size, 15px);
+    line-height: 1.35;
+    color: var(--sv-stat-label-color, inherit);
+  }
+}
+
+/* ==========================================================================
+   The video modal
+   ========================================================================== */
+
+@layer overrides {
+  /* Room for the close button, which sits outside the ring at the corner.
+     `.modal__dialog` clips, so without this the control would be cut in half on
+     a narrow window. */
+  .showcase-modal__dialog {
+    padding: clamp(2.4rem, 5vw, 5.6rem);
+  }
+
+  .showcase-modal__dialog::backdrop {
+    background-color: var(--sv-modal-backdrop, rgba(15, 46, 47, 0.55));
+    -webkit-backdrop-filter: blur(var(--sv-modal-backdrop-blur, 8px));
+    backdrop-filter: blur(var(--sv-modal-backdrop-blur, 8px));
+  }
+
+  /* The ring is the panel: a translucent frame with the stage inset into it by
+     its own padding. Two elements would need the radii kept in step by hand. */
+  .showcase-modal__panel {
+    position: relative;
+
+    /* Three ceilings, and the third is the one that is easy to forget: a 9:16
+       stage at 880px wide is 1560px tall, which is off the bottom of every
+       screen there is. So the panel is also capped at whatever width the
+       viewport's *height* can afford at this ratio — which is why the ratio is
+       emitted as a decimal as well as as a pair, since `calc()` cannot divide
+       by `16 / 9`. */
+    inline-size: min(
+      var(--sv-modal-width, 880px),
+      100%,
+      calc((100vh - var(--sv-modal-chrome)) * var(--sv-modal-ratio-value, 1.7778))
+    );
+
+    /* The dialog's own padding either side of the panel, plus the ring, which
+       is the room the stage does not get. */
+    --sv-modal-chrome: calc(11.2rem + 2 * var(--sv-modal-ring, 14px));
+
+    max-block-size: none;
+
+    padding: var(--sv-modal-ring, 14px);
+    border-radius: calc(var(--sv-modal-radius, 24px) + var(--sv-modal-ring, 14px));
+
+    background-color: var(--sv-modal-ring-color, rgba(255, 255, 255, 0.28));
+    box-shadow: none;
+    overflow: visible;
+  }
+
+  .showcase-modal__stage {
+    position: relative;
+    aspect-ratio: var(--sv-modal-ratio, 16 / 9);
+    inline-size: 100%;
+
+    border-radius: var(--sv-modal-radius, 24px);
+    overflow: hidden;
+    background-color: #000000;
+  }
+
+  .showcase-modal__close {
+    position: absolute;
+    z-index: 2;
+    inset-block-start: -1.8rem;
+    inset-inline-end: -1.8rem;
+
+    inline-size: 3.6rem;
+    block-size: 3.6rem;
+
+    display: grid;
+    place-items: center;
+
+    appearance: none;
+    border: 0;
+    padding: 0;
+    border-radius: 50%;
+    cursor: pointer;
+
+    background-color: var(--sv-badge-background, #03d26f);
+    color: var(--sv-badge-text, #0f2e2f);
+
+    transition: transform var(--duration-base, 250ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+  }
+
+  @media (hover: hover) {
+    .showcase-modal__close:hover { transform: scale(1.08); }
+  }
+
+  /* Below the point where a button hanging off the corner would leave the
+     screen, it comes inside the ring instead. */
+  @media screen and (max-width: 749px) {
+    .showcase-modal__close {
+      inset-block-start: 0.8rem;
+      inset-inline-end: 0.8rem;
+    }
+  }
+
+  /* ---- the media inside it ---- */
+
+  .showcase-media {
+    display: block;
+    position: absolute;
+    inset: 0;
+  }
+
+  .showcase-media__poster {
+    display: block;
+    position: absolute;
+    inset: 0;
+
+    appearance: none;
+    border: 0;
+    padding: 0;
+    background: none;
+    cursor: pointer;
+  }
+
+  .showcase-media__poster[hidden] { display: none; }
+
+  .showcase-media__image,
+  .showcase-media__poster responsive-image {
+    display: block;
+    inline-size: 100%;
+    block-size: 100%;
+    object-fit: cover;
+  }
+
+  /* `<deferred-media>` appends the media as a sibling of the poster, so it is
+     placed here rather than by whatever the embed's own markup happens to do. */
+  .showcase-media__player,
+  .showcase-media iframe,
+  .showcase-media video {
+    position: absolute;
+    inset: 0;
+    inline-size: 100%;
+    block-size: 100%;
+    border: 0;
+    object-fit: contain;
+    background-color: #000000;
+  }
+
+  /* ---- the badge ---- */
+
+  .showcase-media__badge {
+    position: absolute;
+    inset-block-start: 50%;
+    inset-inline-start: 50%;
+    transform: translate(-50%, -50%);
+
+    inline-size: var(--sv-badge-size, 112px);
+    block-size: var(--sv-badge-size, 112px);
+
+    display: grid;
+    place-items: center;
+
+    border-radius: 50%;
+    background-color: var(--sv-badge-background, #03d26f);
+    color: var(--sv-badge-text, #0f2e2f);
+    pointer-events: none;
+  }
+
+  .showcase-media__badge-ring {
+    position: absolute;
+    inset: 0;
+    inline-size: 100%;
+    block-size: 100%;
+    animation: showcase-badge-spin var(--sv-badge-spin, 12s) linear infinite;
+  }
+
+  /* The size is in viewBox units, so the ring of text scales with the badge
+     rather than staying at one pixel size inside a circle that grows. */
+  .showcase-media__badge-text {
+    font-family: var(--font-body-family, inherit);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    fill: currentColor;
+  }
+
+  .showcase-media__badge-glyph {
+    display: grid;
+    place-items: center;
+    margin-inline-start: 0.1em;
+  }
+
+  @keyframes showcase-badge-spin {
+    to { transform: rotate(360deg); }
+  }
+
+  /* A badge spinning forever is decorative movement with no control, which is
+     exactly what the preference exists to switch off. The badge stays; only
+     the rotation goes. */
+  @media (prefers-reduced-motion: reduce) {
+    .showcase-media__badge-ring { animation: none; }
+  }
+
+  @media (hover: hover) {
+    .showcase-media__poster:hover .showcase-media__badge,
+    .showcase-media__poster:focus-visible .showcase-media__badge {
+      transform: translate(-50%, -50%) scale(1.06);
+    }
+  }
+}

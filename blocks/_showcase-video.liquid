@@ -1,0 +1,866 @@
+{% doc %}
+  blocks/_showcase-video.liquid — private to `blocks/_showcase-column.liquid`.
+
+  One video review: a face, a play control, and what they said written over the
+  foot of their own photograph.
+
+  ## The card is one box, not a picture with a caption under it
+
+  `.showcase-card` is a one-cell grid and everything in it occupies that cell —
+  the photograph, the scrim over it, and the words. The row is as tall as the
+  taller of the two, so a long quote grows the card and stretches the picture
+  with it rather than spilling off the bottom of a fixed frame.
+
+  That is why the ratio is on the media rather than on the card. A card with
+  `aspect-ratio` on itself is a box that ignores its own contents; a media cell
+  with one is a *preferred* height that the grid row is free to beat.
+
+  ## Nothing is fetched for a video nobody opens
+
+  The card carries a `<template>` holding a whole `<deferred-media>` — poster,
+  play control, and a second `<template>` with the real video or embed. Markup
+  inside a template is inert: no fetch, no decode, no metadata request. A lane
+  of twelve reviews costs twelve posters' worth of `<img>` and nothing else
+  until one is pressed, at which point
+  `assets/testimonial-showcase.js` clones that template into the section's
+  modal.
+
+  Two templates rather than one because they switch off two different things.
+  The outer one keeps the modal's poster out of the page; the inner one is
+  `<deferred-media>`'s own contract, and keeps the video out of the modal until
+  the play badge is pressed there too.
+
+  ## The play control is a button, and the card is not a link
+
+  A card that navigates cannot also open a video without the first tap doing
+  something nobody asked for. So the picture is not a link, the play control is
+  a `<button>`, and it carries the reviewer's name as its accessible label —
+  "Play Myrna T.'s video" rather than twelve buttons all called "Play".
+
+  The lanes clone their cards to loop, so the button's handler is delegated from
+  the section rather than bound here: a listener attached at build time would be
+  missing from every copy, which is most of what is on the screen.
+
+  ## The verified seal is drawn here rather than in `snippets/icon.liquid`
+
+  It is two shapes that have to sit inside each other — a scalloped disc and the
+  tick on it — and the icon snippet renders one path with one stroke. Adding a
+  case for it would mean either a seal with no tick or a second icon that only
+  makes sense stacked on the first.
+
+  ## Three copies of every default
+
+  The schema default, the `| default:` beside the setting that reads it, and the
+  column preset in the section. They have to agree: a card created from a preset
+  that omits a setting has nothing stored, so it falls through to the Liquid
+  fallback while the editor panel shows the schema's number.
+{% enddoc %}
+
+{%- liquid
+  assign s = block.settings
+
+  comment
+    ---- what there is to play ----
+
+    A hosted video is a file in Shopify's CDN — real playback control, real
+    posters, `video_tag` writing the sources. A URL is YouTube or Vimeo and an
+    iframe. Both are supported because merchants have their footage in both
+    places, and the hosted path is better in every measurable way.
+
+    Truthiness for the object and `''` for the string: nil is falsy in every
+    Liquid engine, and `nil != blank` is not consistently false in all of them.
+    That difference decides whether a merchant with only a URL gets an embed or
+    an empty `<video>`.
+  endcomment
+  assign hosted = false
+  if s.video
+    assign hosted = true
+  endif
+
+  assign external = s.video_url | default: ''
+
+  assign has_video = false
+  if hosted or external != ''
+    assign has_video = true
+  endif
+
+  comment
+    The card's own picture, and the modal's poster, are the same image resolved
+    once. A merchant who uploads a video gets its `preview_image` without being
+    asked for a still; picking one overrides it, which is worth doing when the
+    first frame is a fade from black.
+  endcomment
+  assign poster = s.image
+  if poster == blank and hosted
+    assign poster = s.video.preview_image
+  endif
+
+  assign author = s.author | default: ''
+  assign rating = s.rating | default: 5 | plus: 0
+
+  assign show_verified = s.show_verified
+  if show_verified == nil
+    assign show_verified = true
+  endif
+
+  comment
+    The button says whose video it is. Twelve buttons called "Play" is twelve
+    identical stops in a screen reader's list of controls, and the name is the
+    only thing that tells them apart.
+  endcomment
+  assign play_label = 'sections.testimonials_showcase.play_video' | t
+  if author != ''
+    assign play_label = 'sections.testimonials_showcase.play_video_by' | t: name: author
+  endif
+
+  comment
+    ---- the frame ----
+
+    The theme's border group, resolved exactly as `blocks/_testimonial-card.liquid`
+    resolves its own, with one addition: Gradient. The design draws a stroke that
+    is bright at one corner and gone at the other, which a single border colour
+    cannot express — so that option paints a gradient into a pseudo-element and
+    masks its middle out, and the plain styles keep using a real border.
+
+    A blank colour has no alpha channel to read until the scheme resolves in the
+    browser, so `color_modify` cannot fade it and `color-mix` does that job at
+    paint time instead.
+  endcomment
+  assign border_line = s.border_style | default: 'gradient'
+  assign border_width = 0
+  assign border_paint = ''
+
+  if border_line != 'none'
+    assign border_width = s.border_width | default: 1 | plus: 0
+
+    assign border_percent = s.border_opacity | default: 100 | plus: 0
+    if s.border_color == blank
+      assign border_paint = 'color-mix(in srgb, currentColor ' | append: border_percent | append: '%, transparent)'
+    else
+      assign border_alpha = border_percent | divided_by: 100.0
+      assign border_paint = s.border_color | color_modify: 'alpha', border_alpha
+    endif
+  endif
+
+  assign gradient_paint = ''
+  if border_line == 'gradient'
+    assign gradient_angle = s.border_gradient_angle | default: 200 | plus: 0
+    assign gradient_end = s.border_color_end | default: 'rgba(255,255,255,0)'
+    assign gradient_paint = 'linear-gradient(' | append: gradient_angle | append: 'deg, ' | append: border_paint | append: ', ' | append: gradient_end | append: ')'
+  endif
+
+  assign radius = s.border_radius | default: 20 | plus: 0
+  assign radius_mobile = s.border_radius_mobile | default: radius | plus: 0
+
+  comment
+    ---- the scrim ----
+
+    A gradient rather than a flat tint, and a height rather than a full cover:
+    the words need a dark floor to sit on and the face above them does not need
+    dimming. `--sv-scrim-height` is where the gradient starts, as a share of the
+    card.
+  endcomment
+  assign scrim_paint = ''
+  if s.scrim_color != blank
+    assign scrim_alpha = s.scrim_opacity | default: 90 | plus: 0
+    assign scrim_alpha = scrim_alpha | divided_by: 100.0
+    assign scrim_paint = s.scrim_color | color_modify: 'alpha', scrim_alpha
+  endif
+
+  assign scrim_height = s.scrim_height | default: 62 | plus: 0
+
+  comment
+    ---- the play control ----
+
+    Sized from one number. The glyph, the disc and the ring around it are all
+    derived from `play_size`, so a merchant moves one slider rather than three
+    that can be set out of proportion with each other.
+  endcomment
+  comment
+    Resolved here rather than in the `render` argument: filters are not allowed
+    on arguments passed to `render`, and the tag fails to parse rather than
+    ignoring them.
+  endcomment
+  assign star_size = s.star_size | default: 11 | plus: 0
+
+  assign play_size = s.play_size | default: 48 | plus: 0
+  assign play_glyph = play_size | times: 0.36 | round
+  if play_glyph < 8
+    assign play_glyph = 8
+  endif
+
+  assign card_ratio = s.card_ratio | default: '3-4'
+
+  comment
+    `sizes` describes the widest this card is ever painted. A lane is a column
+    about a third of the row on a desktop and a fixed-width card on a phone, so
+    a wrong hint here is a photograph arriving three sizes larger than the box
+    it fills — once per card, and the lanes clone their cards.
+  endcomment
+  assign card_sizes = '(min-width: 990px) 360px, (min-width: 750px) 320px, 80vw'
+
+  assign card_classes = 'showcase-card'
+  if border_line == 'gradient'
+    assign card_classes = card_classes | append: ' showcase-card--gradient-border'
+  endif
+  unless has_video
+    assign card_classes = card_classes | append: ' showcase-card--still'
+  endunless
+-%}
+
+{%- capture card_style -%}
+  {%- render 'spacing', block: s, declarations: true -%}
+  --sv-card-radius: {{ radius }}px;
+  --sv-card-radius-mobile: {{ radius_mobile }}px;
+  --sv-card-gap: {{ s.gap | default: 8 | plus: 0 }}px;
+  --sv-card-ratio: {% render 'aspect-ratio', ratio: card_ratio, image: poster %};
+  --sv-scrim-height: {{ scrim_height }}%;
+  --sv-play-size: {{ play_size }}px;
+  --sv-name-size: {{ s.name_size | default: 18 | plus: 0 }}px;
+  --sv-headline-size: {{ s.headline_size | default: 15 | plus: 0 }}px;
+  --sv-quote-size: {{ s.quote_size | default: 15 | plus: 0 }}px;
+  {%- if border_width > 0 -%}
+    --sv-card-border-width: {{ border_width }}px;
+    {%- if border_line == 'gradient' -%}
+      --sv-card-border-image: {{ gradient_paint }};
+    {%- else -%}
+      --sv-card-border-style: {{ border_line }};
+      --sv-card-border-color: {{ border_paint }};
+    {%- endif -%}
+  {%- endif -%}
+  {%- if s.glow_size > 0 and s.glow_color != blank -%}
+    --sv-card-glow: 0 0 {{ s.glow_size | plus: 0 }}px {{ s.glow_color }};
+  {%- endif -%}
+  {%- if scrim_paint != '' -%}
+    --sv-scrim: {{ scrim_paint }};
+  {%- endif -%}
+  {%- if s.text_color != blank -%}
+    --sv-card-text: {{ s.text_color }};
+  {%- endif -%}
+  {%- if s.star_color != blank -%}
+    --sv-star-color: {{ s.star_color }};
+  {%- endif -%}
+  {%- if s.verified_color != blank -%}
+    --sv-verified: {{ s.verified_color }};
+  {%- endif -%}
+  {%- if s.play_background != blank -%}
+    --sv-play-background: {{ s.play_background }};
+  {%- endif -%}
+  {%- if s.play_icon_color != blank -%}
+    --sv-play-icon: {{ s.play_icon_color }};
+  {%- endif -%}
+{%- endcapture -%}
+
+<article
+  class="{{ card_classes }}"
+  data-showcase-card
+  {%- if author != blank %} data-showcase-label="{{ author | escape }}"{% endif %}
+  style="{{ card_style | strip_newlines | strip }}"
+  {{ block.shopify_attributes }}
+>
+  <div class="showcase-card__media">
+    {% render 'image',
+       image: poster,
+       alt: '',
+       ratio: card_ratio,
+       class: 'showcase-card__image',
+       wrapper_class: 'showcase-card__frame',
+       placeholder: 'hero-apparel-2',
+       sizes: card_sizes %}
+  </div>
+
+  {%- comment -%}
+    Decoration, and it says so. The words above it are the content and the
+    gradient exists so they can be read over a photograph nobody chose for its
+    contrast.
+  {%- endcomment -%}
+  <span class="showcase-card__scrim" aria-hidden="true"></span>
+
+  {%- if has_video -%}
+    <button
+      type="button"
+      class="showcase-card__play"
+      data-showcase-play
+      aria-label="{{ play_label | escape }}"
+    >
+      <span class="showcase-card__play-glyph" aria-hidden="true">
+        {% render 'icon', icon: 'play', size: play_glyph %}
+      </span>
+    </button>
+  {%- endif -%}
+
+  {%- comment -%}
+    `data-block-spacing` is on the body rather than on the card, and that is not
+    a mistake. The four padding sliders are the room around the *words*; the
+    card itself is a photograph that runs to its own corners, and padding on it
+    would inset the picture instead.
+  {%- endcomment -%}
+  <div class="showcase-card__body" data-block-spacing>
+    {%- if author != blank or rating > 0 -%}
+      <div class="showcase-card__head">
+        {%- if author != blank -%}
+          <span class="showcase-card__identity">
+            {%- if show_verified -%}
+              {%- comment -%}
+                A seal, not a claim. The word "Verified" is not written out here
+                because the design has no room for it beside the name — so it is
+                `aria-hidden` and the sentence that carries the meaning is the
+                one on the button and in the quote itself.
+              {%- endcomment -%}
+              <svg
+                class="showcase-card__seal"
+                viewBox="0 0 24 24"
+                fill="none"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path
+                  d="M12 1.2l2.1 2.1 2.9-.4.9 2.8 2.8.9-.4 2.9 2.1 2.1-2.1 2.1.4 2.9-2.8.9-.9 2.8-2.9-.4L12 22.8l-2.1-2.1-2.9.4-.9-2.8-2.8-.9.4-2.9L1.6 12.4l2.1-2.1-.4-2.9 2.8-.9.9-2.8 2.9.4L12 1.2z"
+                  fill="currentColor"
+                />
+                <path
+                  d="M8.4 12.2l2.5 2.5 4.7-5"
+                  stroke="var(--sv-verified-check, #0F2E2F)"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            {%- endif -%}
+            <cite class="showcase-card__name">{{ author | escape }}</cite>
+          </span>
+        {%- endif -%}
+
+        {%- if rating > 0 -%}
+          <span class="showcase-card__rating">
+            {% render 'rating-stars', rating: rating, size: star_size %}
+          </span>
+        {%- endif -%}
+      </div>
+    {%- endif -%}
+
+    {%- if s.headline != blank -%}
+      <p class="showcase-card__headline">{{ s.headline | escape }}</p>
+    {%- endif -%}
+
+    {%- if s.quote != blank -%}
+      <blockquote class="showcase-card__quote">{{ s.quote }}</blockquote>
+    {%- endif -%}
+  </div>
+
+  {%- if has_video -%}
+    {%- comment -%}
+      The modal's contents, held inert until the play control is pressed.
+
+      Both the outer element and the inner one are templates and they switch off
+      two different things — see the note at the head of this file. Cloning the
+      outer one puts a `<deferred-media>` in the modal with a poster and nothing
+      loaded; pressing that poster is what fetches the footage.
+    {%- endcomment -%}
+    <template data-showcase-video>
+      <deferred-media class="showcase-media" data-autoplay="false">
+        <button
+          type="button"
+          class="showcase-media__poster"
+          data-ref="poster"
+          aria-label="{{ play_label | escape }}"
+        >
+          {% render 'image',
+             image: poster,
+             alt: '',
+             ratio: '16-9',
+             class: 'showcase-media__image',
+             placeholder: 'hero-apparel-2',
+             sizes: '(min-width: 990px) 880px, 100vw' %}
+
+          {%- comment -%}
+            The rotating badge. The ring of text is one `textPath` around a
+            circle rather than letters positioned one at a time, so it stays
+            legible at any size and a merchant can write their own words into
+            it. It spins in CSS and stops under `prefers-reduced-motion`.
+          {%- endcomment -%}
+          <span class="showcase-media__badge" aria-hidden="true">
+            <svg class="showcase-media__badge-ring" viewBox="0 0 100 100" focusable="false">
+              <defs>
+                <path
+                  id="showcase-badge-path-{{ block.id }}"
+                  d="M50,50 m-34,0 a34,34 0 1,1 68,0 a34,34 0 1,1 -68,0"
+                  fill="none"
+                />
+              </defs>
+              <text class="showcase-media__badge-text">
+                <textPath href="#showcase-badge-path-{{ block.id }}" startOffset="0">
+                  {{- 'sections.testimonials_showcase.badge' | t -}}
+                </textPath>
+              </text>
+            </svg>
+            <span class="showcase-media__badge-glyph">
+              {% render 'icon', icon: 'play', size: 22 %}
+            </span>
+          </span>
+        </button>
+
+        <template data-ref="template">
+          {%- if hosted -%}
+            {{ s.video
+               | video_tag:
+                   autoplay: true,
+                   loop: false,
+                   muted: false,
+                   controls: true,
+                   playsinline: true,
+                   preload: 'none',
+                   image_size: '1280x',
+                   class: 'showcase-media__player' }}
+          {%- else -%}
+            {%- comment -%}
+              `external_video_url` builds the embed with the flags a review needs
+              — it starts on press, it does not trail into unrelated videos, and
+              it carries no channel branding. It is deliberately *not* muted:
+              somebody pressing play on a testimonial is there for what the
+              person says.
+            {%- endcomment -%}
+            {{ external
+               | external_video_url:
+                   autoplay: true,
+                   loop: false,
+                   controls: true,
+                   playsinline: true,
+                   modestbranding: true,
+                   rel: 0
+               | external_video_tag:
+                   class: 'showcase-media__player',
+                   loading: 'lazy',
+                   title: play_label }}
+          {%- endif -%}
+        </template>
+      </deferred-media>
+    </template>
+  {%- endif -%}
+</article>
+
+{%- comment -%}
+  Every setting below is a control a merchant reaches in the editor, and the
+  schema is one element's styling surface: splitting it to get under Theme
+  Check's count of 40 would split the thing the settings style.
+{%- endcomment -%}
+{% # theme-check-disable ExcessiveSettingsCount %}
+{% schema %}
+{
+  "name": "t:blocks.showcase_video.name",
+  "tag": null,
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "t:blocks.showcase_video.paragraph"
+    },
+    {
+      "type": "video",
+      "id": "video",
+      "label": "t:shared.background.video.label",
+      "info": "t:blocks.showcase_video.settings.video.info"
+    },
+    {
+      "type": "video_url",
+      "id": "video_url",
+      "label": "t:shared.background.video_url.label",
+      "info": "t:shared.background.video_url.info",
+      "accept": ["youtube", "vimeo"]
+    },
+    {
+      "type": "image_picker",
+      "id": "image",
+      "label": "t:blocks.showcase_video.settings.image.label",
+      "info": "t:blocks.showcase_video.settings.image.info"
+    },
+    {
+      "type": "text",
+      "id": "author",
+      "label": "t:blocks.testimonial.settings.author.label",
+      "default": "Myrna T."
+    },
+    {
+      "type": "checkbox",
+      "id": "show_verified",
+      "label": "t:blocks.showcase_video.settings.show_verified.label",
+      "info": "t:blocks.showcase_video.settings.show_verified.info",
+      "default": true
+    },
+    {
+      "type": "range",
+      "id": "rating",
+      "label": "t:blocks.testimonial.settings.rating.label",
+      "min": 0,
+      "max": 5,
+      "step": 1,
+      "default": 5
+    },
+    {
+      "type": "text",
+      "id": "headline",
+      "label": "t:blocks.showcase_video.settings.headline.label",
+      "info": "t:blocks.showcase_video.settings.headline.info",
+      "default": "95% love their experience"
+    },
+    {
+      "type": "richtext",
+      "id": "quote",
+      "label": "t:blocks.testimonial.settings.quote.label",
+      "default": "<p>“I used to crash after lunch, but now my energy stays stable. It’s such an easy habit.”</p>"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.showcase_video.headers.shape"
+    },
+    {
+      "type": "select",
+      "id": "card_ratio",
+      "label": "t:shared.image_ratio.label",
+      "info": "t:blocks.showcase_video.settings.card_ratio.info",
+      "options": [
+        { "value": "9-16", "label": "t:shared.image_ratio.options__1.label" },
+        { "value": "2-3", "label": "t:shared.image_ratio.options__2.label" },
+        { "value": "3-4", "label": "t:shared.image_ratio.options__3.label" },
+        { "value": "portrait", "label": "t:shared.image_ratio.options__4.label" },
+        { "value": "1-1", "label": "t:shared.image_ratio.options__5.label" },
+        { "value": "4-3", "label": "t:shared.image_ratio.options__6.label" },
+        { "value": "16-9", "label": "t:shared.image_ratio.options__7.label" }
+      ],
+      "default": "3-4"
+    },
+    {
+      "type": "range",
+      "id": "border_radius",
+      "label": "t:shared.corner_radius.label",
+      "min": 0,
+      "max": 48,
+      "step": 2,
+      "unit": "px",
+      "default": 20
+    },
+    {
+      "type": "range",
+      "id": "border_radius_mobile",
+      "label": "t:blocks.showcase_video.settings.border_radius_mobile.label",
+      "min": 0,
+      "max": 48,
+      "step": 2,
+      "unit": "px",
+      "default": 16
+    },
+    {
+      "type": "range",
+      "id": "gap",
+      "label": "t:shared.gap.label",
+      "info": "t:blocks.showcase_video.settings.gap.info",
+      "min": 0,
+      "max": 32,
+      "step": 1,
+      "unit": "px",
+      "default": 8
+    },
+    {
+      "type": "select",
+      "id": "border_style",
+      "label": "t:blocks.group.settings.border_style.label",
+      "info": "t:blocks.showcase_video.settings.border_style.info",
+      "options": [
+        { "value": "none", "label": "t:shared.options.none" },
+        { "value": "solid", "label": "t:shared.options.solid" },
+        { "value": "dashed", "label": "t:shared.options.dashed" },
+        { "value": "gradient", "label": "t:blocks.showcase_video.settings.border_style.options__4.label" }
+      ],
+      "default": "gradient"
+    },
+    {
+      "type": "range",
+      "id": "border_width",
+      "label": "t:shared.border.thickness.label",
+      "min": 0,
+      "max": 6,
+      "step": 1,
+      "unit": "px",
+      "default": 1,
+      "visible_if": "{{ block.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_opacity",
+      "label": "t:shared.border.opacity.label",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 100,
+      "visible_if": "{{ block.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "color",
+      "id": "border_color",
+      "label": "t:blocks.group.settings.border_color.label",
+      "default": "#03D26F",
+      "visible_if": "{{ block.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "color",
+      "id": "border_color_end",
+      "label": "t:blocks.showcase_video.settings.border_color_end.label",
+      "info": "t:blocks.showcase_video.settings.border_color_end.info",
+      "default": "#0F2E2F",
+      "visible_if": "{{ block.settings.border_style == 'gradient' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_gradient_angle",
+      "label": "t:blocks.showcase_video.settings.border_gradient_angle.label",
+      "min": 0,
+      "max": 360,
+      "step": 5,
+      "unit": "deg",
+      "default": 200,
+      "visible_if": "{{ block.settings.border_style == 'gradient' }}"
+    },
+    {
+      "type": "color",
+      "id": "glow_color",
+      "label": "t:blocks.showcase_video.settings.glow_color.label",
+      "info": "t:blocks.showcase_video.settings.glow_color.info",
+      "default": "rgba(3, 210, 111, 0.25)"
+    },
+    {
+      "type": "range",
+      "id": "glow_size",
+      "label": "t:blocks.showcase_video.settings.glow_size.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 24
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.showcase_video.headers.overlay"
+    },
+    {
+      "type": "color",
+      "id": "scrim_color",
+      "label": "t:blocks.showcase_video.settings.scrim_color.label",
+      "info": "t:blocks.showcase_video.settings.scrim_color.info",
+      "default": "#0F2E2F"
+    },
+    {
+      "type": "range",
+      "id": "scrim_opacity",
+      "label": "t:blocks.showcase_video.settings.scrim_opacity.label",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 90
+    },
+    {
+      "type": "range",
+      "id": "scrim_height",
+      "label": "t:blocks.showcase_video.settings.scrim_height.label",
+      "info": "t:blocks.showcase_video.settings.scrim_height.info",
+      "min": 20,
+      "max": 100,
+      "step": 2,
+      "unit": "%",
+      "default": 62
+    },
+    {
+      "type": "color",
+      "id": "text_color",
+      "label": "t:blocks.showcase_video.settings.text_color.label",
+      "default": "#FFFFFF"
+    },
+    {
+      "type": "range",
+      "id": "name_size",
+      "label": "t:blocks.showcase_video.settings.name_size.label",
+      "min": 12,
+      "max": 30,
+      "step": 1,
+      "unit": "px",
+      "default": 18
+    },
+    {
+      "type": "range",
+      "id": "headline_size",
+      "label": "t:blocks.showcase_video.settings.headline_size.label",
+      "min": 11,
+      "max": 26,
+      "step": 1,
+      "unit": "px",
+      "default": 15
+    },
+    {
+      "type": "range",
+      "id": "quote_size",
+      "label": "t:blocks.showcase_video.settings.quote_size.label",
+      "min": 11,
+      "max": 24,
+      "step": 1,
+      "unit": "px",
+      "default": 15
+    },
+    {
+      "type": "color",
+      "id": "star_color",
+      "label": "t:blocks.showcase_video.settings.star_color.label",
+      "default": "#F9F871"
+    },
+    {
+      "type": "range",
+      "id": "star_size",
+      "label": "t:blocks.testimonial_card.settings.star_size.label",
+      "min": 8,
+      "max": 20,
+      "step": 1,
+      "unit": "px",
+      "default": 11
+    },
+    {
+      "type": "color",
+      "id": "verified_color",
+      "label": "t:blocks.showcase_video.settings.verified_color.label",
+      "default": "#F9F871",
+      "visible_if": "{{ block.settings.show_verified }}"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.showcase_video.headers.play"
+    },
+    {
+      "type": "range",
+      "id": "play_size",
+      "label": "t:blocks.showcase_video.settings.play_size.label",
+      "info": "t:blocks.showcase_video.settings.play_size.info",
+      "min": 32,
+      "max": 96,
+      "step": 2,
+      "unit": "px",
+      "default": 48
+    },
+    {
+      "type": "color",
+      "id": "play_background",
+      "label": "t:blocks.showcase_video.settings.play_background.label",
+      "default": "rgba(255, 255, 255, 0.82)"
+    },
+    {
+      "type": "color",
+      "id": "play_icon_color",
+      "label": "t:blocks.showcase_video.settings.play_icon_color.label",
+      "default": "#0F2E2F"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.spacing.block_header"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:blocks.showcase_video.paragraphs.padding"
+    },
+    {
+      "type": "select",
+      "id": "padding_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        { "value": "desktop", "label": "t:shared.spacing.devices.options__1.label" },
+        { "value": "mobile", "label": "t:shared.spacing.devices.options__2.label" }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 20,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 20,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 18,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 18,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 16,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 16,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left_mobile",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 14,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right_mobile",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 14,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    }
+  ]
+}
+{% endschema %}

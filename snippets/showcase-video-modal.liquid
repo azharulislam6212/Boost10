@@ -1,0 +1,163 @@
+{% doc %}
+  The video overlay for `sections/testimonials-showcase.liquid`.
+
+  ## One modal for the whole section
+
+  Twelve reviews is not twelve dialogs. Each card carries a `<template>` with
+  its own poster, its own play control and its own media, and
+  `assets/testimonial-showcase.js` clones the one that was pressed into the
+  stage below. The chrome — the ring, the close button, the focus trap, the
+  scroll lock — is written once and reused.
+
+  That also makes the lanes' clones harmless. A lane duplicates its cards to
+  loop seamlessly, and a modal per card would mean four copies of the same
+  dialog id in the document.
+
+  ## The stage is empty until it is asked for
+
+  Nothing is rendered inside it here. Opening fills it; closing empties it, and
+  emptying it is what stops playback — `pause()` reaches a hosted video and
+  does nothing whatsoever to a YouTube iframe, which would otherwise carry on
+  behind a closed overlay with no way to reach it.
+
+  ## Why `<modal-dialog>` rather than a div
+
+  The same reason every other overlay in the theme uses it: the browser owns the
+  top layer, the backdrop, the inertness of the page behind and the Escape key.
+  What this snippet adds is a shape — a ring around a 16:9 stage — and a close
+  button that sits outside the frame rather than over the footage.
+
+  @param {string} id - Unique per section. The section passes `showcase-video-{{ section.id }}`.
+  @param {object} settings - The section's settings object.
+
+  @example
+    {% render 'showcase-video-modal', id: modal_id, settings: section.settings %}
+{% enddoc %}
+
+{%- liquid
+  assign s = settings
+
+  assign ring_width = s.modal_ring_width | default: 14 | plus: 0
+  assign radius = s.modal_radius | default: 24 | plus: 0
+  assign max_width = s.modal_width | default: 880 | plus: 0
+
+  comment
+    The ring is a translucent white by default rather than a colour picked from
+    the scheme: it sits over whatever the page happens to be behind the
+    backdrop, and a scheme colour there is a rectangle that changes meaning
+    every time the modal opens over a different section.
+  endcomment
+  assign ring_paint = 'rgba(255, 255, 255, 0.28)'
+  if s.modal_ring_color != blank
+    assign ring_alpha = s.modal_ring_opacity | default: 28 | plus: 0
+    assign ring_alpha = ring_alpha | divided_by: 100.0
+    assign ring_paint = s.modal_ring_color | color_modify: 'alpha', ring_alpha
+  endif
+
+  assign backdrop_blur = s.modal_backdrop_blur | default: 8 | plus: 0
+
+  comment
+    ---- the shape of the stage ----
+
+    Two forms of the same number. `aspect-ratio` takes the pair and gives the
+    stage its shape; the decimal is what the width has to be multiplied *back*
+    by to work out how wide a panel of a given height can be, and `calc()`
+    cannot divide by a `16 / 9`.
+
+    It exists because a testimonial is as often filmed on a phone as on a
+    camera, and a portrait video in a 16:9 stage is two black bars with a face
+    between them.
+  endcomment
+  assign modal_ratio = s.modal_ratio | default: '16-9'
+
+  case modal_ratio
+    when '9-16'
+      assign ratio_pair = '9 / 16'
+      assign ratio_value = 0.5625
+    when '4-5'
+      assign ratio_pair = '4 / 5'
+      assign ratio_value = 0.8
+    when '1-1'
+      assign ratio_pair = '1 / 1'
+      assign ratio_value = 1
+    when '4-3'
+      assign ratio_pair = '4 / 3'
+      assign ratio_value = 1.3333
+    else
+      assign ratio_pair = '16 / 9'
+      assign ratio_value = 1.7778
+  endcase
+
+  assign entrance = s.modal_animation | default: 'zoom-out'
+  assign entrance_duration = s.modal_animation_duration | default: 360 | plus: 0
+
+  assign modal_label = 'sections.testimonials_showcase.modal_label' | t
+
+  comment
+    ---- the play badge ----
+
+    Its settings live on the section and are written onto *this* element rather
+    than onto the section root, because the modal is a sibling of the section
+    and custom properties inherit down a tree rather than across one. The badge
+    is markup cloned in from a card, so the only ancestor it is guaranteed to
+    have is this one.
+  endcomment
+  assign badge_size = s.badge_size | default: 112 | plus: 0
+  assign badge_spin = s.badge_spin | default: 12 | plus: 0
+-%}
+
+{%- capture modal_style -%}
+  --sv-modal-ring: {{ ring_width }}px;
+  --sv-modal-ring-color: {{ ring_paint }};
+  --sv-modal-radius: {{ radius }}px;
+  --sv-modal-width: {{ max_width }}px;
+  --sv-modal-ratio: {{ ratio_pair }};
+  --sv-modal-ratio-value: {{ ratio_value }};
+  --sv-modal-backdrop-blur: {{ backdrop_blur }}px;
+  --sv-badge-size: {{ badge_size }}px;
+  --sv-badge-spin: {{ badge_spin }}s;
+  {%- if s.modal_backdrop_color != blank -%}
+    --sv-modal-backdrop: {{ s.modal_backdrop_color }};
+  {%- endif -%}
+  {%- if s.badge_background != blank -%}
+    --sv-badge-background: {{ s.badge_background }};
+  {%- endif -%}
+  {%- if s.badge_text_color != blank -%}
+    --sv-badge-text: {{ s.badge_text_color }};
+  {%- endif -%}
+{%- endcapture -%}
+
+<modal-dialog
+  id="{{ id }}"
+  class="modal showcase-modal"
+  data-overlay-type="video"
+  data-animation="{{ entrance }}"
+  data-animation-duration="{{ entrance_duration }}"
+  style="{{ modal_style | strip_newlines | strip }}"
+>
+  <dialog class="modal__dialog showcase-modal__dialog" data-ref="dialog" aria-label="{{ modal_label | escape }}">
+    <div class="modal__panel showcase-modal__panel" data-ref="panel">
+      {%- comment -%}
+        Outside the ring, at the corner, which is where the design puts it and
+        where it cannot be mistaken for part of the footage. It is the first
+        thing in the panel so it is also the first thing focus lands on.
+      {%- endcomment -%}
+      <button
+        type="button"
+        class="showcase-modal__close"
+        data-overlay-close
+        aria-label="{{ 'general.actions.close' | t }}"
+      >
+        {% render 'icon', icon: 'close', size: 16 %}
+      </button>
+
+      {%- comment -%}
+        Filled by `assets/testimonial-showcase.js` with a clone of the pressed
+        card's template, and emptied again on close. Deliberately not
+        `aria-live`: the customer pressed play, so the change is one they asked
+        for and announcing it is noise.
+      {%- endcomment -%}
+      <div class="showcase-modal__stage" data-showcase-stage></div>
+    </div>
+  </dialog>
+</modal-dialog>

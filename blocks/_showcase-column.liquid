@@ -1,0 +1,400 @@
+{% doc %}
+  blocks/_showcase-column.liquid — private to `sections/testimonials-showcase.liquid`.
+
+  One lane of video reviews: a clipped viewport, a track inside it, and the
+  direction and speed that track travels at.
+
+  ## Why the lanes are blocks and not a number
+
+  The obvious design is a **Columns** slider on the section and cards dealt into
+  those columns by JavaScript. It is also the design that cannot answer the
+  first question a merchant asks — "why is that one going the wrong way?" — and
+  the second — "why is that review in the right-hand column?"
+
+  As blocks, each lane owns its own direction, its own speed and its own list.
+  A merchant drags a review from one lane to another and it stays there;
+  they set the right-hand lane to travel down and it travels down. Nothing is
+  derived from an index nobody can see.
+
+  It is also what makes the mobile behaviour honest. On a phone a lane is a row
+  rather than a column, and a lane that is a *block* can say that it travels
+  left there and right on its neighbour. A lane that is a computed column can
+  only alternate.
+
+  ## The axis changes, the element does not
+
+  Above 750px a lane is a column and its track is a flex column; below, both
+  turn on their side. That is two rules in `base.css` and one media query in
+  `assets/testimonial-showcase.js`, and the two breakpoints are deliberately the
+  same number — a lane laid out as a row and animated as a column reads as a
+  section that has broken rather than as one pixel out.
+
+  ## The height is a setting because the clip is the effect
+
+  A lane with no height is as tall as its cards, which is a list rather than a
+  loop: nothing is ever cut off at the top or the bottom, so nothing reads as
+  continuing past the edge. The number here is what the customer sees through,
+  and the cards behind it are what makes it look endless.
+
+  On a phone the height is dropped — the lane is a row, and its height is one
+  card's — and **Card width** takes over as the number that decides how much of
+  the next review is showing.
+{% enddoc %}
+
+{%- liquid
+  assign s = block.settings
+
+  comment
+    Two directions, one per axis, because they are not the same question. Up and
+    down is what a column does; left and right is what a row does. A single
+    control would have to mean both, and the pair a merchant wants — the
+    right-hand lane travelling *down* on a desktop and *left* on a phone — is
+    not expressible as one value.
+  endcomment
+  assign direction = s.direction | default: 'up'
+  assign direction_mobile = s.direction_mobile | default: 'left'
+
+  comment
+    Pixels per second rather than a duration, so a lane of four cards and a lane
+    of twelve travel at the same visible speed. A duration would make the longer
+    lane faster by exactly the ratio of their lengths.
+
+    `plus: 0` rather than `default` alone: the component clamps, and a merchant
+    who wants a nearly-still lane should be able to have one.
+  endcomment
+  assign speed = s.speed | default: 40 | plus: 0
+  assign speed_mobile = s.speed_mobile | plus: 0
+  if s.speed_mobile == nil
+    assign speed_mobile = 30
+  endif
+
+  assign offset = s.offset | default: 0 | plus: 0
+
+  assign gap = s.gap | default: 24 | plus: 0
+  assign gap_mobile = s.gap_mobile | plus: 0
+  if s.gap_mobile == nil
+    assign gap_mobile = 12
+  endif
+
+  assign width = s.width | default: 0 | plus: 0
+  assign height = s.height | default: 620 | plus: 0
+  assign card_width_mobile = s.card_width_mobile | default: 260 | plus: 0
+
+  assign fade = s.fade | default: 0 | plus: 0
+
+  comment
+    `false == blank` is true in Liquid, so a blank check would read "hide it" as
+    "not set" and put the lane back on a phone. `nil` is the only value that
+    means the merchant has not answered yet.
+  endcomment
+  assign hide_mobile = s.hide_mobile
+  if hide_mobile == nil
+    assign hide_mobile = false
+  endif
+
+  assign lane_classes = 'showcase-lane'
+  if hide_mobile
+    assign lane_classes = lane_classes | append: ' showcase-lane--desktop-only'
+  endif
+  if fade > 0
+    assign lane_classes = lane_classes | append: ' showcase-lane--faded'
+  endif
+-%}
+
+{%- capture lane_style -%}
+  {%- render 'spacing', block: s, declarations: true -%}
+  --sv-lane-gap: {{ gap }}px;
+  --sv-lane-gap-mobile: {{ gap_mobile }}px;
+  --sv-lane-card-mobile: {{ card_width_mobile }}px;
+  {%- comment -%}
+    A fixed width is two properties rather than one, because `flex-grow` beats
+    `inline-size` in a flex row: a lane given a width and left growing is a lane
+    that ignores the width it was given. So a width switches the growth off and
+    becomes the basis instead, and 0 leaves both at their sharing defaults.
+  {%- endcomment -%}
+  {%- if width > 0 -%}
+    --sv-lane-grow: 0;
+    --sv-lane-basis: {{ width }}px;
+  {%- endif -%}
+  {%- if height > 0 -%}
+    --sv-lane-height: {{ height }}px;
+  {%- endif -%}
+  {%- if fade > 0 -%}
+    --sv-lane-fade: {{ fade }}px;
+  {%- endif -%}
+{%- endcapture -%}
+
+<div
+  class="{{ lane_classes }}"
+  data-showcase-lane
+  data-block-spacing
+  data-direction-desktop="{{ direction }}"
+  data-direction-mobile="{{ direction_mobile }}"
+  data-speed="{{ speed }}"
+  data-speed-mobile="{{ speed_mobile }}"
+  data-offset="{{ offset }}"
+  style="{{ lane_style | strip_newlines | strip }}"
+  {{ block.shopify_attributes }}
+>
+  {%- comment -%}
+    The track is what moves; the lane is what clips. They cannot be the same
+    element — an element that is translated cannot also be the box the
+    translation is measured against.
+
+    `data-showcase-track` is how the component finds it. A class would work and
+    would also mean that renaming a class in `base.css` silently stops a section
+    animating, which is the kind of coupling data attributes exist to avoid.
+  {%- endcomment -%}
+  <div class="showcase-lane__track" data-showcase-track>
+    {% content_for 'blocks' %}
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "t:blocks.showcase_column.name",
+  "tag": null,
+  "blocks": [
+    {
+      "type": "_showcase-video"
+    }
+  ],
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "t:blocks.showcase_column.paragraph"
+    },
+    {
+      "type": "select",
+      "id": "direction",
+      "label": "t:blocks.showcase_column.settings.direction.label",
+      "info": "t:blocks.showcase_column.settings.direction.info",
+      "options": [
+        { "value": "up", "label": "t:blocks.showcase_column.settings.direction.options__1.label" },
+        { "value": "down", "label": "t:blocks.showcase_column.settings.direction.options__2.label" }
+      ],
+      "default": "up"
+    },
+    {
+      "type": "select",
+      "id": "direction_mobile",
+      "label": "t:blocks.showcase_column.settings.direction_mobile.label",
+      "info": "t:blocks.showcase_column.settings.direction_mobile.info",
+      "options": [
+        { "value": "left", "label": "t:blocks.showcase_column.settings.direction_mobile.options__1.label" },
+        { "value": "right", "label": "t:blocks.showcase_column.settings.direction_mobile.options__2.label" }
+      ],
+      "default": "left"
+    },
+    {
+      "type": "range",
+      "id": "speed",
+      "label": "t:blocks.showcase_column.settings.speed.label",
+      "info": "t:blocks.showcase_column.settings.speed.info",
+      "min": 5,
+      "max": 200,
+      "step": 5,
+      "unit": "px",
+      "default": 40
+    },
+    {
+      "type": "range",
+      "id": "speed_mobile",
+      "label": "t:blocks.showcase_column.settings.speed_mobile.label",
+      "min": 5,
+      "max": 200,
+      "step": 5,
+      "unit": "px",
+      "default": 30
+    },
+    {
+      "type": "range",
+      "id": "offset",
+      "label": "t:blocks.showcase_column.settings.offset.label",
+      "info": "t:blocks.showcase_column.settings.offset.info",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 0
+    },
+    {
+      "type": "checkbox",
+      "id": "hide_mobile",
+      "label": "t:blocks.showcase_column.settings.hide_mobile.label",
+      "info": "t:blocks.showcase_column.settings.hide_mobile.info",
+      "default": false
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.showcase_column.headers.shape"
+    },
+    {
+      "type": "range",
+      "id": "height",
+      "label": "t:blocks.showcase_column.settings.height.label",
+      "info": "t:blocks.showcase_column.settings.height.info",
+      "min": 0,
+      "max": 1000,
+      "step": 20,
+      "unit": "px",
+      "default": 620
+    },
+    {
+      "type": "range",
+      "id": "width",
+      "label": "t:blocks.showcase_column.settings.width.label",
+      "info": "t:blocks.showcase_column.settings.width.info",
+      "min": 0,
+      "max": 600,
+      "step": 10,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "card_width_mobile",
+      "label": "t:blocks.showcase_column.settings.card_width_mobile.label",
+      "info": "t:blocks.showcase_column.settings.card_width_mobile.info",
+      "min": 160,
+      "max": 420,
+      "step": 10,
+      "unit": "px",
+      "default": 260
+    },
+    {
+      "type": "range",
+      "id": "gap",
+      "label": "t:blocks.showcase_column.settings.gap.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 24
+    },
+    {
+      "type": "range",
+      "id": "gap_mobile",
+      "label": "t:blocks.showcase_column.settings.gap_mobile.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 12
+    },
+    {
+      "type": "range",
+      "id": "fade",
+      "label": "t:blocks.showcase_column.settings.fade.label",
+      "info": "t:blocks.showcase_column.settings.fade.info",
+      "min": 0,
+      "max": 200,
+      "step": 5,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "header",
+      "content": "t:shared.spacing.block_header"
+    },
+    {
+      "type": "select",
+      "id": "padding_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        { "value": "desktop", "label": "t:shared.spacing.devices.options__1.label" },
+        { "value": "mobile", "label": "t:shared.spacing.devices.options__2.label" }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left_mobile",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right_mobile",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    }
+  ]
+}
+{% endschema %}

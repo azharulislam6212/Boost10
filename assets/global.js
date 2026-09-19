@@ -105,6 +105,13 @@ const LAZY_MODULES = [
 
   { specifier: '@theme/carousel', tags: ['carousel-slider'] },
   { specifier: '@theme/testimonial-product', tags: ['testimonial-product'] },
+
+  // The lanes of video reviews on the Testimonials showcase section, and the
+  // modal they open. Lazy like the rest: a page without the section never
+  // fetches it. Without it the lanes are a still, scrollable list of cards
+  // whose names, ratings and quotes all still read — what is lost is the
+  // movement and the video, and neither of those was the content.
+  { specifier: '@theme/testimonial-showcase', tags: ['testimonial-showcase'] },
   // The lit point on the Product highlight point section, advanced by the
   // shared scroll ticker. Lazy like the rest: a page without the section never
   // fetches it, and without it every point still renders with the one the
