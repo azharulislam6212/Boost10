@@ -13180,3 +13180,546 @@
     }
   }
 }
+
+/* ==========================================================================
+   Comparison table — the section frame
+   ========================================================================== */
+
+@layer components {
+  .comparison-section {
+    display: flex;
+    flex-direction: column;
+
+    border-radius: var(--comparison-radius, 0);
+
+    border-width: var(--comparison-border-width, 0px);
+    border-style: var(--comparison-border-style, solid);
+    border-color: var(--comparison-border-color, transparent);
+
+    margin-block-start: var(--comparison-margin-block-start, 0px);
+    margin-block-end: var(--comparison-margin-block-end, 0px);
+  }
+
+  @media screen and (max-width: 749px) {
+    .comparison-section {
+      border-radius: var(--comparison-radius-mobile, var(--comparison-radius, 0));
+    }
+  }
+
+  .comparison-section.has-background-media { overflow: hidden; }
+
+  .comparison-section.has-background-media > :not(.background-media) {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* The stack the merchant arranged: a heading cluster, the table, the buttons,
+     the reassurance row. One gap pair behind the section's Desktop/Mobile
+     switch, like every other section in the theme. */
+  .comparison-section__inner {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    gap: var(--comparison-gap-y, var(--space-8)) var(--comparison-gap-x, var(--space-8));
+  }
+
+  .comparison-section--start .comparison-section__inner { align-items: flex-start; }
+  .comparison-section--center .comparison-section__inner { align-items: center; }
+  .comparison-section--end .comparison-section__inner { align-items: flex-end; }
+
+  /* Every child still runs the full width — `align-items` is what centres a
+     button row that hugs its own content, not a licence for the table to come
+     out narrower than the container it was given. */
+  .comparison-section__inner > * { inline-size: 100%; }
+
+  @media screen and (max-width: 749px) {
+    .comparison-section__inner {
+      gap: var(--comparison-gap-y-mobile, var(--comparison-gap-y, var(--space-6)))
+           var(--comparison-gap-x-mobile, var(--comparison-gap-x, var(--space-6)));
+    }
+  }
+
+  /* ==========================================================================
+     Comparison table — the grid, and the rows every column shares
+     ========================================================================== */
+
+  /* One grid, and the reason the whole section exists.
+
+     The row tracks are declared here and nowhere else. Each column spans all of
+     them and re-uses them with `subgrid`, so a claim that wraps to two lines
+     grows its row in every column at the same moment. Four independent columns
+     could not promise that, and a comparison whose rows have slipped out of
+     step is a comparison that lies.
+
+     `--ct-cols-active` is what `assets/comparison-table.js` writes once it has
+     counted the columns that are really there; the per-device values behind it
+     are the merchant's settings, and they are what the page is laid out with
+     before the module lands and if it never does. */
+  .comparison-grid {
+    display: grid;
+    grid-template-columns:
+      minmax(0, var(--ct-label-col, 1.23fr))
+      repeat(var(--ct-cols-active, var(--ct-cols, 3)), minmax(0, 1fr));
+    grid-template-rows:
+      var(--ct-head, 130px)
+      repeat(var(--ct-rows, 6), minmax(var(--ct-row-min, 70px), auto))
+      var(--ct-foot, 32px);
+
+    /* A column past the count the merchant set is hidden by the module. Without
+       it every alternative is on screen, and an implicit track sized like an
+       explicit one is what keeps that arrangement even rather than ragged. */
+    grid-auto-columns: minmax(0, 1fr);
+    grid-auto-flow: column;
+
+    column-gap: var(--ct-gap, 8px);
+    row-gap: 0;
+
+    inline-size: 100%;
+    border-radius: var(--ct-radius, 0);
+
+    border-width: var(--ct-border-width, 0px);
+    border-style: var(--ct-border-style, solid);
+    border-color: var(--ct-border-color, transparent);
+
+    background: var(--ct-background, transparent);
+  }
+
+  /* No claims column, so no wider first track. */
+  .comparison-grid--no-labels {
+    grid-template-columns: repeat(var(--ct-cols-active, var(--ct-cols, 3)), minmax(0, 1fr));
+  }
+
+  @media screen and (max-width: 989px) {
+    .comparison-grid {
+      grid-template-columns:
+        minmax(0, var(--ct-label-col-tablet, var(--ct-label-col, 1.2fr)))
+        repeat(var(--ct-cols-active, var(--ct-cols-tablet, 2)), minmax(0, 1fr));
+    }
+
+    .comparison-grid--no-labels {
+      grid-template-columns: repeat(var(--ct-cols-active, var(--ct-cols-tablet, 2)), minmax(0, 1fr));
+    }
+  }
+
+  @media screen and (max-width: 749px) {
+    .comparison-grid {
+      grid-template-columns:
+        minmax(0, var(--ct-label-col-mobile, var(--ct-label-col, 1.18fr)))
+        repeat(var(--ct-cols-active, var(--ct-cols-mobile, 2)), minmax(0, 1fr));
+      grid-template-rows:
+        var(--ct-head-mobile, var(--ct-head, 88px))
+        repeat(var(--ct-rows, 6), minmax(var(--ct-row-min-mobile, var(--ct-row-min, 56px)), auto))
+        var(--ct-foot-mobile, var(--ct-foot, 20px));
+      column-gap: var(--ct-gap-mobile, var(--ct-gap, 6px));
+    }
+
+    .comparison-grid--no-labels {
+      grid-template-columns: repeat(var(--ct-cols-active, var(--ct-cols-mobile, 2)), minmax(0, 1fr));
+    }
+  }
+
+  /* ---- one column ----
+
+     A grid item with a definite row span and no column position: the grid
+     places it into the next free track in order-modified document order, which
+     is what makes `order` alone enough to move a column and `hidden` alone
+     enough to take one out without leaving a gap where it was.
+
+     Its padding is inline by design. A subgrid subtracts its own padding and
+     border from its first and last tracks rather than from every one, so Top
+     and Bottom here shape the header row and the tail of the panel — and the
+     rows in between stay level with every other column, which is the one thing
+     that must never depend on a setting. */
+  .comparison-column {
+    grid-row: 1 / -1;
+
+    display: grid;
+    grid-template-rows: subgrid;
+    grid-template-columns: minmax(0, 1fr);
+
+    padding-block-start: var(--block-padding-block-start, 0px);
+    padding-block-end: var(--block-padding-block-end, 0px);
+    padding-inline-start: var(--block-padding-inline-start, 32px);
+    padding-inline-end: var(--block-padding-inline-end, 32px);
+
+    border-radius: var(--ct-col-radius, 16px);
+
+    border-width: var(--ct-col-border-width, 0px);
+    border-style: var(--ct-col-border-style, solid);
+    border-color: var(--ct-col-border-color, transparent);
+
+    background: var(--ct-col-background, transparent);
+    color: var(--ct-col-text, inherit);
+
+    /* The chooser's panel hangs out of the header row. */
+    overflow: visible;
+    min-inline-size: 0;
+  }
+
+  /* The claims column starts one row down, which is what makes the drawing read
+     as a table with a header rather than as four equal panels. */
+  .comparison-column--headless { grid-row: 2 / -1; }
+
+  @media screen and (max-width: 749px) {
+    .comparison-column {
+      padding-block-start: var(--block-padding-block-start-mobile, var(--block-padding-block-start, 0px));
+      padding-block-end: var(--block-padding-block-end-mobile, var(--block-padding-block-end, 0px));
+      padding-inline-start: var(--block-padding-inline-start-mobile, var(--block-padding-inline-start, 12px));
+      padding-inline-end: var(--block-padding-inline-end-mobile, var(--block-padding-inline-end, 12px));
+      border-radius: var(--ct-col-radius-mobile, var(--ct-col-radius, 12px));
+    }
+  }
+
+  /* Subgrid is how the rows are shared. Without it each column falls back to
+     tracks of its own, which is the drawn design exactly — fixed 70px rows —
+     and loses only the ability for a long claim to grow every column at once. */
+  @supports not (grid-template-rows: subgrid) {
+    .comparison-column {
+      grid-template-rows:
+        var(--ct-head, 130px)
+        repeat(var(--ct-rows, 6), var(--ct-row-min, 70px))
+        var(--ct-foot, 32px);
+    }
+
+    .comparison-column--headless {
+      grid-template-rows:
+        repeat(var(--ct-rows, 6), var(--ct-row-min, 70px))
+        var(--ct-foot, 32px);
+    }
+
+    @media screen and (max-width: 749px) {
+      .comparison-column {
+        grid-template-rows:
+          var(--ct-head-mobile, var(--ct-head, 88px))
+          repeat(var(--ct-rows, 6), var(--ct-row-min-mobile, var(--ct-row-min, 56px)))
+          var(--ct-foot-mobile, var(--ct-foot, 20px));
+      }
+
+      .comparison-column--headless {
+        grid-template-rows:
+          repeat(var(--ct-rows, 6), var(--ct-row-min-mobile, var(--ct-row-min, 56px)))
+          var(--ct-foot-mobile, var(--ct-foot, 20px));
+      }
+    }
+  }
+
+  /* ---- the header row ---- */
+
+  .comparison-column__head {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-inline-size: 0;
+
+    /* The chooser's panel is absolutely positioned against this. */
+    position: relative;
+  }
+
+  .comparison-column__logo {
+    display: flex;
+    justify-content: center;
+    inline-size: 100%;
+  }
+
+  .comparison-column__logo-image,
+  .comparison-column__logo img {
+    inline-size: var(--ct-logo-width, 140px);
+    max-inline-size: 100%;
+    block-size: auto;
+  }
+
+  @media screen and (max-width: 749px) {
+    .comparison-column__logo-image,
+    .comparison-column__logo img {
+      inline-size: var(--ct-logo-width-mobile, var(--ct-logo-width, 96px));
+    }
+  }
+
+  .comparison-column__title {
+    font-family: var(--font-heading-family);
+    font-size: var(--ct-head-size, 1.8rem);
+    font-weight: var(--ct-head-weight, 700);
+    line-height: 1.25;
+    text-align: center;
+    color: var(--ct-head-color, currentColor);
+  }
+
+  @media screen and (max-width: 749px) {
+    .comparison-column__title {
+      font-size: var(--ct-head-size-mobile, var(--ct-head-size, 1.5rem));
+    }
+  }
+
+  /* ---- one cell ----
+
+     The divider is drawn between cells rather than under them, so it never
+     appears above the first or below the last — and in a column with a header
+     row the first cell is preceded by the header, which is not a cell, so one
+     selector is right in both shapes.
+
+     It sits on the border box rather than inside the padding, which is why
+     changing the space around a claim never moves the line and why its inset is
+     the column's own left and right padding, exactly as drawn. */
+  .comparison-cell {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: var(--ct-cell-align, center);
+    min-inline-size: 0;
+
+    padding-block-start: var(--block-padding-block-start, 8px);
+    padding-block-end: var(--block-padding-block-end, 8px);
+    padding-inline-start: var(--block-padding-inline-start, 0px);
+    padding-inline-end: var(--block-padding-inline-end, 0px);
+
+    text-align: var(--ct-cell-align, center);
+  }
+
+  .comparison-cell--align-start { --ct-cell-align: start; }
+  .comparison-cell--align-center { --ct-cell-align: center; }
+  .comparison-cell--align-end { --ct-cell-align: end; }
+
+  @media screen and (max-width: 749px) {
+    .comparison-cell {
+      padding-block-start: var(--block-padding-block-start-mobile, var(--block-padding-block-start, 6px));
+      padding-block-end: var(--block-padding-block-end-mobile, var(--block-padding-block-end, 6px));
+      padding-inline-start: var(--block-padding-inline-start-mobile, var(--block-padding-inline-start, 0px));
+      padding-inline-end: var(--block-padding-inline-end-mobile, var(--block-padding-inline-end, 0px));
+    }
+  }
+
+  .comparison-column--ruled .comparison-cell + .comparison-cell::before {
+    content: '';
+    position: absolute;
+    inset-inline: 0;
+    inset-block-start: 0;
+    block-size: var(--ct-divider-height, 1px);
+    background-image: var(--ct-divider-image, none);
+    pointer-events: none;
+  }
+
+  .comparison-cell__text {
+    display: block;
+    min-inline-size: 0;
+    font-family: var(--block-font-family, inherit);
+    font-size: var(--block-font-size, 1.6rem);
+    font-weight: var(--block-font-weight, inherit);
+    line-height: var(--block-line-height, 1.25);
+    letter-spacing: var(--block-letter-spacing, inherit);
+    color: var(--block-text-color, currentColor);
+  }
+
+  @media screen and (max-width: 749px) {
+    .comparison-cell__text {
+      font-size: var(--block-font-size-mobile, var(--block-font-size, 1.3rem));
+    }
+  }
+
+  /* ---- the tick and the cross ----
+
+     One element, two palettes. Which palette a cell reads is decided in Liquid
+     by pointing `--ct-mark-*` at `--ct-mark-yes-*` or `--ct-mark-no-*`, so the
+     difference between a filled disc and an outlined ring is which of the same
+     six properties the merchant filled in — on the table, once, for every cell
+     in it. */
+  .comparison-cell__mark {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+
+    inline-size: var(--ct-mark-size, 24px);
+    block-size: var(--ct-mark-size, 24px);
+    border-radius: 50%;
+
+    background: var(--ct-mark-fill, none);
+    box-shadow: inset 0 0 0 var(--ct-mark-ring-width, 0px) var(--ct-mark-ring-color, transparent);
+    color: var(--ct-mark-color, currentColor);
+  }
+
+  @media screen and (max-width: 749px) {
+    .comparison-cell__mark {
+      inline-size: var(--ct-mark-size-mobile, var(--ct-mark-size, 20px));
+      block-size: var(--ct-mark-size-mobile, var(--ct-mark-size, 20px));
+    }
+  }
+
+  /* Sized here rather than by `snippets/icon.liquid`, which writes `--icon-size`
+     inline — and an inline property cannot be swapped at a breakpoint. */
+  .comparison-cell__glyph {
+    inline-size: var(--ct-mark-icon-size, 12px);
+    block-size: var(--ct-mark-icon-size, 12px);
+    stroke-width: var(--ct-mark-stroke, 2);
+  }
+
+  /* ==========================================================================
+     Comparison table — the chooser
+     ========================================================================== */
+
+  .comparison-choose__trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--ct-trigger-gap, 8px);
+
+    inline-size: 100%;
+    min-inline-size: 0;
+
+    padding-block: var(--ct-trigger-pad-block, 13px);
+    padding-inline: var(--ct-trigger-pad-inline, 14px);
+
+    border-width: var(--ct-trigger-border-width, 0px);
+    border-style: var(--ct-trigger-border-style, solid);
+    border-color: var(--ct-trigger-border-color, transparent);
+    border-radius: var(--ct-trigger-radius, 24px);
+
+    background: var(--ct-trigger-background, transparent);
+    color: var(--ct-trigger-color, currentColor);
+
+    font-family: var(--font-body-family);
+    font-size: var(--ct-trigger-size, 1.6rem);
+    font-weight: var(--ct-trigger-weight, 700);
+    line-height: 1.25;
+    text-align: center;
+
+    cursor: pointer;
+    transition: border-color var(--duration-fast, 150ms) ease, background var(--duration-fast, 150ms) ease;
+  }
+
+  /* A 390px phone gives a column about a hundred pixels, and the chooser has to
+     put a product name inside that. So every part of the pill gives back what
+     it can — type size, side padding, the gap and the chevron — and it grows
+     downwards into a header row that has the room.
+
+     `flex-wrap` is the safety net rather than the layout: a name that still
+     cannot sit beside the chevron pushes it onto its own line instead of
+     squeezing the name until the browser breaks the word in half, which is what
+     a nowrap row does when the space runs out. */
+  @media screen and (max-width: 749px) {
+    .comparison-choose__trigger {
+      flex-wrap: wrap;
+      font-size: var(--ct-trigger-size-mobile, var(--ct-trigger-size, 1.2rem));
+      gap: min(var(--ct-trigger-gap, 8px), 4px);
+      padding-inline: max(4px, calc(var(--ct-trigger-pad-inline, 14px) / 3));
+      padding-block: max(8px, calc(var(--ct-trigger-pad-block, 13px) / 1.6));
+      border-radius: min(var(--ct-trigger-radius, 24px), 24px);
+    }
+
+    .comparison-choose__chevron {
+      inline-size: min(var(--ct-trigger-icon, 14px), 12px);
+      block-size: min(var(--ct-trigger-icon, 14px), 12px);
+    }
+  }
+
+  /* Without the module every alternative is already on screen, so the control
+     has nothing left to do and says so. It is `aria-disabled` rather than
+     `disabled` because the button is still a real, named, focusable thing —
+     see `blocks/_comparison-column.liquid`. */
+  .comparison-choose__trigger[aria-disabled='true'] { cursor: default; }
+
+  /* The name wraps rather than trailing off.
+
+     A column is a third of the table wide and an alternative can legitimately
+     be called "Recovery capsules"; at the drawn size that is the full width of
+     the pill with nothing to spare, and the merchant's font is not the font
+     this was drawn in. Ellipsis puts the rest of the name behind the very menu
+     whose label the customer is trying to read, so it wraps instead — the
+     header row is 130px and has the room, and a name that fits on one line,
+     which is the drawn design, is untouched either way. */
+  .comparison-choose__name {
+    min-inline-size: 0;
+
+    /* Not `text-wrap: balance`. Balancing evens the lines out, and with the
+       `overflow-wrap: break-word` it inherits from `body` available to it, the
+       evenest way to fit "Hydration powder" into a phone-width column is four
+       fragments of one broken word. Ordinary wrapping breaks at the space,
+       which is the only place a name should ever break. */
+    text-wrap: wrap;
+  }
+
+  .comparison-choose__chevron {
+    inline-size: var(--ct-trigger-icon, 14px);
+    block-size: var(--ct-trigger-icon, 14px);
+    transition: rotate var(--duration-fast, 150ms) ease;
+  }
+
+  /* The chevron does not turn while the menu is open. It is the one affordance
+     the drawing is explicit about — the open state in the design keeps it
+     pointing down — and a chooser whose arrow flips is a different control from
+     the one that was drawn. The transition stays for anything that does move
+     it, so a merchant who adds one is not fighting a jump. */
+
+  .comparison-choose__panel {
+    position: absolute;
+    inset-block-start: calc(100% + var(--ct-panel-offset, 4px));
+    inset-inline-start: 0;
+    z-index: 3;
+
+    inline-size: 100%;
+    min-inline-size: max-content;
+    max-block-size: min(60vh, 420px);
+    overflow-y: auto;
+
+    padding-block: var(--ct-panel-pad-block, 8px);
+    padding-inline: var(--ct-panel-pad-inline, 0px);
+
+    border-width: var(--ct-panel-border-width, 0px);
+    border-style: var(--ct-panel-border-style, solid);
+    border-color: var(--ct-panel-border-color, transparent);
+    border-radius: var(--ct-panel-radius, 12px);
+
+    background: var(--ct-panel-background, #ffffff);
+    box-shadow: var(--ct-panel-shadow, none);
+  }
+
+  .comparison-choose__panel[hidden] { display: none; }
+  .comparison-choose__panel:focus-visible { outline: none; }
+
+  .comparison-choose__option {
+    padding-block: var(--ct-option-pad-block, 8px);
+    padding-inline: var(--ct-option-pad-inline, 16px);
+    border-radius: var(--ct-option-radius, 8px);
+
+    font-family: var(--font-body-family);
+    font-size: var(--ct-option-size, 1.6rem);
+    font-weight: 400;
+    line-height: 1.4;
+    text-align: start;
+    white-space: nowrap;
+    color: var(--ct-option-color, currentColor);
+
+    cursor: pointer;
+  }
+
+  @media screen and (max-width: 749px) {
+    .comparison-choose__option {
+      font-size: var(--ct-option-size-mobile, var(--ct-option-size, 1.4rem));
+    }
+  }
+
+  .comparison-choose__option[aria-selected='true'] {
+    font-weight: var(--ct-option-active-weight, 700);
+    color: var(--ct-option-active-color, currentColor);
+    background: var(--ct-option-active-background, transparent);
+  }
+
+  /* `is-active` is where the arrow keys have got to, which is not the same
+     thing as the chosen one: the listbox keeps focus and names the option with
+     `aria-activedescendant`, so this is the only thing that can show it.
+
+     Behind `:focus-visible` on the panel, because the panel is focused
+     programmatically the moment it opens and the drawn open menu has no band
+     behind its chosen row. A browser does not treat focus moved after a mouse
+     press as focus-visible, so a customer who clicked sees the menu as drawn
+     and a customer who arrowed into it can still see where they are. */
+  .comparison-choose__panel:focus-visible .comparison-choose__option.is-active,
+  .comparison-choose__option:hover {
+    background: var(--ct-option-hover-background, color-mix(in srgb, currentColor 6%, transparent));
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .comparison-choose__chevron,
+    .comparison-choose__trigger {
+      transition: none;
+    }
+  }
+}

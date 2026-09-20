@@ -1,0 +1,1294 @@
+{% doc %}
+  blocks/_comparison-table.liquid — private.
+
+  The table itself: one CSS grid, and every column inside it a `subgrid`.
+
+  ## Why the rows are the grid's and not each column's
+
+  A comparison is only a comparison while *Third-party lab tested* is on the
+  same line in all four columns. Four independent columns cannot promise that —
+  each is as tall as its own content, so the first claim that wraps to two lines
+  in one column and not another slides every row under it out of step, and the
+  table goes on looking plausible while saying the wrong thing about three
+  products.
+
+  So the rows belong to this block. It declares them once —
+
+      grid-template-rows: var(--ct-head)
+                          repeat(var(--ct-rows), minmax(var(--ct-row-min), auto))
+                          var(--ct-foot);
+
+  — and each **Comparison column** is a grid item spanning all of them with
+  `grid-template-rows: subgrid`, so its cells sit in *these* tracks rather than
+  in tracks of their own. A claim that wraps grows its row in every column at
+  once, at the moment it wraps, with nothing measured in JavaScript and no fixed
+  heights anywhere.
+
+  `@supports not (grid-template-rows: subgrid)` falls back to fixed row heights,
+  which is the drawn design exactly — 70px rows — and only loses the ability to
+  grow.
+
+  ## Feature rows is a number because Liquid cannot count blocks
+
+  `block.blocks` does not exist: a block cannot read its children, and
+  `forloop` does not reach inside `{% content_for 'blocks' %}`. The row track
+  list needs a count before any child renders, so the count is a setting.
+
+  `assets/comparison-table.js` corrects it on connect from the number of cells
+  actually in the first column, so a merchant who adds a seventh row and forgets
+  the slider sees the right table anyway. The setting is what makes the page
+  correct *before* and *without* that script, which is why it is not simply left
+  to JavaScript.
+
+  ## Why the chooser lives here and not on each column
+
+  Every alternative column in the drawing offers the same list — because the
+  list *is* the set of alternative columns. Each column drawing its own copy
+  would mean the merchant typing every name once per column and keeping four
+  lists in step by hand, which is the trap `blocks/_featured-pills-tabs.liquid`
+  documents at length.
+
+  So each column publishes its own name on `data-comparison-name`, and
+  `assets/comparison-table.js` builds every chooser's list from all of them —
+  the same shape as `<tab-group>` building its buttons from its panels. How the
+  chooser *looks* is set here too, once, so all of them agree.
+
+  With the script absent every alternative column renders side by side, named,
+  complete and readable. What is lost is the switching, not the content.
+
+  ## Alternatives shown, per device
+
+  The drawing has two alternatives beside the brand on a wide screen. A 390px
+  phone cannot hold four columns of text, so the count is a setting per device
+  and the columns past it are hidden rather than squeezed — the chooser is how
+  the customer reaches the rest, which is the same job it does on a desktop.
+
+  Private — the leading underscore — because a table of comparison columns is
+  not something to drop into a footer. It is addable inside
+  `sections/comparison-table.liquid` and nowhere else.
+{% enddoc %}
+
+{%- liquid
+  assign s = block.settings
+
+  comment
+    ---- the columns ----
+
+    The label column is wider than the product columns — 312 against 253 in the
+    drawing — so it is expressed as a ratio of one product column rather than as
+    a width. A ratio survives every container width and every column count; a
+    width does not.
+
+    It reaches CSS as a bare `fr`, computed here, because `calc(1.23 * 1fr)` is
+    not something to rely on across browsers and `repeat()` will not take a
+    `calc()` as its count either. Liquid does the arithmetic; CSS receives
+    literals.
+  endcomment
+  assign label_ratio = s.label_ratio | default: 123 | plus: 0
+  assign label_col = label_ratio | divided_by: 100.0
+
+  assign label_ratio_tablet = s.label_ratio_tablet | default: label_ratio | plus: 0
+  assign label_col_tablet = label_ratio_tablet | divided_by: 100.0
+
+  assign label_ratio_mobile = s.label_ratio_mobile | default: label_ratio_tablet | plus: 0
+  assign label_col_mobile = label_ratio_mobile | divided_by: 100.0
+
+  comment
+    One brand column plus however many alternatives that device shows. Summed
+    here rather than in a `calc()` inside `repeat()`, for the reason above.
+
+    A merchant who has added fewer alternative columns than the count asks for
+    would leave an empty track; `assets/comparison-table.js` writes the real
+    number over these three the moment it connects.
+  endcomment
+  assign slots = s.slots | default: 2 | plus: 0
+  assign slots_tablet = s.slots_tablet | default: 1 | plus: 0
+  assign slots_mobile = s.slots_mobile | default: 1 | plus: 0
+
+  assign cols = slots | plus: 1
+  assign cols_tablet = slots_tablet | plus: 1
+  assign cols_mobile = slots_mobile | plus: 1
+
+  assign rows = s.rows | default: 6 | plus: 0
+
+  comment
+    ---- the chooser ----
+
+    Resolved the way every border in this theme is: `none` emits nothing at all,
+    and with no colour picked the line is `currentColor` faded by `color-mix`,
+    because the colour filters cannot take an alpha channel from a keyword.
+  endcomment
+  assign trigger_line = s.trigger_border_style | default: 'none'
+  assign trigger_width = 0
+  if trigger_line != 'none'
+    assign trigger_width = s.trigger_border_width | default: 1 | plus: 0
+    assign trigger_percent = s.trigger_border_opacity | default: 100 | plus: 0
+    if s.trigger_border_color == blank
+      assign trigger_paint = 'color-mix(in srgb, currentColor ' | append: trigger_percent | append: '%, transparent)'
+    else
+      assign trigger_alpha = trigger_percent | divided_by: 100.0
+      assign trigger_paint = s.trigger_border_color | color_modify: 'alpha', trigger_alpha
+    endif
+  endif
+
+  assign panel_line = s.panel_border_style | default: 'none'
+  assign panel_width = 0
+  if panel_line != 'none'
+    assign panel_width = s.panel_border_width | default: 1 | plus: 0
+    assign panel_percent = s.panel_border_opacity | default: 100 | plus: 0
+    if s.panel_border_color == blank
+      assign panel_paint = 'color-mix(in srgb, currentColor ' | append: panel_percent | append: '%, transparent)'
+    else
+      assign panel_alpha = panel_percent | divided_by: 100.0
+      assign panel_paint = s.panel_border_color | color_modify: 'alpha', panel_alpha
+    endif
+  endif
+
+  assign table_line = s.border_style | default: 'none'
+  assign table_width = 0
+  if table_line != 'none'
+    assign table_width = s.border_width | default: 1 | plus: 0
+    assign table_percent = s.border_opacity | default: 100 | plus: 0
+    if s.border_color == blank
+      assign table_paint = 'color-mix(in srgb, currentColor ' | append: table_percent | append: '%, transparent)'
+    else
+      assign table_alpha = table_percent | divided_by: 100.0
+      assign table_paint = s.border_color | color_modify: 'alpha', table_alpha
+    endif
+  endif
+
+  assign label_text = s.accessible_label | default: 'Product comparison'
+-%}
+
+{%- capture table_style -%}
+  {%- render 'spacing', block: s, declarations: true -%}
+  --ct-label-col: {{ label_col }}fr;
+  --ct-label-col-tablet: {{ label_col_tablet }}fr;
+  --ct-label-col-mobile: {{ label_col_mobile }}fr;
+  --ct-cols: {{ cols }};
+  --ct-cols-tablet: {{ cols_tablet }};
+  --ct-cols-mobile: {{ cols_mobile }};
+  --ct-slots: {{ slots }};
+  --ct-slots-tablet: {{ slots_tablet }};
+  --ct-slots-mobile: {{ slots_mobile }};
+  --ct-rows: {{ rows }};
+  --ct-gap: {{ s.column_gap | default: 8 | plus: 0 }}px;
+  --ct-gap-mobile: {{ s.column_gap_mobile | default: 6 | plus: 0 }}px;
+  --ct-head: {{ s.head_height | default: 130 | plus: 0 }}px;
+  --ct-head-mobile: {{ s.head_height_mobile | default: 88 | plus: 0 }}px;
+  --ct-row-min: {{ s.row_height | default: 70 | plus: 0 }}px;
+  --ct-row-min-mobile: {{ s.row_height_mobile | default: 56 | plus: 0 }}px;
+  --ct-foot: {{ s.foot_height | default: 32 | plus: 0 }}px;
+  --ct-foot-mobile: {{ s.foot_height_mobile | default: 20 | plus: 0 }}px;
+  --ct-radius: {{ s.border_radius | default: 0 | plus: 0 }}px;
+  --ct-border-width: {{ table_width }}px;
+  {%- if table_width > 0 -%}
+    --ct-border-style: {{ table_line }};
+    --ct-border-color: {{ table_paint }};
+  {%- endif -%}
+  {%- if s.background != blank -%}
+    --ct-background: {{ s.background }};
+  {%- endif -%}
+
+  {%- comment -%}
+    ---- the chooser, set once for every column ----
+  {%- endcomment -%}
+  --ct-trigger-radius: {{ s.trigger_radius | default: 24 | plus: 0 }}px;
+  --ct-trigger-pad-block: {{ s.trigger_padding_block | default: 13 | plus: 0 }}px;
+  --ct-trigger-pad-inline: {{ s.trigger_padding_inline | default: 14 | plus: 0 }}px;
+  --ct-trigger-size: {{ s.trigger_font_size | default: 16 | plus: 0 | divided_by: 10.0 }}rem;
+  --ct-trigger-size-mobile: {{ s.trigger_font_size_mobile | default: 12 | plus: 0 | divided_by: 10.0 }}rem;
+  --ct-trigger-weight: {{ s.trigger_font_weight | default: '700' }};
+  --ct-trigger-gap: {{ s.trigger_gap | default: 8 | plus: 0 }}px;
+  --ct-trigger-icon: {{ s.trigger_icon_size | default: 14 | plus: 0 }}px;
+  --ct-trigger-border-width: {{ trigger_width }}px;
+  {%- if trigger_width > 0 -%}
+    --ct-trigger-border-style: {{ trigger_line }};
+    --ct-trigger-border-color: {{ trigger_paint }};
+  {%- endif -%}
+  {%- if s.trigger_background != blank -%}
+    --ct-trigger-background: {{ s.trigger_background }};
+  {%- endif -%}
+  {%- if s.trigger_color != blank -%}
+    --ct-trigger-color: {{ s.trigger_color }};
+  {%- endif -%}
+
+  --ct-panel-radius: {{ s.panel_radius | default: 12 | plus: 0 }}px;
+  --ct-panel-pad-block: {{ s.panel_padding_block | default: 8 | plus: 0 }}px;
+  --ct-panel-pad-inline: {{ s.panel_padding_inline | default: 0 | plus: 0 }}px;
+  --ct-panel-offset: {{ s.panel_offset | default: 4 | plus: 0 }}px;
+  --ct-panel-border-width: {{ panel_width }}px;
+  {%- if panel_width > 0 -%}
+    --ct-panel-border-style: {{ panel_line }};
+    --ct-panel-border-color: {{ panel_paint }};
+  {%- endif -%}
+  {%- if s.panel_background != blank -%}
+    --ct-panel-background: {{ s.panel_background }};
+  {%- endif -%}
+  {%- comment -%}
+    One checkbox, not four sliders.
+
+    Distance, blur and colour were three more controls and three more
+    translation keys for a value no merchant tunes, on a file that is at its
+    key ceiling. The shadow is `currentColor` faded rather than a fixed dark,
+    so it follows the colour scheme the table is sitting in instead of holding
+    one colour across all of them — the same reasoning every border in this
+    theme uses when no colour is picked.
+  {%- endcomment -%}
+  {%- if s.panel_shadow -%}
+    --ct-panel-shadow: 0 12px 32px color-mix(in srgb, currentColor 12%, transparent);
+  {%- else -%}
+    --ct-panel-shadow: none;
+  {%- endif -%}
+
+  --ct-option-size: {{ s.option_font_size | default: 16 | plus: 0 | divided_by: 10.0 }}rem;
+  --ct-option-size-mobile: {{ s.option_font_size_mobile | default: 14 | plus: 0 | divided_by: 10.0 }}rem;
+  --ct-option-pad-block: {{ s.option_padding_block | default: 8 | plus: 0 }}px;
+  --ct-option-pad-inline: {{ s.option_padding_inline | default: 16 | plus: 0 }}px;
+  --ct-option-radius: {{ s.option_radius | default: 8 | plus: 0 }}px;
+  {%- if s.option_color != blank -%}
+    --ct-option-color: {{ s.option_color }};
+  {%- endif -%}
+  {%- if s.option_active_color != blank -%}
+    --ct-option-active-color: {{ s.option_active_color }};
+  {%- endif -%}
+  {%- if s.option_active_background != blank -%}
+    --ct-option-active-background: {{ s.option_active_background }};
+  {%- endif -%}
+  --ct-option-active-weight: {{ s.option_active_weight | default: '700' }};
+
+  {%- comment -%}
+    ---- the two marks ----
+
+    A tick and a cross are the same element with two palettes, and both are set
+    here rather than on each cell for the reason the chooser is: a table whose
+    third tick is a different green from its second is a table that will be.
+    Each cell picks a palette by name — `var(--ct-mark-yes-fill)` or
+    `var(--ct-mark-no-fill)` — so a cell that overrides nothing emits nothing.
+
+    A fill of `none` rather than a colour is what makes the cross an outline:
+    both palettes carry the same six properties, and the difference between a
+    disc and a ring is which of them the merchant filled in.
+  {%- endcomment -%}
+  --ct-mark-yes-size: {{ s.mark_yes_size | default: 24 | plus: 0 }}px;
+  --ct-mark-yes-size-mobile: {{ s.mark_yes_size_mobile | default: 20 | plus: 0 }}px;
+  --ct-mark-yes-icon-size: {{ s.mark_yes_icon_size | default: 12 | plus: 0 }}px;
+  --ct-mark-yes-fill: {% if s.mark_yes_fill != blank %}{{ s.mark_yes_fill }}{% else %}none{% endif %};
+  --ct-mark-yes-ring-width: {{ s.mark_yes_ring_width | default: 0 | plus: 0 }}px;
+  --ct-mark-yes-ring-color: {{ s.mark_yes_ring_color | default: 'transparent' }};
+  --ct-mark-yes-color: {{ s.mark_yes_color | default: '#161514' }};
+
+  --ct-mark-no-size: {{ s.mark_no_size | default: 20 | plus: 0 }}px;
+  --ct-mark-no-size-mobile: {{ s.mark_no_size_mobile | default: 18 | plus: 0 }}px;
+  --ct-mark-no-icon-size: {{ s.mark_no_icon_size | default: 9 | plus: 0 }}px;
+  --ct-mark-no-fill: {% if s.mark_no_fill != blank %}{{ s.mark_no_fill }}{% else %}none{% endif %};
+  --ct-mark-no-ring-width: {{ s.mark_no_ring_width | default: 1 | plus: 0 }}px;
+  --ct-mark-no-ring-color: {{ s.mark_no_ring_color | default: '#03D26F' }};
+  --ct-mark-no-color: {{ s.mark_no_color | default: '#161514' }};
+{%- endcapture -%}
+
+{%- comment -%}
+  `<comparison-table>` is the grid. Making the custom element the grid rather
+  than a wrapper around one keeps the columns as its direct children, which is
+  what `subgrid` needs — an element in between would be a grid item with tracks
+  of its own and the alignment this block exists for would be gone.
+
+  It is not `role="table"`. The DOM here is column-major and the visual rows are
+  grid tracks, so a `table` role would be a promise about row order that the
+  markup cannot keep. It is a labelled group instead, each column is a labelled
+  group inside it, and `assets/comparison-table.js` names every mark with the
+  claim it answers — which it can do, because it knows each cell's position and
+  Liquid does not.
+{%- endcomment -%}
+<comparison-table
+  class="comparison-grid"
+  data-block-spacing
+  data-rows="{{ rows }}"
+  data-slots="{{ slots }}"
+  data-slots-tablet="{{ slots_tablet }}"
+  data-slots-mobile="{{ slots_mobile }}"
+  role="group"
+  aria-label="{{ label_text | escape }}"
+  style="{{ table_style | strip_newlines | strip }}"
+  {{ block.shopify_attributes }}
+>
+  {% content_for 'blocks' %}
+</comparison-table>
+
+{%- comment -%}
+  Every setting below is a control a merchant reaches in the editor, and the
+  schema is one element's styling surface: splitting it to get under Theme
+  Check's count of 40 would split the thing the settings style.
+{%- endcomment -%}
+{% # theme-check-disable ExcessiveSettingsCount %}
+{% schema %}
+{
+  "name": "t:blocks.comparison_table.name",
+  "tag": null,
+  "blocks": [
+    {
+      "type": "_comparison-column"
+    }
+  ],
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "t:blocks.comparison_table.paragraphs.blocks"
+    },
+    {
+      "type": "text",
+      "id": "accessible_label",
+      "label": "t:blocks.featured_pills_carousel.settings.label.label",
+      "info": "t:blocks.featured_pills_carousel.settings.label.info",
+      "default": "Product comparison"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.comparison_table.headers.rows"
+    },
+    {
+      "type": "range",
+      "id": "rows",
+      "label": "t:blocks.comparison_table.settings.rows.label",
+      "info": "t:blocks.comparison_table.settings.rows.info",
+      "min": 1,
+      "max": 16,
+      "step": 1,
+      "default": 6
+    },
+    {
+      "type": "select",
+      "id": "size_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        {
+          "value": "desktop",
+          "label": "t:shared.spacing.devices.options__1.label"
+        },
+        {
+          "value": "mobile",
+          "label": "t:shared.spacing.devices.options__2.label"
+        }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "head_height",
+      "label": "t:blocks.comparison_table.settings.head_height.label",
+      "min": 0,
+      "max": 160,
+      "step": 2,
+      "unit": "px",
+      "default": 130,
+      "visible_if": "{{ block.settings.size_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "row_height",
+      "label": "t:blocks.comparison_table.settings.row_height.label",
+      "info": "t:blocks.comparison_table.settings.row_height.info",
+      "min": 32,
+      "max": 160,
+      "step": 2,
+      "unit": "px",
+      "default": 70,
+      "visible_if": "{{ block.settings.size_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "foot_height",
+      "label": "t:blocks.comparison_table.settings.foot_height.label",
+      "min": 0,
+      "max": 120,
+      "step": 2,
+      "unit": "px",
+      "default": 32,
+      "visible_if": "{{ block.settings.size_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "head_height_mobile",
+      "label": "t:blocks.comparison_table.settings.head_height.label",
+      "min": 0,
+      "max": 160,
+      "step": 2,
+      "unit": "px",
+      "default": 88,
+      "visible_if": "{{ block.settings.size_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "row_height_mobile",
+      "label": "t:blocks.comparison_table.settings.row_height.label",
+      "min": 32,
+      "max": 160,
+      "step": 2,
+      "unit": "px",
+      "default": 56,
+      "visible_if": "{{ block.settings.size_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "foot_height_mobile",
+      "label": "t:blocks.comparison_table.settings.foot_height.label",
+      "min": 0,
+      "max": 120,
+      "step": 2,
+      "unit": "px",
+      "default": 20,
+      "visible_if": "{{ block.settings.size_device == 'mobile' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.group.headers.layout"
+    },
+    {
+      "type": "range",
+      "id": "slots",
+      "label": "t:shared.columns.desktop.label",
+      "info": "t:blocks.comparison_table.settings.slots.info",
+      "min": 1,
+      "max": 5,
+      "step": 1,
+      "default": 2
+    },
+    {
+      "type": "range",
+      "id": "slots_tablet",
+      "label": "t:shared.columns.tablet.label",
+      "min": 1,
+      "max": 5,
+      "step": 1,
+      "default": 1
+    },
+    {
+      "type": "range",
+      "id": "slots_mobile",
+      "label": "t:shared.columns.mobile.label",
+      "min": 1,
+      "max": 3,
+      "step": 1,
+      "default": 1
+    },
+    {
+      "type": "range",
+      "id": "label_ratio",
+      "label": "t:blocks.comparison_table.settings.label_ratio.label",
+      "min": 80,
+      "max": 160,
+      "step": 1,
+      "unit": "%",
+      "default": 123,
+      "visible_if": "{{ block.settings.size_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "label_ratio_mobile",
+      "label": "t:blocks.comparison_table.settings.label_ratio.label",
+      "min": 80,
+      "max": 160,
+      "step": 1,
+      "unit": "%",
+      "default": 118,
+      "visible_if": "{{ block.settings.size_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "column_gap",
+      "label": "t:shared.gap.label",
+      "min": 0,
+      "max": 48,
+      "step": 1,
+      "unit": "px",
+      "default": 8,
+      "visible_if": "{{ block.settings.size_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "column_gap_mobile",
+      "label": "t:shared.gap.label",
+      "min": 0,
+      "max": 48,
+      "step": 1,
+      "unit": "px",
+      "default": 6,
+      "visible_if": "{{ block.settings.size_device == 'mobile' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.comparison_table.headers.chooser"
+    },
+    {
+      "type": "color_background",
+      "id": "trigger_background",
+      "label": "t:shared.appearance.background_color.label"
+    },
+    {
+      "type": "color",
+      "id": "trigger_color",
+      "label": "t:shared.typography.text_color.label",
+      "default": "#161514"
+    },
+    {
+      "type": "select",
+      "id": "trigger_border_style",
+      "label": "t:blocks.group.settings.border_style.label",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.options.none"
+        },
+        {
+          "value": "solid",
+          "label": "t:shared.options.solid"
+        },
+        {
+          "value": "dashed",
+          "label": "t:shared.options.dashed"
+        },
+        {
+          "value": "dotted",
+          "label": "t:shared.options.dotted"
+        }
+      ],
+      "default": "dashed"
+    },
+    {
+      "type": "range",
+      "id": "trigger_border_width",
+      "label": "t:shared.border.thickness.label",
+      "min": 1,
+      "max": 6,
+      "step": 1,
+      "unit": "px",
+      "default": 1,
+      "visible_if": "{{ block.settings.trigger_border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "trigger_border_opacity",
+      "label": "t:shared.border.opacity.label",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 30,
+      "visible_if": "{{ block.settings.trigger_border_style != 'none' }}"
+    },
+    {
+      "type": "color",
+      "id": "trigger_border_color",
+      "label": "t:shared.border.color.label",
+      "default": "#0F2E2F",
+      "visible_if": "{{ block.settings.trigger_border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "trigger_radius",
+      "label": "t:shared.corners.radius.label",
+      "min": 0,
+      "max": 50,
+      "step": 1,
+      "unit": "px",
+      "default": 24
+    },
+    {
+      "type": "range",
+      "id": "trigger_padding_block",
+      "label": "t:blocks.comparison_table.settings.trigger_padding_block.label",
+      "min": 0,
+      "max": 40,
+      "step": 1,
+      "unit": "px",
+      "default": 13
+    },
+    {
+      "type": "range",
+      "id": "trigger_padding_inline",
+      "label": "t:blocks.comparison_table.settings.trigger_padding_inline.label",
+      "min": 0,
+      "max": 60,
+      "step": 1,
+      "unit": "px",
+      "default": 14
+    },
+    {
+      "type": "select",
+      "id": "trigger_font_size",
+      "label": "t:shared.typography.font_size.label",
+      "options": [
+        {
+          "value": "12",
+          "label": "12px"
+        },
+        {
+          "value": "13",
+          "label": "13px"
+        },
+        {
+          "value": "14",
+          "label": "14px"
+        },
+        {
+          "value": "15",
+          "label": "15px"
+        },
+        {
+          "value": "16",
+          "label": "16px"
+        },
+        {
+          "value": "18",
+          "label": "18px"
+        },
+        {
+          "value": "20",
+          "label": "20px"
+        }
+      ],
+      "default": "16"
+    },
+    {
+      "type": "select",
+      "id": "trigger_font_size_mobile",
+      "label": "t:shared.typography.font_size_mobile.label",
+      "info": "t:shared.typography.font_size_mobile.info",
+      "options": [
+        {
+          "value": "11",
+          "label": "11px"
+        },
+        {
+          "value": "12",
+          "label": "12px"
+        },
+        {
+          "value": "13",
+          "label": "13px"
+        },
+        {
+          "value": "14",
+          "label": "14px"
+        },
+        {
+          "value": "15",
+          "label": "15px"
+        },
+        {
+          "value": "16",
+          "label": "16px"
+        }
+      ],
+      "default": "12"
+    },
+    {
+      "type": "select",
+      "id": "trigger_font_weight",
+      "label": "t:shared.typography.font_weight.label",
+      "options": [
+        {
+          "value": "400",
+          "label": "400"
+        },
+        {
+          "value": "500",
+          "label": "500"
+        },
+        {
+          "value": "600",
+          "label": "600"
+        },
+        {
+          "value": "700",
+          "label": "700"
+        },
+        {
+          "value": "800",
+          "label": "800"
+        }
+      ],
+      "default": "700"
+    },
+    {
+      "type": "range",
+      "id": "trigger_gap",
+      "label": "t:blocks.featured_pills_check.settings.gap.label",
+      "min": 0,
+      "max": 32,
+      "step": 1,
+      "unit": "px",
+      "default": 8
+    },
+    {
+      "type": "range",
+      "id": "trigger_icon_size",
+      "label": "t:shared.icon_size.custom.label",
+      "min": 8,
+      "max": 32,
+      "step": 1,
+      "unit": "px",
+      "default": 14
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.comparison_table.headers.panel"
+    },
+    {
+      "type": "color_background",
+      "id": "panel_background",
+      "label": "t:shared.appearance.background_color.label",
+      "default": "linear-gradient(rgba(255, 255, 255, 1), rgba(255, 255, 255, 1))"
+    },
+    {
+      "type": "select",
+      "id": "panel_border_style",
+      "label": "t:blocks.group.settings.border_style.label",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.options.none"
+        },
+        {
+          "value": "solid",
+          "label": "t:shared.options.solid"
+        },
+        {
+          "value": "dashed",
+          "label": "t:shared.options.dashed"
+        }
+      ],
+      "default": "solid"
+    },
+    {
+      "type": "range",
+      "id": "panel_border_width",
+      "label": "t:shared.border.thickness.label",
+      "min": 1,
+      "max": 6,
+      "step": 1,
+      "unit": "px",
+      "default": 1,
+      "visible_if": "{{ block.settings.panel_border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "panel_border_opacity",
+      "label": "t:shared.border.opacity.label",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 15,
+      "visible_if": "{{ block.settings.panel_border_style != 'none' }}"
+    },
+    {
+      "type": "color",
+      "id": "panel_border_color",
+      "label": "t:shared.border.color.label",
+      "default": "#0F2E2F",
+      "visible_if": "{{ block.settings.panel_border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "panel_radius",
+      "label": "t:shared.corners.radius.label",
+      "min": 0,
+      "max": 40,
+      "step": 1,
+      "unit": "px",
+      "default": 12
+    },
+    {
+      "type": "range",
+      "id": "panel_padding_block",
+      "label": "t:blocks.comparison_table.settings.trigger_padding_block.label",
+      "min": 0,
+      "max": 32,
+      "step": 1,
+      "unit": "px",
+      "default": 8
+    },
+    {
+      "type": "range",
+      "id": "panel_padding_inline",
+      "label": "t:blocks.comparison_table.settings.trigger_padding_inline.label",
+      "min": 0,
+      "max": 32,
+      "step": 1,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "panel_offset",
+      "label": "t:blocks.comparison_table.settings.panel_offset.label",
+      "min": -20,
+      "max": 32,
+      "step": 1,
+      "unit": "px",
+      "default": 4
+    },
+    {
+      "type": "checkbox",
+      "id": "panel_shadow",
+      "label": "t:blocks.comparison_table.settings.panel_shadow.label",
+      "default": true
+    },
+    {
+      "type": "select",
+      "id": "option_font_size",
+      "label": "t:shared.typography.font_size.label",
+      "options": [
+        {
+          "value": "12",
+          "label": "12px"
+        },
+        {
+          "value": "13",
+          "label": "13px"
+        },
+        {
+          "value": "14",
+          "label": "14px"
+        },
+        {
+          "value": "15",
+          "label": "15px"
+        },
+        {
+          "value": "16",
+          "label": "16px"
+        },
+        {
+          "value": "18",
+          "label": "18px"
+        }
+      ],
+      "default": "16"
+    },
+    {
+      "type": "select",
+      "id": "option_font_size_mobile",
+      "label": "t:shared.typography.font_size_mobile.label",
+      "options": [
+        {
+          "value": "11",
+          "label": "11px"
+        },
+        {
+          "value": "12",
+          "label": "12px"
+        },
+        {
+          "value": "13",
+          "label": "13px"
+        },
+        {
+          "value": "14",
+          "label": "14px"
+        },
+        {
+          "value": "15",
+          "label": "15px"
+        },
+        {
+          "value": "16",
+          "label": "16px"
+        }
+      ],
+      "default": "14"
+    },
+    {
+      "type": "range",
+      "id": "option_padding_block",
+      "label": "t:blocks.comparison_table.settings.trigger_padding_block.label",
+      "min": 0,
+      "max": 32,
+      "step": 1,
+      "unit": "px",
+      "default": 8
+    },
+    {
+      "type": "range",
+      "id": "option_padding_inline",
+      "label": "t:blocks.comparison_table.settings.trigger_padding_inline.label",
+      "min": 0,
+      "max": 40,
+      "step": 1,
+      "unit": "px",
+      "default": 16
+    },
+    {
+      "type": "range",
+      "id": "option_radius",
+      "label": "t:shared.corners.radius.label",
+      "min": 0,
+      "max": 24,
+      "step": 1,
+      "unit": "px",
+      "default": 8
+    },
+    {
+      "type": "color",
+      "id": "option_color",
+      "label": "t:shared.typography.text_color.label",
+      "default": "#161514"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.comparison_table.headers.option_active"
+    },
+    {
+      "type": "color",
+      "id": "option_active_color",
+      "label": "t:shared.typography.text_color.label",
+      "default": "#0F2E2F"
+    },
+    {
+      "type": "color_background",
+      "id": "option_active_background",
+      "label": "t:shared.appearance.background_color.label"
+    },
+    {
+      "type": "select",
+      "id": "option_active_weight",
+      "label": "t:shared.typography.font_weight.label",
+      "options": [
+        {
+          "value": "400",
+          "label": "400"
+        },
+        {
+          "value": "500",
+          "label": "500"
+        },
+        {
+          "value": "600",
+          "label": "600"
+        },
+        {
+          "value": "700",
+          "label": "700"
+        },
+        {
+          "value": "800",
+          "label": "800"
+        }
+      ],
+      "default": "700"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.comparison_table.headers.mark_yes"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:blocks.comparison_table.paragraphs.marks"
+    },
+    {
+      "type": "range",
+      "id": "mark_yes_size",
+      "label": "t:blocks.feature_icon.settings.shape_size.label",
+      "min": 12,
+      "max": 72,
+      "step": 1,
+      "unit": "px",
+      "default": 24
+    },
+    {
+      "type": "range",
+      "id": "mark_yes_size_mobile",
+      "label": "t:blocks.feature_icon.settings.shape_size_mobile.label",
+      "min": 10,
+      "max": 60,
+      "step": 1,
+      "unit": "px",
+      "default": 20
+    },
+    {
+      "type": "range",
+      "id": "mark_yes_icon_size",
+      "label": "t:shared.icon_size.custom.label",
+      "min": 6,
+      "max": 40,
+      "step": 1,
+      "unit": "px",
+      "default": 12
+    },
+    {
+      "type": "color_background",
+      "id": "mark_yes_fill",
+      "label": "t:blocks.feature_icon.settings.fill_color.label",
+      "default": "linear-gradient(rgba(3, 210, 111, 1), rgba(3, 210, 111, 1))"
+    },
+    {
+      "type": "range",
+      "id": "mark_yes_ring_width",
+      "label": "t:shared.border.thickness.label",
+      "min": 0,
+      "max": 6,
+      "step": 1,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "color",
+      "id": "mark_yes_ring_color",
+      "label": "t:shared.border.color.label",
+      "visible_if": "{{ block.settings.mark_yes_ring_width > 0 }}"
+    },
+    {
+      "type": "color",
+      "id": "mark_yes_color",
+      "label": "t:blocks.feature_icon.settings.icon_color.label",
+      "default": "#161514"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.comparison_table.headers.mark_no"
+    },
+    {
+      "type": "range",
+      "id": "mark_no_size",
+      "label": "t:blocks.feature_icon.settings.shape_size.label",
+      "min": 12,
+      "max": 72,
+      "step": 1,
+      "unit": "px",
+      "default": 20
+    },
+    {
+      "type": "range",
+      "id": "mark_no_size_mobile",
+      "label": "t:blocks.feature_icon.settings.shape_size_mobile.label",
+      "min": 10,
+      "max": 60,
+      "step": 1,
+      "unit": "px",
+      "default": 18
+    },
+    {
+      "type": "range",
+      "id": "mark_no_icon_size",
+      "label": "t:shared.icon_size.custom.label",
+      "min": 6,
+      "max": 40,
+      "step": 1,
+      "unit": "px",
+      "default": 9
+    },
+    {
+      "type": "color_background",
+      "id": "mark_no_fill",
+      "label": "t:blocks.feature_icon.settings.fill_color.label"
+    },
+    {
+      "type": "range",
+      "id": "mark_no_ring_width",
+      "label": "t:shared.border.thickness.label",
+      "min": 0,
+      "max": 6,
+      "step": 1,
+      "unit": "px",
+      "default": 1
+    },
+    {
+      "type": "color",
+      "id": "mark_no_ring_color",
+      "label": "t:shared.border.color.label",
+      "default": "#03D26F",
+      "visible_if": "{{ block.settings.mark_no_ring_width > 0 }}"
+    },
+    {
+      "type": "color",
+      "id": "mark_no_color",
+      "label": "t:blocks.feature_icon.settings.icon_color.label",
+      "default": "#161514"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.appearance.header"
+    },
+    {
+      "type": "color_background",
+      "id": "background",
+      "label": "t:shared.appearance.background_color.label"
+    },
+    {
+      "type": "select",
+      "id": "border_style",
+      "label": "t:blocks.group.settings.border_style.label",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.options.none"
+        },
+        {
+          "value": "solid",
+          "label": "t:shared.options.solid"
+        },
+        {
+          "value": "dashed",
+          "label": "t:shared.options.dashed"
+        },
+        {
+          "value": "dotted",
+          "label": "t:shared.options.dotted"
+        }
+      ],
+      "default": "none"
+    },
+    {
+      "type": "range",
+      "id": "border_width",
+      "label": "t:shared.border.thickness.label",
+      "min": 1,
+      "max": 8,
+      "step": 1,
+      "unit": "px",
+      "default": 1,
+      "visible_if": "{{ block.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_opacity",
+      "label": "t:shared.border.opacity.label",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 100,
+      "visible_if": "{{ block.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "color",
+      "id": "border_color",
+      "label": "t:blocks.group.settings.border_color.label",
+      "visible_if": "{{ block.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius",
+      "label": "t:blocks.group.settings.border_radius.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "header",
+      "content": "t:shared.spacing.block_header"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:shared.spacing.block_paragraph"
+    },
+    {
+      "type": "select",
+      "id": "padding_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        {
+          "value": "desktop",
+          "label": "t:shared.spacing.devices.options__1.label"
+        },
+        {
+          "value": "mobile",
+          "label": "t:shared.spacing.devices.options__2.label"
+        }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left_mobile",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right_mobile",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    }
+  ]
+}
+{% endschema %}

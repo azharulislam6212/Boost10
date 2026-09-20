@@ -1,0 +1,1833 @@
+{% comment %}
+  sections/comparison-table.liquid
+
+  The honest comparison: one column of claims, the store's own product beside
+  them, and two or more alternatives the customer can swap between.
+
+  ## Why it is not `sections/feature-cards.liquid` with four cards
+
+  A row of cards says four things that happen to sit next to each other. A
+  comparison says one thing about each of four products, six times over, and the
+  whole argument is in the alignment: *Third-party lab tested* has to be on the
+  same line in every column or the customer is reading four lists rather than
+  one table. Cards cannot promise that — each one is as tall as its own content
+  — and a merchant who types a claim into the second card and forgets the third
+  gets a table that looks right and lies.
+
+  So the rows are real rows. `blocks/_comparison-table.liquid` is one CSS grid
+  and every column is a `subgrid` inside it, which means a claim that wraps to
+  two lines grows *its* row in every column at once. Nothing is measured in
+  JavaScript and nothing is a fixed height.
+
+  ## Why it is not `assets/compare.js`
+
+  That is the product comparison drawer: a customer ticks products on a
+  collection page and the theme renders their real prices, options and
+  inventory side by side. It is about the catalogue, it is stored per browser,
+  and it is off until a merchant turns it on.
+
+  This is a piece of marketing. The claims are the merchant's, the alternatives
+  are categories rather than products — *Hydration powder*, *Energy drops* — and
+  nothing in it is fetched. The two never want the same settings and never want
+  the same markup.
+
+  ## What this file is, and what it is not
+
+  It is the frame and nothing else: the container, the colour scheme, the
+  background media, the four border widths, the two sets of corners, the gaps
+  behind a Desktop/Mobile switch, the margins, the stack layer and the whole
+  spacing group. Every id here is one `sections/expert-quote.liquid` and
+  `sections/featured-pills.liquid` already carry, resolved through the same
+  `snippets/spacing.liquid`, `snippets/background-media.liquid` and
+  `snippets/container.liquid`. A merchant who has arranged one of those has
+  arranged this one.
+
+  Everything with content in it is a block, and they all arrive through one
+  `{% content_for 'blocks' %}`:
+
+    The heading cluster   `blocks/section-header.liquid` — the theme's own,
+                          with a Subheading and a Text block inside it
+    The table             `blocks/_comparison-table.liquid`
+    The buttons           a Group of `blocks/button.liquid`
+    The reassurance row   a Group of `blocks/icon-with-text.liquid`
+
+  Only the table is new. The rest of the drawn design is blocks this theme
+  already has, arranged by the preset — which is the point of a block theme and
+  the reason this section's own schema is as short as it is.
+
+  ## The container is Compact
+
+  The drawing puts the table in 1090px of a 1440px page, which is the theme's
+  **Compact** width to within a rounding error. It is a select like every other
+  section's, so a merchant who wants the table to run wider has the same five
+  choices here as anywhere else.
+{% endcomment %}
+
+{%- liquid
+  assign s = section.settings
+
+  comment
+    The background is the colour scheme's until the merchant says otherwise:
+    either a colour — or, as the preset ships it, the soft horizontal wash the
+    section was drawn on — or a picture behind the whole section.
+
+    Emitted as a real `background` declaration rather than a custom property
+    because `color-scheme-container` paints a background *and* a gradient image,
+    and only the shorthand clears both.
+  endcomment
+  assign background_media = s.background_media | default: 'none'
+  assign has_background_media = false
+  if background_media != 'none'
+    assign has_background_media = true
+  endif
+
+  assign background_paint = ''
+  if has_background_media == false
+    assign background_paint = s.background_color | default: ''
+  endif
+
+  comment
+    ---- the frame ----
+
+    One width per side rather than one for the box, summed into `border_any` so
+    the three properties are emitted only when at least one side is drawn — a
+    zero-width border with a colour on it is three declarations that paint
+    nothing.
+
+    Opacity goes into the colour rather than onto the element: `opacity` on the
+    section would fade the table along with its frame. With no colour picked the
+    border is `currentColor`, which the colour filters cannot take an alpha
+    channel from, so `color-mix` does the same fade in the browser instead and
+    both paths honour the slider.
+
+    Identical to `sections/expert-quote.liquid` and
+    `sections/featured-pills.liquid` by construction, not by coincidence — same
+    ids, same resolution, same stylesheet shape.
+  endcomment
+  assign border_line = s.border_style | default: 'none'
+
+  assign bw_top = 0
+  assign bw_right = 0
+  assign bw_bottom = 0
+  assign bw_left = 0
+  assign border_any = 0
+
+  if border_line != 'none'
+    assign bw_top = s.border_width_top | default: 0 | plus: 0
+    assign bw_right = s.border_width_right | default: 0 | plus: 0
+    assign bw_bottom = s.border_width_bottom | default: 0 | plus: 0
+    assign bw_left = s.border_width_left | default: 0 | plus: 0
+    assign border_any = bw_top | plus: bw_right | plus: bw_bottom | plus: bw_left
+
+    assign border_percent = s.border_opacity | default: 100 | plus: 0
+    if s.border_color == blank
+      assign border_paint = 'color-mix(in srgb, currentColor ' | append: border_percent | append: '%, transparent)'
+    else
+      assign border_alpha = border_percent | divided_by: 100.0
+      assign border_paint = s.border_color | color_modify: 'alpha', border_alpha
+    endif
+  endif
+
+  comment
+    ---- corners ----
+
+    Four corners, twice — one set per device, behind the same Desktop/Mobile
+    switch the padding and the gaps already use.
+
+    The top pair ships at 40 and the bottom pair at 0, because a section is a
+    band that lifts away from what is above it and sits flush on what is below:
+    a rounded bottom edge leaves two slivers of the page showing through under
+    it. They are four sliders rather than one number and a rule, so a merchant
+    who wants a fully rounded card can still have one.
+
+    They reach CSS as a single border-radius shorthand, in the order that
+    property takes — top-left, top-right, bottom-right, bottom-left. Nothing in
+    the stylesheet reads them as a bare number, which is what makes sending a
+    shorthand safe.
+
+    A phone gets its own four because the same number does not read the same at
+    both widths: 40px is a soft lift across 1400px and a heavy scoop out of a
+    390px screen. Each mobile corner falls back to its desktop value when the
+    setting is missing entirely, so a section saved before these existed keeps
+    one shape at every width.
+  endcomment
+  assign r_tl = s.border_radius_top_left | default: 40 | plus: 0
+  assign r_tr = s.border_radius_top_right | default: 40 | plus: 0
+  assign r_bl = s.border_radius_bottom_left | default: 0 | plus: 0
+  assign r_br = s.border_radius_bottom_right | default: 0 | plus: 0
+
+  assign r_tl_m = s.border_radius_top_left_mobile | default: r_tl | plus: 0
+  assign r_tr_m = s.border_radius_top_right_mobile | default: r_tr | plus: 0
+  assign r_bl_m = s.border_radius_bottom_left_mobile | default: r_bl | plus: 0
+  assign r_br_m = s.border_radius_bottom_right_mobile | default: r_br | plus: 0
+
+  assign margin_top = s.margin_top | default: 0 | plus: 0
+  assign margin_bottom = s.margin_bottom | default: 0 | plus: 0
+
+  comment
+    ---- the gaps ----
+
+    A Desktop/Mobile pair behind one switch, the shape every other section in
+    the theme uses. Both pairs are published unconditionally and
+    `assets/base.css` picks which applies at a given width, because the pair the
+    merchant is not looking at in the editor is still the pair the other
+    breakpoint renders.
+
+    `plus: 0` rather than `default` alone, which would replace a deliberate 0.
+    Each mobile axis falls back to its desktop value when the setting is absent
+    entirely, so a section saved before the mobile pair existed renders as it
+    did; one added since gets the schema default, which is half the desktop one.
+  endcomment
+  assign gap_x = s.gap_horizontal | default: 40 | plus: 0
+  assign gap_y = s.gap_vertical | default: 40 | plus: 0
+  assign gap_x_mobile = s.gap_horizontal_mobile | default: gap_x | plus: 0
+  assign gap_y_mobile = s.gap_vertical_mobile | default: gap_y | plus: 0
+
+  assign align = s.alignment | default: 'center'
+-%}
+
+{%- capture section_style -%}
+  {%- render 'spacing', section: s, declarations: true -%}
+  --comparison-radius: {{ r_tl }}px {{ r_tr }}px {{ r_br }}px {{ r_bl }}px;
+  --comparison-radius-mobile: {{ r_tl_m }}px {{ r_tr_m }}px {{ r_br_m }}px {{ r_bl_m }}px;
+  --comparison-margin-block-start: {{ margin_top }}px;
+  --comparison-margin-block-end: {{ margin_bottom }}px;
+  --comparison-gap-x: {{ gap_x }}px;
+  --comparison-gap-y: {{ gap_y }}px;
+  --comparison-gap-x-mobile: {{ gap_x_mobile }}px;
+  --comparison-gap-y-mobile: {{ gap_y_mobile }}px;
+  {%- if border_any > 0 -%}
+    --comparison-border-width: {{ bw_top }}px {{ bw_right }}px {{ bw_bottom }}px {{ bw_left }}px;
+    --comparison-border-style: {{ border_line }};
+    --comparison-border-color: {{ border_paint }};
+  {%- endif -%}
+  {%- if background_paint != '' -%}
+    background: {{ background_paint }};
+  {%- endif -%}
+{%- endcapture -%}
+
+<div
+  class="comparison-section comparison-section--{{ align }} color-scheme-container color-{{ s.color_scheme | default: 'scheme-1' }}{% if has_background_media %} has-background-media{% endif %}"
+  data-section-spacing
+  {%- if s.stack_layer != blank and s.stack_layer != 'default' %} data-section-layer="{{ s.stack_layer }}"{% endif %}
+  data-section-id="{{ section.id }}"
+  style="{{ section_style | strip_newlines | strip }}"
+>
+  {%- if has_background_media -%}
+    {% render 'background-media', settings: s %}
+  {%- endif -%}
+
+  {%- comment -%}
+    One stream, in the order the merchant arranged it. The table is a block in
+    the same way the heading and the buttons are blocks, so a store that wants
+    the call to action above the table drags it there rather than asking for a
+    setting that would only ever have two values.
+  {%- endcomment -%}
+  <div class="comparison-section__inner {% render 'container', width: s.container_width %}">
+    {% content_for 'blocks' %}
+  </div>
+</div>
+
+{%- comment -%}
+  Every setting below is a control a merchant reaches in the editor, and the
+  schema is one element's styling surface: splitting it to get under Theme
+  Check's count of 40 would split the thing the settings style.
+{%- endcomment -%}
+{% # theme-check-disable ExcessiveSettingsCount %}
+{% schema %}
+{
+  "name": "t:sections.comparison_table.name",
+  "tag": "section",
+  "class": "section",
+  "blocks": [
+    {
+      "type": "_comparison-table"
+    },
+    {
+      "type": "@theme"
+    },
+    {
+      "type": "@app"
+    }
+  ],
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "t:sections.comparison_table.paragraphs.blocks"
+    },
+    {
+      "type": "select",
+      "id": "container_width",
+      "label": "t:shared.container.width.label",
+      "info": "t:shared.container.width.info",
+      "options": [
+        {
+          "value": "edge",
+          "label": "t:shared.container.width.options__1.label"
+        },
+        {
+          "value": "wide",
+          "label": "t:shared.container.width.options__2.label"
+        },
+        {
+          "value": "standard",
+          "label": "t:shared.container.width.options__3.label"
+        },
+        {
+          "value": "compact",
+          "label": "t:shared.container.width.options__4.label"
+        },
+        {
+          "value": "custom",
+          "label": "t:shared.container.width.options__5.label"
+        }
+      ],
+      "default": "compact"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.group.headers.layout"
+    },
+    {
+      "type": "select",
+      "id": "alignment",
+      "label": "t:shared.alignment.label",
+      "options": [
+        {
+          "value": "start",
+          "label": "t:shared.alignment.options__1.label"
+        },
+        {
+          "value": "center",
+          "label": "t:shared.alignment.options__2.label"
+        },
+        {
+          "value": "end",
+          "label": "t:shared.alignment.options__3.label"
+        }
+      ],
+      "default": "center"
+    },
+    {
+      "type": "select",
+      "id": "gap_device",
+      "label": "t:shared.gap.label",
+      "options": [
+        {
+          "value": "desktop",
+          "label": "t:shared.spacing.devices.options__1.label"
+        },
+        {
+          "value": "mobile",
+          "label": "t:shared.spacing.devices.options__2.label"
+        }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "gap_horizontal",
+      "label": "t:shared.gap.horizontal.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 40,
+      "visible_if": "{{ section.settings.gap_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "gap_vertical",
+      "label": "t:shared.gap.vertical.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 40,
+      "visible_if": "{{ section.settings.gap_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "gap_horizontal_mobile",
+      "label": "t:shared.gap.horizontal.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 20,
+      "visible_if": "{{ section.settings.gap_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "gap_vertical_mobile",
+      "label": "t:shared.gap.vertical.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 20,
+      "visible_if": "{{ section.settings.gap_device == 'mobile' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.appearance.header"
+    },
+    {
+      "type": "color_scheme",
+      "id": "color_scheme",
+      "label": "t:shared.color_scheme.label",
+      "default": "scheme-1"
+    },
+    {
+      "type": "select",
+      "id": "background_media",
+      "label": "t:shared.background.media.label",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.background.media.options__1.label"
+        },
+        {
+          "value": "image",
+          "label": "t:shared.background.media.options__2.label"
+        },
+        {
+          "value": "video",
+          "label": "t:shared.background.media.options__3.label"
+        }
+      ],
+      "default": "none"
+    },
+    {
+      "type": "color_background",
+      "id": "background_color",
+      "label": "t:shared.background.color.label",
+      "info": "t:shared.background.color.info",
+      "default": "linear-gradient(90deg, #E5F1EE 0%, #FBFDFC 20%, #FBFDFC 40%, #F4F9F8 60%, #EDF5F3 80%, #E5F1EE 100%)",
+      "visible_if": "{{ section.settings.background_media == 'none' }}"
+    },
+    {
+      "type": "image_picker",
+      "id": "image",
+      "label": "t:shared.background.image.label",
+      "visible_if": "{{ section.settings.background_media == 'image' }}"
+    },
+    {
+      "type": "image_picker",
+      "id": "image_mobile",
+      "label": "t:shared.background.image_mobile.label",
+      "info": "t:shared.background.image_mobile.info",
+      "visible_if": "{{ section.settings.background_media == 'image' }}"
+    },
+    {
+      "type": "select",
+      "id": "image_position",
+      "label": "t:shared.background.image_position.label",
+      "info": "t:shared.background.image_position.info",
+      "options": [
+        {
+          "value": "cover",
+          "label": "t:shared.background.image_position.options__1.label"
+        },
+        {
+          "value": "fit",
+          "label": "t:shared.background.image_position.options__2.label"
+        }
+      ],
+      "default": "cover",
+      "visible_if": "{{ section.settings.background_media == 'image' }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "image_parallax",
+      "label": "t:shared.background.image_parallax.label",
+      "info": "t:shared.background.image_parallax.info",
+      "default": false,
+      "visible_if": "{{ section.settings.background_media == 'image' }}"
+    },
+    {
+      "type": "range",
+      "id": "image_parallax_speed",
+      "label": "t:shared.background.image_parallax_speed.label",
+      "info": "t:shared.background.image_parallax_speed.info",
+      "min": 5,
+      "max": 40,
+      "step": 5,
+      "unit": "%",
+      "default": 15,
+      "visible_if": "{{ section.settings.background_media == 'image' and section.settings.image_parallax }}"
+    },
+    {
+      "type": "video",
+      "id": "video",
+      "label": "t:shared.background.video.label",
+      "info": "t:shared.background.video.info",
+      "visible_if": "{{ section.settings.background_media == 'video' }}"
+    },
+    {
+      "type": "video_url",
+      "id": "video_url",
+      "label": "t:shared.background.video_url.label",
+      "info": "t:shared.background.video_url.info",
+      "accept": [
+        "youtube",
+        "vimeo"
+      ],
+      "visible_if": "{{ section.settings.background_media == 'video' }}"
+    },
+    {
+      "type": "image_picker",
+      "id": "video_poster",
+      "label": "t:shared.background.video_poster.label",
+      "info": "t:shared.background.video_poster.info",
+      "visible_if": "{{ section.settings.background_media == 'video' }}"
+    },
+    {
+      "type": "select",
+      "id": "video_position",
+      "label": "t:shared.background.video_position.label",
+      "options": [
+        {
+          "value": "cover",
+          "label": "t:shared.background.video_position.options__1.label"
+        },
+        {
+          "value": "contain",
+          "label": "t:shared.background.video_position.options__2.label"
+        }
+      ],
+      "default": "cover",
+      "visible_if": "{{ section.settings.background_media == 'video' }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "video_loop",
+      "label": "t:shared.background.video_loop.label",
+      "default": true,
+      "visible_if": "{{ section.settings.background_media == 'video' }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "overlay_enabled",
+      "label": "t:shared.background.overlay_enabled.label",
+      "info": "t:shared.background.overlay_enabled.info",
+      "default": false,
+      "visible_if": "{{ section.settings.background_media != 'none' }}"
+    },
+    {
+      "type": "select",
+      "id": "overlay_style",
+      "label": "t:shared.background.overlay_style.label",
+      "info": "t:shared.background.overlay_style.info",
+      "options": [
+        {
+          "value": "solid",
+          "label": "t:shared.background.overlay_style.options__1.label"
+        },
+        {
+          "value": "gradient",
+          "label": "t:shared.background.overlay_style.options__2.label"
+        }
+      ],
+      "default": "solid",
+      "visible_if": "{{ section.settings.background_media != 'none' and section.settings.overlay_enabled }}"
+    },
+    {
+      "type": "color",
+      "id": "overlay_color",
+      "label": "t:shared.background.overlay_color.label",
+      "default": "#000000",
+      "visible_if": "{{ section.settings.background_media != 'none' and section.settings.overlay_enabled and section.settings.overlay_style == 'solid' }}"
+    },
+    {
+      "type": "color_background",
+      "id": "overlay_gradient",
+      "label": "t:shared.background.overlay_gradient.label",
+      "info": "t:shared.background.overlay_gradient.info",
+      "default": "linear-gradient(180deg, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 1) 100%)",
+      "visible_if": "{{ section.settings.background_media != 'none' and section.settings.overlay_enabled and section.settings.overlay_style == 'gradient' }}"
+    },
+    {
+      "type": "range",
+      "id": "overlay_opacity",
+      "label": "t:shared.background.overlay_opacity.label",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 40,
+      "visible_if": "{{ section.settings.background_media != 'none' and section.settings.overlay_enabled }}"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.group.headers.borders"
+    },
+    {
+      "type": "select",
+      "id": "border_style",
+      "label": "t:blocks.group.settings.border_style.label",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.options.none"
+        },
+        {
+          "value": "solid",
+          "label": "t:shared.options.solid"
+        },
+        {
+          "value": "dashed",
+          "label": "t:shared.border.style.options__2.label"
+        }
+      ],
+      "default": "solid"
+    },
+    {
+      "type": "range",
+      "id": "border_width_top",
+      "label": "t:shared.border.sides.top.label",
+      "info": "t:shared.border.sides.info",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 1,
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_width_right",
+      "label": "t:shared.border.sides.right.label",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_width_bottom",
+      "label": "t:shared.border.sides.bottom.label",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_width_left",
+      "label": "t:shared.border.sides.left.label",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_opacity",
+      "label": "t:shared.border.opacity.label",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 100,
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "color",
+      "id": "border_color",
+      "label": "t:blocks.group.settings.border_color.label",
+      "default": "#0F2E2F",
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.corners.header"
+    },
+    {
+      "type": "select",
+      "id": "radius_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        {
+          "value": "desktop",
+          "label": "t:shared.spacing.devices.options__1.label"
+        },
+        {
+          "value": "mobile",
+          "label": "t:shared.spacing.devices.options__2.label"
+        }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_top_left",
+      "label": "t:shared.corners.top_left.label",
+      "info": "t:shared.corners.paragraph",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 40,
+      "visible_if": "{{ section.settings.radius_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_top_right",
+      "label": "t:shared.corners.top_right.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 40,
+      "visible_if": "{{ section.settings.radius_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_bottom_left",
+      "label": "t:shared.corners.bottom_left.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.radius_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_bottom_right",
+      "label": "t:shared.corners.bottom_right.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.radius_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_top_left_mobile",
+      "label": "t:shared.corners.top_left.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 24,
+      "visible_if": "{{ section.settings.radius_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_top_right_mobile",
+      "label": "t:shared.corners.top_right.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 24,
+      "visible_if": "{{ section.settings.radius_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_bottom_left_mobile",
+      "label": "t:shared.corners.bottom_left.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.radius_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_bottom_right_mobile",
+      "label": "t:shared.corners.bottom_right.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.radius_device == 'mobile' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.animation.header"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:shared.animation.paragraph"
+    },
+    {
+      "type": "select",
+      "id": "animation_text",
+      "label": "t:shared.animation.animation_text.label",
+      "options": [
+        {
+          "value": "inherit",
+          "label": "t:shared.animation.animation_text.options__1.label"
+        },
+        {
+          "value": "none",
+          "label": "t:shared.animation.animation_text.options__2.label"
+        },
+        {
+          "value": "fade-in",
+          "label": "t:shared.animation.animation_text.options__3.label"
+        },
+        {
+          "value": "fade-up",
+          "label": "t:shared.animation.animation_text.options__4.label"
+        },
+        {
+          "value": "slide-up",
+          "label": "t:shared.animation.animation_text.options__5.label"
+        }
+      ],
+      "default": "inherit"
+    },
+    {
+      "type": "select",
+      "id": "animation_image",
+      "label": "t:shared.animation.animation_image.label",
+      "options": [
+        {
+          "value": "inherit",
+          "label": "t:shared.animation.animation_image.options__1.label"
+        },
+        {
+          "value": "none",
+          "label": "t:shared.animation.animation_image.options__2.label"
+        },
+        {
+          "value": "fade-in",
+          "label": "t:shared.animation.animation_image.options__3.label"
+        },
+        {
+          "value": "fade-up",
+          "label": "t:shared.animation.animation_image.options__4.label"
+        },
+        {
+          "value": "zoom-in",
+          "label": "t:shared.animation.animation_image.options__7.label"
+        }
+      ],
+      "default": "fade-up"
+    },
+    {
+      "type": "range",
+      "id": "animation_duration",
+      "label": "t:shared.animation.animation_duration.label",
+      "info": "t:shared.animation.animation_duration.info",
+      "min": 0,
+      "max": 2000,
+      "step": 100,
+      "unit": "ms",
+      "default": 1000
+    },
+    {
+      "type": "range",
+      "id": "animation_stagger",
+      "label": "t:shared.animation.animation_stagger.label",
+      "info": "t:shared.animation.animation_stagger.info",
+      "min": 0,
+      "max": 300,
+      "step": 10,
+      "unit": "ms",
+      "default": 80
+    },
+    {
+      "type": "header",
+      "content": "t:shared.spacing.section_header"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:shared.spacing.section_paragraph"
+    },
+    {
+      "type": "select",
+      "id": "padding_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        {
+          "value": "desktop",
+          "label": "t:shared.spacing.devices.options__1.label"
+        },
+        {
+          "value": "mobile",
+          "label": "t:shared.spacing.devices.options__2.label"
+        }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 160,
+      "step": 2,
+      "unit": "px",
+      "default": 100,
+      "visible_if": "{{ section.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 160,
+      "step": 2,
+      "unit": "px",
+      "default": 100,
+      "visible_if": "{{ section.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 160,
+      "step": 2,
+      "unit": "px",
+      "default": 56,
+      "visible_if": "{{ section.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 160,
+      "step": 2,
+      "unit": "px",
+      "default": 56,
+      "visible_if": "{{ section.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "margin_top",
+      "label": "t:shared.spacing.margin_top.label",
+      "info": "t:shared.spacing.margin_negative.info",
+      "min": -160,
+      "max": 160,
+      "step": 4,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "margin_bottom",
+      "label": "t:shared.spacing.margin_bottom.label",
+      "info": "t:shared.spacing.margin_negative.info",
+      "min": -160,
+      "max": 160,
+      "step": 4,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "select",
+      "id": "stack_layer",
+      "label": "t:shared.spacing.stack_layer.label",
+      "info": "t:shared.spacing.stack_layer.info",
+      "options": [
+        {
+          "value": "under",
+          "label": "t:shared.spacing.stack_layer.options__1.label"
+        },
+        {
+          "value": "default",
+          "label": "t:shared.spacing.stack_layer.options__2.label"
+        },
+        {
+          "value": "over",
+          "label": "t:shared.spacing.stack_layer.options__3.label"
+        }
+      ],
+      "default": "default"
+    }
+  ],
+  "presets": [
+    {
+      "name": "t:sections.comparison_table.presets.default.name",
+      "category": "t:categories.products",
+      "settings": {
+        "container_width": "compact",
+        "alignment": "center",
+        "gap_device": "desktop",
+        "gap_horizontal": 40,
+        "gap_vertical": 40,
+        "gap_horizontal_mobile": 20,
+        "gap_vertical_mobile": 20,
+        "color_scheme": "scheme-1",
+        "background_media": "none",
+        "background_color": "linear-gradient(90deg, #E5F1EE 0%, #FBFDFC 20%, #FBFDFC 40%, #F4F9F8 60%, #EDF5F3 80%, #E5F1EE 100%)",
+        "border_style": "solid",
+        "border_width_top": 1,
+        "border_width_right": 0,
+        "border_width_bottom": 0,
+        "border_width_left": 0,
+        "border_opacity": 100,
+        "border_color": "#0F2E2F",
+        "radius_device": "desktop",
+        "border_radius_top_left": 40,
+        "border_radius_top_right": 40,
+        "border_radius_bottom_left": 0,
+        "border_radius_bottom_right": 0,
+        "border_radius_top_left_mobile": 24,
+        "border_radius_top_right_mobile": 24,
+        "border_radius_bottom_left_mobile": 0,
+        "border_radius_bottom_right_mobile": 0,
+        "animation_text": "inherit",
+        "animation_image": "fade-up",
+        "animation_duration": 1000,
+        "animation_stagger": 80,
+        "padding_device": "desktop",
+        "padding_top": 100,
+        "padding_bottom": 100,
+        "padding_top_mobile": 56,
+        "padding_bottom_mobile": 56,
+        "margin_top": 0,
+        "margin_bottom": 0,
+        "stack_layer": "default"
+      },
+      "blocks": [
+        {
+          "type": "section-header",
+          "settings": {
+            "inherit_color_scheme": true,
+            "direction": "column",
+            "alignment": "center",
+            "position": "start",
+            "gap": 16,
+            "gap_horizontal": 16,
+            "gap_vertical": 16,
+            "gap_horizontal_mobile": 12,
+            "gap_vertical_mobile": 12,
+            "width": "fill",
+            "border_style": "none"
+          },
+          "blocks": [
+            {
+              "type": "subheading",
+              "settings": {
+                "text": "<p>Honest Comparison</p>",
+                "icon_source": "icon",
+                "icon": "capsule",
+                "icon_size": "small",
+                "icon_style": "solid",
+                "icon_background": "#0F2E2F",
+                "icon_color": "#03D26F",
+                "icon_width": 22,
+                "icon_height": 22,
+                "icon_border_style": "none",
+                "icon_border_radius": 50,
+                "show_divider": true,
+                "gap": 8,
+                "preset": "subheading",
+                "font_size": "14",
+                "font_size_mobile": "12",
+                "letter_spacing": "normal",
+                "color": "custom",
+                "text_color_custom": "#161514",
+                "background": "custom",
+                "background_color": "linear-gradient(rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.55))",
+                "border_style": "dashed",
+                "border_thickness": 1,
+                "border_color": "#0F2E2F",
+                "border_radius": 40,
+                "width": "fit",
+                "alignment": "center",
+                "padding_top": 4,
+                "padding_bottom": 4,
+                "padding_left": 4,
+                "padding_right": 16
+              }
+            },
+            {
+              "type": "text",
+              "name": "t:blocks.text.presets.heading.name",
+              "settings": {
+                "text": "<p>Smart Nutrition, Better Results</p>",
+                "preset": "h2",
+                "color": "gradient",
+                "text_gradient": "linear-gradient(90deg, #161514 0%, #0F2E2F 50%, #03D26F 100%)",
+                "highlight_style": "none",
+                "width": "fill",
+                "max_width": "normal",
+                "alignment": "center",
+                "width_mobile": "fill",
+                "alignment_mobile": "center"
+              }
+            },
+            {
+              "type": "text",
+              "settings": {
+                "text": "<p>We don't hide behind artificial fillers or proprietary blends. Compare our standards against traditional alternatives to see the clean difference.</p>",
+                "preset": "paragraph",
+                "font_size": "16",
+                "font_size_mobile": "14",
+                "color": "custom",
+                "text_color_custom": "#3F3E3E",
+                "width": "fill",
+                "max_width": "narrow",
+                "alignment": "center",
+                "width_mobile": "fill",
+                "alignment_mobile": "center"
+              }
+            }
+          ]
+        },
+        {
+          "type": "_comparison-table",
+          "settings": {
+            "accessible_label": "How Boost10 compares",
+            "rows": 6,
+            "size_device": "desktop",
+            "head_height": 130,
+            "row_height": 70,
+            "foot_height": 32,
+            "head_height_mobile": 88,
+            "row_height_mobile": 56,
+            "foot_height_mobile": 20,
+            "slots": 2,
+            "slots_tablet": 1,
+            "slots_mobile": 1,
+            "label_ratio": 123,
+            "label_ratio_mobile": 118,
+            "column_gap": 8,
+            "column_gap_mobile": 6,
+            "trigger_color": "#161514",
+            "trigger_border_style": "dashed",
+            "trigger_border_width": 1,
+            "trigger_border_opacity": 30,
+            "trigger_border_color": "#0F2E2F",
+            "trigger_radius": 24,
+            "trigger_padding_block": 13,
+            "trigger_padding_inline": 14,
+            "trigger_font_size": "16",
+            "trigger_font_size_mobile": "12",
+            "trigger_font_weight": "700",
+            "trigger_gap": 8,
+            "trigger_icon_size": 14,
+            "panel_background": "linear-gradient(rgba(255, 255, 255, 1), rgba(255, 255, 255, 1))",
+            "panel_border_style": "solid",
+            "panel_border_width": 1,
+            "panel_border_opacity": 15,
+            "panel_border_color": "#0F2E2F",
+            "panel_radius": 12,
+            "panel_padding_block": 8,
+            "panel_padding_inline": 0,
+            "panel_offset": 4,
+            "panel_shadow": true,
+            "option_font_size": "16",
+            "option_font_size_mobile": "14",
+            "option_padding_block": 8,
+            "option_padding_inline": 16,
+            "option_radius": 8,
+            "option_color": "#161514",
+            "option_active_color": "#0F2E2F",
+            "option_active_weight": "700",
+            "mark_yes_size": 24,
+            "mark_yes_size_mobile": 20,
+            "mark_yes_icon_size": 12,
+            "mark_yes_fill": "linear-gradient(rgba(3, 210, 111, 1), rgba(3, 210, 111, 1))",
+            "mark_yes_ring_width": 0,
+            "mark_yes_color": "#161514",
+            "mark_no_size": 20,
+            "mark_no_size_mobile": 18,
+            "mark_no_icon_size": 9,
+            "mark_no_ring_width": 1,
+            "mark_no_ring_color": "#03D26F",
+            "mark_no_color": "#161514",
+            "border_style": "none",
+            "border_radius": 0,
+            "padding_device": "desktop"
+          },
+          "blocks": [
+            {
+              "type": "_comparison-column",
+              "name": "t:blocks.comparison_column.settings.role.options__1.label",
+              "settings": {
+                "role": "features",
+                "name": "Our standards",
+                "show_head": false,
+                "cell_alignment": "start",
+                "divider_style": "dashed",
+                "divider_width": 1,
+                "divider_dash": 2,
+                "divider_gap": 2,
+                "divider_opacity": 30,
+                "divider_color": "#0F2E2F",
+                "background": "linear-gradient(rgba(229, 241, 238, 1), rgba(229, 241, 238, 1))",
+                "border_style": "none",
+                "radius_device": "desktop",
+                "radius_top_left": 16,
+                "radius_top_right": 16,
+                "radius_bottom_left": 16,
+                "radius_bottom_right": 16,
+                "radius_top_left_mobile": 12,
+                "radius_top_right_mobile": 12,
+                "radius_bottom_left_mobile": 12,
+                "radius_bottom_right_mobile": 12,
+                "text_color": "#161514",
+                "padding_device": "desktop",
+                "padding_left": 32,
+                "padding_right": 32,
+                "padding_left_mobile": 12,
+                "padding_right_mobile": 12
+              },
+              "blocks": [
+                {
+                  "type": "_comparison-cell",
+                  "settings": {
+                    "kind": "text",
+                    "text": "100% Doctor Formulated",
+                    "preset": "custom",
+                    "font_family": "body",
+                    "font_weight": "700",
+                    "font_size": "16",
+                    "font_size_mobile": "13",
+                    "line_height": "tight",
+                    "color": "custom",
+                    "text_color_custom": "#161514"
+                  }
+                },
+                {
+                  "type": "_comparison-cell",
+                  "settings": {
+                    "kind": "text",
+                    "text": "Third-Party Lab Tested",
+                    "preset": "custom",
+                    "font_family": "body",
+                    "font_weight": "700",
+                    "font_size": "16",
+                    "font_size_mobile": "13",
+                    "line_height": "tight",
+                    "color": "custom",
+                    "text_color_custom": "#161514"
+                  }
+                },
+                {
+                  "type": "_comparison-cell",
+                  "settings": {
+                    "kind": "text",
+                    "text": "Zero Artificial Fillers",
+                    "preset": "custom",
+                    "font_family": "body",
+                    "font_weight": "700",
+                    "font_size": "16",
+                    "font_size_mobile": "13",
+                    "line_height": "tight",
+                    "color": "custom",
+                    "text_color_custom": "#161514"
+                  }
+                },
+                {
+                  "type": "_comparison-cell",
+                  "settings": {
+                    "kind": "text",
+                    "text": "Sustainably Sourced",
+                    "preset": "custom",
+                    "font_family": "body",
+                    "font_weight": "700",
+                    "font_size": "16",
+                    "font_size_mobile": "13",
+                    "line_height": "tight",
+                    "color": "custom",
+                    "text_color_custom": "#161514"
+                  }
+                },
+                {
+                  "type": "_comparison-cell",
+                  "settings": {
+                    "kind": "text",
+                    "text": "High Bioavailability Rate",
+                    "preset": "custom",
+                    "font_family": "body",
+                    "font_weight": "700",
+                    "font_size": "16",
+                    "font_size_mobile": "13",
+                    "line_height": "tight",
+                    "color": "custom",
+                    "text_color_custom": "#161514"
+                  }
+                },
+                {
+                  "type": "_comparison-cell",
+                  "settings": {
+                    "kind": "text",
+                    "text": "Money-Back Guarantee",
+                    "preset": "custom",
+                    "font_family": "body",
+                    "font_weight": "700",
+                    "font_size": "16",
+                    "font_size_mobile": "13",
+                    "line_height": "tight",
+                    "color": "custom",
+                    "text_color_custom": "#161514"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "_comparison-column",
+              "name": "t:blocks.comparison_column.settings.role.options__2.label",
+              "settings": {
+                "role": "brand",
+                "name": "Boost10",
+                "head_source": "logo",
+                "logo_width": 140,
+                "logo_width_mobile": 84,
+                "cell_alignment": "center",
+                "divider_style": "dashed",
+                "divider_width": 1,
+                "divider_dash": 2,
+                "divider_gap": 2,
+                "divider_opacity": 30,
+                "divider_color": "#FFFFFF",
+                "background": "linear-gradient(rgba(15, 46, 47, 1), rgba(15, 46, 47, 1))",
+                "border_style": "none",
+                "radius_device": "desktop",
+                "radius_top_left": 16,
+                "radius_top_right": 16,
+                "radius_bottom_left": 16,
+                "radius_bottom_right": 16,
+                "radius_top_left_mobile": 12,
+                "radius_top_right_mobile": 12,
+                "radius_bottom_left_mobile": 12,
+                "radius_bottom_right_mobile": 12,
+                "text_color": "#FFFFFF",
+                "head_font_size": "24",
+                "head_font_size_mobile": "16",
+                "head_font_weight": "700",
+                "head_color": "#FFFFFF",
+                "padding_device": "desktop",
+                "padding_left": 32,
+                "padding_right": 32,
+                "padding_left_mobile": 8,
+                "padding_right_mobile": 8
+              },
+              "blocks": [
+                {
+                  "type": "_comparison-cell",
+                  "settings": {
+                    "kind": "check"
+                  }
+                },
+                {
+                  "type": "_comparison-cell",
+                  "settings": {
+                    "kind": "check"
+                  }
+                },
+                {
+                  "type": "_comparison-cell",
+                  "settings": {
+                    "kind": "check"
+                  }
+                },
+                {
+                  "type": "_comparison-cell",
+                  "settings": {
+                    "kind": "check"
+                  }
+                },
+                {
+                  "type": "_comparison-cell",
+                  "settings": {
+                    "kind": "check"
+                  }
+                },
+                {
+                  "type": "_comparison-cell",
+                  "settings": {
+                    "kind": "check"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "_comparison-column",
+              "settings": {
+                "role": "product",
+                "name": "Hydration powder",
+                "cell_alignment": "center",
+                "divider_style": "dashed",
+                "divider_width": 1,
+                "divider_dash": 2,
+                "divider_gap": 2,
+                "divider_opacity": 30,
+                "divider_color": "#0F2E2F",
+                "background": "linear-gradient(rgba(229, 241, 238, 1), rgba(229, 241, 238, 1))",
+                "border_style": "none",
+                "radius_device": "desktop",
+                "radius_top_left": 16,
+                "radius_top_right": 16,
+                "radius_bottom_left": 16,
+                "radius_bottom_right": 16,
+                "radius_top_left_mobile": 12,
+                "radius_top_right_mobile": 12,
+                "radius_bottom_left_mobile": 12,
+                "radius_bottom_right_mobile": 12,
+                "text_color": "#3F3E3E",
+                "chevron_size": 16,
+                "padding_device": "desktop",
+                "padding_left": 32,
+                "padding_right": 32,
+                "padding_left_mobile": 8,
+                "padding_right_mobile": 8
+              },
+              "blocks": [
+                {
+                  "type": "_comparison-cell",
+                  "settings": {
+                    "kind": "cross"
+                  }
+                },
+                {
+                  "type": "_comparison-cell",
+                  "settings": {
+                    "kind": "cross"
+                  }
+                },
+                {
+                  "type": "_comparison-cell",
+                  "settings": {
+                    "kind": "text",
+                    "text": "114mg Sugar",
+                    "preset": "custom",
+                    "font_family": "body",
+                    "font_weight": "400",
+                    "font_size": "16",
+                    "font_size_mobile": "13",
+                    "line_height": "tight",
+                    "color": "custom",
+                    "text_color_custom": "#3F3E3E"
+                  }
+                },
+                {
+                  "type": "_comparison-cell",
+                  "settings": {
+                    "kind": "cross"
+                  }
+                },
+                {
+                  "type": "_comparison-cell",
+                  "settings": {
+                    "kind": "text",
+                    "text": "Low Rate",
+                    "preset": "custom",
+                    "font_family": "body",
+                    "font_weight": "400",
+                    "font_size": "16",
+                    "font_size_mobile": "13",
+                    "line_height": "tight",
+                    "color": "custom",
+                    "text_color_custom": "#3F3E3E"
+                  }
+                },
+                {
+                  "type": "_comparison-cell",
+                  "settings": {
+                    "kind": "text",
+                    "text": "114mg Fee",
+                    "preset": "custom",
+                    "font_family": "body",
+                    "font_weight": "400",
+                    "font_size": "16",
+                    "font_size_mobile": "13",
+                    "line_height": "tight",
+                    "color": "custom",
+                    "text_color_custom": "#3F3E3E"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "_comparison-column",
+              "settings": {
+                "role": "product",
+                "name": "Recovery capsules",
+                "cell_alignment": "center",
+                "divider_style": "dashed",
+                "divider_width": 1,
+                "divider_dash": 2,
+                "divider_gap": 2,
+                "divider_opacity": 30,
+                "divider_color": "#0F2E2F",
+                "background": "linear-gradient(rgba(229, 241, 238, 1), rgba(229, 241, 238, 1))",
+                "border_style": "none",
+                "radius_device": "desktop",
+                "radius_top_left": 16,
+                "radius_top_right": 16,
+                "radius_bottom_left": 16,
+                "radius_bottom_right": 16,
+                "radius_top_left_mobile": 12,
+                "radius_top_right_mobile": 12,
+                "radius_bottom_left_mobile": 12,
+                "radius_bottom_right_mobile": 12,
+                "text_color": "#3F3E3E",
+                "chevron_size": 16,
+                "padding_device": "desktop",
+                "padding_left": 32,
+                "padding_right": 32,
+                "padding_left_mobile": 8,
+                "padding_right_mobile": 8
+              },
+              "blocks": [
+                {
+                  "type": "_comparison-cell",
+                  "settings": {
+                    "kind": "cross"
+                  }
+                },
+                {
+                  "type": "_comparison-cell",
+                  "settings": {
+                    "kind": "cross"
+                  }
+                },
+                {
+                  "type": "_comparison-cell",
+                  "settings": {
+                    "kind": "text",
+                    "text": "114mg Gelatin",
+                    "preset": "custom",
+                    "font_family": "body",
+                    "font_weight": "400",
+                    "font_size": "16",
+                    "font_size_mobile": "13",
+                    "line_height": "tight",
+                    "color": "custom",
+                    "text_color_custom": "#3F3E3E"
+                  }
+                },
+                {
+                  "type": "_comparison-cell",
+                  "settings": {
+                    "kind": "check"
+                  }
+                },
+                {
+                  "type": "_comparison-cell",
+                  "settings": {
+                    "kind": "cross"
+                  }
+                },
+                {
+                  "type": "_comparison-cell",
+                  "settings": {
+                    "kind": "text",
+                    "text": "Slow Release",
+                    "preset": "custom",
+                    "font_family": "body",
+                    "font_weight": "400",
+                    "font_size": "16",
+                    "font_size_mobile": "13",
+                    "line_height": "tight",
+                    "color": "custom",
+                    "text_color_custom": "#3F3E3E"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "_comparison-column",
+              "settings": {
+                "role": "product",
+                "name": "Energy drops",
+                "cell_alignment": "center",
+                "divider_style": "dashed",
+                "divider_width": 1,
+                "divider_dash": 2,
+                "divider_gap": 2,
+                "divider_opacity": 30,
+                "divider_color": "#0F2E2F",
+                "background": "linear-gradient(rgba(229, 241, 238, 1), rgba(229, 241, 238, 1))",
+                "border_style": "none",
+                "radius_device": "desktop",
+                "radius_top_left": 16,
+                "radius_top_right": 16,
+                "radius_bottom_left": 16,
+                "radius_bottom_right": 16,
+                "radius_top_left_mobile": 12,
+                "radius_top_right_mobile": 12,
+                "radius_bottom_left_mobile": 12,
+                "radius_bottom_right_mobile": 12,
+                "text_color": "#3F3E3E",
+                "chevron_size": 16,
+                "padding_device": "desktop",
+                "padding_left": 32,
+                "padding_right": 32,
+                "padding_left_mobile": 8,
+                "padding_right_mobile": 8
+              },
+              "blocks": [
+                {
+                  "type": "_comparison-cell",
+                  "settings": {
+                    "kind": "cross"
+                  }
+                },
+                {
+                  "type": "_comparison-cell",
+                  "settings": {
+                    "kind": "cross"
+                  }
+                },
+                {
+                  "type": "_comparison-cell",
+                  "settings": {
+                    "kind": "text",
+                    "text": "114mg Synthetics",
+                    "preset": "custom",
+                    "font_family": "body",
+                    "font_weight": "400",
+                    "font_size": "16",
+                    "font_size_mobile": "13",
+                    "line_height": "tight",
+                    "color": "custom",
+                    "text_color_custom": "#3F3E3E"
+                  }
+                },
+                {
+                  "type": "_comparison-cell",
+                  "settings": {
+                    "kind": "cross"
+                  }
+                },
+                {
+                  "type": "_comparison-cell",
+                  "settings": {
+                    "kind": "text",
+                    "text": "Quick Crash",
+                    "preset": "custom",
+                    "font_family": "body",
+                    "font_weight": "400",
+                    "font_size": "16",
+                    "font_size_mobile": "13",
+                    "line_height": "tight",
+                    "color": "custom",
+                    "text_color_custom": "#3F3E3E"
+                  }
+                },
+                {
+                  "type": "_comparison-cell",
+                  "settings": {
+                    "kind": "cross"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "_comparison-column",
+              "settings": {
+                "role": "product",
+                "name": "Focus gummies",
+                "cell_alignment": "center",
+                "divider_style": "dashed",
+                "divider_width": 1,
+                "divider_dash": 2,
+                "divider_gap": 2,
+                "divider_opacity": 30,
+                "divider_color": "#0F2E2F",
+                "background": "linear-gradient(rgba(229, 241, 238, 1), rgba(229, 241, 238, 1))",
+                "border_style": "none",
+                "radius_device": "desktop",
+                "radius_top_left": 16,
+                "radius_top_right": 16,
+                "radius_bottom_left": 16,
+                "radius_bottom_right": 16,
+                "radius_top_left_mobile": 12,
+                "radius_top_right_mobile": 12,
+                "radius_bottom_left_mobile": 12,
+                "radius_bottom_right_mobile": 12,
+                "text_color": "#3F3E3E",
+                "chevron_size": 16,
+                "padding_device": "desktop",
+                "padding_left": 32,
+                "padding_right": 32,
+                "padding_left_mobile": 8,
+                "padding_right_mobile": 8
+              },
+              "blocks": [
+                {
+                  "type": "_comparison-cell",
+                  "settings": {
+                    "kind": "cross"
+                  }
+                },
+                {
+                  "type": "_comparison-cell",
+                  "settings": {
+                    "kind": "cross"
+                  }
+                },
+                {
+                  "type": "_comparison-cell",
+                  "settings": {
+                    "kind": "text",
+                    "text": "114mg Cornstarch",
+                    "preset": "custom",
+                    "font_family": "body",
+                    "font_weight": "400",
+                    "font_size": "16",
+                    "font_size_mobile": "13",
+                    "line_height": "tight",
+                    "color": "custom",
+                    "text_color_custom": "#3F3E3E"
+                  }
+                },
+                {
+                  "type": "_comparison-cell",
+                  "settings": {
+                    "kind": "cross"
+                  }
+                },
+                {
+                  "type": "_comparison-cell",
+                  "settings": {
+                    "kind": "text",
+                    "text": "Low Potency",
+                    "preset": "custom",
+                    "font_family": "body",
+                    "font_weight": "400",
+                    "font_size": "16",
+                    "font_size_mobile": "13",
+                    "line_height": "tight",
+                    "color": "custom",
+                    "text_color_custom": "#3F3E3E"
+                  }
+                },
+                {
+                  "type": "_comparison-cell",
+                  "settings": {
+                    "kind": "text",
+                    "text": "Slow Release",
+                    "preset": "custom",
+                    "font_family": "body",
+                    "font_weight": "400",
+                    "font_size": "16",
+                    "font_size_mobile": "13",
+                    "line_height": "tight",
+                    "color": "custom",
+                    "text_color_custom": "#3F3E3E"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "group",
+          "settings": {
+            "inherit_color_scheme": true,
+            "direction": "row",
+            "stack_on_mobile": false,
+            "alignment": "center",
+            "position": "center",
+            "gap": 12,
+            "gap_horizontal": 12,
+            "gap_vertical": 12,
+            "gap_horizontal_mobile": 8,
+            "gap_vertical_mobile": 8,
+            "width": "fill",
+            "border_style": "none"
+          },
+          "blocks": [
+            {
+              "type": "button",
+              "settings": {
+                "label": "Subscribe & Save",
+                "link": "shopify://collections/all",
+                "style": "primary",
+                "icon": "arrow-right",
+                "icon_style": "solid",
+                "icon_position": "end",
+                "corner_radius": 40,
+                "width": "auto"
+              }
+            },
+            {
+              "type": "button",
+              "settings": {
+                "label": "Start Shopping",
+                "link": "shopify://collections/all",
+                "style": "outline",
+                "border_style": "dashed",
+                "border_thickness": 1,
+                "icon": "arrow-right",
+                "icon_style": "solid",
+                "icon_position": "end",
+                "corner_radius": 40,
+                "width": "auto"
+              }
+            }
+          ]
+        },
+        {
+          "type": "group",
+          "settings": {
+            "inherit_color_scheme": true,
+            "direction": "row",
+            "stack_on_mobile": false,
+            "alignment": "center",
+            "position": "center",
+            "gap": 40,
+            "gap_horizontal": 40,
+            "gap_vertical": 12,
+            "gap_horizontal_mobile": 20,
+            "gap_vertical_mobile": 8,
+            "width": "fill",
+            "border_style": "none"
+          },
+          "blocks": [
+            {
+              "type": "icon-with-text",
+              "settings": {
+                "icon_source": "icon",
+                "icon": "check",
+                "icon_size": "extra_small",
+                "icon_color": "#0F2E2F",
+                "shape": "circle",
+                "shape_size": 24,
+                "shape_size_mobile": 22,
+                "ring_style": "solid",
+                "ring_width": 1,
+                "ring_color": "#03D26F",
+                "heading": "100% Certified Purity",
+                "alignment": "row",
+                "gap": 10
+              }
+            },
+            {
+              "type": "icon-with-text",
+              "settings": {
+                "icon_source": "icon",
+                "icon": "check",
+                "icon_size": "extra_small",
+                "icon_color": "#0F2E2F",
+                "shape": "circle",
+                "shape_size": 24,
+                "shape_size_mobile": 22,
+                "ring_style": "solid",
+                "ring_width": 1,
+                "ring_color": "#03D26F",
+                "heading": "30-Day Risk-Free Trial",
+                "alignment": "row",
+                "gap": 10
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+{% endschema %}

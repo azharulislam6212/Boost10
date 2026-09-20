@@ -1,0 +1,728 @@
+{% doc %}
+  blocks/_comparison-cell.liquid — private.
+
+  One answer in one column: a claim, a tick, a cross, or the number that makes
+  the point better than either.
+
+  ## Why it is not `blocks/icon-with-text.liquid`
+
+  
+  Icon with text is a glyph beside a sentence and it has no idea of being one of
+  a set. This one is a cell — its height is a track of the table's grid, its top
+  edge carries the divider its column drew, and the thing it says is only
+  meaningful next to whatever the same row says in the column beside it.
+
+  ## Five kinds, one file
+
+    Claim   the label down the left of the drawing
+    Yes     the filled tick
+    No      the outlined cross
+    Value   a phrase in place of a mark — *114mg Sugar*, *Slow Release*
+    Empty   a row this column has nothing to say about
+
+  Yes and No are the same element with two palettes, and both palettes live on
+  **Comparison table** rather than here: a table whose third tick is a different
+  green from its second is a table that will be, and a merchant tuning the
+  marks should be doing it once. Everything on this block under **The mark** is
+  an override, blank by default, for the one cell that genuinely differs.
+
+  ## The divider is drawn here and configured there
+
+  `.comparison-cell + .comparison-cell` is the selector, so the line appears
+  between cells and never above the first one or below the last — in a column
+  with a header row the first cell is preceded by the header, which is not a
+  cell, so the rule is right in both shapes without a modifier.
+
+  It sits on the cell's border box rather than inside its padding, so changing
+  the space around a claim never moves the line, and the line's inset is the
+  column's left and right padding exactly as the drawing has it.
+
+  ## What it does not say out loud
+
+  A mark on its own announces as nothing. The static markup therefore ships
+  visually hidden text — *Yes* / *No*, translated — and
+  `assets/comparison-table.js` upgrades it to *Third-party lab tested: Yes* once
+  it connects, because it knows which row the cell is in and Liquid does not:
+  `block.blocks` does not exist and `forloop` does not reach inside
+  `{% content_for 'blocks' %}`.
+
+  Private — the leading underscore — because a cell outside a column is a tick
+  in a box. It is addable inside **Comparison column** and nowhere else.
+{% enddoc %}
+
+{%- liquid
+  assign s = block.settings
+
+  assign kind = s.kind | default: 'text'
+
+  assign has_mark = false
+  if kind == 'check' or kind == 'cross' or kind == 'icon'
+    assign has_mark = true
+  endif
+
+  comment
+    Which palette the mark reads. Both are published by
+    `blocks/_comparison-table.liquid` as two sets of custom properties with the
+    same suffixes, so the cell picks a set by name rather than by branching over
+    six properties twice.
+
+    A custom icon takes the Yes palette, because an icon a merchant chose is a
+    thing they are saying *about* their own column rather than a mark against
+    it.
+  endcomment
+  assign palette = 'yes'
+  if kind == 'cross'
+    assign palette = 'no'
+  endif
+
+  comment
+    Which glyph. The two marks have a fixed one — a tick is a tick — and only
+    the custom kind reads a setting. `snippets/icon.liquid` renders an empty
+    `svg` for a name it does not know, so the name is checked here rather than
+    passed straight through.
+  endcomment
+  case kind
+    when 'check'
+      assign glyph = 'check'
+    when 'cross'
+      assign glyph = 'close'
+    when 'icon'
+      assign glyph = s.icon | default: 'check'
+    else
+      assign glyph = ''
+  endcase
+
+  comment
+    ---- what it announces ----
+
+    A default that says something is better than a default that says nothing:
+    a tick with no text is announced as an empty group. The merchant can replace
+    it, and the module replaces it again with the claim the cell answers.
+  endcomment
+  assign sr_text = s.sr_text | default: ''
+  if sr_text == blank
+    case kind
+      when 'check'
+        assign sr_text = 'sections.comparison_table.yes' | t
+      when 'cross'
+        assign sr_text = 'sections.comparison_table.no' | t
+    endcase
+  endif
+
+  assign preset = s.preset | default: 'default'
+  assign text_classes = 'comparison-cell__text block-text--' | append: preset
+  if s.color == 'gradient'
+    assign text_classes = text_classes | append: ' block-text--gradient'
+  endif
+
+  assign align = s.alignment | default: 'inherit'
+
+  assign classes = 'comparison-cell comparison-cell--' | append: kind
+  if align != 'inherit'
+    assign classes = classes | append: ' comparison-cell--align-' | append: align
+  endif
+-%}
+
+{%- capture cell_style -%}
+  {%- render 'spacing', block: s, declarations: true -%}
+  {%- if has_mark -%}
+    {%- comment -%}
+      Each property falls back through the table's palette to a hard default in
+      `assets/base.css`, so a cell that overrides nothing emits nothing and the
+      table stays the single place the marks are tuned.
+    {%- endcomment -%}
+    --ct-mark-size: var(--ct-mark-{{ palette }}-size);
+    --ct-mark-size-mobile: var(--ct-mark-{{ palette }}-size-mobile);
+    --ct-mark-fill: var(--ct-mark-{{ palette }}-fill);
+    --ct-mark-ring-color: var(--ct-mark-{{ palette }}-ring-color);
+    --ct-mark-ring-width: var(--ct-mark-{{ palette }}-ring-width);
+    --ct-mark-color: var(--ct-mark-{{ palette }}-color);
+    --ct-mark-icon-size: var(--ct-mark-{{ palette }}-icon-size);
+
+    {%- if s.mark_size > 0 -%}--ct-mark-size: {{ s.mark_size }}px;{%- endif -%}
+    {%- if s.icon_size > 0 -%}--ct-mark-icon-size: {{ s.icon_size }}px;{%- endif -%}
+    {%- if s.mark_fill != blank -%}--ct-mark-fill: {{ s.mark_fill }};{%- endif -%}
+    {%- if s.mark_ring_color != blank -%}--ct-mark-ring-color: {{ s.mark_ring_color }};{%- endif -%}
+    {%- if s.mark_color != blank -%}--ct-mark-color: {{ s.mark_color }};{%- endif -%}
+  {%- endif -%}
+  {%- render 'block-typography', block: s -%}
+{%- endcapture -%}
+
+<div
+  class="{{ classes }}"
+  data-block-spacing
+  data-comparison-cell
+  data-comparison-kind="{{ kind }}"
+  style="{{ cell_style | strip_newlines | strip }}"
+  {{ block.shopify_attributes }}
+>
+  {%- if has_mark -%}
+    {%- comment -%}
+      `data-comparison-mark` is what the module re-labels. The hidden span is
+      inside the mark rather than beside it so the two are announced as one
+      thing, and `aria-hidden` on the `svg` comes from `snippets/icon.liquid` —
+      an icon never carries the accessible name in this theme.
+    {%- endcomment -%}
+    <span class="comparison-cell__mark" data-comparison-mark>
+      {%- comment -%}
+        No `size:` is passed. The snippet would write `--icon-size` inline, and
+        an inline property cannot be swapped at a breakpoint — the glyph is
+        sized by `--ct-mark-icon-size` in `assets/base.css` instead, which falls
+        through the table's palette and can still shrink on a phone.
+      {%- endcomment -%}
+      {% render 'icon', icon: glyph, class: 'comparison-cell__glyph' %}
+      {%- if sr_text != blank -%}
+        <span class="visually-hidden" data-comparison-answer>{{ sr_text | escape }}</span>
+      {%- endif -%}
+    </span>
+  {%- elsif kind == 'text' and s.text != blank -%}
+    <span class="{{ text_classes }}">{{ s.text | escape }}</span>
+  {%- endif -%}
+</div>
+
+{%- comment -%}
+  Every setting below is a control a merchant reaches in the editor, and the
+  schema is one element's styling surface: splitting it to get under Theme
+  Check's count of 40 would split the thing the settings style.
+{%- endcomment -%}
+{% # theme-check-disable ExcessiveSettingsCount %}
+{% schema %}
+{
+  "name": "t:blocks.comparison_cell.name",
+  "tag": null,
+  "settings": [
+    {
+      "type": "select",
+      "id": "kind",
+      "label": "t:blocks.comparison_cell.settings.kind.label",
+      "options": [
+        {
+          "value": "text",
+          "label": "t:blocks.comparison_cell.settings.kind.options__1.label"
+        },
+        {
+          "value": "check",
+          "label": "t:blocks.comparison_cell.settings.kind.options__2.label"
+        },
+        {
+          "value": "cross",
+          "label": "t:blocks.comparison_cell.settings.kind.options__3.label"
+        },
+        {
+          "value": "icon",
+          "label": "t:blocks.comparison_cell.settings.kind.options__4.label"
+        },
+        {
+          "value": "blank",
+          "label": "t:blocks.comparison_cell.settings.kind.options__5.label"
+        }
+      ],
+      "default": "text"
+    },
+    {
+      "type": "text",
+      "id": "text",
+      "label": "t:shared.text.label",
+      "default": "Name one claim",
+      "visible_if": "{{ block.settings.kind == 'text' }}"
+    },
+    {
+      "type": "select",
+      "id": "icon",
+      "label": "t:blocks.subheading.settings.icon.label",
+      "options": [
+        {
+          "value": "check",
+          "label": "t:blocks.subheading.settings.icon.options__2.label"
+        },
+        {
+          "value": "close",
+          "label": "t:blocks.comparison_cell.settings.kind.options__3.label"
+        },
+        {
+          "value": "leaf",
+          "label": "t:shared.icons.leaf"
+        },
+        {
+          "value": "droplet",
+          "label": "t:shared.icons.droplet"
+        },
+        {
+          "value": "bolt",
+          "label": "t:shared.icons.bolt"
+        },
+        {
+          "value": "pulse",
+          "label": "t:shared.icons.pulse"
+        },
+        {
+          "value": "sparkle",
+          "label": "t:shared.icons.sparkle"
+        },
+        {
+          "value": "shield",
+          "label": "t:blocks.icon_with_text.settings.icon.options__2"
+        },
+        {
+          "value": "star",
+          "label": "t:blocks.subheading.settings.icon.options__1.label"
+        },
+        {
+          "value": "info",
+          "label": "t:blocks.subheading.settings.icon.options__12.label"
+        }
+      ],
+      "default": "check",
+      "visible_if": "{{ block.settings.kind == 'icon' }}"
+    },
+    {
+      "type": "text",
+      "id": "sr_text",
+      "label": "t:blocks.comparison_cell.settings.sr_text.label",
+      "info": "t:blocks.comparison_cell.settings.sr_text.info",
+      "visible_if": "{{ block.settings.kind == 'check' or block.settings.kind == 'cross' or block.settings.kind == 'icon' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.group.headers.layout"
+    },
+    {
+      "type": "select",
+      "id": "alignment",
+      "label": "t:shared.alignment.label",
+      "options": [
+        {
+          "value": "inherit",
+          "label": "t:shared.typography.color.options__1.label"
+        },
+        {
+          "value": "start",
+          "label": "t:shared.alignment.options__1.label"
+        },
+        {
+          "value": "center",
+          "label": "t:shared.alignment.options__2.label"
+        },
+        {
+          "value": "end",
+          "label": "t:shared.alignment.options__3.label"
+        }
+      ],
+      "default": "inherit"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.feature_icon.headers.shape"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:blocks.comparison_cell.paragraphs.mark"
+    },
+    {
+      "type": "range",
+      "id": "icon_size",
+      "label": "t:shared.icon_size.custom.label",
+      "min": 0,
+      "max": 40,
+      "step": 1,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.kind == 'check' or block.settings.kind == 'cross' or block.settings.kind == 'icon' }}"
+    },
+    {
+      "type": "range",
+      "id": "mark_size",
+      "label": "t:blocks.feature_icon.settings.shape_size.label",
+      "min": 0,
+      "max": 72,
+      "step": 1,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.kind == 'check' or block.settings.kind == 'cross' or block.settings.kind == 'icon' }}"
+    },
+    {
+      "type": "color_background",
+      "id": "mark_fill",
+      "label": "t:blocks.feature_icon.settings.fill_color.label",
+      "visible_if": "{{ block.settings.kind == 'check' or block.settings.kind == 'cross' or block.settings.kind == 'icon' }}"
+    },
+    {
+      "type": "color",
+      "id": "mark_ring_color",
+      "label": "t:shared.border.color.label",
+      "visible_if": "{{ block.settings.kind == 'check' or block.settings.kind == 'cross' or block.settings.kind == 'icon' }}"
+    },
+    {
+      "type": "color",
+      "id": "mark_color",
+      "label": "t:blocks.feature_icon.settings.icon_color.label",
+      "visible_if": "{{ block.settings.kind == 'check' or block.settings.kind == 'cross' or block.settings.kind == 'icon' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.typography.header"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:shared.typography.paragraph"
+    },
+    {
+      "type": "select",
+      "id": "preset",
+      "label": "t:shared.typography.preset.label",
+      "info": "t:shared.typography.preset.info",
+      "options": [
+        {
+          "value": "default",
+          "label": "t:shared.typography.preset.options__1.label"
+        },
+        {
+          "value": "paragraph",
+          "label": "t:shared.typography.preset.options__2.label"
+        },
+        {
+          "value": "subheading",
+          "label": "t:shared.typography.preset.options__3.label"
+        },
+        {
+          "value": "h4",
+          "label": "t:shared.typography.preset.options__7.label"
+        },
+        {
+          "value": "h5",
+          "label": "t:shared.typography.preset.options__8.label"
+        },
+        {
+          "value": "h6",
+          "label": "t:shared.typography.preset.options__9.label"
+        },
+        {
+          "value": "custom",
+          "label": "t:shared.typography.preset.options__10.label"
+        }
+      ],
+      "default": "custom",
+      "visible_if": "{{ block.settings.kind == 'text' }}"
+    },
+    {
+      "type": "select",
+      "id": "font_family",
+      "label": "t:shared.typography.font_family.label",
+      "options": [
+        {
+          "value": "body",
+          "label": "t:shared.typography.font_family.options__2.label"
+        },
+        {
+          "value": "heading",
+          "label": "t:shared.typography.font_family.options__1.label"
+        },
+        {
+          "value": "accent",
+          "label": "t:shared.typography.font_family.options__3.label"
+        }
+      ],
+      "default": "body",
+      "visible_if": "{{ block.settings.kind == 'text' and block.settings.preset == 'custom' }}"
+    },
+    {
+      "type": "select",
+      "id": "font_weight",
+      "label": "t:shared.typography.font_weight.label",
+      "options": [
+        {
+          "value": "inherit",
+          "label": "t:shared.typography.font_weight.options__1.label"
+        },
+        {
+          "value": "300",
+          "label": "300"
+        },
+        {
+          "value": "400",
+          "label": "400"
+        },
+        {
+          "value": "500",
+          "label": "500"
+        },
+        {
+          "value": "600",
+          "label": "600"
+        },
+        {
+          "value": "700",
+          "label": "700"
+        },
+        {
+          "value": "800",
+          "label": "800"
+        }
+      ],
+      "default": "inherit",
+      "visible_if": "{{ block.settings.kind == 'text' and block.settings.preset == 'custom' }}"
+    },
+    {
+      "type": "select",
+      "id": "font_size",
+      "label": "t:shared.typography.font_size.label",
+      "options": [
+        {
+          "value": "12",
+          "label": "12px"
+        },
+        {
+          "value": "13",
+          "label": "13px"
+        },
+        {
+          "value": "14",
+          "label": "14px"
+        },
+        {
+          "value": "15",
+          "label": "15px"
+        },
+        {
+          "value": "16",
+          "label": "16px"
+        },
+        {
+          "value": "18",
+          "label": "18px"
+        },
+        {
+          "value": "20",
+          "label": "20px"
+        }
+      ],
+      "default": "16",
+      "visible_if": "{{ block.settings.kind == 'text' and block.settings.preset == 'custom' }}"
+    },
+    {
+      "type": "select",
+      "id": "font_size_mobile",
+      "label": "t:shared.typography.font_size_mobile.label",
+      "info": "t:shared.typography.font_size_mobile.info",
+      "options": [
+        {
+          "value": "11",
+          "label": "11px"
+        },
+        {
+          "value": "12",
+          "label": "12px"
+        },
+        {
+          "value": "13",
+          "label": "13px"
+        },
+        {
+          "value": "14",
+          "label": "14px"
+        },
+        {
+          "value": "15",
+          "label": "15px"
+        },
+        {
+          "value": "16",
+          "label": "16px"
+        }
+      ],
+      "default": "13",
+      "visible_if": "{{ block.settings.kind == 'text' and block.settings.preset == 'custom' }}"
+    },
+    {
+      "type": "select",
+      "id": "line_height",
+      "label": "t:shared.typography.line_height.label",
+      "options": [
+        {
+          "value": "tight",
+          "label": "t:shared.typography.line_height.options__1.label"
+        },
+        {
+          "value": "normal",
+          "label": "t:shared.typography.line_height.options__2.label"
+        },
+        {
+          "value": "loose",
+          "label": "t:shared.typography.line_height.options__3.label"
+        }
+      ],
+      "default": "tight",
+      "visible_if": "{{ block.settings.kind == 'text' and block.settings.preset == 'custom' }}"
+    },
+    {
+      "type": "select",
+      "id": "letter_spacing",
+      "label": "t:shared.typography.letter_spacing.label",
+      "options": [
+        {
+          "value": "tight",
+          "label": "t:shared.typography.letter_spacing.options__1.label"
+        },
+        {
+          "value": "normal",
+          "label": "t:shared.typography.letter_spacing.options__2.label"
+        },
+        {
+          "value": "wide",
+          "label": "t:shared.typography.letter_spacing.options__3.label"
+        }
+      ],
+      "default": "normal",
+      "visible_if": "{{ block.settings.kind == 'text' and block.settings.preset == 'custom' }}"
+    },
+    {
+      "type": "select",
+      "id": "color",
+      "label": "t:shared.typography.color.label",
+      "info": "t:shared.typography.color.info",
+      "options": [
+        {
+          "value": "inherit",
+          "label": "t:shared.typography.color.options__1.label"
+        },
+        {
+          "value": "muted",
+          "label": "t:shared.typography.color.options__2.label"
+        },
+        {
+          "value": "custom",
+          "label": "t:shared.typography.color.options__3.label"
+        },
+        {
+          "value": "gradient",
+          "label": "t:shared.typography.color.options__4.label"
+        }
+      ],
+      "default": "inherit",
+      "visible_if": "{{ block.settings.kind == 'text' }}"
+    },
+    {
+      "type": "color",
+      "id": "text_color_custom",
+      "label": "t:shared.typography.text_color.label",
+      "info": "t:shared.typography.text_color.info",
+      "visible_if": "{{ block.settings.kind == 'text' and block.settings.color == 'custom' }}"
+    },
+    {
+      "type": "color_background",
+      "id": "text_gradient",
+      "label": "t:shared.typography.text_gradient.label",
+      "info": "t:shared.typography.text_gradient.info",
+      "visible_if": "{{ block.settings.kind == 'text' and block.settings.color == 'gradient' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.spacing.block_header"
+    },
+    {
+      "type": "select",
+      "id": "padding_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        {
+          "value": "desktop",
+          "label": "t:shared.spacing.devices.options__1.label"
+        },
+        {
+          "value": "mobile",
+          "label": "t:shared.spacing.devices.options__2.label"
+        }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 60,
+      "step": 1,
+      "unit": "px",
+      "default": 8,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 60,
+      "step": 1,
+      "unit": "px",
+      "default": 8,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 60,
+      "step": 1,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 60,
+      "step": 1,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 60,
+      "step": 1,
+      "unit": "px",
+      "default": 6,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 60,
+      "step": 1,
+      "unit": "px",
+      "default": 6,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left_mobile",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 60,
+      "step": 1,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right_mobile",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 60,
+      "step": 1,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    }
+  ]
+}
+{% endschema %}

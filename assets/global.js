@@ -118,6 +118,12 @@ const LAZY_MODULES = [
   // merchant marked lit.
   { specifier: '@theme/highlight-points', tags: ['highlight-points'] },
 
+  // The chooser on the Comparison table section. Lazy like the rest: a page
+  // without the section never fetches it, and without it the table still
+  // renders every alternative column side by side, named and complete — what is
+  // lost is the switching, not the content.
+  { specifier: '@theme/comparison-table', tags: ['comparison-table'] },
+
   // `<button-swap>` is only emitted for buttons whose hover effect actually
   // needs a duplicated track, so a page of ordinary buttons never fetches this.
   { specifier: '@theme/button-element', tags: ['button-swap'] },
