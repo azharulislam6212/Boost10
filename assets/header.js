@@ -1,11 +1,12 @@
 /**
  * header.js — Boost10
  *
- * Two elements:
+ * Four elements:
  *
  *   <nav-menu>       the desktop navigation
  *   <nav-disclosure> a single dropdown outside the navigation (the account menu)
  *   <mobile-nav>     the drawer navigation, accordion or slide
+ *   <account-anchor> puts Shopify's account sheet under the account icon
  *
  * Everything that opens here is a `<details>`. The browser already owns the
  * open/closed state, the Enter and Space handling and the "expands something"
@@ -19,9 +20,12 @@ import { BaseComponent, defineComponent } from '@theme/component';
 import { EVENTS } from '@theme/events';
 import {
   closeDisclosure,
+  isRTL,
+  matchesQuery,
   openDisclosure,
   panelOf,
-  prefersReducedMotion
+  prefersReducedMotion,
+  rafThrottle
 } from '@theme/utilities';
 
 /** Pointer must rest this long before a panel opens. */
@@ -813,3 +817,178 @@ export class MarketPicker extends BaseComponent {
 }
 
 defineComponent('market-picker', MarketPicker);
+
+/* ==========================================================================
+   <account-anchor>
+   ========================================================================== */
+
+/**
+ * Anchors Shopify's account sheet under the account icon.
+ *
+ * ## The sheet is Shopify's, and it is pinned to the corner of the screen
+ *
+ * `<shopify-account>` opens its sheet as a `<dialog>` that it calls
+ * `showModal()` on. A modal dialog is painted in the top layer, so it is
+ * positioned against the viewport and not against the element that opened it —
+ * and the component's own stylesheet places it at:
+ *
+ *     inset-block-start: var(--shopify-account-dialog-position-top)   // 20px
+ *     inset-inline-end:  var(--app-page-spacing)                      // 20px
+ *
+ * That is the top-right corner of the window, which is where the sheet was
+ * appearing: floating over the announcement bar, nowhere near the icon that
+ * opened it, and covering the cart on its way past.
+ *
+ * ## One variable is documented, the other is not
+ *
+ * `--shopify-account-dialog-position-top` is a published custom property. It is
+ * declared on the component's `:host`, so a value set on the element from the
+ * theme wins, and the component reads the same variable again when it sizes the
+ * sheet's scroll area — setting it moves the sheet *and* keeps its maximum
+ * height honest, which is why the vertical half of this needs nothing else.
+ *
+ * There is no horizontal equivalent. `--app-page-spacing` is declared on a
+ * `<div>` *inside* the shadow root, so it is re-set for every descendant and a
+ * value inherited from the host never reaches the dialog. The one declaration
+ * this element adds therefore goes into the shadow root itself — the component
+ * opens its root in `open` mode, so a `<style>` appended there is the way in —
+ * and it wins on specificity, for the reason recorded at the rule.
+ *
+ * The rule names no class of Shopify's, so a redesign inside the component
+ * cannot silently detach it. If the sheet ever stops being a `<dialog>` the
+ * rule simply matches nothing, the sheet returns to the corner it uses today,
+ * and the vertical offset — the documented half — still applies.
+ *
+ * ## Desktop only
+ *
+ * Below 751px the component drops the popover and becomes a bottom drawer that
+ * spans the screen, which is the right shape for a phone and has nothing to
+ * anchor to. Both variables are cleared at those widths so the drawer keeps its
+ * full height.
+ */
+export class AccountAnchor extends BaseComponent {
+  /** The width at which the component switches from bottom drawer to popover. */
+  static POPOVER_QUERY = '(min-width: 751px)';
+
+  /** Distance between the bottom of the icon and the top of the sheet. */
+  static GAP = 8;
+
+  /** The sheet never comes closer than this to an edge of the window. */
+  static MIN_EDGE = 12;
+
+  /** @type {HTMLElement|null} */
+  #account = null;
+
+  /** @type {boolean} */
+  #styled = false;
+
+  /** @type {boolean} */
+  #open = false;
+
+  setup() {
+    this.#account = this.querySelector('shopify-account');
+    if (!this.#account) return;
+
+    // `open` and `close` are the component's own published events. They do not
+    // bubble, so they are bound on the element itself rather than delegated.
+    this.on(this.#account, 'open', () => {
+      this.#open = true;
+      this.#injectPlacementRule();
+      this.place();
+    });
+
+    this.on(this.#account, 'close', () => {
+      this.#open = false;
+    });
+
+    // The icon moves under the sheet when the window is resized, and when a
+    // sticky header pins or unpins. Re-measuring is a read and two custom
+    // properties, and it only runs while the sheet is actually open.
+    const reposition = rafThrottle(() => {
+      if (this.#open) this.place();
+    });
+
+    this.on(window, 'resize', reposition);
+    this.on(window, 'scroll', reposition, { passive: true });
+  }
+
+  teardown() {
+    this.#open = false;
+    this.#styled = false;
+  }
+
+  /**
+   * Points the sheet at the icon. Safe to call when nothing is open.
+   */
+  place() {
+    const account = this.#account;
+    if (!account) return;
+
+    const { POPOVER_QUERY, GAP, MIN_EDGE } = AccountAnchor;
+
+    if (!matchesQuery(POPOVER_QUERY)) {
+      account.style.removeProperty('--shopify-account-dialog-position-top');
+      account.style.removeProperty('--account-sheet-inline-end');
+      return;
+    }
+
+    const icon = account.getBoundingClientRect();
+
+    // `clientWidth`, not `innerWidth`: a modal dialog resolves its insets
+    // against the viewport with the scrollbar already taken off, and an
+    // eight-pixel disagreement is visible when two edges are meant to line up.
+    const viewport = document.documentElement.clientWidth;
+
+    // The sheet hangs from the bottom of the icon and lines its trailing edge up
+    // with the icon's — the ordinary dropdown, and the only alignment that keeps
+    // a 360px panel on screen under a 40px control.
+    const top = Math.max(MIN_EDGE, Math.round(icon.bottom + GAP));
+    const trailing = isRTL() ? icon.left : viewport - icon.right;
+
+    account.style.setProperty('--shopify-account-dialog-position-top', `${top}px`);
+    account.style.setProperty(
+      '--account-sheet-inline-end',
+      `${Math.max(MIN_EDGE, Math.round(trailing))}px`
+    );
+  }
+
+  /**
+   * Adds the one rule the component does not expose a variable for, once.
+   *
+   * @private
+   */
+  #injectPlacementRule() {
+    if (this.#styled) return;
+
+    const root = this.#account?.shadowRoot;
+    if (!root) return;
+
+    const style = document.createElement('style');
+
+    // The component copies the page's nonce onto the style elements it creates,
+    // so a storefront serving `style-src 'nonce-…'` does not drop them. This one
+    // is created the same way for the same reason.
+    const nonce = /** @type {HTMLElement|null} */ (
+      document.querySelector('style[nonce], script[nonce]')
+    )?.nonce;
+    if (nonce) style.nonce = nonce;
+
+    // `dialog[open]`, not `.dialog`, and the reason is worth keeping: a shadow
+    // root's `adoptedStyleSheets` are ordered *after* its own `<style>`
+    // elements, not before. Appending later therefore loses, and matching the
+    // component's own `.dialog` selector produced a sheet that sat in the
+    // corner exactly as before. One attribute of extra specificity settles it
+    // without `!important`, and the selector names nothing the component could
+    // rename: there is one dialog in that root and it is open when this runs.
+    style.textContent = `@media ${AccountAnchor.POPOVER_QUERY} {
+  dialog[open] {
+    inset-inline-end: var(--account-sheet-inline-end, var(--app-page-spacing));
+  }
+}`;
+
+    root.appendChild(style);
+    this.#styled = true;
+  }
+}
+
+defineComponent('account-anchor', AccountAnchor);

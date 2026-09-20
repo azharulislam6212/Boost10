@@ -135,7 +135,10 @@ const LAZY_MODULES = [
   // The header's own behaviour. `<sticky-header>` is registered in this file
   // because every page has one; the navigation is lazy because a password
   // page, a checkout-adjacent page and a bare landing page have no menu.
-  { specifier: '@theme/header', tags: ['nav-menu', 'nav-disclosure', 'mobile-nav', 'market-picker'] },
+  {
+    specifier: '@theme/header',
+    tags: ['nav-menu', 'nav-disclosure', 'mobile-nav', 'market-picker', 'account-anchor']
+  },
   { specifier: '@theme/tabs', tags: ['tab-group'] },
   { specifier: '@theme/facet-dropdown', tags: ['facet-dropdown'] },
 

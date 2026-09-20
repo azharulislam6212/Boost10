@@ -9,12 +9,37 @@
   gives two sources of truth that disagree the moment a discount removes a line,
   and the one the customer sees is the wrong one.
 
-  ## Why the account control is sometimes a disclosure
+  ## The account control has three shapes, and Shopify owns the first
 
-  With no account menu set it is a plain link to the login or account page —
-  one target, one destination, nothing to expand. With a menu set it becomes a
-  `<details>` handled by the same `<nav-menu>` code as the main navigation, so
-  the animation, the hover intent and the Escape handling are not written twice.
+  **Account sheet** renders `<shopify-account>`, the component the Theme Store
+  requires a theme to carry in its header. Shopify draws the avatar and the
+  sheet that opens from it, and the sheet is what gives a signed-out customer
+  Shop recognition, passwordless sign-in and the rest — none of which a theme
+  can build for itself. It is the default for that reason.
+
+  What the theme hands it is the menu handle and the signed-out avatar, through
+  the `signed-out-avatar` slot, so the icon matches the other controls in the
+  row rather than arriving as a second visual language. Everything past that
+  belongs to Shopify, which updates the component independently of the theme.
+
+  The one exception is *where the sheet lands*, which the component puts in the
+  corner of the window rather than under the icon. `<account-anchor>` wraps it
+  and moves it; the reasoning is in `assets/header.js`.
+
+  **Theme menu** is the theme's own `<details>`, handled by the same
+  `<nav-menu>` code as the main navigation so the animation, the hover intent
+  and the Escape handling are not written twice. It opens on hover, which the
+  account sheet does not.
+
+  **Link** is a plain anchor to the login or account page — one target, one
+  destination, nothing to expand.
+
+  ## Nothing renders when the shop has no accounts
+
+  All three are inside `shop.customer_accounts_enabled`. A shop with customer
+  accounts turned off has no login page to send anyone to, so an account icon
+  there is a control whose only outcome is a dead end — and the component's own
+  documentation asks for the same check before it is rendered.
 
   @param {boolean} cart_is_drawer
   @param {string} cart_count_display - Already padded if the merchant asked
@@ -81,15 +106,54 @@
     </button>
   {%- endif -%}
 
-  {%- if st.show_account -%}
+  {%- if st.show_account and shop.customer_accounts_enabled -%}
     {%- liquid
       assign account_url = routes.account_login_url
       if customer
         assign account_url = routes.account_url
       endif
+
+      assign account_style = st.account_style | default: 'sheet'
+
+      comment
+        The component takes a handle, not a link list. `customer-account-main-menu`
+        is the menu Shopify's own account pages use, so it is what the setting
+        falls back to when a merchant has not picked one.
+      endcomment
+      assign account_menu_handle = 'customer-account-main-menu'
+      if st.account_menu != blank
+        assign account_menu_handle = st.account_menu.handle
+      endif
     -%}
 
-    {%- if st.account_menu != blank and st.account_menu.links.size > 0 -%}
+    {%- if account_style == 'sheet' -%}
+      {%- comment -%}
+        `<account-anchor>` is `display: contents`, so it adds no box and the
+        component stays a flex item of the actions row exactly as before. All it
+        does is move the sheet: Shopify opens it as a modal `<dialog>`, which
+        the top layer positions against the *viewport*, and the component's own
+        placement is the top-right corner of the window — over the announcement
+        bar, past the cart, and nowhere near the icon that opened it. The
+        element measures the icon and points the sheet at it. See header.js.
+      {%- endcomment -%}
+      <account-anchor>
+      <shopify-account class="site-header__account-component" menu="{{ account_menu_handle }}">
+        {%- comment -%}
+          The slot, not `::part()`, for the glyph itself: a part can be styled
+          but its contents still come from Shopify, and this is the theme's own
+          account icon at the theme's own size. The wrapper carries the same
+          class as the other controls so the circle, the hover and the sizing
+          are the row's, not a second set written for one element.
+        {%- endcomment -%}
+        <span slot="signed-out-avatar" class="site-header__action site-header__action--account">
+          {% render 'icon', icon: 'account', size: 18 %}
+          {%- if show_labels -%}
+            <span class="site-header__action-label">{{ 'sections.header.account' | t }}</span>
+          {%- endif -%}
+        </span>
+      </shopify-account>
+      </account-anchor>
+    {%- elsif account_style == 'menu' and st.account_menu != blank and st.account_menu.links.size > 0 -%}
       <nav-disclosure class="site-header__account">
       <details class="nav__details" data-nav-details data-kind="sub">
         <summary

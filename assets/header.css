@@ -2075,6 +2075,40 @@
     position: relative;
   }
 
+  /* <shopify-account>, the component the Theme Store asks a header to carry.
+
+     Shopify owns what is inside it and updates it independently of the theme,
+     so the theme styles only the two surfaces the component exposes: the slot
+     it takes the signed-out avatar from, and the custom properties for the
+     signed-in one. Everything else here is sizing, so the component occupies
+     the same 40px box as the search and cart controls beside it and the row
+     does not change height when a customer signs in. */
+  /* No box of its own. `<account-anchor>` exists to measure the icon and write
+     two custom properties onto the component; giving it a layout box would put
+     a wrapper between the actions row and its flex item for no reason, and the
+     measurement is taken from the component, not from the wrapper. */
+  account-anchor {
+    display: contents;
+  }
+
+  .site-header__account-component {
+    display: inline-flex;
+    align-items: center;
+    flex: none;
+  }
+
+  .site-header__account-component::part(signed-out-avatar) {
+    padding: 0;
+    inline-size: auto;
+    block-size: auto;
+  }
+
+  .site-header__account-component {
+    --shopify-account-signed-in-avatar-size: 40px;
+    --shopify-account-signed-in-avatar-color-background: var(--color-primary-button-background, var(--color-text));
+    --shopify-account-signed-in-avatar-color-text: var(--color-primary-button-text, var(--color-background));
+  }
+
   .site-header__action {
     display: inline-flex;
     align-items: center;
@@ -3383,6 +3417,17 @@
     .site-header[data-logo-mobile='center'] .site-header__action--account,
     .site-header[data-logo-mobile='center'] .site-header__account {
       display: none;
+    }
+
+    /* Except the Shopify component, which the Theme Store requires to be visible
+       in the mobile header as well as the desktop one — so it is not the theme's
+       to move into the drawer. The second selector is the signed-out avatar the
+       theme passes into the slot: it carries the control classes to inherit the
+       row's circle and hover, and would otherwise be caught by the rule above
+       and hidden inside a component that is itself still shown. */
+    .site-header[data-logo-mobile='center'] .site-header__account-component,
+    .site-header[data-logo-mobile='center'] .site-header__account-component .site-header__action--account {
+      display: inline-flex;
     }
 
     /* The controls stay above the logo's box, so a long shop name is truncated by
