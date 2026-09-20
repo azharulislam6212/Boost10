@@ -12322,9 +12322,27 @@
   .showcase__intro,
   .showcase__media { min-inline-size: 0; }
 
+  /* The band bleeds, the copy does not.
+
+     `sections/testimonials-showcase.liquid` ships with no section padding so
+     the lanes can run off the top and bottom edges, which means the inset the
+     words need has to live on the column the words are in. Four sides, because
+     the copy column is the one part of this section a merchant might want
+     pulled in from the container edge as well. */
   .showcase__intro {
     display: flex;
     flex-direction: column;
+    padding-block: var(--sv-content-pt, 0px) var(--sv-content-pb, 0px);
+    padding-inline: var(--sv-content-pl, 0px) var(--sv-content-pr, 0px);
+  }
+
+  @media screen and (max-width: 749px) {
+    .showcase__intro {
+      padding-block: var(--sv-content-pt-mobile, var(--sv-content-pt, 0px))
+        var(--sv-content-pb-mobile, var(--sv-content-pb, 0px));
+      padding-inline: var(--sv-content-pl-mobile, var(--sv-content-pl, 0px))
+        var(--sv-content-pr-mobile, var(--sv-content-pr, 0px));
+    }
   }
 
   /* ==========================================================================
@@ -12844,7 +12862,7 @@
 
     block-size: 100%;
 
-    border-radius: var(--sv-stat-radius, 16px);
+    border-radius: var(--sv-stat-radius, 24px);
     border-width: var(--sv-stat-border-width, 0px);
     border-style: var(--sv-stat-border-style, solid);
     border-color: var(--sv-stat-border-color, transparent);
@@ -12852,9 +12870,82 @@
     background: var(--sv-stat-background, transparent);
   }
 
+  /* A frame that changes colour as it goes round.
+
+     `border-image` is the property for this and cannot be used: a bordered box
+     with a corner radius draws its border along the curve, and a border image
+     is sliced against the straight border box — the gradient would cut the
+     corners off square. So the border keeps a real width and no colour, and
+     two background layers do the painting: the fill clipped to the padding box,
+     the gradient clipped to the border box, which leaves the gradient visible
+     in exactly the ring the border reserved. Both layers follow the radius,
+     because a background always does.
+
+     The tile is translucent by design, so the fill layer has to be stated as a
+     gradient of one colour rather than a `background-color` — a colour in the
+     shorthand paints under every layer, including the ring, and would lift the
+     gradient off the section behind it.
+
+     `solid` is forced rather than offered: dashes here would show the ring
+     through the gaps and nothing through the dashes, which is the frame
+     inside out. */
+  /* A frame that changes colour as it goes round, over a fill that does not
+     hide it.
+
+     The tile keeps its own translucent `background` from the rule above and
+     the frame is drawn by a pseudo-element, so the two never share a
+     declaration. That matters twice over. A custom property is only checked
+     when it is substituted, so a malformed one invalidates the whole
+     declaration reading it — put the fill and the frame in one multi-layer
+     `background` and a bad border colour takes the background down with it,
+     leaving a tile with neither and nothing on the page to say why. And a
+     custom property cannot be read by an ancestor, so the ring has to be drawn
+     where the value lands.
+
+     The usual two-layer trick — fill clipped to the padding box over gradient
+     clipped to the border box — is what this replaced, and it only works when
+     the fill is opaque enough to cover what is under it. This fill is white at
+     4%, so the gradient came straight through it and washed the whole tile in
+     accent instead of tracing its edge.
+
+     So: a pseudo-element the size of the border box, painted with the gradient,
+     then masked down to its own padding ring. Two masks composited to exclude
+     each other leave exactly the band between the outer edge and the content
+     box, which is the border. It follows the corner radius because a background
+     does, which is the reason this is not `border-image` — border image slices
+     are cut against the square border box and would square the corners off. */
+  .showcase-stat--gradient-border {
+    position: relative;
+    border-color: transparent;
+  }
+
+  .showcase-stat--gradient-border::before {
+    content: '';
+    position: absolute;
+
+    /* Absolute children are laid out against the padding box, so the ring has
+       to be pushed back out over the border the tile already reserved. */
+    inset: calc(-1 * var(--sv-stat-border-width, 1px));
+    border-radius: inherit;
+    padding: var(--sv-stat-border-width, 1px);
+
+    background: var(--sv-stat-border-image, none);
+
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask-composite: exclude;
+
+    pointer-events: none;
+  }
+
   @media screen and (max-width: 749px) {
     .showcase-stat {
-      border-radius: var(--sv-stat-radius-mobile, var(--sv-stat-radius, 16px));
+      border-radius: var(--sv-stat-radius-mobile, var(--sv-stat-radius, 24px));
     }
   }
 

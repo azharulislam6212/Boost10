@@ -46,9 +46,43 @@
   endif
 
   comment
+    ---- the frame ----
+
     The theme's border group, one width rather than four: this is a filled tile,
     and the frame a merchant wants around a filled tile is the whole outline or
     nothing.
+
+    **Fill** is the one addition. A solid line is one colour all the way round;
+    the design this block was drawn from lights the top-left corner in the
+    accent and lets it fall away to a hairline of white, which no single
+    `border-color` can do. The gradient path swaps the border colour for a
+    border-box background layer — see the note beside
+    `.showcase-stat--gradient-border` in `base.css` for why that is the
+    mechanism rather than `border-image`, which cannot follow a corner radius.
+
+    ---- opacity multiplies, it does not replace ----
+
+    `color_modify: 'alpha'` *sets* the channel, so a picked
+    `rgba(255, 255, 255, 0.04)` came back out at `alpha: 1` — an opaque white
+    tile — the moment the slider sat at its default 100%. The slider is a
+    proportion of the colour the merchant picked, not a replacement for the
+    alpha they picked it with, so the picked alpha is read back with
+    `color_extract` and the two are multiplied.
+
+    ---- filters only, never a colour's properties ----
+
+    The multiply is then handed back to `color_modify`, and every colour below
+    leaves this file through a colour *filter*. The `.rgb` and `.alpha`
+    properties are not used, and every `rgba(…)` built here by string
+    concatenation has been taken out.
+
+    `snippets/color-schemes.liquid` does read `.rgb`, but it reads it off
+    `settings.color_schemes`, which is a different object from a block's own
+    colour setting. Copying that line down here produced `rgba(, 1)` — an
+    invalid declaration — and an invalid custom property is not ignored the way
+    a bad rule is: it poisons every property that substitutes it. The fill and
+    the frame both went, and a tile with no fill and no frame is very hard to
+    read back to a missing comma in a colour.
 
     A blank colour has no alpha channel to read until the scheme resolves in the
     browser, so the colour filters cannot fade it — `color-mix` does the same
@@ -56,44 +90,85 @@
     surface in the theme uses.
   endcomment
   assign border_line = s.border_style | default: 'solid'
+  assign border_fill = s.border_fill | default: 'gradient'
   assign border_width = 0
   assign border_paint = ''
+  assign border_gradient = ''
 
   if border_line != 'none'
     assign border_width = s.border_width | default: 1 | plus: 0
 
-    assign border_percent = s.border_opacity | default: 100 | plus: 0
-    if s.border_color == blank
-      assign border_paint = 'color-mix(in srgb, currentColor ' | append: border_percent | append: '%, transparent)'
+    if border_fill == 'gradient'
+      comment
+        A gradient carries its own alpha in each stop, so the opacity slider is
+        hidden on this path rather than quietly doing nothing.
+
+        Each stop goes into the string as the colour object itself, which
+        renders as whatever CSS colour the picker holds. A colour the merchant
+        has cleared is not nil — it is a colour that prints as nothing — so
+        `| default:` never fires for it and the stop would go out as
+        `linear-gradient(135deg,  0%, …)`. Hence the blank test and a literal
+        fallback: an `if` rather than a `default` filter, because a blank test
+        is what matches what an empty colour actually is.
+      endcomment
+      assign gradient_angle = s.border_gradient_angle | default: 135 | plus: 0
+      assign gradient_midpoint = s.border_gradient_midpoint | default: 48 | plus: 0
+
+      assign gradient_start = 'rgba(3, 210, 111, 0.4)'
+      if s.border_gradient_start != blank
+        assign gradient_start = s.border_gradient_start
+      endif
+
+      assign gradient_end = 'rgba(255, 255, 255, 0.1)'
+      if s.border_gradient_end != blank
+        assign gradient_end = s.border_gradient_end
+      endif
+
+      assign border_gradient = 'linear-gradient(' | append: gradient_angle | append: 'deg, '
+      assign border_gradient = border_gradient | append: gradient_start | append: ' 0%, '
+      assign border_gradient = border_gradient | append: gradient_end | append: ' '
+      assign border_gradient = border_gradient | append: gradient_midpoint | append: '%, '
+      assign border_gradient = border_gradient | append: gradient_end | append: ' 100%)'
     else
-      assign border_alpha = border_percent | divided_by: 100.0
-      assign border_paint = s.border_color | color_modify: 'alpha', border_alpha
+      assign border_percent = s.border_opacity | default: 100 | plus: 0
+      if s.border_color == blank
+        assign border_paint = 'color-mix(in srgb, currentColor ' | append: border_percent | append: '%, transparent)'
+      else
+        assign border_picked = s.border_color | color_extract: 'alpha'
+        assign border_alpha = border_percent | divided_by: 100.0 | times: border_picked
+        assign border_paint = s.border_color | color_modify: 'alpha', border_alpha
+      endif
     endif
   endif
 
   assign background_paint = ''
   if s.background_color != blank
-    assign background_alpha = s.background_opacity | default: 100 | plus: 0
-    assign background_alpha = background_alpha | divided_by: 100.0
+    assign background_percent = s.background_opacity | default: 100 | plus: 0
+    assign background_picked = s.background_color | color_extract: 'alpha'
+    assign background_alpha = background_percent | divided_by: 100.0 | times: background_picked
     assign background_paint = s.background_color | color_modify: 'alpha', background_alpha
   endif
 
-  assign radius = s.border_radius | default: 16 | plus: 0
+  assign radius = s.border_radius | default: 24 | plus: 0
   assign radius_mobile = s.border_radius_mobile | default: radius | plus: 0
 -%}
 
 {%- capture stat_style -%}
   {%- render 'spacing', block: s, declarations: true -%}
-  --sv-stat-gap: {{ s.gap | default: 8 | plus: 0 }}px;
-  --sv-stat-icon-gap: {{ s.icon_gap | default: 14 | plus: 0 }}px;
+  --sv-stat-gap: {{ s.gap | default: 16 | plus: 0 }}px;
+  --sv-stat-icon-gap: {{ s.icon_gap | default: 16 | plus: 0 }}px;
   --sv-stat-value-size: {{ s.value_size | default: 22 | plus: 0 }}px;
   --sv-stat-label-size: {{ s.label_size | default: 15 | plus: 0 }}px;
   --sv-stat-radius: {{ radius }}px;
   --sv-stat-radius-mobile: {{ radius_mobile }}px;
   {%- if border_width > 0 -%}
     --sv-stat-border-width: {{ border_width }}px;
-    --sv-stat-border-style: {{ border_line }};
-    --sv-stat-border-color: {{ border_paint }};
+    {%- if border_gradient != '' -%}
+      --sv-stat-border-image: {{ border_gradient }};
+    {%- else -%}
+      --sv-stat-border-style: {{ border_line }};
+      --sv-stat-border-color: {{ border_paint }};
+    {%- endif -%}
   {%- endif -%}
   {%- if background_paint != '' -%}
     --sv-stat-background: {{ background_paint }};
@@ -110,7 +185,7 @@
 {%- endcapture -%}
 
 <div
-  class="showcase-stat"
+  class="showcase-stat{% if border_gradient != blank %} showcase-stat--gradient-border{% endif %}"
   data-block-spacing
   style="{{ stat_style | strip_newlines | strip }}"
   {{ block.shopify_attributes }}
@@ -247,9 +322,9 @@
       "label": "t:blocks.showcase_stat.settings.icon_gap.label",
       "min": 0,
       "max": 40,
-      "step": 2,
+      "step": 1,
       "unit": "px",
-      "default": 14,
+      "default": 16,
       "visible_if": "{{ block.settings.icon_source != 'none' }}"
     },
     {
@@ -288,10 +363,10 @@
       "id": "gap",
       "label": "t:blocks.testimonial_stat.settings.gap.label",
       "min": 0,
-      "max": 24,
+      "max": 32,
       "step": 1,
       "unit": "px",
-      "default": 8
+      "default": 16
     },
     {
       "type": "color",
@@ -333,6 +408,18 @@
       "visible_if": "{{ block.settings.border_style != 'none' }}"
     },
     {
+      "type": "select",
+      "id": "border_fill",
+      "label": "t:blocks.showcase_stat.settings.border_fill.label",
+      "info": "t:blocks.showcase_stat.settings.border_fill.info",
+      "options": [
+        { "value": "solid", "label": "t:blocks.showcase_stat.settings.border_fill.options__1.label" },
+        { "value": "gradient", "label": "t:blocks.showcase_stat.settings.border_fill.options__2.label" }
+      ],
+      "default": "gradient",
+      "visible_if": "{{ block.settings.border_style != 'none' }}"
+    },
+    {
       "type": "range",
       "id": "border_opacity",
       "label": "t:shared.border.opacity.label",
@@ -341,34 +428,73 @@
       "step": 5,
       "unit": "%",
       "default": 30,
-      "visible_if": "{{ block.settings.border_style != 'none' }}"
+      "visible_if": "{{ block.settings.border_style != 'none' and block.settings.border_fill == 'solid' }}"
     },
     {
       "type": "color",
       "id": "border_color",
       "label": "t:blocks.group.settings.border_color.label",
       "default": "#03D26F",
-      "visible_if": "{{ block.settings.border_style != 'none' }}"
+      "visible_if": "{{ block.settings.border_style != 'none' and block.settings.border_fill == 'solid' }}"
+    },
+    {
+      "type": "color",
+      "id": "border_gradient_start",
+      "label": "t:blocks.showcase_stat.settings.border_gradient_start.label",
+      "info": "t:blocks.showcase_stat.settings.border_gradient_start.info",
+      "default": "rgba(3, 210, 111, 0.4)",
+      "visible_if": "{{ block.settings.border_style != 'none' and block.settings.border_fill == 'gradient' }}"
+    },
+    {
+      "type": "color",
+      "id": "border_gradient_end",
+      "label": "t:blocks.showcase_stat.settings.border_gradient_end.label",
+      "default": "rgba(255, 255, 255, 0.1)",
+      "visible_if": "{{ block.settings.border_style != 'none' and block.settings.border_fill == 'gradient' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_gradient_midpoint",
+      "label": "t:blocks.showcase_stat.settings.border_gradient_midpoint.label",
+      "info": "t:blocks.showcase_stat.settings.border_gradient_midpoint.info",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "%",
+      "default": 48,
+      "visible_if": "{{ block.settings.border_style != 'none' and block.settings.border_fill == 'gradient' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_gradient_angle",
+      "label": "t:blocks.showcase_stat.settings.border_gradient_angle.label",
+      "info": "t:blocks.showcase_stat.settings.border_gradient_angle.info",
+      "min": 0,
+      "max": 360,
+      "step": 5,
+      "unit": "deg",
+      "default": 135,
+      "visible_if": "{{ block.settings.border_style != 'none' and block.settings.border_fill == 'gradient' }}"
     },
     {
       "type": "range",
       "id": "border_radius",
       "label": "t:shared.corner_radius.label",
       "min": 0,
-      "max": 40,
-      "step": 2,
+      "max": 48,
+      "step": 1,
       "unit": "px",
-      "default": 16
+      "default": 24
     },
     {
       "type": "range",
       "id": "border_radius_mobile",
       "label": "t:blocks.showcase_stat.settings.border_radius_mobile.label",
       "min": 0,
-      "max": 40,
-      "step": 2,
+      "max": 48,
+      "step": 1,
       "unit": "px",
-      "default": 14
+      "default": 20
     },
     {
       "type": "header",
@@ -390,9 +516,9 @@
       "label": "t:shared.spacing.padding_top.label",
       "min": 0,
       "max": 100,
-      "step": 2,
+      "step": 1,
       "unit": "px",
-      "default": 22,
+      "default": 20,
       "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
     },
     {
@@ -401,9 +527,9 @@
       "label": "t:shared.spacing.padding_bottom.label",
       "min": 0,
       "max": 100,
-      "step": 2,
+      "step": 1,
       "unit": "px",
-      "default": 22,
+      "default": 20,
       "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
     },
     {
@@ -412,9 +538,9 @@
       "label": "t:shared.spacing.padding_left.label",
       "min": 0,
       "max": 100,
-      "step": 2,
+      "step": 1,
       "unit": "px",
-      "default": 18,
+      "default": 21,
       "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
     },
     {
@@ -423,9 +549,9 @@
       "label": "t:shared.spacing.padding_right.label",
       "min": 0,
       "max": 100,
-      "step": 2,
+      "step": 1,
       "unit": "px",
-      "default": 18,
+      "default": 21,
       "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
     },
     {
@@ -434,7 +560,7 @@
       "label": "t:shared.spacing.padding_top.label",
       "min": 0,
       "max": 100,
-      "step": 2,
+      "step": 1,
       "unit": "px",
       "default": 18,
       "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
@@ -445,7 +571,7 @@
       "label": "t:shared.spacing.padding_bottom.label",
       "min": 0,
       "max": 100,
-      "step": 2,
+      "step": 1,
       "unit": "px",
       "default": 18,
       "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
@@ -456,9 +582,9 @@
       "label": "t:shared.spacing.padding_left.label",
       "min": 0,
       "max": 100,
-      "step": 2,
+      "step": 1,
       "unit": "px",
-      "default": 14,
+      "default": 18,
       "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
     },
     {
@@ -467,9 +593,9 @@
       "label": "t:shared.spacing.padding_right.label",
       "min": 0,
       "max": 100,
-      "step": 2,
+      "step": 1,
       "unit": "px",
-      "default": 14,
+      "default": 18,
       "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
     }
   ]
