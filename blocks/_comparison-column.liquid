@@ -79,6 +79,23 @@
 
   assign column_name = s.name | default: ''
 
+  assign alternative = 1
+  if is_chooser
+    assign alternatives = section.settings.alternatives | strip | newline_to_br | split: '<br />'
+    assign alternative = s.alternative | default: 1 | plus: 0
+    if alternative > alternatives.size
+      assign alternative = alternatives.size
+    endif
+    if alternative < 1
+      assign alternative = 1
+    endif
+    assign alt_index = alternative | minus: 1
+    assign chosen = alternatives[alt_index] | strip
+    if chosen != blank
+      assign column_name = chosen
+    endif
+  endif
+
   assign chevron_px = s.chevron_size | default: 16 | plus: 0
 -%}
 
@@ -122,6 +139,7 @@
   data-block-spacing
   data-comparison-column
   data-comparison-role="{{ role }}"
+  {%- if is_chooser %} data-comparison-alternative="{{ alternative }}"{% endif %}
   {%- if column_name != blank %} data-comparison-name="{{ column_name | escape }}"{% endif %}
   {%- if column_name != blank %} role="group" aria-label="{{ column_name | escape }}"{% endif %}
   style="{{ column_style | strip_newlines | strip }}"
@@ -210,7 +228,19 @@
       "id": "name",
       "label": "t:blocks.comparison_column.settings.name.label",
       "info": "t:blocks.comparison_column.settings.name.info",
-      "default": "Alternative"
+      "default": "Alternative",
+      "visible_if": "{{ block.settings.role != 'product' }}"
+    },
+    {
+      "type": "range",
+      "id": "alternative",
+      "label": "t:blocks.comparison_column.settings.alternative.label",
+      "info": "t:blocks.comparison_column.settings.alternative.info",
+      "min": 1,
+      "max": 8,
+      "step": 1,
+      "default": 1,
+      "visible_if": "{{ block.settings.role == 'product' }}"
     },
     {
       "type": "checkbox",

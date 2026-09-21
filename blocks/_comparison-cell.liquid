@@ -46,6 +46,12 @@
 
   assign align = s.alignment | default: 'inherit'
 
+  assign values = s.values | strip | newline_to_br | split: '<br />'
+  assign per_alternative = false
+  if values.size > 0
+    assign per_alternative = true
+  endif
+
   assign classes = 'comparison-cell comparison-cell--' | append: kind
   if align != 'inherit'
     assign classes = classes | append: ' comparison-cell--align-' | append: align
@@ -54,20 +60,8 @@
 
 {%- capture cell_style -%}
   {%- render 'spacing', block: s, declarations: true -%}
-  {%- if has_mark -%}
-    --ct-mark-size: var(--ct-mark-{{ palette }}-size);
-    --ct-mark-size-mobile: var(--ct-mark-{{ palette }}-size-mobile);
-    --ct-mark-fill: var(--ct-mark-{{ palette }}-fill);
-    --ct-mark-ring-color: var(--ct-mark-{{ palette }}-ring-color);
-    --ct-mark-ring-width: var(--ct-mark-{{ palette }}-ring-width);
-    --ct-mark-color: var(--ct-mark-{{ palette }}-color);
-    --ct-mark-icon-size: var(--ct-mark-{{ palette }}-icon-size);
-
-    {%- if s.mark_size > 0 -%}--ct-mark-size: {{ s.mark_size }}px;{%- endif -%}
-    {%- if s.icon_size > 0 -%}--ct-mark-icon-size: {{ s.icon_size }}px;{%- endif -%}
-    {%- if s.mark_fill != blank -%}--ct-mark-fill: {{ s.mark_fill }};{%- endif -%}
-    {%- if s.mark_ring_color != blank -%}--ct-mark-ring-color: {{ s.mark_ring_color }};{%- endif -%}
-    {%- if s.mark_color != blank -%}--ct-mark-color: {{ s.mark_color }};{%- endif -%}
+  {%- if has_mark and per_alternative == false -%}
+    {%- render 'comparison-mark-vars', palette: palette, block: s -%}
   {%- endif -%}
   {%- render 'block-typography', block: s -%}
 {%- endcapture -%}
@@ -80,7 +74,51 @@
   style="{{ cell_style | strip_newlines | strip }}"
   {{ block.shopify_attributes }}
 >
-  {%- if has_mark -%}
+  {%- if per_alternative -%}
+    {%- for line in values -%}
+      {%- liquid
+        assign value = line | strip
+        assign token = value | downcase
+
+        assign v_kind = 'text'
+        if token == 'check' or token == 'yes'
+          assign v_kind = 'check'
+        elsif token == 'cross' or token == 'no'
+          assign v_kind = 'cross'
+        elsif value == blank or value == '-'
+          assign v_kind = 'blank'
+        endif
+
+        assign v_palette = 'yes'
+        assign v_glyph = 'check'
+        assign v_sr = 'sections.comparison_table.yes' | t
+        if v_kind == 'cross'
+          assign v_palette = 'no'
+          assign v_glyph = 'close'
+          assign v_sr = 'sections.comparison_table.no' | t
+        endif
+        if s.sr_text != blank
+          assign v_sr = s.sr_text
+        endif
+      -%}
+      <span
+        class="comparison-cell__value"
+        data-comparison-value="{{ forloop.index }}"
+        {%- if v_kind == 'check' or v_kind == 'cross' %}
+          style="{% render 'comparison-mark-vars', palette: v_palette, block: s %}"
+        {%- endif -%}
+      >
+        {%- if v_kind == 'check' or v_kind == 'cross' -%}
+          <span class="comparison-cell__mark" data-comparison-mark>
+            {% render 'icon', icon: v_glyph, class: 'comparison-cell__glyph' %}
+            <span class="visually-hidden" data-comparison-answer>{{ v_sr | escape }}</span>
+          </span>
+        {%- elsif v_kind == 'text' -%}
+          <span class="{{ text_classes }}">{{ value | escape }}</span>
+        {%- endif -%}
+      </span>
+    {%- endfor -%}
+  {%- elsif has_mark -%}
     <span class="comparison-cell__mark" data-comparison-mark>
       {% render 'icon', icon: glyph, class: 'comparison-cell__glyph' %}
       {%- if sr_text != blank -%}
@@ -132,6 +170,12 @@
       "label": "t:shared.text.label",
       "default": "Name one claim",
       "visible_if": "{{ block.settings.kind == 'text' }}"
+    },
+    {
+      "type": "textarea",
+      "id": "values",
+      "label": "t:blocks.comparison_cell.settings.values.label",
+      "info": "t:blocks.comparison_cell.settings.values.info"
     },
     {
       "type": "select",

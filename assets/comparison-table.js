@@ -16,18 +16,22 @@ export class ComparisonTable extends BaseComponent {
   /** @type {HTMLElement[]} */
   #columns = [];
 
-  /** @type {HTMLElement[]} */
-  #alternatives = [];
+  /** Columns whose head carries a chooser, in DOM order. @type {HTMLElement[]} */
+  #choosers = [];
 
   /** @type {HTMLElement|null} */
   #features = null;
 
+  /** Every alternative the chooser offers, in the order the section lists them. @type {string[]} */
+  #alternatives = [];
+
   /**
-   * Which alternative column is in which slot. Indices into #alternatives.
+   * Which alternative each chooser column shows. One 1-based index per entry
+   * in `#choosers`, and no two entries ever hold the same one.
    *
    * @type {number[]}
    */
-  #slots = [];
+  #choice = [];
 
   /** @type {HTMLElement|null} */
   #open = null;
@@ -41,8 +45,8 @@ export class ComparisonTable extends BaseComponent {
     if (this.#columns.length === 0) return;
 
     this.#applyCounts();
-    this.#labelMarks();
     this.#resize();
+    this.#labelMarks();
 
     for (const query of [TABLET, MOBILE]) {
       this.on(window.matchMedia(query), 'change', () => this.#resize());
@@ -61,10 +65,11 @@ export class ComparisonTable extends BaseComponent {
         const column = target.closest('[data-comparison-column]');
         if (!(column instanceof HTMLElement)) return;
 
-        const index = this.#alternatives.indexOf(column);
-        if (index === -1 || this.#slots.includes(index)) return;
+        const position = this.#choosers.indexOf(column);
+        if (position === -1) return;
 
-        this.#slots[0] = index;
+        this.#choice[position] = this.#published(column);
+        this.#settle(position);
         this.#apply();
       });
     }
@@ -82,7 +87,67 @@ export class ComparisonTable extends BaseComponent {
     );
 
     this.#features = this.#columns.find((column) => column.dataset.comparisonRole === 'features') ?? null;
-    this.#alternatives = this.#columns.filter((column) => column.dataset.comparisonRole === 'product');
+    this.#choosers = this.#columns.filter((column) => column.dataset.comparisonRole === 'product');
+
+    this.#alternatives = this.#readAlternatives();
+
+    this.#choice = this.#choosers.map((column) => this.#published(column));
+    for (let position = 0; position < this.#choice.length; position += 1) this.#settle(position);
+  }
+
+  /** @returns {string[]} */
+  #readAlternatives() {
+    const raw = this.dataset.comparisonAlternatives;
+    if (!raw) return [];
+
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed.map((name) => String(name).trim()).filter(Boolean);
+    } catch {
+      // A malformed list leaves the names to the columns themselves.
+    }
+    return [];
+  }
+
+  /**
+   * The alternative a column was rendered on, clamped to the list.
+   *
+   * @param {HTMLElement} column
+   * @returns {number}
+   */
+  #published(column) {
+    const index = Number(column.dataset.comparisonAlternative ?? 1);
+    if (!Number.isFinite(index)) return 1;
+    return Math.min(Math.max(Math.round(index), 1), Math.max(this.#count(), 1));
+  }
+
+  /** How many alternatives there are to choose between. @returns {number} */
+  #count() {
+    if (this.#alternatives.length > 0) return this.#alternatives.length;
+
+    let most = 1;
+    for (const column of this.#choosers) {
+      for (const cell of column.querySelectorAll(':scope > [data-comparison-cell]')) {
+        most = Math.max(most, cell.querySelectorAll(':scope > [data-comparison-value]').length);
+      }
+    }
+    return most;
+  }
+
+  /**
+   * Moves the chooser at `position` off any alternative another one already
+   * shows, so the columns beside each other never repeat a value.
+   *
+   * @param {number} position
+   */
+  #settle(position) {
+    const total = Math.max(this.#count(), 1);
+
+    for (let step = 0; step < total; step += 1) {
+      const taken = this.#choice.some((value, index) => index !== position && value === this.#choice[position]);
+      if (!taken) return;
+      this.#choice[position] = (this.#choice[position] % total) + 1;
+    }
   }
 
   /** Re-reads the row count from the cells that actually rendered. */
@@ -98,29 +163,14 @@ export class ComparisonTable extends BaseComponent {
 
   /* ------------------------------------------------------------- layout -- ---- */
 
-  /**
-   * How many alternatives this width shows, and which ones. A choice is kept
-   * across a breakpoint change wherever it still fits.
-   */
+  /** Hides the chooser columns this width has no room for. */
   #resize() {
-    const count = Math.max(1, Number(this.#slotCount()) || 1);
-    const available = Math.min(count, this.#alternatives.length);
+    const available = Math.min(Math.max(1, Number(this.#slotCount()) || 1), this.#choosers.length);
 
-    const next = [];
-    for (let position = 0; position < available; position += 1) {
-      const kept = this.#slots[position];
-      next.push(typeof kept === 'number' && kept < this.#alternatives.length ? kept : -1);
-    }
+    this.#choosers.forEach((column, position) => {
+      column.hidden = position >= available;
+    });
 
-    let candidate = 0;
-    for (let position = 0; position < next.length; position += 1) {
-      if (next[position] !== -1) continue;
-      while (candidate < this.#alternatives.length && next.includes(candidate)) candidate += 1;
-      next[position] = candidate;
-      candidate += 1;
-    }
-
-    this.#slots = next;
     this.#apply();
   }
 
@@ -131,31 +181,27 @@ export class ComparisonTable extends BaseComponent {
     return Number(this.dataset.slots ?? 2);
   }
 
-  /** Writes the arrangement to the DOM. */
+  /** Writes every chooser's current alternative to the DOM. */
   #apply() {
-    if (this.#features) this.#features.style.order = '0';
+    this.classList.add('is-arranged');
 
-    for (const column of this.#columns) {
-      if (column.dataset.comparisonRole === 'brand') column.style.order = '1';
-    }
+    this.#choosers.forEach((column, position) => {
+      const chosen = this.#choice[position];
+      column.dataset.comparisonAlternative = String(chosen);
 
-    this.#alternatives.forEach((column, index) => {
-      const position = this.#slots.indexOf(index);
+      const name = this.#nameOf(chosen);
+      if (name) column.dataset.comparisonName = name;
 
-      if (position === -1) {
-        column.hidden = true;
-        column.style.removeProperty('order');
-        return;
-      }
+      const label = column.querySelector('[data-comparison-trigger-label]');
+      if (label && name) label.textContent = name;
 
-      column.hidden = false;
-      column.style.order = String(2 + position);
+      this.#buildPanel(column, position);
     });
 
-    const brands = this.#columns.filter((column) => column.dataset.comparisonRole === 'brand').length;
-    this.style.setProperty('--ct-cols-active', String(brands + this.#slots.length));
-
-    for (const column of this.#alternatives) this.#buildPanel(column);
+    const visible = this.#columns.filter(
+      (column) => column !== this.#features && !column.hidden
+    ).length;
+    this.style.setProperty('--ct-cols-active', String(visible));
   }
 
   /* ------------------------------------------------------------ chooser -- ---- */
@@ -164,50 +210,44 @@ export class ComparisonTable extends BaseComponent {
    * Fills one column's listbox with every alternative there is.
    *
    * @param {HTMLElement} column
+   * @param {number} position Index into `#choosers`.
    */
-  #buildPanel(column) {
+  #buildPanel(column, position) {
     const panel = column.querySelector('[data-comparison-panel]');
     const trigger = column.querySelector('[data-comparison-trigger]');
     if (!(panel instanceof HTMLElement) || !(trigger instanceof HTMLElement)) return;
 
-    const slot = this.#slots.indexOf(this.#alternatives.indexOf(column));
-    if (slot === -1) return;
-
-    const panelId = `${this.#id}-panel-${slot}`;
+    const panelId = `${this.#id}-panel-${position}`;
     panel.id = panelId;
     trigger.setAttribute('aria-controls', panelId);
-
     trigger.removeAttribute('aria-disabled');
 
-    const label = column.querySelector('[data-comparison-trigger-label]');
-    if (label) label.textContent = this.#nameOf(column);
+    const total = this.#count();
+    const options = [];
 
-    const options = this.#alternatives.map((alternative, index) => {
+    for (let index = 1; index <= total; index += 1) {
+      const name = this.#nameOf(index);
+      if (!name) continue;
+
       const option = document.createElement('div');
       option.className = 'comparison-choose__option';
       option.id = `${panelId}-option-${index}`;
       option.setAttribute('role', 'option');
       option.dataset.comparisonOption = String(index);
-      option.setAttribute('aria-selected', String(alternative === column));
-      option.textContent = this.#nameOf(alternative);
-      return option;
-    });
+      option.setAttribute('aria-selected', String(index === this.#choice[position]));
+      option.textContent = name;
+      options.push(option);
+    }
 
     panel.replaceChildren(...options);
   }
 
   /**
-   * A column's name: its published attribute, else its rendered trigger label.
-   *
-   * @param {HTMLElement} column
+   * @param {number} index 1-based.
    * @returns {string}
    */
-  #nameOf(column) {
-    const published = column.dataset.comparisonName?.trim();
-    if (published) return published;
-
-    const label = column.querySelector('[data-comparison-trigger-label]');
-    return (label?.textContent ?? '').trim();
+  #nameOf(index) {
+    return this.#alternatives[index - 1] ?? '';
   }
 
   /** @param {Event} event */
@@ -217,9 +257,8 @@ export class ComparisonTable extends BaseComponent {
 
     const option = target.closest('[data-comparison-option]');
     if (option instanceof HTMLElement) {
-      const panel = option.closest('[data-comparison-panel]');
       const column = option.closest('[data-comparison-column]');
-      if (panel instanceof HTMLElement && column instanceof HTMLElement) {
+      if (column instanceof HTMLElement) {
         this.#choose(column, Number(option.dataset.comparisonOption));
       }
       return;
@@ -237,25 +276,25 @@ export class ComparisonTable extends BaseComponent {
   };
 
   /**
-   * Puts the chosen alternative in this column's slot.
+   * Puts the chosen alternative in this column. A column already showing it
+   * takes this one's place, so the two never read the same.
    *
    * @param {HTMLElement} column The column whose chooser was used.
-   * @param {number} index Index into `#alternatives`.
+   * @param {number} index 1-based index into the alternatives.
    */
   #choose(column, index) {
-    const here = this.#slots.indexOf(this.#alternatives.indexOf(column));
-    if (here === -1 || Number.isNaN(index)) return;
+    const here = this.#choosers.indexOf(column);
+    if (here === -1 || !Number.isFinite(index)) return;
 
-    const there = this.#slots.indexOf(index);
-    if (there !== -1) this.#slots[there] = this.#slots[here];
-    this.#slots[here] = index;
+    const there = this.#choice.indexOf(index);
+    if (there !== -1) this.#choice[there] = this.#choice[here];
+    this.#choice[here] = index;
 
     this.#close();
     this.#apply();
     this.#labelMarks();
 
-    const moved = this.#alternatives[index];
-    const trigger = moved?.querySelector('[data-comparison-trigger]');
+    const trigger = column.querySelector('[data-comparison-trigger]');
     if (trigger instanceof HTMLElement) trigger.focus();
   }
 
@@ -391,14 +430,15 @@ export class ComparisonTable extends BaseComponent {
       const cells = column.querySelectorAll(':scope > [data-comparison-cell]');
 
       cells.forEach((cell, index) => {
-        const answer = cell.querySelector('[data-comparison-answer]');
         const claim = claims[index];
-        if (!answer || !claim) return;
+        if (!claim) return;
 
-        const base = answer.getAttribute('data-comparison-base') ?? (answer.textContent ?? '').trim();
-        answer.setAttribute('data-comparison-base', base);
+        for (const answer of cell.querySelectorAll('[data-comparison-answer]')) {
+          const base = answer.getAttribute('data-comparison-base') ?? (answer.textContent ?? '').trim();
+          answer.setAttribute('data-comparison-base', base);
 
-        answer.textContent = name ? `${name}, ${claim}: ${base}` : `${claim}: ${base}`;
+          answer.textContent = name ? `${name}, ${claim}: ${base}` : `${claim}: ${base}`;
+        }
       });
     }
   }
