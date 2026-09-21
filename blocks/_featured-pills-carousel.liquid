@@ -1,82 +1,19 @@
 {% doc %}
-  blocks/_featured-pills-carousel.liquid
-
   A slideshow inside one **Pill** panel: a run of slides and the
   `( ← ) 01 ▬▬▬▬▭▭▭ 05 ( → )` bar that walks them.
-
-  ## None of the carousel is this file's
-
-  The element is `<carousel-slider>` from `assets/carousel.js`, the attributes
-  and the options JSON are `snippets/carousel-shell-attrs.liquid`, the pause
-  button and the live region are `carousel-shell-tail.liquid`, and the control
-  bar is `carousel-controls.liquid` — which draws exactly the arrangement the
-  *Ingredients* panel was drawn with, zero-padded numbers and all, because that
-  bar is what the snippet is.
-
-  The whole `carousel_*` settings group is the one every other carousel in the
-  theme carries, id for id, so a merchant who has set up the Feature cards
-  carousel has set this one up.
-
-  ## Why the element is written out here rather than through `carousel-shell`
-
-  Because its slides are theme blocks. `{% content_for 'blocks' %}` cannot have
-  its output captured — Shopify renders blocks with their editor bindings
-  attached and buffering that is not something the platform supports — so a
-  caller whose slides are blocks has to own the tag and let the two half
-  snippets supply what goes before and after the track.
-  `sections/feature-cards.liquid` and `sections/multicolumn.liquid` do the same,
-  for the same reason, and the comment there is the long version of this one.
-
-  ## The bar sits on the picture, or under it
-
-  **Over the slides** is the drawn design: the bar floats inside the frame near
-  the bottom edge, on a lozenge of its own. It is absolutely positioned, so it
-  takes no room and a slide's height is the slide's business.
-
-  **Under the slides** puts it back in the flow for a carousel whose slides are
-  not photographs, where a control floating over content is just a control in
-  the way.
-
-  Either way it is *detached* — rendered outside `<carousel-slider>` and linked
-  back by `data-carousel-for` — because a bar positioned against the frame
-  cannot also be a child of the thing that clips to it.
-
-  ## Private, and this section's
-
-  A slideshow is not a scarce component; the theme has carousels everywhere. It
-  is private because its *slides* are: `_featured-pills-slide` is a picture that
-  holds this section's own blocks, and a slide outside a track is a
-  `.carousel-shell__item` with nothing to slide in.
 {% enddoc %}
 
 {%- liquid
   assign s = block.settings
 
-  comment
-    One slide at a time is the drawn design and the default, but the columns are
-    settings rather than a constant: three ingredient cards in a row that scroll
-    together is the same block, and a section that could only ever show one
-    would need a second one for that.
-  endcomment
   assign cols_desktop = s.columns_desktop | default: 1 | plus: 0
   assign cols_tablet = s.columns_tablet | default: cols_desktop | plus: 0
   assign cols_mobile = s.columns_mobile | default: 1 | plus: 0
 
-  comment
-    Always a carousel, at both breakpoints. `carousel-shell-attrs` takes the
-    grid/carousel pair because most callers offer the choice; this one does not
-    — a slideshow that is a grid on a desktop is a grid, and the section already
-    has blocks for those.
-  endcomment
   assign carousel_id = 'FeaturedPillsCarousel-' | append: block.id
 
   assign placement = s.controls_placement | default: 'over'
 
-  comment
-    `controls` is one bar carrying its own arrows, so rendering the bare pair
-    beside it would draw the navigation twice — the same test
-    `carousel-shell-tail.liquid` makes when the controls are nested.
-  endcomment
   assign pagination = s.carousel_pagination | default: 'controls'
   assign pagination_align = s.carousel_pagination_align | default: 'center'
 
@@ -102,11 +39,6 @@
   {%- endif -%}
 {%- endcapture -%}
 
-{%- comment -%}
-  `kind: 'image'` and not `'text'`: a slide is a photograph, and the text
-  family's presets split their target into words and letters — which on a
-  picture is nothing at all, and on the card over it is the card coming apart.
-{%- endcomment -%}
 <motion-effect
   class="{{ classes }}"
   data-block-spacing
@@ -133,11 +65,6 @@
       {% content_for 'blocks' %}
     </div>
 
-    {%- comment -%}
-      `detached` keeps the pause button and the live region — both are found by
-      ref and announced from inside the element — and stands the arrows and the
-      pagination down, so the bar below is the only one drawn.
-    {%- endcomment -%}
     {% render 'carousel-shell-tail',
        settings: s,
        layout: 'carousel',
@@ -169,11 +96,6 @@
   </div>
 </motion-effect>
 
-{%- comment -%}
-  Every setting below is a control a merchant reaches in the editor, and the
-  schema is one element's styling surface: splitting it to get under Theme
-  Check's count of 40 would split the thing the settings style.
-{%- endcomment -%}
 {% # theme-check-disable ExcessiveSettingsCount %}
 {% schema %}
 {

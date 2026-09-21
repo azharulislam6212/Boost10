@@ -1,27 +1,5 @@
 /**
- * search.js — Boost10
- *
  * `<predictive-search>` and `<search-drawer>`.
- *
- * Suggestions are rendered by Liquid. The request goes to Shopify's predictive
- * search endpoint with `section_id`, so the response is HTML built by the same
- * snippets the search results page uses — product cards, prices, badges and all.
- * Nothing about a product is reconstructed in JavaScript, which is the only way
- * money formatting, translations and metafield logic stay correct in a dropdown.
- *
- * The whole thing degrades to a plain form. The input is a real `<input
- * type="search" name="q">` inside a `<form action="/search">`, so pressing Enter
- * with JavaScript disabled runs a normal search.
- *
- * Accessibility follows the combobox pattern: focus never leaves the input, and
- * the highlighted suggestion is tracked through `aria-activedescendant` by
- * `<search-list>`. Moving focus into a suggestion list closes the mobile
- * keyboard and breaks the input's editing keys, which is why it is not done.
- *
- * `<search-list>` lives here rather than in `results-list.js` because the two
- * solve different problems. A suggestion list is a combobox popup owned by an
- * input; a collection results list is the page's main content. Sharing one
- * element would mean one of them permanently carrying the other's compromises.
  *
  * @module @theme/search
  */
@@ -40,15 +18,7 @@ import {
   prefersReducedMotion
 } from '@theme/utilities';
 
-/**
- * Suggestions start at the first character.
- *
- * Two was a guess about noise, and it was the wrong one for a catalogue people
- * search by brand initial or by a short name — "b", "k2", "d3" are real queries
- * in a supplement store, and a panel that stayed empty until the second
- * keystroke read as broken. Shopify's endpoint ranks a single-character query
- * perfectly well; the 300ms debounce is what keeps the request count sane.
- */
+/** Suggestions start at the first character. */
 const MIN_QUERY_LENGTH = 1;
 
 /** Where recent searches live. Per browser, never sent anywhere. */
@@ -60,19 +30,11 @@ const PROMPT_INTERVAL = 3200;
 /** Fade-out half of the prompt swap. Must match `--search-prompt-duration`. */
 const PROMPT_FADE = 260;
 
-
 /* ==========================================================================
    Recent searches
    ========================================================================== */
 
-/**
- * Recent search terms, stored in `localStorage`.
- *
- * A customer's search history is theirs: it stays in their browser, it is never
- * sent to the shop, and clearing it clears it. Every access is wrapped, because
- * `localStorage` throws rather than returning null in Safari's private mode and
- * an unavailable storage API must not take the search field down with it.
- */
+/** Recent search terms, stored in `localStorage`. */
 export const recentSearches = {
   /**
    * @param {number} [limit]
@@ -94,10 +56,7 @@ export const recentSearches = {
   write(list) {
     try {
       window.localStorage.setItem(RECENT_KEY, JSON.stringify(list));
-    } catch {
-      // Storage full, disabled or blocked. Recent searches are a convenience,
-      // never a dependency.
-    }
+    } catch {}
   },
 
   /**
@@ -134,39 +93,15 @@ export const recentSearches = {
   clear() {
     try {
       window.localStorage.removeItem(RECENT_KEY);
-    } catch {
-      // See write().
-    }
+    } catch {}
   }
 };
-
 
 /* ==========================================================================
    <search-list>
    ========================================================================== */
 
-/**
- * The suggestion listbox for predictive search.
- *
- * Implements the combobox popup half of the ARIA pattern. It never takes focus:
- * the input keeps it, and this element reports which option is active through
- * `aria-activedescendant` on that input. Highlighting is expressed with
- * `data-selected` and `aria-selected`, both of which survive a morph because the
- * list is re-rendered wholesale and reset afterwards.
- *
- * Pointer and keyboard are kept in agreement: hovering an option makes it the
- * active one, so Enter always activates whatever the customer is looking at.
- *
- * Markup:
- *
- *   <search-list data-input="SearchInput">
- *     <ul role="listbox" id="SearchResults">
- *       <li role="option" id="result-1" data-result data-url="/products/x">
- *         <a href="/products/x">…</a>
- *       </li>
- *     </ul>
- *   </search-list>
- */
+/** The suggestion listbox for predictive search. */
 export class SearchList extends BaseComponent {
   /** Index of the highlighted option, or -1 for none. */
   #index = -1;
@@ -179,7 +114,7 @@ export class SearchList extends BaseComponent {
     this.on(this, 'click', this.#onClick);
   }
 
-  /* --------------------------------------------------------- public API -- */
+  /* --------------------------------------------------------- public API -- ---- */
 
   /**
    * @returns {HTMLElement[]} Selectable options, in document order.
@@ -204,10 +139,6 @@ export class SearchList extends BaseComponent {
 
   /**
    * Handle a navigation key.
-   *
-   * Called by `<predictive-search>` rather than bound here, because the keydown
-   * happens on the input — focus never reaches this element. Returns true when
-   * the key was consumed.
    *
    * @param {KeyboardEvent} event
    * @returns {boolean}
@@ -270,16 +201,12 @@ export class SearchList extends BaseComponent {
     option.setAttribute('data-selected', '');
     option.setAttribute('aria-selected', 'true');
 
-    // `nearest` scrolls the list and leaves the page alone, which matters when
-    // the panel is a dropdown rather than a drawer.
     option.scrollIntoView({ block: 'nearest' });
 
     this.#input()?.setAttribute('aria-activedescendant', option.id || '');
   }
 
-  /**
-   * Remove the highlight.
-   */
+  /** Remove the highlight. */
   clear() {
     for (const option of this.options) {
       option.removeAttribute('data-selected');
@@ -306,18 +233,13 @@ export class SearchList extends BaseComponent {
     if (option.dataset.url) window.location.assign(option.dataset.url);
   }
 
-  /**
-   * Reset after the list is replaced.
-   *
-   * A stale `aria-activedescendant` points at a node that no longer exists,
-   * which silences the announcement of every subsequent option.
-   */
+  /** Reset after the list is replaced. */
   reset() {
     this.#index = -1;
     this.#input()?.removeAttribute('aria-activedescendant');
   }
 
-  /* ---------------------------------------------------------- internals -- */
+  /* ---------------------------------------------------------- internals -- ---- */
 
   /**
    * @returns {HTMLElement|null}
@@ -348,8 +270,6 @@ export class SearchList extends BaseComponent {
     const option = event.target instanceof Element ? event.target.closest('[data-result]') : null;
     if (!option) return;
 
-    // A real link inside the option handles its own navigation, including
-    // middle-click and modifier-click, which this must not steal.
     if (event.target instanceof Element && event.target.closest('a[href]')) return;
 
     event.preventDefault();
@@ -363,29 +283,6 @@ defineComponent('search-list', SearchList);
    <predictive-search>
    ========================================================================== */
 
-/**
- * Markup:
- *
- *   <predictive-search data-section-id="predictive-search">
- *     <form action="{{ routes.search_url }}" method="get" role="search">
- *       <input
- *         data-ref="input"
- *         id="SearchInput"
- *         type="search"
- *         name="q"
- *         role="combobox"
- *         aria-expanded="false"
- *         aria-controls="SearchResults"
- *         aria-autocomplete="list"
- *         autocomplete="off">
- *       <button data-ref="reset" type="button">…</button>
- *     </form>
- *     <div data-ref="panel" id="SearchResults" hidden>
- *       <search-list data-input="SearchInput">…</search-list>
- *     </div>
- *     <p data-ref="status" class="visually-hidden" role="status"></p>
- *   </predictive-search>
- */
 export class PredictiveSearch extends BaseComponent {
   static requiredRefs = ['input', 'panel'];
 
@@ -405,17 +302,10 @@ export class PredictiveSearch extends BaseComponent {
   #promptSwap = null;
 
   setup() {
-    // The idle column, the recent searches and the rotating prompts are not
-    // predictive search: they work with the suggestion request switched off, and
-    // a merchant who turns suggestions off should still get the panel.
     this.#setupPrompts();
     this.#setupRecent();
     this.#setupTerms();
 
-    // The field's own chrome — the clear button and the animated prompt — reacts
-    // to what is typed whether or not suggestions are switched on. Bound before
-    // the early return, or a merchant with predictive search off gets a prompt
-    // animating underneath the customer's own text.
     this.on(this.refs.input, 'input', () => this.#syncField());
     this.#syncField();
 
@@ -433,10 +323,6 @@ export class PredictiveSearch extends BaseComponent {
         return;
       }
 
-      // The spinner starts on the keystroke, not on the request. Waiting for
-      // the debounce to expire first leaves 300ms in which the customer has
-      // typed and nothing at all has acknowledged it — which is exactly the
-      // window that makes a search field feel dead.
       this.#busy(true);
       search(value);
     });
@@ -450,8 +336,6 @@ export class PredictiveSearch extends BaseComponent {
       this.on(this.refs.reset, 'click', () => this.reset());
     }
 
-    // A click anywhere else dismisses the panel. Bound on the document because
-    // the customer's next click is not going to be inside this element.
     this.on(document, 'click', (event) => {
       if (this.contains(event.target)) return;
       this.close();
@@ -473,7 +357,7 @@ export class PredictiveSearch extends BaseComponent {
     }
   }
 
-  /* --------------------------------------------------------- public API -- */
+  /* --------------------------------------------------------- public API -- ---- */
 
   /**
    * @returns {boolean}
@@ -503,16 +387,10 @@ export class PredictiveSearch extends BaseComponent {
     if (cached) {
       this.#render(cached, term);
 
-      // Nothing was fetched, so nothing is pending. The input handler turns the
-      // spinner on for every keystroke and this is the path where it would
-      // otherwise keep spinning over results that are already on screen.
       this.#busy(false);
       return;
     }
 
-    // A customer typing quickly generates a request per keystroke. Only the last
-    // one matters, and an out-of-order response would show results for a query
-    // they have already moved past.
     this.#request?.abort();
 
     const controller = new AbortController();
@@ -539,11 +417,6 @@ export class PredictiveSearch extends BaseComponent {
       announceUrgent(message);
       this.close();
     } finally {
-      // Only the newest request may clear the pending state. An aborted call
-      // reaches this line *after* its replacement has started, so the old
-      // `this.#request = null` was nulling the live controller — and clearing
-      // the spinner while a request was still in flight, which is the flicker
-      // between keystrokes.
       if (this.#request === controller) {
         this.#busy(false);
         this.#request = null;
@@ -551,9 +424,7 @@ export class PredictiveSearch extends BaseComponent {
     }
   }
 
-  /**
-   * Show the suggestion panel.
-   */
+  /** Show the suggestion panel. */
   open() {
     if (this.isOpen) return;
 
@@ -562,9 +433,7 @@ export class PredictiveSearch extends BaseComponent {
     this.refs.input.setAttribute('aria-expanded', 'true');
   }
 
-  /**
-   * Hide the suggestion panel.
-   */
+  /** Hide the suggestion panel. */
   close() {
     if (!this.isOpen) return;
 
@@ -592,12 +461,7 @@ export class PredictiveSearch extends BaseComponent {
     if (focus) this.refs.input.focus({ preventScroll: true });
   }
 
-  /**
-   * Repaint the recent searches block.
-   *
-   * Public because the drawer calls it on open: the customer may have searched
-   * from another field, or in another tab, since this markup was rendered.
-   */
+  /** Repaint the recent searches block. */
   refreshRecent() {
     this.#renderRecent();
   }
@@ -609,7 +473,7 @@ export class PredictiveSearch extends BaseComponent {
     return this.dataset.sectionId || 'predictive-search';
   }
 
-  /* ---------------------------------------------------------- internals -- */
+  /* ---------------------------------------------------------- internals -- ---- */
 
   /**
    * Build the resource parameters from theme settings, so a merchant who turned
@@ -657,10 +521,6 @@ export class PredictiveSearch extends BaseComponent {
 
     const list = this.results;
 
-    // The section cannot know which field asked for these results — the theme
-    // has more than one — so the link between the listbox and its input is
-    // stamped here, where the answer is known. Without it
-    // `aria-activedescendant` is never set and arrow keys announce nothing.
     if (list && this.refs.input.id) list.dataset.input = this.refs.input.id;
 
     this.#refreshMedia();
@@ -672,8 +532,6 @@ export class PredictiveSearch extends BaseComponent {
         ? themeString('searchResultsCount', '', { count })
         : themeString('searchNoResults', '');
 
-    // Announced politely rather than assertively: the customer is still typing,
-    // and interrupting them mid-word is worse than waiting for a pause.
     this.#status(message);
     announce(message);
 
@@ -682,16 +540,6 @@ export class PredictiveSearch extends BaseComponent {
 
   /**
    * Put every image in the freshly morphed panel back into a visible state.
-   *
-   * `<responsive-image>` reveals itself by writing `data-loaded`, and a morph
-   * removes any attribute the incoming markup does not carry — which
-   * server-rendered markup never does for a runtime flag. `global.js` restores
-   * the flag on its own, but only for elements that upgraded; a panel rendered
-   * before that module arrives, or a card whose `<img>` node was replaced
-   * outright, would be left faded to zero with no event coming to fix it.
-   *
-   * Cheap and idempotent: a handful of nodes, one attribute each, and a
-   * one-shot listener for anything still in flight.
    *
    * @private
    */
@@ -735,8 +583,6 @@ export class PredictiveSearch extends BaseComponent {
 
     if (!this.isOpen) return;
 
-    // Navigation keys belong to the list, but the event happens on the input,
-    // because focus never leaves it.
     this.results?.handleKeydown(event);
   };
 
@@ -748,9 +594,6 @@ export class PredictiveSearch extends BaseComponent {
     this.toggleAttribute('data-loading', busy);
     this.refs.panel.setAttribute('aria-busy', busy ? 'true' : 'false');
 
-    // The spinner is `aria-hidden` decoration, so the state is given to a screen
-    // reader as words. Cleared rather than left to the results announcement,
-    // which never arrives when a request fails.
     if (this.refs.busy instanceof HTMLElement) {
       this.refs.busy.textContent = busy ? themeString('loading', '') : '';
     }
@@ -773,13 +616,10 @@ export class PredictiveSearch extends BaseComponent {
 
     this.refs.reset.toggleAttribute('data-visible', visible);
 
-    // `hidden` would win over the fade, so the button is taken out of the tab
-    // order explicitly instead. `visibility: hidden` in CSS already hides it
-    // from assistive technology.
     this.refs.reset.tabIndex = visible ? 0 : -1;
   }
 
-  /* ------------------------------------------------- prompts and history -- */
+  /* ------------------------------------------------- prompts and history -- ---- */
 
   /**
    * How many recent searches this field keeps, and whether it keeps any.
@@ -795,18 +635,6 @@ export class PredictiveSearch extends BaseComponent {
   /**
    * The animated prompt.
    *
-   * A native `placeholder` cannot be animated — no pseudo-element transition
-   * applies to it — so the moving copy lives in a real element painted over the
-   * field, and the native placeholder is emptied only once that element is in
-   * play. With JavaScript off, or with a single prompt configured, or with
-   * `prefers-reduced-motion`, nothing here runs and the customer sees the
-   * server-rendered `placeholder` exactly as before. That ordering is the whole
-   * fallback: the enhancement removes the plain version, never the reverse.
-   *
-   * The prompt is `aria-hidden` and `pointer-events: none`. It is decoration
-   * over a field that already has a real `<label>`, and a click on it has to
-   * land in the input underneath.
-   *
    * @private
    */
   #setupPrompts() {
@@ -820,8 +648,6 @@ export class PredictiveSearch extends BaseComponent {
 
     if (prompts.length === 0) return;
 
-    // Take over from the native placeholder. One element showing the copy means
-    // there is never a frame with both.
     prompt.textContent = prompts[0];
     this.refs.input.placeholder = '';
     this.setAttribute('data-prompt', '');
@@ -832,9 +658,6 @@ export class PredictiveSearch extends BaseComponent {
     let index = 0;
 
     this.#promptTimer = window.setInterval(() => {
-      // A customer who has started typing is left alone: moving copy under a
-      // half-typed query is motion with no meaning, and the prompt is hidden
-      // behind their text anyway.
       if (this.refs.input.value.trim().length > 0) return;
 
       index = (index + 1) % prompts.length;
@@ -850,13 +673,6 @@ export class PredictiveSearch extends BaseComponent {
 
   /**
    * Keep the field's chrome in step with its value.
-   *
-   * The clear button is shown through `data-visible` rather than the `hidden`
-   * attribute: `hidden` is `display: none`, which cannot transition, and the
-   * button appearing and vanishing between keystrokes without a fade is the
-   * jumpiest thing in the panel. CSS hides it with `visibility` instead, which
-   * keeps it out of the accessibility tree and out of the tab order while still
-   * allowing the fade.
    *
    * @private
    */
@@ -899,9 +715,6 @@ export class PredictiveSearch extends BaseComponent {
   /**
    * Repaint the recent chips from storage.
    *
-   * The whole block is hidden when there is nothing in it: a "Recent searches"
-   * heading over an empty row is worse than no heading.
-   *
    * @private
    */
   #renderRecent() {
@@ -914,9 +727,6 @@ export class PredictiveSearch extends BaseComponent {
     recentList.replaceChildren();
 
     for (const term of terms) {
-      // The pill is the `<li>`, holding two real buttons: the term runs the
-      // search, the cross forgets it. A cross nested inside the term button
-      // would be invalid HTML and unreachable by keyboard.
       const item = document.createElement('li');
       item.className = 'search-chip search-chip--recent';
 
@@ -944,10 +754,6 @@ export class PredictiveSearch extends BaseComponent {
   /**
    * Chips and tags run their term through the field rather than navigating.
    *
-   * A tag that jumped straight to the results page would throw away the panel
-   * the customer is standing in, and with it the chance to refine. Setting the
-   * value and searching keeps them where they are.
-   *
    * @private
    */
   #setupTerms() {
@@ -959,8 +765,6 @@ export class PredictiveSearch extends BaseComponent {
       this.#useTerm(trigger.dataset.searchTerm || '');
     });
 
-    // Submitting is the moment a query becomes worth remembering. Recorded on
-    // the form rather than on the button so Enter counts too.
     const form = this.querySelector('form');
     if (form) {
       this.on(form, 'submit', () => {
@@ -968,8 +772,6 @@ export class PredictiveSearch extends BaseComponent {
       });
     }
 
-    // Following a suggestion is also a completed search, and the one customers
-    // repeat most often.
     this.on(this, 'click', (event) => {
       const result = event.target instanceof Element ? event.target.closest('[data-result]') : null;
       if (!result) return;
@@ -990,9 +792,6 @@ export class PredictiveSearch extends BaseComponent {
     this.#syncField();
     this.refs.input.focus({ preventScroll: true });
 
-    // With suggestions switched off there is nothing to show in place, so the
-    // chip does the next best thing and runs the real search. A tag that
-    // silently did nothing would read as a broken button.
     if (window.Theme?.settings?.predictiveSearch === false) {
       recentSearches.add(value, this.#recentLimit);
       this.querySelector('form')?.submit();
@@ -1009,24 +808,13 @@ defineComponent('predictive-search', PredictiveSearch);
    <search-drawer>
    ========================================================================== */
 
-/**
- * The search drawer.
- *
- * Focus goes to the search field rather than the close button — the exception to
- * the drawer default, because opening search has exactly one purpose and a
- * customer who has to Tab to the field first will assume it is broken.
- *
- * The query is cleared on close. Reopening search and finding a previous query
- * with stale suggestions attached is more confusing than starting fresh.
- */
+/** The search drawer. */
 export class SearchDrawer extends DrawerComponent {
   get overlayType() {
     return 'search';
   }
 
   afterOpen() {
-    // The customer may have searched from the 404 field, or in another tab,
-    // since this markup was rendered.
     this.querySelector('predictive-search')?.refreshRecent?.();
 
     const input = this.querySelector('input[type="search"]');
@@ -1037,9 +825,6 @@ export class SearchDrawer extends DrawerComponent {
   }
 
   afterClose() {
-    // The drawer is already closed here. Never focus the search input during
-    // cleanup; doing so focuses an element inside a closed native dialog and
-    // can make the browser jump the page to that hidden field.
     this.querySelector('predictive-search')?.reset?.({ focus: false });
   }
 }

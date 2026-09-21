@@ -1,37 +1,5 @@
 /**
- * customer-orders.js — Boost10
- *
  * `<customer-order-history>` — the order list in the account area.
- *
- * The table is rendered by Liquid from `customer.orders`, fully paginated and
- * fully readable without JavaScript. This element adds three things on top:
- * filtering by fulfilment status, a reorder button, and a responsive table that
- * becomes readable cards on a phone.
- *
- * Filtering is client-side and deliberately so. Shopify's Liquid `customer`
- * object has no server-side filter, and paginating a filtered set would require
- * a request per filter to an endpoint that does not exist. Since the page is
- * already paginated by Shopify, filtering only ever hides rows on the current
- * page — and the element says so, rather than implying it searched every order.
- *
- * Reorder adds every still-available line from an order in one request. Items
- * that have been discontinued or are sold out are reported rather than silently
- * dropped: a customer who reorders six things and receives four without being
- * told has been misled.
- *
- * Markup:
- *
- *   <customer-order-history>
- *     <select data-ref="filter">…</select>
- *     <table data-ref="table">
- *       <tr data-order data-status="fulfilled">
- *         <td data-label="Order">…</td>
- *         <td><button data-reorder data-items='[{"id":123,"quantity":2}]'>…</button></td>
- *       </tr>
- *     </table>
- *     <p data-ref="empty" hidden></p>
- *     <p data-ref="status" class="visually-hidden" role="status"></p>
- *   </customer-order-history>
  *
  * @module @theme/customer-orders
  */
@@ -51,7 +19,7 @@ export class CustomerOrderHistory extends BaseComponent {
     this.#applyFilterFromUrl();
   }
 
-  /* --------------------------------------------------------- public API -- */
+  /* --------------------------------------------------------- public API -- ---- */
 
   /**
    * @returns {HTMLElement[]}
@@ -89,8 +57,6 @@ export class CustomerOrderHistory extends BaseComponent {
     this.dataset.filter = wanted;
     this.#syncUrl(wanted);
 
-    // "On this page" is stated explicitly. Implying that every order was
-    // searched, when only the current page was, is worse than no filter.
     const message = themeString('ordersShowing', '', { shown: count, total: this.orders.length });
     this.#status(message);
     announce(message);
@@ -122,9 +88,6 @@ export class CustomerOrderHistory extends BaseComponent {
       announce(themeString('reorderSuccess', ''));
       return true;
     } catch (error) {
-      // Shopify rejects the whole request if any line is unavailable, so retry
-      // once with the line it named removed. Anything beyond that is a cart the
-      // customer should look at themselves rather than one built by guesswork.
       const rejected = error?.body?.description || '';
       const remaining = items.filter((item) => !rejected.includes(String(item.id)));
 
@@ -133,9 +96,7 @@ export class CustomerOrderHistory extends BaseComponent {
           await cart.addItem(remaining);
           announce(themeString('reorderPartial', ''));
           return true;
-        } catch {
-          /* fall through to the failure message */
-        }
+        } catch {}
       }
 
       announceUrgent(error?.message || themeString('reorderFailed', ''));
@@ -146,7 +107,7 @@ export class CustomerOrderHistory extends BaseComponent {
     }
   }
 
-  /* ---------------------------------------------------------- internals -- */
+  /* ---------------------------------------------------------- internals -- ---- */
 
   /**
    * @param {MouseEvent} event
@@ -187,8 +148,6 @@ export class CustomerOrderHistory extends BaseComponent {
       url.searchParams.set('status', status);
     }
 
-    // `replaceState`: changing a filter is not a navigation, and filling the
-    // history stack makes Back leave the account area unpredictably.
     window.history.replaceState({ orders: true }, '', `${url.pathname}${url.search}`);
   }
 

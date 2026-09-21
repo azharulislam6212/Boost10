@@ -1,52 +1,5 @@
 {% doc %}
-  blocks/_comparison-column.liquid — private.
-
-  One column of the comparison: the claims down the left, the store's own
-  product, or an alternative the customer can switch away from.
-
-  ## One block, three roles, because they are one thing
-
-  
-  A claims column, the brand column and an alternative column differ in what
-  sits in their top row and in nothing else. All three are a panel with a
-  radius, a background and a set of rows divided by a dotted line, and all three
-  have to keep those rows in step with each other. Three files would be three
-  copies of that, free to drift the first time somebody changes a divider.
-
-  So **Role** chooses the top row:
-
-    Claims       nothing, and the panel starts one row down — which is why the
-                 drawing's label column is shorter than the others
-    Your product a logo, or a name
-    Alternative  the chooser, from which the customer picks a different one
-
-  Everything else is the same set of controls on all three.
-
-  ## It is a `subgrid`, so its padding is inline
-
-  The column is a grid item spanning every row of
-  `blocks/_comparison-table.liquid`, with `grid-template-rows: subgrid`. That is
-  what keeps *Third-party lab tested* on one line across four columns: the cells
-  sit in the table's tracks, not in tracks of this column's own.
-
-  A subgrid's own padding and border are subtracted from its **first and last**
-  tracks rather than from every one — so **Top** and **Bottom** here pad the
-  header row and the tail of the panel, and the space around a claim is the
-  cell's own padding. Left and right behave exactly as they read, and they are
-  what insets the dotted divider, because the divider is drawn across the cell's
-  content box.
-
-  ## The name is published, not drawn twice
-
-  `data-comparison-name` is how `assets/comparison-table.js` builds every
-  chooser's list without the merchant typing the same four names into four
-  columns. A block cannot read its siblings in Liquid; the attribute is how one
-  reaches another, and it is the same mechanism `<tab-group>` uses to build its
-  buttons from its panels.
-
-  Private — the leading underscore — because a comparison column outside a
-  comparison table is a panel with nothing to be a column of. It is addable
-  inside **Comparison table** and nowhere else.
+  One column of the comparison. Private — addable inside Comparison table only.
 {% enddoc %}
 
 {%- liquid
@@ -54,13 +7,6 @@
 
   assign role = s.role | default: 'product'
 
-  comment
-    The claims column has no top row in the drawing: its panel begins level with
-    the first claim while the product panels start a row higher, and that offset
-    is the whole reason the drawing reads as a table with a header. It is a
-    checkbox rather than a rule, because a merchant who wants a title over the
-    claims should be able to have one.
-  endcomment
   assign has_head = true
   if role == 'features' and s.show_head != true
     assign has_head = false
@@ -84,17 +30,6 @@
     endif
   endif
 
-  comment
-    ---- the panel ----
-
-    `color_background`, so a merchant can hand it a gradient — which is what the
-    drawing's quiet columns are: a flat mint that is a gradient of one colour in
-    Shopify's own picker.
-
-    The alpha goes into the border colour rather than onto the element, for the
-    reason `blocks/card-content.liquid` sets out: `opacity` here would fade the
-    claims the panel exists to sit behind.
-  endcomment
   assign border_line = s.border_style | default: 'none'
   assign border_width = 0
   if border_line != 'none'
@@ -108,14 +43,6 @@
     endif
   endif
 
-  comment
-    ---- corners ----
-
-    Four, twice, behind the same Desktop/Mobile switch the section's own corners
-    use. Emitted as one `border-radius` shorthand in the order that property
-    takes — top-left, top-right, bottom-right, bottom-left. Each mobile corner
-    falls back to its desktop value when the setting is absent entirely.
-  endcomment
   assign r_tl = s.radius_top_left | default: 16 | plus: 0
   assign r_tr = s.radius_top_right | default: 16 | plus: 0
   assign r_bl = s.radius_bottom_left | default: 16 | plus: 0
@@ -126,17 +53,6 @@
   assign r_bl_m = s.radius_bottom_left_mobile | default: r_bl | plus: 0
   assign r_br_m = s.radius_bottom_right_mobile | default: r_br | plus: 0
 
-  comment
-    ---- the divider ----
-
-    Drawn by the cell, configured here, so every row in a column agrees and a
-    merchant changes one control rather than six.
-
-    Dashed and dotted are a repeating gradient rather than a `border-style`,
-    because CSS gives no control over a border's dash length and the drawing's
-    is a precise 2px on, 2px off. A gradient takes both numbers, and `solid`
-    falls out of it as a dash with no gap.
-  endcomment
   assign divider_style = s.divider_style | default: 'none'
   assign divider_percent = s.divider_opacity | default: 100 | plus: 0
   if s.divider_color == blank
@@ -163,18 +79,6 @@
 
   assign column_name = s.name | default: ''
 
-  comment
-    Resolved here rather than in the render tag below. A render tag takes bare
-    values for its arguments and nothing else — a filter in one is a Liquid
-    syntax error that takes the whole file down rather than the one glyph, and
-    it is raised at upload rather than at render.
-
-    Note the wording: no tag delimiters are spelled out anywhere in this liquid
-    block. A liquid tag ends at the first closing delimiter it meets, including
-    one inside a comment line, so writing the tag out here would have closed
-    this tag early and left the comment above unterminated. Same hazard
-    `snippets/icon.liquid` documents for an svg tag inside a comment.
-  endcomment
   assign chevron_px = s.chevron_size | default: 16 | plus: 0
 -%}
 
@@ -226,20 +130,6 @@
   {%- if has_head -%}
     <div class="comparison-column__head">
       {%- if is_chooser -%}
-        {%- comment -%}
-          The button is real, named and focusable from the first paint. It
-          carries `aria-disabled` rather than `disabled` because without the
-          module every alternative column is already on screen — nothing is
-          hidden, so nothing is lost, and the control simply has nothing left to
-          do. `assets/comparison-table.js` removes the attribute when it takes
-          the chooser over.
-
-          The panel is empty in the markup for the reason
-          `blocks/_featured-pills-tabs.liquid` gives about its strip: the list is
-          the other columns, a block cannot read its siblings in Liquid, and the
-          alternative is the merchant keeping one list per column in step by
-          hand.
-        {%- endcomment -%}
         <button
           type="button"
           class="comparison-choose__trigger"
@@ -280,11 +170,6 @@
   {% content_for 'blocks' %}
 </div>
 
-{%- comment -%}
-  Every setting below is a control a merchant reaches in the editor, and the
-  schema is one element's styling surface: splitting it to get under Theme
-  Check's count of 40 would split the thing the settings style.
-{%- endcomment -%}
 {% # theme-check-disable ExcessiveSettingsCount %}
 {% schema %}
 {

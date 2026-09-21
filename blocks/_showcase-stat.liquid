@@ -1,35 +1,5 @@
 {% doc %}
   blocks/_showcase-stat.liquid — private to `blocks/_showcase-stats.liquid`.
-
-  One proof card: a glyph, a number, and the sentence that says what the number
-  counts.
-
-  ## Why this is not the theme's Icon with text block
-
-  That block is a row — glyph beside words — and this is a tile: a centred
-  stack inside a bordered box that has to be the same height as the two beside
-  it. Getting there from the row block means overriding its direction, its
-  alignment, its background and its border, which is four settings a merchant
-  has to know to change and one they can get wrong.
-
-  It is also not `blocks/_testimonial-stat.liquid`, which is the same idea in
-  `sections/testimonials.liquid` drawn as bare text with no box and no glyph.
-  Both stay as they are: a shared block would be one with two shapes and a
-  switch, and the switch is the thing that breaks the section that did not
-  change.
-
-  ## The glyph is optional and so is its box
-
-  A stat with no icon is a number and a label, which is a perfectly good stat.
-  Setting **Icon** to None removes the element rather than leaving an empty
-  square where it was, so the card closes up around what is left.
-
-  ## Everything inherits until it is told not to
-
-  The value, the label, the border and the fill all default to blank and take
-  their colour from the section around them. A merchant who recolours the
-  section recolours the stats with it, and the two that the design does tint —
-  the glyph and the border — are the two with their own pickers.
 {% enddoc %}
 
 {%- liquid
@@ -45,50 +15,6 @@
     assign has_icon = true
   endif
 
-  comment
-    ---- the frame ----
-
-    The theme's border group, one width rather than four: this is a filled tile,
-    and the frame a merchant wants around a filled tile is the whole outline or
-    nothing.
-
-    **Fill** is the one addition. A solid line is one colour all the way round;
-    the design this block was drawn from lights the top-left corner in the
-    accent and lets it fall away to a hairline of white, which no single
-    `border-color` can do. The gradient path swaps the border colour for a
-    border-box background layer — see the note beside
-    `.showcase-stat--gradient-border` in `base.css` for why that is the
-    mechanism rather than `border-image`, which cannot follow a corner radius.
-
-    ---- opacity multiplies, it does not replace ----
-
-    `color_modify: 'alpha'` *sets* the channel, so a picked
-    `rgba(255, 255, 255, 0.04)` came back out at `alpha: 1` — an opaque white
-    tile — the moment the slider sat at its default 100%. The slider is a
-    proportion of the colour the merchant picked, not a replacement for the
-    alpha they picked it with, so the picked alpha is read back with
-    `color_extract` and the two are multiplied.
-
-    ---- filters only, never a colour's properties ----
-
-    The multiply is then handed back to `color_modify`, and every colour below
-    leaves this file through a colour *filter*. The `.rgb` and `.alpha`
-    properties are not used, and every `rgba(…)` built here by string
-    concatenation has been taken out.
-
-    `snippets/color-schemes.liquid` does read `.rgb`, but it reads it off
-    `settings.color_schemes`, which is a different object from a block's own
-    colour setting. Copying that line down here produced `rgba(, 1)` — an
-    invalid declaration — and an invalid custom property is not ignored the way
-    a bad rule is: it poisons every property that substitutes it. The fill and
-    the frame both went, and a tile with no fill and no frame is very hard to
-    read back to a missing comma in a colour.
-
-    A blank colour has no alpha channel to read until the scheme resolves in the
-    browser, so the colour filters cannot fade it — `color-mix` does the same
-    job at paint time instead, which is the fallback every other bordered
-    surface in the theme uses.
-  endcomment
   assign border_line = s.border_style | default: 'solid'
   assign border_fill = s.border_fill | default: 'gradient'
   assign border_width = 0
@@ -99,18 +25,6 @@
     assign border_width = s.border_width | default: 1 | plus: 0
 
     if border_fill == 'gradient'
-      comment
-        A gradient carries its own alpha in each stop, so the opacity slider is
-        hidden on this path rather than quietly doing nothing.
-
-        Each stop goes into the string as the colour object itself, which
-        renders as whatever CSS colour the picker holds. A colour the merchant
-        has cleared is not nil — it is a colour that prints as nothing — so
-        `| default:` never fires for it and the stop would go out as
-        `linear-gradient(135deg,  0%, …)`. Hence the blank test and a literal
-        fallback: an `if` rather than a `default` filter, because a blank test
-        is what matches what an empty colour actually is.
-      endcomment
       assign gradient_angle = s.border_gradient_angle | default: 135 | plus: 0
       assign gradient_midpoint = s.border_gradient_midpoint | default: 48 | plus: 0
 
@@ -193,11 +107,7 @@
   {%- if has_icon -%}
     <span class="showcase-stat__icon">
       {%- if icon_source == 'image' -%}
-        {%- comment -%}
-          A merchant's own mark, so it keeps its alt text: an uploaded glyph is
-          often a certification badge, and "B Corp" is content in a way a star
-          outline is not.
-        {%- endcomment -%}
+
         {% render 'image',
            image: s.icon_image,
            alt: s.icon_image_alt,
@@ -219,11 +129,6 @@
   {%- endif -%}
 </div>
 
-{%- comment -%}
-  Every setting below is a control a merchant reaches in the editor, and the
-  schema is one element's styling surface: splitting it to get under Theme
-  Check's count of 40 would split the thing the settings style.
-{%- endcomment -%}
 {% # theme-check-disable ExcessiveSettingsCount %}
 {% schema %}
 {

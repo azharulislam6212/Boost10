@@ -1,37 +1,5 @@
 /**
- * cart-shipping.js — Boost10
- *
  * `<shipping-calculator>` — an estimate of shipping rates before checkout.
- *
- * Uses `/cart/shipping_rates.json`, which returns the merchant's real configured
- * rates for a destination. It is an estimate only: the final price depends on
- * the checkout address and on any rate adjustments Shopify applies there, which
- * is why every result is labelled as an estimate rather than a quote.
- *
- * The country and province selects are rendered by Liquid with real `<option>`
- * elements, so the form works without JavaScript and the province list is
- * correct on first paint. This module only keeps the province select in step
- * with the country and performs the lookup.
- *
- * Markup:
- *
- *   <shipping-calculator>
- *     <select data-ref="country" name="country">{{ country_option_tags }}</select>
- *     <select data-ref="province" name="province" disabled></select>
- *     <input data-ref="zip" name="zip">
- *     <button data-ref="submit" type="button">Calculate</button>
- *     <div data-ref="results" role="status"></div>
- *   </shipping-calculator>
- *
- * The province list is Shopify's, and it arrives on the country options rather
- * than in a payload of its own:
- *
- *   <option value="Canada" data-provinces="[[&quot;Alberta&quot;,&quot;Alberta&quot;],…]">
- *
- * so `#syncProvinces` reads the attribute off whichever option is selected. It
- * is empty for a country with no provinces, and the field is hidden for those.
- * A theme shipping its own list would be wrong somewhere in the world within a
- * year, which is why none of it is stored here.
  *
  * @module @theme/cart-shipping
  */
@@ -46,11 +14,6 @@ export class ShippingCalculator extends BaseComponent {
   #request = null;
 
   setup() {
-    // `country_option_tags` puts a "---" option under the shop's own country to
-    // separate it from the full list. It is a divider, not a destination, and
-    // nothing in the markup says so — a customer who lands on it gets an error
-    // from Shopify about a country that does not exist. One attribute here is
-    // cheaper than teaching the rest of this file to ignore a sentinel value.
     for (const option of this.refs.country.options ?? []) {
       if (option.value === '---') option.disabled = true;
     }
@@ -72,7 +35,7 @@ export class ShippingCalculator extends BaseComponent {
     this.#request = null;
   }
 
-  /* --------------------------------------------------------- public API -- */
+  /* --------------------------------------------------------- public API -- ---- */
 
   /**
    * Look up rates for the entered destination.
@@ -105,9 +68,6 @@ export class ShippingCalculator extends BaseComponent {
       const data = await response.json();
 
       if (!response.ok) {
-        // Shopify returns field-level errors here, for instance an invalid
-        // postcode for the selected country. They are more useful than a generic
-        // failure, so they are surfaced verbatim.
         this.#renderErrors(data);
         return [];
       }
@@ -129,7 +89,7 @@ export class ShippingCalculator extends BaseComponent {
     }
   }
 
-  /* ---------------------------------------------------------- internals -- */
+  /* ---------------------------------------------------------- internals -- ---- */
 
   /**
    * Repopulate the province select for the selected country, and hide it
@@ -141,21 +101,6 @@ export class ShippingCalculator extends BaseComponent {
     const select = this.refs.province;
     if (!(select instanceof HTMLSelectElement)) return;
 
-    // The list belongs to the *selected* country's option, and it is in an
-    // attribute on that option.
-    //
-    // This was `parseJSONScript(this.querySelector('[data-provinces]'))`, which
-    // got both halves wrong and could never have worked. `querySelector` takes
-    // the first option in the list whatever the customer has chosen, so the
-    // province list would have been one fixed country's; and `parseJSONScript`
-    // reads an element's text, which on an `<option>` is the country's name —
-    // or "---", the divider `country_option_tags` emits under the shop's own
-    // country, which is what was being reported as a JSON syntax error on every
-    // cart page. The result parsed to nothing, was then read as a map keyed by
-    // country name, and the province field never appeared for anywhere.
-    //
-    // The shape is Shopify's: an array of `[value, label]` pairs, empty for a
-    // country with no provinces.
     const country = this.refs.country;
     const option = country instanceof HTMLSelectElement ? country.selectedOptions[0] : null;
     const provinces = parseJSONAttribute(option, 'data-provinces', []) || [];

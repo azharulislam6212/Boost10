@@ -1,38 +1,5 @@
 /**
- * form-validation.js — Boost10
- *
  * `<validated-form>` — inline validation for every form in the theme.
- *
- * ## What this does not do
- *
- * It does **not** replace the browser's validation, and it does not replace
- * Shopify's. The browser already knows what a valid email looks like in every
- * locale; Shopify already knows whether that email is already registered. This
- * only fixes the part neither of them does well: *where and when* the message
- * appears.
- *
- * Native validation shows one bubble, on the first invalid field, that vanishes
- * on the next keystroke and is invisible to some screen readers. Shopify's own
- * errors arrive after a page reload, at the top, with the field that caused them
- * possibly off screen.
- *
- * So: `novalidate` turns off the bubbles, `checkValidity()` still decides what is
- * valid, and this places the message beside the field with `aria-describedby` and
- * `aria-invalid`.
- *
- * ## Three rules about timing
- *
- * **Nothing is validated before the first submit.** Marking a field red because
- * someone has not finished typing their email is the most disliked pattern in
- * form design, and it punishes slow typists hardest.
- *
- * **After a failed submit, fields re-validate on input.** Once someone knows
- * there is a problem, live feedback is help rather than nagging — and the error
- * clearing as they fix it is the confirmation they need.
- *
- * **Focus moves to the first invalid field, once.** Not to the summary, because
- * the summary is not where the work is; and not on every keystroke, because
- * stealing focus mid-typing is worse than any error message.
  *
  * @module @theme/form-validation
  */
@@ -51,13 +18,10 @@ export class ValidatedForm extends BaseComponent {
     const form = this.form;
     if (!form) return;
 
-    // The browser's own bubbles are turned off, but `checkValidity()` still
-    // works — so the rules stay native and only the presentation changes.
     form.setAttribute('novalidate', '');
 
     this.on(form, 'submit', this.#onSubmit);
 
-    // `invalid` does not bubble, so it has to be captured.
     this.on(form, 'invalid', (event) => event.preventDefault(), { capture: true });
 
     for (const field of this.fields) {
@@ -65,15 +29,13 @@ export class ValidatedForm extends BaseComponent {
         if (this.#submitted) this.validateField(field);
       });
 
-      // Blur validates only after a failed submit too. A field that turns red
-      // the moment someone tabs past it is the same nagging by another name.
       this.on(field, 'blur', () => {
         if (this.#submitted) this.validateField(field);
       });
     }
   }
 
-  /* --------------------------------------------------------- public API -- */
+  /* --------------------------------------------------------- public API -- ---- */
 
   /**
    * @returns {HTMLFormElement|null}
@@ -103,9 +65,6 @@ export class ValidatedForm extends BaseComponent {
     }
 
     if (firstInvalid) {
-      // Focus the field, not the summary. The summary is not where the work is,
-      // and `preventScroll` plus an explicit scroll keeps a sticky header from
-      // covering the thing we just focused.
       firstInvalid.focus({ preventScroll: true });
       firstInvalid.scrollIntoView({ block: 'center', behavior: 'smooth' });
 
@@ -138,11 +97,6 @@ export class ValidatedForm extends BaseComponent {
   /**
    * The message for a field's failure.
    *
-   * Written per failure type rather than passing `validationMessage` through,
-   * because the browser's wording is not translated with the rest of the theme —
-   * a French storefront would show a French field label above an English error,
-   * or vice versa, depending on the customer's browser language.
-   *
    * @param {HTMLElement} field
    * @returns {string}
    */
@@ -163,7 +117,7 @@ export class ValidatedForm extends BaseComponent {
     return themeString('formInvalid', '');
   }
 
-  /* ---------------------------------------------------------- internals -- */
+  /* ---------------------------------------------------------- internals -- ---- */
 
   /**
    * @param {SubmitEvent} event
@@ -193,8 +147,6 @@ export class ValidatedForm extends BaseComponent {
 
     if (!source) return field.getAttribute('aria-label') || '';
 
-    // Strip a trailing required marker, so a message does not read
-    // "Email * is required".
     return source.textContent.replace(/\s*\*\s*$/, '').trim();
   }
 
@@ -212,10 +164,6 @@ export class ValidatedForm extends BaseComponent {
       target.id = id;
       target.className = 'form-field__error';
 
-      // Not `role="alert"`. One alert per field means a screen reader announces
-      // four errors in a row over the top of each other; `aria-describedby`
-      // means each is read when its field is reached, which is when it is
-      // useful. The single summary announcement covers the overall failure.
       field.insertAdjacentElement('afterend', target);
     }
 
@@ -224,7 +172,6 @@ export class ValidatedForm extends BaseComponent {
 
     field.setAttribute('aria-invalid', 'true');
 
-    // Preserve any describedby the markup already set, such as a help text id.
     const described = (field.dataset.describedby ??= field.getAttribute('aria-describedby') || '');
     field.setAttribute('aria-describedby', `${described} ${id}`.trim());
   }

@@ -1,35 +1,6 @@
 /**
- * results-list.js — Boost10
- *
  * `<results-list>` — any paginated grid of server-rendered results: a collection,
  * a search results page, or the bundle builder's product picker.
- *
- * It owns the results container and nothing else. `<facet-filters>` decides what
- * the results should be and produces a URL; this element decides how they appear,
- * where focus lands, and what the address bar says afterwards.
- *
- * Three pagination modes, all of which must survive the same three situations:
- * a filter change, a deep link straight to page 4, and a Back navigation.
- *
- *   paginate    Numbered links. Clicks are intercepted and the results swapped
- *               in place, but the links are real `<a href>` and work unaided.
- *   load-more   A button appends the next page.
- *   infinite    A sentinel appends automatically, up to a limit, then hands
- *               back to the button.
- *
- * Deep links are the case most themes get wrong. Landing on `?page=4` with
- * load-more or infinite gives you page 4 and no way back to pages 1 to 3 except
- * by editing the URL. This element reveals a "load previous" control in that
- * situation, prepends earlier pages, and — critically — corrects the scroll
- * position afterwards, because inserting content above the viewport pushes
- * everything the customer was reading down the page.
- *
- * As pages are appended, the address bar is updated with `replaceState` to the
- * page currently in view. A refresh, a shared link, or a Back from a product
- * page then lands close to where the customer was, rather than at page 1.
- *
- * Nothing here is product-specific. `data-item-selector` names what an item is,
- * which is how the bundle builder reuses the whole thing.
  *
  * @module @theme/results-list
  */
@@ -43,25 +14,6 @@ import { themeString, announce, announceUrgent, getFocusableElements } from '@th
 /** Automatic loads allowed before infinite scroll hands over to the button. */
 const AUTO_LOAD_LIMIT = 3;
 
-/**
- * Markup:
- *
- *   <results-list
- *     data-section-id="main-collection"
- *     data-pagination="load-more"
- *     data-item-selector="[data-product-id]"
- *     data-page="4"
- *     data-total="120">
- *
- *     <button data-ref="loadPrevious" data-prev-url="?page=3" hidden>…</button>
- *     <div data-ref="grid" id="ProductGrid">…items…</div>
- *     <div data-ref="empty" hidden>…</div>
- *     <button data-ref="loadMore" data-next-url="?page=5">…</button>
- *     <div data-ref="sentinel" aria-hidden="true"></div>
- *     <nav data-ref="pagination">…numbered links…</nav>
- *     <p data-ref="status" class="visually-hidden" role="status"></p>
- *   </results-list>
- */
 export class ResultsList extends BaseComponent {
   static requiredRefs = ['grid'];
 
@@ -93,15 +45,10 @@ export class ResultsList extends BaseComponent {
     this.#markCurrentPage();
     this.#applyMode();
 
-    // Only take over history when no filter form is present. When there is one,
-    // `<facet-filters>` owns the URL and already listens for popstate; two
-    // handlers would fetch the same page twice.
     if (!document.querySelector('facet-filters')) {
       this.on(window, 'popstate', () => this.#onPopState());
     }
 
-    // Restoring from the back/forward cache skips setup entirely, so the
-    // observers have to be re-armed or infinite scroll silently stops working.
     this.on(window, 'pageshow', (event) => {
       if (event.persisted) {
       this.refreshRefs();
@@ -119,7 +66,7 @@ export class ResultsList extends BaseComponent {
     this.#pageObserver = null;
   }
 
-  /* --------------------------------------------------------- public API -- */
+  /* --------------------------------------------------------- public API -- ---- */
 
   /**
    * @returns {'paginate'|'load-more'|'infinite'}
@@ -181,10 +128,6 @@ export class ResultsList extends BaseComponent {
   /**
    * Replace the results with freshly rendered HTML.
    *
-   * Used after a filter, sort or price change, and after a numbered-page click.
-   * The whole element is morphed, so the grid, the empty state, the counts and
-   * every pagination control update together and cannot disagree.
-   *
    * @param {string} html Section HTML containing a `<results-list>`.
    * @param {Object} [options]
    * @param {boolean} [options.focus=true] Move focus to the results.
@@ -201,16 +144,10 @@ update(html, { focus = true, scroll = false } = {}) {
 
   morph(this, next);
 
-  // The one line the original was missing. Without it every ref below — and
-  // every ref `#applyMode()` reads — still points into the pre-morph tree.
   this.refreshRefs();
 
   this.#autoLoads = 0;
   this.#pageAnchors = [];
-
-  // `#bindControls()` is deliberately NOT called here. Controls are delegated
-  // from the root in `setup()`, so they survive morph on their own. Calling it
-  // again would add a duplicate listener, not refresh a stale one.
 
   this.#markCurrentPage();
   this.#applyMode();
@@ -219,9 +156,6 @@ update(html, { focus = true, scroll = false } = {}) {
 
   if (scroll) this.#scrollIntoView();
 
-  // Filtering replaces the page's main content while focus sits on a checkbox
-  // in the sidebar. Without moving it, a keyboard user is told nothing changed
-  // and their next Tab lands somewhere unrelated.
   if (focus) this.focusResults();
 
   return true;
@@ -241,10 +175,6 @@ update(html, { focus = true, scroll = false } = {}) {
 
   /**
    * Prepend the previous page.
-   *
-   * Only reachable when the customer arrived on a deep link. Scroll position is
-   * corrected afterwards, because inserting content above the viewport moves
-   * everything they were looking at down the page.
    *
    * @returns {Promise<boolean>}
    */
@@ -287,12 +217,7 @@ update(html, { focus = true, scroll = false } = {}) {
     }
   }
 
-  /**
-   * Move focus to the results container.
-   *
-   * The container, not the first item: landing on an item implies the customer
-   * chose it, and it skips the count that was just announced.
-   */
+  /** Move focus to the results container. */
   focusResults() {
     const target = this.refs.grid;
     if (!(target instanceof HTMLElement)) return;
@@ -301,7 +226,7 @@ update(html, { focus = true, scroll = false } = {}) {
     target.focus({ preventScroll: true });
   }
 
-  /* ------------------------------------------------------------ loading -- */
+  /* ------------------------------------------------------------ loading -- ---- */
 
   /**
    * @param {string} url
@@ -314,8 +239,6 @@ update(html, { focus = true, scroll = false } = {}) {
     this.#request = new AbortController();
     this.#setLoading(true);
 
-    // Measured before the DOM changes, so the scroll correction below can put
-    // the customer back exactly where they were.
     const heightBefore = document.documentElement.scrollHeight;
     const scrollBefore = window.scrollY;
 
@@ -333,7 +256,6 @@ update(html, { focus = true, scroll = false } = {}) {
       if (direction === 'append') {
         for (const node of incoming) this.refs.grid.appendChild(node);
       } else {
-        // Inserted in reverse so the original order is preserved at the top.
         for (const node of [...incoming].reverse()) {
           this.refs.grid.insertBefore(node, this.refs.grid.firstChild);
         }
@@ -344,7 +266,6 @@ update(html, { focus = true, scroll = false } = {}) {
       this.dataset.count = String(this.count);
 
       if (direction === 'prepend') {
-        // Restore the reading position: the page just got taller above us.
         const grown = document.documentElement.scrollHeight - heightBefore;
         window.scrollTo({ top: scrollBefore + grown, behavior: 'instant' });
       }
@@ -390,7 +311,7 @@ update(html, { focus = true, scroll = false } = {}) {
     return response.text();
   }
 
-  /* ------------------------------------------------------------- wiring -- */
+  /* ------------------------------------------------------------- wiring -- ---- */
 
   /** @private */
 #bindControls() {
@@ -398,9 +319,6 @@ update(html, { focus = true, scroll = false } = {}) {
     if (event.defaultPrevented || event.button !== 0) return;
     if (!(event.target instanceof Element)) return;
 
-    // Modifier-clicks are the customer asking the browser to do something
-    // other than navigate here — a new tab, a download. Intercepting those
-    // breaks an expectation the browser set, not one the theme did.
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
 
     const loadMore = event.target.closest('[data-ref~="loadMore"]');
@@ -417,8 +335,6 @@ update(html, { focus = true, scroll = false } = {}) {
       return;
     }
 
-    // Numbered links stay real links. Intercepting the click keeps the page
-    // from reloading; middle-click, modifier-click and no-JS all still work.
     if (this.pagination !== 'paginate') return;
 
     const link = event.target.closest('[data-ref~="pagination"] a[href]');
@@ -438,9 +354,6 @@ update(html, { focus = true, scroll = false } = {}) {
     this.#sentinelObserver?.disconnect();
     this.#sentinelObserver = null;
 
-    // Arriving directly on page 4 with load-more or infinite leaves pages 1 to 3
-    // unreachable. The control is rendered by Liquid and revealed here, because
-    // whether it is needed is only knowable from the current page number.
     const deepLinked = this.page > 1 && this.pagination !== 'paginate';
     if (this.refs.loadPrevious instanceof HTMLElement) {
       this.refs.loadPrevious.toggleAttribute('hidden', !deepLinked || !this.previousUrl);
@@ -473,10 +386,6 @@ update(html, { focus = true, scroll = false } = {}) {
 
   /**
    * Keep the address bar pointing at the page currently in view.
-   *
-   * `replaceState`, not `pushState`: appending pages while scrolling should not
-   * fill the history stack with entries the Back button has to walk through one
-   * at a time.
    *
    * @private
    */
@@ -564,8 +473,6 @@ update(html, { focus = true, scroll = false } = {}) {
         if (!this.nextUrl) return;
 
         if (this.#autoLoads >= AUTO_LOAD_LIMIT) {
-          // Stop loading automatically and let the button take over, so the
-          // footer stays reachable and the customer keeps control.
           this.#sentinelObserver?.disconnect();
           this.refs.loadMore?.removeAttribute('hidden');
           return;
@@ -580,7 +487,7 @@ update(html, { focus = true, scroll = false } = {}) {
     this.#sentinelObserver.observe(sentinel);
   }
 
-  /* ----------------------------------------------------------- feedback -- */
+  /* ----------------------------------------------------------- feedback -- ---- */
 
   /**
    * @param {boolean} loading
@@ -631,8 +538,6 @@ update(html, { focus = true, scroll = false } = {}) {
    * @private
    */
   #focusNewContent(first, direction) {
-    // Prepending must not steal focus: the customer is reading further down and
-    // did not ask to be moved to the top of the grid.
     if (direction === 'prepend') return;
     if (!(first instanceof HTMLElement)) return;
 

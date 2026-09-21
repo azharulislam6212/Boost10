@@ -1,36 +1,5 @@
 {% comment %}
-  sections/predictive-search.liquid
-
   The section the predictive search endpoint renders.
-
-  `assets/search.js` requests `/search/suggest?q=…&section_id=predictive-search`,
-  so the suggestions are built by Liquid rather than reconstructed in JavaScript.
-  Money formatting, translations, metafield-driven ratings and badge rules stay
-  correct in the dropdown because they are the same snippets the rest of the
-  theme uses.
-
-  This file did not exist. `<predictive-search>` was fetching a section id that
-  Shopify could not resolve, every request came back 404, and the panel never
-  opened — which is why predictive search looked "off" no matter what the
-  setting said.
-
-  ## Contract with the JavaScript
-
-    - The root element carries `data-results-panel`. `search.js` parses the
-      response, takes that element and morphs it into the live panel. Without it
-      the panel closes silently.
-    - `<search-list>` is the combobox popup. `search.js` stamps `data-input` on
-      it after the morph, because only the browser knows which of the theme's
-      search fields made the request.
-    - Every selectable row carries `data-result` and a unique `id`. The id is
-      what `aria-activedescendant` points at while the customer arrows through
-      the list, so it must not collide between groups.
-
-  ## Grouping
-
-  One listbox, one group per resource type. A separate listbox per type would
-  break arrow-key navigation across the whole set, which is what a customer
-  expects when the panel shows products and articles together.
 {% endcomment %}
 
 {%- liquid
@@ -45,12 +14,6 @@
   assign total = total | plus: products.size | plus: collections.size
   assign total = total | plus: articles.size | plus: pages.size
 
-  comment
-    Type headings are a merchant choice (Theme settings › Search › Show types).
-    With a single resource type enabled they say nothing the panel does not
-    already show, so the products group falls back to a neutral "Result" label —
-    the design's single-column case.
-  endcomment
   assign show_types = settings.show_search_types
 
   assign list_id = 'PredictiveSearchList'
@@ -146,10 +109,6 @@
       </ul>
     </search-list>
 
-    {%- comment -%}
-      Outside `<search-list>` on purpose: it is not a suggestion, and inside the
-      list it would take an arrow-key stop and read as a fifth result.
-    {%- endcomment -%}
     <div class="search-results__footer">
       <a class="search-results__all" href="{{ browse_all_url | strip }}">
         <span>{{ settings.browse_all_text | default: 'Browse All' | escape }}</span>

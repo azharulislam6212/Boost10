@@ -1,29 +1,5 @@
 /**
- * page-transition.js — Boost10
- *
  * `<page-transition>` animates the gap between page loads.
- *
- * Two implementations, chosen at runtime:
- *
- *   1. The View Transitions API, where supported. The browser handles the
- *      cross-fade natively across a real navigation, which is both smoother and
- *      cheaper than anything scripted.
- *   2. A WAAPI overlay fallback everywhere else: play an exit animation, then
- *      navigate, then play an entrance animation on the next page.
- *
- * This element never fetches or swaps content. Navigation stays a real browser
- * navigation, so the URL, history, scroll restoration, back button and
- * `content_for_header` all keep working exactly as Shopify expects. A theme that
- * turns navigation into `fetch()` inherits every routing bug in a router it did
- * not write, for a visual effect.
- *
- * Safety rails, all of which fall back to a plain navigation:
- *   - reduced motion, or the setting turned off
- *   - modified clicks (new tab, download, middle click)
- *   - cross-origin links, `target` attributes, `mailto:` and `tel:`
- *   - same-page hash links, which scroll instead
- *   - the Theme Editor, where an animated overlay would obstruct editing
- *   - anything marked `data-no-transition`
  *
  * @module @theme/page-transition
  */
@@ -42,7 +18,7 @@ export class PageTransition extends BaseComponent {
   /** True once a navigation has been committed, to block a second one. */
   #navigating = false;
 
-  /* ------------------------------------------------------------ lifecycle */
+  /* ------------------------------------------------------------ lifecycle ---- */
 
   setup() {
     this.#mode = /** @type {any} */ (this.dataset.mode) || 'fade';
@@ -59,8 +35,6 @@ export class PageTransition extends BaseComponent {
 
     this.on(document, 'click', this.#onDocumentClick, { capture: true });
 
-    // Restoring from the back/forward cache skips the normal load path, which
-    // would otherwise leave the overlay stuck covering the page.
     this.on(window, 'pageshow', (event) => {
       if (event.persisted) {
         this.#navigating = false;
@@ -69,7 +43,7 @@ export class PageTransition extends BaseComponent {
     });
   }
 
-  /* --------------------------------------------------------- public API -- */
+  /* --------------------------------------------------------- public API -- ---- */
 
   /**
    * Navigate to a URL with the configured transition.
@@ -90,7 +64,7 @@ export class PageTransition extends BaseComponent {
     window.location.assign(url);
   }
 
-  /* ---------------------------------------------------------- internals -- */
+  /* ---------------------------------------------------------- internals -- ---- */
 
   /**
    * @returns {boolean}
@@ -108,9 +82,6 @@ export class PageTransition extends BaseComponent {
    * @private
    */
   #supportsViewTransitions() {
-    // Cross-document view transitions are opted into from CSS with
-    // `@view-transition { navigation: auto; }` in base.css. When the browser
-    // supports it there is nothing for this element to animate.
     return typeof document.startViewTransition === 'function' && CSS.supports('view-transition-name', 'none');
   }
 
@@ -157,8 +128,6 @@ export class PageTransition extends BaseComponent {
 
     if (url.origin !== window.location.origin) return false;
 
-    // A link to the current page with only a hash difference should scroll,
-    // not reload behind a full-screen overlay.
     const samePage = url.pathname === window.location.pathname && url.search === window.location.search;
     if (samePage && url.hash) return false;
 
@@ -180,7 +149,6 @@ export class PageTransition extends BaseComponent {
       fill: 'forwards'
     });
 
-    // Never let a stalled animation strand the customer on a covered page.
     await Promise.race([animation.finished.catch(() => {}), timeout(EXIT_TIMEOUT)]);
   }
 

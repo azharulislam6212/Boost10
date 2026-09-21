@@ -1,38 +1,5 @@
 /**
- * scrollbar.js — Boost10
- *
  * Owns everything to do with page scrolling.
- *
- * Two elements live here because they share one piece of state — the current
- * scroll position and its progress — and the architecture rule is that shared
- * state has exactly one owner. `<smooth-scrollbar>` owns it; `<scroll-to-top>`
- * reads it and calls back into the owner by direct method call.
- *
- *   <smooth-scrollbar>  Lenis instance, rAF loop, scroll progress, scrollTo
- *   <scroll-to-top>     Visibility threshold, click handling, focus return
- *
- * Lenis is vendored at `assets/lenis.js` and loaded through the `@theme/lenis`
- * specifier. It is imported dynamically so that a failure to load degrades to
- * native scrolling instead of taking the page down: every public method here
- * has a native fallback path, and nothing else in the theme touches scrolling
- * directly.
- *
- * Required CSS (shipped inline in theme.liquid and repeated in base.css):
- *
- *   html.lenis, html.lenis body { height: auto; }
- *   .lenis.lenis-smooth { scroll-behavior: auto !important; }
- *   .lenis.lenis-smooth [data-lenis-prevent] { overscroll-behavior: contain; }
- *   .lenis.lenis-stopped { overflow: hidden; }
- *   .lenis.lenis-smooth iframe { pointer-events: none; }
- *
- * Mark any independently scrolling container — a tall drawer, a filter panel,
- * a modal body — with `data-lenis-prevent` so Lenis leaves it alone.
- *
- * Public API, called directly by other modules:
- *   stop()      pause smoothing  — `lockScroll()` calls this when an overlay opens
- *   start()     resume smoothing — `unlockScroll()` calls this when the last one closes
- *   scrollTo()  animated scroll to an element, selector or offset
- *   progress    scroll progress from 0 to 1
  *
  * @module @theme/scrollbar
  */
@@ -60,17 +27,11 @@ export class SmoothScrollbar extends BaseComponent {
   /**
    * The back-to-top control, looked up once.
    *
-   * `#publishProgress` runs on every frame of every scroll, and it used to find
-   * this with a fresh `querySelector` each time — a whole-document query per
-   * frame to reach an element that is rendered once by Liquid and never moves.
-   * Resolved lazily rather than in `setup()` because the control is a sibling in
-   * `sections/overlays.liquid` and may not be parsed yet when this runs.
-   *
    * @type {Element|null|undefined} undefined until looked up, null if absent.
    */
   #backToTop;
 
-  /* ------------------------------------------------------------ lifecycle */
+  /* ------------------------------------------------------------ lifecycle ---- */
 
   setup() {
     this.#token += 1;
@@ -96,22 +57,14 @@ export class SmoothScrollbar extends BaseComponent {
     this.#lenis = null;
   }
 
-  /* --------------------------------------------------------- public API -- */
+  /* --------------------------------------------------------- public API -- ---- */
 
-  /**
-   * Pause smoothing and hand scrolling back to the browser.
-   *
-   * Called directly by `lockScroll()` in utilities.js when a drawer or modal
-   * opens. No event is involved: the overlay owns the decision and calls the
-   * method on the element that owns the behaviour.
-   */
+  /** Pause smoothing and hand scrolling back to the browser. */
   stop() {
     this.#lenis?.stop();
   }
 
-  /**
-   * Resume smoothing from the page's current position.
-   */
+  /** Resume smoothing from the page's current position. */
   start() {
     this.#lenis?.start();
   }
@@ -136,15 +89,6 @@ export class SmoothScrollbar extends BaseComponent {
   /**
    * Scroll to a position, element or selector.
    *
-   * Note that **Scroll easing** does not reach this. Lenis animates towards a
-   * target either by damping (`lerp`, which is what the setting drives, and what
-   * a wheel or a finger gets) or over a fixed `duration` — and passing a
-   * duration, which a jump to a known place should, switches the damping off
-   * entirely. So this number is the one that decides how long every back-to-top,
-   * anchor link and filter result takes, no matter where the merchant leaves the
-   * slider, and 900ms was long enough that the page felt like it was catching up
-   * rather than answering.
-   *
    * @param {number|string|Element} target Offset in pixels, a selector, or an element.
    * @param {Object} [options]
    * @param {number} [options.offset=0] Extra pixels, usually a negative header height.
@@ -165,14 +109,13 @@ export class SmoothScrollbar extends BaseComponent {
       return;
     }
 
-    // Native fallback: Lenis is unavailable or smoothing is switched off.
     const top = this.#resolveOffset(target) + offset;
     if (Number.isNaN(top)) return;
 
     window.scrollTo({ top, behavior: jump ? 'auto' : 'smooth' });
   }
 
-  /* ---------------------------------------------------------- internals -- */
+  /* ---------------------------------------------------------- internals -- ---- */
 
   /**
    * @returns {boolean}
@@ -202,8 +145,6 @@ export class SmoothScrollbar extends BaseComponent {
       return;
     }
 
-    // The element was disconnected, or reconnected, while the import was in
-    // flight. Anything this call would set up now belongs to a dead connection.
     if (token !== this.#token || !this.isConnected) return;
 
     this.#lenis = new Lenis({
@@ -211,8 +152,6 @@ export class SmoothScrollbar extends BaseComponent {
       wheelMultiplier: Number(this.dataset.wheelMultiplier) || 1,
       touchMultiplier: Number(this.dataset.touchMultiplier) || 1.5,
       smoothWheel: true,
-      // Native momentum on touch beats anything scripted, and hijacking it
-      // breaks pull-to-refresh on mobile Safari.
       syncTouch: false,
       autoRaf: false,
       anchors: false,
@@ -227,18 +166,6 @@ export class SmoothScrollbar extends BaseComponent {
   /**
    * Take on whatever scroll position the browser restored.
    *
-   * This is what was pulling the page back to the top on reload, and it is not
-   * a scroll-restoration bug — the browser restores the position correctly.
-   * Lenis reads the scroll once, when it is constructed, into the target it
-   * animates towards. This module is a deferred import, so construction happens
-   * around the same moment the browser is restoring: read a fraction too early
-   * and Lenis's target is 0 while the real position is the footer, and on its
-   * first frame it dutifully animates the page back to the target it recorded.
-   *
-   * Reading again — now, on the next frame, and once more after `load` — closes
-   * the window. `immediate` sets the position without animating, so where a
-   * reload had already put the customer is simply where they stay.
-   *
    * @private
    */
   #adoptRestoredScroll() {
@@ -246,33 +173,9 @@ export class SmoothScrollbar extends BaseComponent {
       const lenis = this.#lenis;
       if (!lenis) return;
 
-      // Re-measure before doing anything else.
-      //
-      // This is what was yanking the page on reload. Lenis keeps its own cached
-      // page height, and it refreshes it from a ResizeObserver that is
-      // DEBOUNCED BY 250ms (`Dimensions` in assets/lenis.js) — so for the whole
-      // of a page load, while images decode, fonts swap, carousels mount and a
-      // phone's address bar collapses, that cached height is the height the
-      // page had a moment ago, not the height it has now.
-      //
-      // `scrollTo()` clamps its target to the limit that cached height implies.
-      // So on a reload deep into a long page, the browser would restore the
-      // customer correctly to, say, 2000px, this would ask Lenis to adopt 2000,
-      // Lenis would clamp it to the 1200px it still believed the page ended at,
-      // and — because the immediate path writes the result back out through
-      // `setScroll()` — the page was actively scrolled UP to 1200. Three calls
-      // below, so it could happen more than once.
-      //
-      // Refreshing the measurements first costs one layout read and makes the
-      // clamp a no-op, which is what it should always have been. Nothing else
-      // in Lenis is touched: this only updates the cached width and height.
       lenis.dimensions.resize();
 
       const actual = window.scrollY;
-      // A pixel of slack: `animatedScroll` is fractional mid-animation, and a
-      // hard comparison would re-seek on every frame it is called. It is also
-      // what keeps this from interrupting a customer who has already started
-      // scrolling before `load` fires.
       if (Math.abs(actual - (lenis.animatedScroll ?? 0)) <= 1) return;
 
       lenis.scrollTo(actual, { immediate: true, force: true });
@@ -281,8 +184,6 @@ export class SmoothScrollbar extends BaseComponent {
     adopt();
     requestAnimationFrame(adopt);
 
-    // `load` fires after images have settled, which is the last moment the
-    // restored position can still move.
     if (document.readyState === 'complete') {
       setTimeout(adopt, 0);
     } else {
@@ -340,8 +241,6 @@ export class SmoothScrollbar extends BaseComponent {
   #publishProgress(progress, scrollY) {
     setCssVar('--scroll-progress', clamp(progress, 0, 1).toFixed(4));
 
-    // Direct method call on the element that consumes this state. No event, no
-    // registry, and nothing to unsubscribe.
     if (this.#backToTop === undefined) this.#backToTop = document.querySelector('scroll-to-top');
     this.#backToTop?.updateFromScroll?.(scrollY, progress);
   }
@@ -367,23 +266,7 @@ defineComponent('smooth-scrollbar', SmoothScrollbar);
    <scroll-to-top>
    ========================================================================== */
 
-/**
- * A back-to-top control that appears once the customer has scrolled far enough.
- *
- * Accessibility decisions worth keeping:
- *
- *   - It is a real `<button>` rendered by Liquid with a translated label, so it
- *     works before this script runs and reads correctly to screen readers.
- *   - While hidden it is `inert`, which removes it from the tab order instead of
- *     leaving an invisible focus stop floating over the page.
- *   - After scrolling, focus moves to the skip-to-content link. Scrolling the
- *     viewport does not move the keyboard caret, so without this a keyboard user
- *     is returned to the top visually and left at the bottom of the tab order.
- *   - The progress ring is decorative and driven by `--scroll-progress`.
- *
- * Attributes:
- *   data-offset  Pixels scrolled before the button appears (default 600)
- */
+/** A back-to-top control that appears once the customer has scrolled far enough. */
 export class ScrollToTop extends BaseComponent {
   static requiredRefs = ['button'];
 
@@ -396,12 +279,10 @@ export class ScrollToTop extends BaseComponent {
 
     this.on(this.refs.button, 'click', this.#onClick);
 
-    // Seed the initial state: the page may already be scrolled on load, or
-    // restored mid-page by the browser on a back navigation.
     this.updateFromScroll(window.scrollY, 0);
   }
 
-  /* --------------------------------------------------------- public API -- */
+  /* --------------------------------------------------------- public API -- ---- */
 
   /**
    * Called directly by `<smooth-scrollbar>` on every scroll frame.
@@ -442,7 +323,7 @@ export class ScrollToTop extends BaseComponent {
     announce(themeString('backToTop', ''));
   }
 
-  /* ---------------------------------------------------------- internals -- */
+  /* ---------------------------------------------------------- internals -- ---- */
 
   /** @private */
   #onClick = (event) => {

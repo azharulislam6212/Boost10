@@ -1,60 +1,6 @@
 {% doc %}
-  blocks/subheading.liquid
-
   An eyebrow — the short line that sits above a heading — optionally with an
   icon beside it.
-
-  ## Why this is a file and not an eleventh preset on the Text block
-
-  `blocks/text.liquid` already has a Subheading preset, and it stays: a run of
-  text set in the small-caps treatment is a *typography* choice, and that is
-  what a preset is for. This block is a different thing standing next to it —
-  a row. It holds an icon and a line of words on one line, with a gap between
-  them, and a preset cannot introduce a second child element.
-
-  Everything that is *not* the row is the Text block's, unchanged and by
-  reference rather than by copy:
-
-    typography, colour, presets   `snippets/block-typography.liquid`, and the
-                                  `.block-text--*` classes in `assets/base.css`
-    alignment, width              the same `.block-text--align-*` classes
-    background panel              `.block-text--has-background`, driven by the
-                                  same `--block-text-background` / `-radius`
-    highlight                     the same `.block-text--highlight-*` classes
-    padding                       `snippets/spacing.liquid`
-    entrance animation            `snippets/motion-attrs.liquid`
-
-  So this file's root element carries `.block-text` as well as its own class,
-  and a change to Theme settings › Typography moves the Subheading block with
-  every other run of text on the page. There is no second copy of the type map
-  here, and nothing to keep in step by hand.
-
-  ## The icon has two sources and a switch, not three fields
-
-  `blocks/badge-highlight.liquid` tries three sources in order — pasted SVG,
-  then an upload, then the theme set — and the merchant discovers which one won
-  by clearing fields until the right icon appears. Here the source is stated:
-  **None**, **Icon** or **Image**, and only the field belonging to the chosen
-  source is shown. There is no precedence to learn because there is no contest.
-
-  **Gap** follows the same rule. With no icon there is nothing for a gap to sit
-  between, so the control is hidden rather than left in the panel doing nothing.
-
-  ## `block_level: true` on the animation
-
-  The splitting presets — words, letters — take an element's text apart and
-  animate the pieces. On a pill with an icon in it that reads as the label
-  coming apart while the icon sits still. `block_level` resolves the merchant's
-  cascade exactly as usual and then maps any splitting preset onto the
-  whole-element preset that travels the same way, which is what the parameter
-  exists for.
-
-  ## One style attribute
-
-  Spacing and typography are pulled in as declarations rather than as their own
-  attributes. Two `style` attributes on one element is invalid HTML, the browser
-  keeps the first and discards the rest, and that is how padding sliders end up
-  moving a value that never reaches the page.
 {% enddoc %}
 
 {%- liquid
@@ -112,27 +58,6 @@
   endcapture
   assign icon_size = icon_px | plus: 0
 
-  comment
-    `icon_style` is the *box* around the glyph, and it is the one control that
-    decides whether there is a box at all:
-
-      none     no box. The glyph or image sits straight beside the words at
-               Icon size, and width, height, border and radius are hidden
-               because there is nothing for them to apply to.
-      solid    a filled box, painted from the scheme's primary button colours
-      outline  a transparent box carrying the border below
-
-    Written this way there is no combination that does nothing. The alternative
-    — a box that always exists, plus a separate "show background" toggle — has
-    two settings able to contradict each other, which is the state the header
-    notes on `sections/header.liquid` describe as the one worth designing out.
-
-    The solid colours are derived rather than exposed as two more swatches, the
-    same way `snippets/color-schemes.liquid` derives the cart bubble and the
-    badges from the scheme it is already in: a merchant who switches scheme gets
-    an icon that still belongs to it, and nobody has to remember a second pair
-    of colours per scheme.
-  endcomment
   assign icon_style = s.icon_style | default: 'none'
 
   assign icon_box_width = s.icon_width | default: 40 | plus: 0
@@ -141,34 +66,8 @@
   assign icon_border_style = s.icon_border_style | default: 'none'
   assign icon_border_width = s.icon_border_thickness | default: 0 | plus: 0
 
-  comment
-    The image is sized by the same Icon size the glyph uses — one number for
-    both sources, so switching between them does not resize the icon — and it
-    keeps its own aspect ratio. `ratio: '1-1'` used to be passed here, which
-    forced a 1:1 box and cropped anything that was not square; omitting it lets
-    `snippets/image.liquid` fall through to `aspect-ratio`, which reserves the upload's
-    real proportions.
-
-    `sizes` follows the same number rather than a hardcoded `48px`. A hint that
-    says 48 while the merchant has asked for 20 is asking the browser for a file
-    more than twice the width it will paint.
-  endcomment
   assign icon_image_sizes = icon_size | append: 'px'
 
-  comment
-    The divider is a rule *between* the icon and the words, so it cannot exist
-    without both. Tied to `has_icon` rather than to the Show divider checkbox
-    alone: a merchant who turns the icon off and leaves the checkbox on would
-    otherwise get a stray vertical line at the start of the eyebrow with nothing
-    on the other side of it.
-
-    It is an empty element rather than a border on the icon box or a `::before`
-    on the text. A border on the box cannot be inset from the box's own edges,
-    which is the whole look — the rule is shorter than the row and centred on
-    it. A pseudo-element on the text would have to be positioned out of flow to
-    sit in the gap, and would then ignore the Gap slider entirely; as a flex
-    child it simply takes the gap on both sides, for free.
-  endcomment
   assign has_divider = false
   if has_icon and s.show_divider
     assign has_divider = true
@@ -250,15 +149,6 @@
   assign classes = classes | append: ' block-text--align-' | append: alignment
   assign classes = classes | append: ' block-text--align-mobile-' | append: alignment_mobile
 
-  comment
-    The Text block's two wrapping controls — Measure and "Keep on one line on
-    mobile" — are deliberately not offered here. Both govern where a paragraph
-    breaks, and an eyebrow is one short line: a measure it never reaches, and a
-    wrap it never makes. Leaving them in would be two settings a merchant can
-    move all day with nothing happening on the page, which is the failure this
-    theme's own notes keep coming back to.
-  endcomment
-
   if color_mode == 'gradient'
     assign classes = classes | append: ' block-text--gradient'
   elsif color_mode != 'inherit' and color_mode != blank
@@ -271,39 +161,14 @@
     assign classes = classes | append: ' block-text--hl-' | append: highlight_target
   endif
 
-  comment
-    `inherit` emits no background at all, so whatever colour scheme the section
-    is using shows through — the same contract the Text block's colour select
-    keeps, and the reason neither needs a "transparent" swatch. Only `custom`
-    turns the panel on, and with it `.block-text--has-background` brings the
-    padding that keeps a background off the words.
-  endcomment
   if background_mode == 'custom'
     assign classes = classes | append: ' block-text--has-background'
   endif
 
-  comment
-    A border needs the same padding a background needs, and for the same reason
-    the Text block's note gives: a rule drawn flush against its own words reads
-    as a mistake, and making the merchant go and find the spacing sliders to fix
-    it makes the control feel broken. The class only sets `--block-padding-*`
-    defaults, so a slider that has left zero still wins.
-  endcomment
   if has_border
     assign classes = classes | append: ' block-subheading--bordered'
   endif
 
-  comment
-    No `--has-icon` class. The icon element either exists or it does not, and the
-    gap is only emitted when it does — a class saying the same thing a third
-    time is a fact free to disagree with the other two. `snippets/button.liquid`
-    records what that costs: `button--fx-swap` was dropped and every rule still
-    naming it went dead in silence.
-
-    The icon's *surface* does get one, because solid and outline are two
-    discrete treatments rather than a number — the same split the theme keeps
-    everywhere: presets are classes, measurements are custom properties.
-  endcomment
   assign icon_classes = 'block-subheading__icon block-subheading__icon--' | append: icon_style
 -%}
 
@@ -319,18 +184,7 @@
   {%- if has_icon -%}
     --subheading-icon-size: {{ icon_size }}px;
     --subheading-gap: {{ s.gap | default: 8 | plus: 0 }}px;
-    {%- comment -%}
-      Nothing about the box is emitted for the `none` style, so the fallbacks in
-      `assets/base.css` — `auto` for both axes, `0` for the radius and the
-      border — leave the glyph sitting on its own with no box to size.
-    {%- endcomment -%}
-    {%- comment -%}
-      Every colour below is emitted only when the merchant actually picked one.
-      Left blank, the property is never written and the fallback in
-      `assets/base.css` resolves — which is the scheme's own colour, not a
-      hardcoded hex. That is what keeps an icon belonging to whatever scheme the
-      section is set to until somebody deliberately overrides it.
-    {%- endcomment -%}
+
     {%- if s.icon_color != blank -%}
       --subheading-icon-color: {{ s.icon_color }};
     {%- endif -%}
@@ -356,17 +210,7 @@
   {%- if highlight != 'none' and s.highlight_color != blank -%}
     --block-highlight-color: {{ s.highlight_color }};
   {%- endif -%}
-  {%- comment -%}
-    The radius is emitted whatever the background is set to. It used to sit
-    inside the `custom` branch, which tied it to a setting it has nothing to do
-    with: a merchant outlining a transparent pill got a radius control that
-    silently did nothing until they also turned a background on.
 
-    It keeps the name `--block-text-radius` rather than gaining a
-    `--subheading-` twin, because `.block-text--has-background` already reads
-    that property. Two names for one number is how the two rounded corners end
-    up disagreeing.
-  {%- endcomment -%}
   --block-text-radius: {{ s.border_radius | default: 0 | plus: 0 }}px;
   {%- if background_mode == 'custom' and s.background_color != blank -%}
     --block-text-background: {{ s.background_color }};
@@ -389,23 +233,7 @@
     {{ block.shopify_attributes }}
   >
     {%- if has_icon -%}
-      {%- comment -%}
-        No `aria-hidden` on this box, and that is a change rather than an
-        omission.
 
-        It used to be here on the grounds that an eyebrow announcing "star, new
-        arrivals" reads the ornament aloud before the thing it decorates — true
-        of the glyph, and `snippets/icon.liquid` already marks every glyph it
-        renders `aria-hidden`, so that case was covered twice.
-
-        It is not true of an upload. An **Alt text** field now sits beside the
-        image picker, and `aria-hidden` on the wrapper would suppress whatever
-        the merchant typed into it — a field that looks like it works and is
-        silently discarded before it reaches anyone. Left off, each source
-        carries its own semantics: the glyph hides itself, and an image is
-        decorative exactly when its alt is empty, which is the rule the platform
-        already has.
-      {%- endcomment -%}
       <span class="{{ icon_classes }}">
         {%- if icon_source == 'image' -%}
           {% render 'image',
@@ -427,11 +255,6 @@
   </motion-effect>
 {%- endif -%}
 
-{%- comment -%}
-  Every setting below is a control a merchant reaches in the editor, and the
-  schema is one element's styling surface: splitting it to get under Theme
-  Check's count of 40 would split the thing the settings style.
-{%- endcomment -%}
 {% # theme-check-disable ExcessiveSettingsCount %}
 {% schema %}
 {

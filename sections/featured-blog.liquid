@@ -1,98 +1,5 @@
 {% comment %}
-  sections/featured-blog.liquid
-
   Articles from one blog, as a grid or a carousel.
-
-  ## Two existing implementations, joined rather than copied
-
-  The surface is `sections/main-faq.liquid`'s — colour scheme, background media,
-  border, radius, margins and padding, the same setting ids feeding the same
-  snippets. The carousel is `sections/featured-collection.liquid`'s, down to the
-  last `carousel_*` id, so the arrows, the peek, the pagination and the custom
-  colours are one implementation with one set of bugs and one place to fix them.
-
-  Nothing here is a third copy of either.
-
-  ## The card is blocks, not settings
-
-  `snippets/article-card.liquid` still renders the blog index, where every card
-  is the same and there is nothing to arrange. A featured row is the other case,
-  so the card is `blocks/_article-card.liquid` and everything in it — the
-  picture, the pills on it, the read time, the title, the excerpt, the button —
-  is a nested block the merchant arranges once.
-
-  It is rendered here rather than added by the merchant, with the same `id` on
-  every pass, because a row decides how many cards it has. One id means one set
-  of settings shared by all of them: a grid whose third card could be styled
-  differently from the first is a grid that will be.
-
-  `closest.article:` is what carries the article into the card *and* into every
-  block nested inside it. `{% content_for 'blocks' %}` passes no parameters, so
-  a nested Article title has no other way to know which article it is titling.
-  `sections/main-product.liquid` passes `closest.product` into its detail blocks
-  for exactly the same reason.
-
-  ## Why the carousel element is written out here
-
-  `snippets/carousel-shell.liquid` takes its slides as a captured string, and
-  `content_for` output cannot be captured — Shopify renders blocks with their
-  editor bindings attached, and buffering that into a variable is not something
-  the platform supports. So the element and its track are written here, while
-  `carousel-shell-attrs` and `carousel-shell-tail` supply the attributes and the
-  controls from the same sub-snippets the shell itself uses.
-  `sections/featured-collection.liquid` does the same, for the same reason.
-
-  ## Two answers this section gives that the collection one does not
-
-  **The empty row is drawn, not apologised for.** A blog with no posts renders
-  `snippets/article-card-placeholder.liquid` as the slides of the same shell the
-  real cards use — one per **Post count**, in whichever layout Type is set to. A
-  merchant adds this section before they have written anything more often than
-  after, and the theme editor is where the section is judged.
-
-  **View all is a grid-only control.** A carousel already is the way through the
-  rest of the blog, so the button is hidden — in the panel and on the page —
-  whenever the desktop layout is a carousel. See the note by `show_view_all`.
-
-  ## The settings panel is grouped by what a merchant is deciding
-
-  Blog and alignment, then **Cards layout** — one Type select, the three
-  column counts and the two gaps, because those are one decision made once —
-  then **Section layout** for the container and View all. Everything a carousel
-  needs is under **Carousel**, hidden whole when neither breakpoint is one.
-
-  Type is a single select rather than the Desktop layout / Mobile layout pair it
-  replaces. Two selects made four combinations, two of which nobody wants (a
-  desktop carousel that becomes a mobile grid is a row a phone cannot finish),
-  and the pair could not express Editorial at all — that is a desktop
-  arrangement whose mobile answer is always the plain stack. So the desktop
-  arrangement is the question, and **Carousel on mobile** is the one bit of
-  freedom left underneath it, hidden when Type is already Carousel.
-
-  Its colours are an **Inherit color scheme** checkbox with a colour scheme
-  picker under it, rather than the `carousel_color_source` select this section
-  used to carry or the **Use custom colors** checkbox
-  `sections/featured-collection.liquid` still does.
-  `snippets/carousel-style.liquid` reads all three, so the three sections share
-  one implementation and none had to be converted for another.
-
-  The checkbox is the same control `blocks/group.liquid` uses for the same
-  question, which is the point: a merchant who has turned one off knows what
-  this one does. The scheme picker under it sets all eight slider colours at
-  once and the pickers below correct one of them, so the common case — "these
-  arrows, but on the dark scheme" — is one click rather than eight.
-
-  ### The unparenthesised `visible_if` conditions are not a typo
-
-  A carousel setting that also depends on a toggle reads:
-
-      carousel_navigation and layout == 'carousel' or carousel_on_mobile
-
-  which means *navigation is on **and** either breakpoint is a carousel*.
-  `visible_if` is Liquid, and Liquid has no parentheses: operators are evaluated
-  right to left, so the `or` binds first and the `and` takes the whole of it.
-  Writing the grouping out — `A and (B or C)` — is a `ValidVisibleIf` error,
-  which is how this was found rather than guessed at.
 {% endcomment %}
 
 {%- liquid
@@ -101,35 +8,12 @@
   assign featured = s.blog
   assign limit = s.articles_to_show | default: 6 | plus: 0
 
-  comment
-    Editorial counts in fours — one list card and a row of three — so it brings
-    its own count rather than sharing the grid's. Six articles in this layout is
-    a cycle and a half: a list card, three across, and a second list card with
-    nothing under it. Eight is two whole cycles, which is why it is the default
-    and why the setting is its own.
-
-    A merchant who has already set six for a grid does not have that number
-    moved out from under them when they try the layout, which one shared setting
-    with a switched default would do.
-  endcomment
   if s.layout == 'editorial'
     assign limit = s.articles_to_show_editorial | default: 8 | plus: 0
   endif
 
   assign desktop = s.columns_desktop | default: 3 | plus: 0
 
-  comment
-    Mobile columns is a select of two, and it used to be a range of three. A
-    theme that ships a narrower control does not narrow the values already
-    stored against it: a section saved at three columns keeps the 3, the picker
-    has nowhere to show it, and the phone keeps rendering a layout the merchant
-    can no longer see they chose. So the stored value is clamped here rather
-    than trusted.
-
-    `plus: 0` coerces the select's string to a number first — `"2" > 2` is a
-    comparison between a string and an integer, which is false in every Liquid
-    and would let a 3 through if the setting were ever widened again.
-  endcomment
   assign cols_mobile = s.columns_mobile | default: 1 | plus: 0
   if cols_mobile > 2
     assign cols_mobile = 2
@@ -138,17 +22,9 @@
     assign cols_mobile = 1
   endif
 
-  comment
-    `sizes` has to describe the widest a card is ever painted, which is the
-    desktop column count. Getting it wrong is the most common cause of a grid
-    downloading pictures two or three times larger than it shows.
-  endcomment
   assign card_width = 100 | divided_by: desktop
   assign card_sizes = '(min-width: 990px) ' | append: card_width | append: 'vw, (min-width: 750px) 45vw, 90vw'
 
-  comment
-    ---- the surface, from `sections/main-faq.liquid` ----
-  endcomment
   assign background_media = s.background_media | default: 'none'
   assign has_background_media = false
   if background_media != 'none'
@@ -160,33 +36,8 @@
     assign background_paint = s.background_color | default: ''
   endif
 
-  comment
-    Opacity goes into the colour rather than onto the element: `opacity` on the
-    section would fade the cards along with the frame.
-
-    With no colour picked the border is `currentColor`, which the colour filters
-    cannot take an alpha channel from — there is nothing to read until the
-    scheme resolves in the browser. `color-mix` does the same fade at that point
-    instead, so both paths honour the slider.
-
-    Any style the select offers, not the one value it used to have. Testing
-    for `solid` meant the day Dashed was added the width would fall back to
-    zero and nothing would be drawn — a new option that silently did nothing.
-    `none` is the only value that means no border, so that is what is asked
-    about.
-  endcomment
   assign border_line = s.border_style | default: 'none'
 
-  comment
-    One width per side rather than one for the box. The frame a merchant
-    actually wants here is usually a single rule — a hairline across the top
-    of the section, nothing down the sides — and a single slider could only
-    ever draw all four or none.
-
-    They are summed into `border_any` so the properties are emitted only when
-    at least one side is drawn. A zero-width border with a colour on it is
-    three declarations that paint nothing.
-  endcomment
   assign bw_top = 0
   assign bw_right = 0
   assign bw_bottom = 0
@@ -209,29 +60,6 @@
     endif
   endif
 
-  comment
-    ---- corners ----
-
-    Four corners, twice — one set per device, behind the same Desktop/Mobile
-    switch the padding and the gaps already use.
-
-    The top pair ships at 40 and the bottom pair at 0, because a section is a
-    band that lifts away from what is above it and sits flush on what is below:
-    a rounded bottom edge leaves two slivers of the page showing through under
-    it. They are four sliders rather than one number and a rule, so a merchant
-    who wants a fully rounded card can still have one.
-
-    They reach CSS as a single border-radius shorthand, in the order that
-    property takes — top-left, top-right, bottom-right, bottom-left. Nothing in
-    the stylesheet reads them as a bare number, which is what makes sending a
-    shorthand safe.
-
-    A phone gets its own four because the same number does not read the same at
-    both widths: 40px is a soft lift across 1400px and a heavy scoop out of a
-    390px screen. Each mobile corner falls back to its desktop value when the
-    setting is missing entirely, so a section saved before these existed keeps
-    one shape at every width.
-  endcomment
   assign r_tl = s.border_radius_top_left | default: 40 | plus: 0
   assign r_tr = s.border_radius_top_right | default: 40 | plus: 0
   assign r_bl = s.border_radius_bottom_left | default: 0 | plus: 0
@@ -244,25 +72,6 @@
   assign margin_top = s.margin_top | default: 0 | plus: 0
   assign margin_bottom = s.margin_bottom | default: 0 | plus: 0
 
-  comment
-    ---- the carousel ----
-
-    One `matchMedia` and nothing else when both breakpoints are grids: the
-    component checks the breakpoint before it measures anything, so a
-    grid-everywhere section never builds one.
-
-    `count` is what lets `carousel-options` decide whether the merchant's Loop
-    setting is achievable — a loop below twice `slidesPerView` has too few
-    slides to fill the far side of the seam, so it is refused and a rewind is
-    sent instead.
-
-    Three types, two answers. `grid` and `editorial` are both a CSS grid as far
-    as the shell is concerned — editorial is the same grid running a repeating
-    magazine pattern, a full-width list card then three across, which `base.css`
-    draws off `nth-child(4n + 1)` and mirrors on `8n + 5` — so only `carousel`
-    reaches `data-layout`. Anything else here would make the component try to
-    build a carousel out of a layout that is not one.
-  endcomment
   assign layout_type = s.layout | default: 'carousel'
 
   assign editorial_class = ''
@@ -275,16 +84,6 @@
     assign cs_layout = 'carousel'
   endif
 
-  comment
-    `false == blank` is true in Liquid, so a blank check would read "off" as
-    "not set" and turn the mobile carousel back on. `nil` is the only value that
-    means the merchant has not answered yet.
-
-    A desktop carousel is a carousel on a phone too, whatever this holds — the
-    setting is hidden in that case, and a stored `false` from before the type
-    was switched must not leave a phone with a six-card stack the merchant
-    cannot see they have.
-  endcomment
   assign carousel_on_mobile = s.carousel_on_mobile
   if carousel_on_mobile == nil
     assign carousel_on_mobile = true
@@ -295,32 +94,6 @@
     assign cs_layout_mobile = 'carousel'
   endif
 
-  comment
-    ---- the gaps ----
-
-    A Desktop/Mobile pair, published as section-private tokens and mapped onto
-    `--grid-gap-x` / `--grid-gap-y` in `base.css` rather than written to those
-    two names directly.
-
-    Those two names are still what the whole theme spaces a card grid with —
-    `.article-grid` and the shell's pre-init grid both read them, and
-    `carousel.js` never measures it — the gap is a CSS `gap` on the track and
-    resolves from them. So one pair of sliders still moves the grid, the
-    pre-init layout and the live carousel together, and a row cannot space
-    itself one way before the module lands and another way after.
-
-    What the indirection buys is the Mobile half. A section's settings land in a
-    `style` attribute, and an inline custom property beats every rule in every
-    stylesheet — so a section that wrote `--grid-gap-x` itself could never be
-    stepped down in a media query, at any specificity, and the mobile sliders
-    would be controls that move nothing. `carousel.js` re-measures on a
-    breakpoint change, so `spaceBetween` follows the step-down too.
-
-    `plus: 0` rather than `default` alone: 0 is a gap a merchant can legitimately
-    want, and `default` would replace it. The mobile pair uses an explicit `nil`
-    test for the same reason — `default` cannot tell a deliberate 0 from an
-    unanswered setting.
-  endcomment
   assign gap_x = s.gap_horizontal | default: 24 | plus: 0
   assign gap_y = s.gap_vertical | default: 32 | plus: 0
 
@@ -343,49 +116,11 @@
     assign cs_is_carousel = true
   endif
 
-  comment
-    ---- View all ----
-
-    Hidden while the desktop layout is a carousel, and hidden in the same breath
-    in the schema. A carousel already *is* the way through the rest of the blog:
-    a customer who wants the fourth article drags to it. A button underneath
-    saying "view all" alongside a control that already shows all of them is two
-    answers to one question, and the second one leaves the page.
-
-    The setting is checked as well as the layout so that turning the row back
-    into a grid restores whatever the merchant had chosen, rather than silently
-    coming back on.
-  endcomment
   assign show_view_all = false
   if s.show_view_all and layout_type != 'carousel' and featured.articles_count > limit
     assign show_view_all = true
   endif
 
-  comment
-    ---- The empty state ----
-
-    A row with no articles is drawn as placeholder cards rather than as a line
-    of apologetic text. In the theme editor that is the difference between a
-    merchant seeing what the section will look like and a merchant seeing a
-    sentence, and it is where the section is judged: **Featured blog** is added
-    before the first post is written more often than after.
-
-    How many is derived rather than asked for: it is **Post count**, exactly.
-    A preview that stops at one row answers the wrong question — the merchant is
-    not asking what one row looks like, they are asking what *this section* will
-    look like when they have written the posts, and at six posts across three
-    columns that is two rows and a different amount of vertical space. Showing
-    three of them made the section shorter empty than full, which is the one
-    thing a placeholder must not do.
-
-    It also has to be Post count for Editorial to preview at all: that layout is
-    a lead card and the cards around it, and a single row of three has no
-    "around it" to show.
-
-    Shopify ships three placeholder photographs, so the fourth card repeats the
-    first. That is `article-card-placeholder`'s own `modulo`, not something this
-    section counts — see the note there on why the pictures vary at all.
-  endcomment
   assign has_articles = false
   if featured.articles.size > 0
     assign has_articles = true
@@ -393,12 +128,6 @@
 
   assign placeholder_count = limit
 
-  comment
-    The loop guard counts slides, and when the blog is empty the slides are the
-    placeholders. Leaving `cs_count` at zero told `carousel-options` there was
-    nothing to loop, so a merchant who had turned Loop on saw it silently
-    refused in the one state where they are most likely to be looking at it.
-  endcomment
   unless has_articles
     assign cs_count = placeholder_count
   endunless
@@ -436,11 +165,7 @@
   {%- endif -%}
 
   <div class="{% render 'container', width: s.container_width %}">
-    {%- comment -%}
-      The merchant's own heading cluster. Whatever they add — a Section header,
-      a Text block, a row with a button in it — sits above the cards, and this
-      section says nothing about what it should be.
-    {%- endcomment -%}
+
     <motion-effect
       class="featured-blog__header featured-blog__header--{{ s.alignment | default: 'start' }}"
       {% render 'motion-attrs', kind: 'text', section: s, children: true %}
@@ -448,24 +173,6 @@
       {% content_for 'blocks' %}
     </motion-effect>
 
-    {%- comment -%}
-      One shell, whichever kind of slide is going into it.
-
-      The empty state used to be a second element — a plain `<ul>` with the
-      column counts written on it by hand — on the reasoning that there is
-      nothing to page through and arrows over placeholders invite a drag that
-      goes nowhere. That reasoning was wrong in the way that matters: a merchant
-      who has set Type to Carousel and has not written a post yet was shown a
-      two-row grid, and reported the carousel as broken. Correctly — the preview
-      is the whole job of the empty state, and it was previewing a layout they
-      had not chosen.
-
-      So the placeholders are slides now. The arrows work, the dots work, and
-      what the merchant sees before they publish is what they get after. It also
-      removes the hand-written `--columns-*` on that second element, which was a
-      copy of what `carousel-shell-attrs` already writes and was one edit away
-      from disagreeing with it.
-    {%- endcomment -%}
     <carousel-slider
       {% render 'carousel-shell-attrs',
          settings: s,
@@ -522,11 +229,6 @@
   </div>
 </div>
 
-{%- comment -%}
-  Every setting below is a control a merchant reaches in the editor, and the
-  schema is one element's styling surface: splitting it to get under Theme
-  Check's count of 40 would split the thing the settings style.
-{%- endcomment -%}
 {% # theme-check-disable ExcessiveSettingsCount %}
 {% schema %}
 {

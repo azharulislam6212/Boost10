@@ -1,47 +1,5 @@
 {% doc %}
   blocks/_showcase-intro.liquid — private to `sections/testimonials-showcase.liquid`.
-
-  The column the lanes run beside: the aggregate score, the claim, the line
-  under it, and whatever the merchant puts below that.
-
-  ## It is a static block, so it cannot be dragged into a lane
-
-  `sections/testimonials-showcase.liquid` renders it through
-  `{% content_for 'block', type: '_showcase-intro', id: 'showcase-intro' %}`,
-  the same mechanism `sections/feature-cards.liquid` uses for its heading
-  cluster and `sections/testimonials.liquid` uses for its panel. A merchant
-  editing it on the canvas cannot reorder it among the reviews, cannot delete it
-  by accident, and cannot end up with two.
-
-  ## The score row is drawn here rather than by `blocks/rating-badge.liquid`
-
-  That block exists and does very nearly this — five stars, a score, a caption —
-  and it draws its stars as a clipped overlay on outlined glyphs. The design
-  here is five filled chips, which is a different shape, not a different colour:
-  a chip is a square with a star knocked out of it, and there is no setting on
-  the badge that turns one into the other.
-
-  The number is typed, not fetched, for the same reason it is on that block:
-  there is no product here to read a rating off. And for the same reason it
-  emits **no structured data** — a figure a store typed into a text field is not
-  evidence, and marking it up as `AggregateRating` is the fastest route to a
-  manual action from Google.
-
-  ## The buttons are blocks, the words are settings
-
-  A heading and a line of supporting copy are what every one of these columns
-  has. What goes under them is not: two buttons here, a logo row somewhere else,
-  a trust badge on a third store. So the copy is settings and the rest is
-  `@theme` blocks the merchant adds — the theme's own Buttons block is what the
-  preset ships with, so the calls to action are the same element, with the same
-  hover, as every other button in the store.
-
-  ## The column paints its own text, and takes no scheme
-
-  It sits inside the section's scheme and inherits from it. Only the pieces the
-  design tints differently — the score, the caption, the heading — have their
-  own colours, and each falls back to `inherit` so a merchant who recolours the
-  section recolours this with it.
 {% enddoc %}
 
 {%- liquid
@@ -52,13 +10,6 @@
   assign gap = s.gap | default: 16 | plus: 0
   assign width = s.width | default: 0 | plus: 0
 
-  comment
-    ---- the score row ----
-
-    `rating_max` chips are drawn and `rating` of them are filled. Both are
-    coerced before they are compared: an unset select is nil in Shopify and
-    Undefined elsewhere, and `nil > 0` is a type error in the second one.
-  endcomment
   assign show_rating = s.show_rating
   if show_rating == nil
     assign show_rating = true
@@ -76,12 +27,6 @@
     assign chip_glyph = 8
   endif
 
-  comment
-    The whole row carries one accessible name — "Rated 4.9 out of 5" — because
-    five chips read out one at a time is five identical words with no number
-    attached. The score beside them is then `aria-hidden`, or it would be said
-    twice.
-  endcomment
   assign score = s.score | default: ''
   assign rating_label = 'products.product.rating_html' | t: rating: rating_filled, max: rating_max
 -%}
@@ -160,11 +105,7 @@
   {%- endif -%}
 
   {%- if s.heading != blank -%}
-    {%- comment -%}
-      An `<h2>`. This column is the section's heading — there is no separate
-      header cluster above it, the way `sections/testimonials.liquid` has one —
-      so this is the line the page outline should carry.
-    {%- endcomment -%}
+
     <h2 class="showcase-intro__heading">{{ s.heading }}</h2>
   {%- endif -%}
 
@@ -172,26 +113,11 @@
     <div class="showcase-intro__text rte">{{ s.text }}</div>
   {%- endif -%}
 
-  {%- comment -%}
-    Whatever the merchant adds under the copy. The preset ships the theme's
-    Buttons block here, so the two calls to action are ordinary theme buttons
-    rather than a pair this file draws and nothing else in the store matches.
-
-    Rendered inside a wrapper rather than as bare children so the gap between
-    the copy and the buttons is one setting, and so an empty list collapses
-    instead of leaving a gap behind it — `base.css` hides the row when it has no
-    children.
-  {%- endcomment -%}
   <div class="showcase-intro__actions">
     {% content_for 'blocks' %}
   </div>
 </div>
 
-{%- comment -%}
-  Every setting below is a control a merchant reaches in the editor, and the
-  schema is one element's styling surface: splitting it to get under Theme
-  Check's count of 40 would split the thing the settings style.
-{%- endcomment -%}
 {% # theme-check-disable ExcessiveSettingsCount %}
 {% schema %}
 {

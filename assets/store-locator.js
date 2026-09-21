@@ -1,32 +1,5 @@
 /**
- * store-locator.js — Boost10
- *
  * `<store-locator>` — search, filter and pan a list of stores.
- *
- * ## The map decision, stated plainly
- *
- * This module does **not** bundle Leaflet, Mapbox or the Google Maps SDK. The
- * theme's first rule is zero external JavaScript, and every one of those is a
- * third-party script — often a third-party *account* — that a merchant has to
- * configure before the page works at all. A theme whose store finder is blank
- * until someone pastes an API key is a theme that ships broken.
- *
- * So the map is an `<iframe>` the merchant supplies, loaded on interaction, and
- * everything genuinely useful — searching, filtering by distance, opening hours,
- * directions — is done here without a map at all. Customers overwhelmingly want
- * the address, the hours and a directions link; the map is decoration around
- * that, and decoration should not be a hard dependency.
- *
- * Panning is real when an embed exists: selecting a store rewrites the iframe's
- * `src` to that store's query, which is what "pan and open the info window"
- * means for an embed. Without an embed, selecting a store scrolls its card into
- * view and announces it, which is the same information by another route.
- *
- * ## Distance
- *
- * Calculated with the haversine formula against coordinates rendered by Liquid.
- * Geolocation is offered, never taken: `navigator.geolocation` prompts, and a
- * page that prompts on load is a page people leave.
  *
  * @module @theme/store-locator
  */
@@ -37,27 +10,6 @@ import { debounce, themeString, announce, announceUrgent } from '@theme/utilitie
 /** Earth's mean radius in kilometres. */
 const EARTH_RADIUS_KM = 6371;
 
-/**
- * Markup:
- *
- *   <store-locator data-embed="https://www.google.com/maps?q={query}&output=embed">
- *     <input type="search" data-ref="search">
- *     <select data-ref="radius">…</select>
- *     <button data-ref="locate">…</button>
- *
- *     <ul data-ref="list">
- *       <li data-store
- *           data-latitude="51.5" data-longitude="-0.12"
- *           data-name="…" data-address="…" data-query="…">
- *         <button data-store-select>…</button>
- *       </li>
- *     </ul>
- *
- *     <p data-ref="empty" hidden></p>
- *     <p data-ref="status" class="visually-hidden" role="status"></p>
- *     <iframe data-ref="map" loading="lazy"></iframe>
- *   </store-locator>
- */
 export class StoreLocator extends BaseComponent {
   static requiredRefs = ['list'];
 
@@ -68,8 +20,6 @@ export class StoreLocator extends BaseComponent {
     if (this.refs.search) {
       this.on(this.refs.search, 'input', debounce(() => this.filter(), 200));
 
-      // Enter in a search field would otherwise submit an ancestor form and
-      // reload the page, losing the filter the customer just typed.
       this.on(this.refs.search, 'keydown', (event) => {
         if (event.key !== 'Enter') return;
         event.preventDefault();
@@ -96,7 +46,7 @@ export class StoreLocator extends BaseComponent {
     this.filter();
   }
 
-  /* --------------------------------------------------------- public API -- */
+  /* --------------------------------------------------------- public API -- ---- */
 
   /**
    * @returns {HTMLElement[]}
@@ -119,9 +69,7 @@ export class StoreLocator extends BaseComponent {
     return Number(this.refs.radius?.value) || 0;
   }
 
-  /**
-   * Apply the current search term and radius.
-   */
+  /** Apply the current search term and radius. */
   filter() {
     const term = (this.refs.search?.value || '').trim().toLowerCase();
     let matches = 0;
@@ -130,8 +78,6 @@ export class StoreLocator extends BaseComponent {
       const text = `${store.dataset.name || ''} ${store.dataset.address || ''}`.toLowerCase();
       let hit = term === '' || text.includes(term);
 
-      // Distance only narrows the result when we know where the customer is.
-      // Filtering by radius from nowhere would hide every store.
       if (hit && this.#origin && this.radius > 0) {
         const distance = this.#distanceTo(store);
         hit = Number.isFinite(distance) && distance <= this.radius;
@@ -175,9 +121,6 @@ export class StoreLocator extends BaseComponent {
   /**
    * Ask the browser where the customer is, then sort by distance.
    *
-   * Offered on a button, never on load: a page that prompts for location before
-   * anyone has asked for anything is a page people leave.
-   *
    * @returns {Promise<boolean>}
    */
   locate() {
@@ -206,8 +149,6 @@ export class StoreLocator extends BaseComponent {
           resolve(true);
         },
         () => {
-          // A denied prompt is a choice, not an error. Say what happened and
-          // leave the list usable rather than blocking on it.
           this.setLoading(false);
           announceUrgent(themeString('storesLocationDenied', ''));
           resolve(false);
@@ -217,7 +158,7 @@ export class StoreLocator extends BaseComponent {
     });
   }
 
-  /* ---------------------------------------------------------- internals -- */
+  /* ---------------------------------------------------------- internals -- ---- */
 
   /**
    * Great-circle distance in kilometres.
@@ -280,8 +221,6 @@ export class StoreLocator extends BaseComponent {
       const first = Number(a.dataset.distance);
       const second = Number(b.dataset.distance);
 
-      // Stores with no coordinates sink to the bottom rather than jumping to the
-      // top, which is what NaN comparisons do if left alone.
       if (!Number.isFinite(first)) return 1;
       if (!Number.isFinite(second)) return -1;
 

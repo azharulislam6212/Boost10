@@ -1,22 +1,6 @@
 /**
- * search.css — Boost10
- *
  * The search overlay (modal and drawer), the predictive suggestion rows, and
  * the shared empty state.
- *
- * Kept out of base.css deliberately. This is one feature with a lot of surface,
- * it is the part of the theme most likely to be restyled by an agency, and one
- * addressable file makes that a contained change rather than a hunt through
- * nine thousand lines.
- *
- * Loaded after base.css and declared inside `@layer components`, so it takes
- * part in the same cascade as everything else and merchant Custom CSS — which
- * theme.liquid injects unlayered — still beats it without `!important`.
- *
- * Every colour reads a custom property. `--search-accent` resolves to the
- * merchant's primary button colour, which is what puts the green in the round
- * submit button, the saving badge and the rating stars on a store whose buttons
- * are green, and something coherent on a store whose buttons are not.
  */
 
 @layer components {
@@ -35,46 +19,25 @@
     --search-field-height: 5.6rem;
     --search-aside-width: 32rem;
 
-    /* The field's border. A dashed edge in the store's own dark green, kept in a
-       property so an agency restyles the field by changing one value rather
-       than three rules. */
     --search-field-border-color: #0f2e2f;
     --search-field-border: 1px dashed var(--search-field-border-color);
 
-    /* 10rem is 100px at the theme's 62.5% root — past half the field's height,
-       so it resolves to a full pill and stays one if the height changes. */
     --search-field-radius: 10rem;
 
-    /* The panel's corner. Kept in a property because the modal, its glass and
-       the overflow clip all have to agree on one value. */
     --search-modal-radius: 4rem;
 
-    /* Controls inside the field: the submit circle and the clear button. Their
-       size and inset are shared, because the clear button is positioned from
-       them — 16px of clear space between the two, whatever the circle's size. */
     --search-control-size: 4rem;
     --search-control-inset: 0.8rem;
     --search-control-gap: 1.6rem;
 
-    /* Frosted panels. 5px is enough to separate the panel from the page without
-       turning the page into wallpaper. */
     --search-glass-blur: 5px;
     --search-glass-opacity: 0.8;
 
-    /* How far the modal sits below the header. `--header-height` is published by
-       `<sticky-header>` on every resize; the `max()` keeps a sensible gap on a
-       page whose header never measures itself. */
     --search-modal-offset: max(calc(var(--header-height, 0px) + var(--space-3)), var(--space-6));
 
-    /* The two panel widths, in one place. 99rem is 990px and 50rem is 500px at
-       the theme's 62.5% root — a merchant asking for a wider modal changes one
-       number rather than hunting through media queries. */
     --search-modal-width: 99rem;
     --search-drawer-width: 50rem;
 
-    /* Matches PROMPT_FADE in search.js. The swap is a fade out, a text change,
-       and a fade in, so the two halves have to agree or the copy changes while
-       it is still visible. */
     --search-prompt-duration: 260ms;
   }
 
@@ -85,10 +48,6 @@
      field, the FAQ filter and the store locator all render `type="search"`.
      ========================================================================== */
 
-  /* WebKit paints its own clear button inside `type="search"`, and it appears on
-     hover and focus — directly on top of the theme's own clear control, which is
-     positioned in the same corner. Two crosses, one of which is unstyled and
-     ignores the design entirely. The native one goes; the theme's stays. */
   input[type='search']::-webkit-search-decoration,
   input[type='search']::-webkit-search-cancel-button,
   input[type='search']::-webkit-search-results-button,
@@ -98,7 +57,6 @@
     appearance: none;
   }
 
-  /* Edge's equivalent, which is a pseudo-element rather than a shadow control. */
   input[type='search']::-ms-clear,
   input[type='search']::-ms-reveal {
     display: none;
@@ -113,24 +71,6 @@
      nothing here depends on which section rendered it.
      ========================================================================== */
 
-  /* The modal is a centred card rather than a full-width bar. It keeps the
-     `top` placement — the field has to stay near the header control the
-     customer just clicked, and a panel that grows as results arrive must not
-     push its own field up the screen while they read them. */
-  /* Every panel rule below is written as `.search-drawer[data-layout='…']`
-     rather than with the `--modal` / `--drawer` class. base.css sizes the panel
-     through `.drawer[data-placement='top'] .drawer__panel`, which carries an
-     attribute selector and therefore outweighs a two-class rule: written the
-     short way, `inline-size` here would lose and the modal would stay
-     full-bleed. Matching its shape puts these on equal specificity, where file
-     order decides — and search.css loads after base.css. */
-  /* The modal opens under the header rather than over it.
-
-     The offset is padding on the dialog, not a margin on the panel: the dialog
-     is the scroll and centring context, so padding keeps the panel's own
-     `max-block-size` honest — a margin would push the panel down without
-     shortening it, and a tall result list would then run off the bottom of the
-     screen. */
   .search-drawer[data-layout='modal'] .drawer__dialog {
     justify-content: center;
     padding: var(--space-4);
@@ -147,15 +87,6 @@
     overflow: clip;
   }
 
-  /* Same shape as the cart drawer: a fixed width that collapses to the viewport
-     rather than a breakpoint switch, so there is no width at which the panel is
-     wider than the screen and no jump as the screen crosses it.
-
-     The corners are rounded only on the edge that faces the page. Written
-     logically rather than as `32px 0 0 32px`, because an end-placed drawer
-     arrives from the right in English and from the left in Arabic — the
-     physical shorthand would round the outer edge in RTL, which is the edge
-     that is flush against the screen. */
   .search-drawer[data-layout='drawer'] .drawer__panel {
     inline-size: min(var(--search-drawer-width), 100vw);
     max-inline-size: 100vw;
@@ -166,12 +97,7 @@
     overflow: clip;
   }
 
-  /* ---- frosted glass ----
-
-     Only where the blur is actually supported. A translucent panel without the
-     blur behind it is not a softer design, it is body copy with a product grid
-     showing through it — so the opaque background stays the default and the
-     translucency is the enhancement. */
+  /* ---- frosted glass ---- */
   @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
     .search-drawer[data-layout] .drawer__panel {
       background-color: rgb(var(--color-background-rgb) / var(--search-glass-opacity));
@@ -179,9 +105,6 @@
       backdrop-filter: blur(var(--search-glass-blur));
     }
 
-    /* The head and the results column paint their own surfaces on top of the
-       panel. Left opaque they would cover the glass completely and only the
-       gaps between cards would frost. */
     .predictive-search--overlay .search-panel__head {
       background-color: transparent;
     }
@@ -193,12 +116,7 @@
     }
   }
 
-  /* ---- phones ----
-
-     Below the tablet breakpoint both layouts become the same thing: an
-     edge-to-edge sheet. The modal drops its margin, its rounded corners and its
-     side gutters — 990px of centred card on a 390px screen is a card with no
-     room left inside it. */
+  /* ---- phones ---- */
   @media screen and (max-width: 749px) {
     .search-drawer[data-layout] .drawer__dialog {
       padding: 0;
@@ -213,9 +131,6 @@
       border-radius: 0;
     }
 
-    /* Notched phones and gesture bars. `max()` keeps the design's padding on
-       every device that has no inset to report, and the theme's own spacing is
-       never reduced by the safe area — only extended past it. */
     .predictive-search--overlay .search-panel__head {
       padding-block-start: max(var(--space-5), env(safe-area-inset-top));
       padding-inline-start: max(var(--space-5), env(safe-area-inset-left));
@@ -275,9 +190,6 @@
     font-size: var(--font-size-h4, 2.2rem);
   }
 
-  /* Hidden, not removed: `aria-label` on the dialog names it for a screen
-     reader, and dropping the heading entirely would leave the drawer's own
-     heading outline empty. */
   .predictive-search--overlay[data-layout='modal'] .search-panel__title {
     position: absolute;
     inline-size: 1px;
@@ -295,9 +207,6 @@
     display: block;
   }
 
-  /* Round, because everything else in this row is: the field is a pill and the
-     submit control is a circle inside it. A square here reads as a different
-     kind of control. */
   .predictive-search--overlay .close-search-drawer {
     grid-area: close;
     margin-inline-start: 0;
@@ -306,26 +215,10 @@
 
   /* ---- the field ---- */
 
-  /* `position: relative` on the form, not on `<predictive-search>`. The reset
-     and submit buttons are absolutely positioned; anchored to the component
-     they used to land wherever the head row happened to put its top-left
-     corner, which is fine when the form is the only child and wrong the moment
-     a title sits above it. */
   .search-form {
     position: relative;
   }
 
-  /* One field in both layouts: 56px tall, dashed, 8px corners. The dashed edge
-     is the design's cue that this is a prompt to answer rather than a form
-     control to fill in — and it has to survive hover, focus and the invalid
-     state, which is why the border is restated on each of them rather than left
-     to base.css, whose `input:hover` and `:focus` rules change the border
-     colour and would drop back to a solid edge. */
-  /* Written as `.search-form input[type='search']` rather than through the class
-     alone: base.css sets `padding-inline-end` on exactly that selector, which
-     carries an attribute *and* a type and so outweighs a two-class rule. With
-     the shorter selector the field kept base's 48px of end padding and a long
-     query ran underneath the submit circle. */
   .predictive-search--overlay .search-form input[type='search'],
   .predictive-search--overlay .search-form input[type='search']:hover,
   .predictive-search--overlay .search-form input[type='search']:focus,
@@ -348,13 +241,6 @@
     font-size: var(--font-size-md);
   }
 
-  /* Both controls that sit inside the field.
-
-     `transform` is the alignment: base.css centres them with
-     `translateY(-50%)`, and any rule that sets its own `transform` — the clear
-     button's entrance scale, for one — replaces that translation rather than
-     adding to it, which drops the icon to the bottom of the field. Every
-     transform on these two therefore carries the centring with it. */
   .predictive-search--overlay .search-form__submit,
   .predictive-search--overlay .search-form__reset {
     position: absolute;
@@ -368,8 +254,6 @@
     transition: background-color var(--transition-fast), color var(--transition-fast);
   }
 
-  /* The clear button's transform is set further down, with its entrance, so the
-     two never overwrite each other — only the submit is centred here. */
   .predictive-search--overlay .search-form__submit {
     inset-inline-end: var(--search-control-inset);
     transform: translateY(-50%);
@@ -382,15 +266,7 @@
     color: var(--color-primary-button-hover-text);
   }
 
-  /* ---- loading spinner ----
-
-     Stacked on the magnifier inside the submit circle. Both are absolutely
-     centred in the same box and the swap is two opacity changes, so the control
-     never changes size and nothing in the field moves while a request is in
-     flight. A loader that occupies its own space would shove the field's
-     contents sideways on every keystroke. */
-  /* Declared on the plain class, not the overlay one, so the 404 page's field
-     stacks its spinner the same way. */
+  /* ---- loading spinner ---- */
   .search-form__submit {
     position: relative;
     display: grid;
@@ -408,15 +284,11 @@
     block-size: 1.8rem;
     border: 2px solid currentColor;
 
-    /* One quarter left open is what makes the rotation readable — a complete
-       ring spinning looks static. */
     border-block-start-color: transparent;
     border-radius: 50%;
     opacity: 0;
     animation: search-spin 700ms linear infinite;
 
-    /* Paused until it is needed. An animation running behind `opacity: 0` on
-       every page costs a compositor frame for something nobody can see. */
     animation-play-state: paused;
   }
 
@@ -429,8 +301,6 @@
     animation-play-state: running;
   }
 
-  /* The results already on screen belong to the previous query. Dimming them
-     says so, and says it without moving anything. */
   .predictive-search__panel {
     transition: opacity var(--transition-base);
   }
@@ -445,9 +315,6 @@
     }
   }
 
-  /* One control's width plus a 16px gap clear of the submit circle, measured
-     from the same inset — so the pair stays evenly spaced if either size
-     changes. */
   .predictive-search--overlay .search-form__reset {
     inset-inline-end: calc(var(--search-control-inset) + var(--search-control-size) + var(--search-control-gap));
     color: var(--color-accent-text);
@@ -458,19 +325,10 @@
     color: var(--color-heading);
   }
 
-  /* The clear button fades rather than switching on `hidden`. `display: none`
-     cannot transition, and this control appears and disappears between
-     keystrokes — the snap was the jumpiest thing in the panel. `visibility`
-     still takes it out of the accessibility tree; `search.js` takes it out of
-     the tab order to match. */
   .predictive-search .search-form__reset {
     opacity: 0;
     visibility: hidden;
 
-    /* The centring travels with the scale. `transform: scale(0.8)` on its own
-       would replace `translateY(-50%)` and park the icon half a field-height
-       too low — which is exactly how the clear button came to sit below the
-       text baseline instead of on it. */
     transform: translateY(-50%) scale(0.8);
     transition:
       opacity var(--transition-fast),
@@ -487,17 +345,8 @@
     transition-delay: 0s;
   }
 
-  /* ---- the animated prompt ----
-
-     A real element painted over the field, because a native `placeholder`
-     cannot be transitioned. It is only ever filled once `search.js` has cleared
-     the input's own placeholder, so the two never appear together, and with no
-     JavaScript this element stays empty and invisible. */
+  /* ---- the animated prompt ---- */
   .search-form__prompt {
-    /* The insets track the field's own padding, which differs between the
-       overlay's pill and the plain field on the 404 page. Getting these wrong
-       shows up as the animated copy sitting a few pixels off from where the
-       customer's first character lands. */
     --search-prompt-start: var(--input-padding-inline, var(--space-4));
     --search-prompt-end: var(--space-9);
 
@@ -521,8 +370,6 @@
       transform var(--search-prompt-duration) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
   }
 
-  /* The same end inset the field's padding uses, so the animated copy stops
-     exactly where the customer's own text would. */
   .predictive-search--overlay .search-form__prompt {
     --search-prompt-start: var(--space-5);
     --search-prompt-end: calc(
@@ -531,13 +378,11 @@
     );
   }
 
-  /* Mid-swap: out and up, then the text changes and it comes back from below. */
   .search-form__prompt[data-swap] {
     opacity: 0;
     transform: translateY(-0.6rem);
   }
 
-  /* The customer's own text is the only copy in the field once they type. */
   .predictive-search[data-filled] .search-form__prompt {
     opacity: 0;
     visibility: hidden;
@@ -568,10 +413,6 @@
       padding: var(--space-5);
     }
 
-    /* The divider hangs off the results column, not off the aside. Once the
-       aside is `align-self: flex-start` it is only as tall as its own content,
-       and a border on it would stop halfway down the panel. The results column
-       is the one that stretches, so the line it draws runs the full height. */
     .predictive-search--overlay[data-layout='modal'] .search-panel__main {
       padding: var(--space-5);
       border-inline-start: 1px solid var(--color-border);
@@ -585,13 +426,6 @@
     gap: var(--space-6);
   }
 
-  /* On a wide screen the results column is the long one, and the recent
-     searches and tags should stay reachable while it scrolls. `.search-panel__body`
-     is the scroll container, so this sticks to it rather than to the viewport.
-
-     `align-self: flex-start` is what makes it work at all: a grid item stretches
-     to its row by default, and an element already as tall as its container has
-     nothing to stick within. */
   @media screen and (min-width: 990px) {
     .predictive-search--overlay[data-layout='modal'] .search-panel__aside {
       position: sticky;
@@ -604,9 +438,6 @@
     min-inline-size: 0;
   }
 
-  /* The results panel and the idle column occupy the same slot. Only one is
-     ever in flow: `hidden` on the panel is the browser's own switch, and the
-     idle column steps aside as soon as the component reports a query. */
   .predictive-search[data-open] .search-panel__idle {
     display: none;
   }
@@ -617,21 +448,13 @@
     gap: var(--space-6);
   }
 
-  /* Products, collections and blog posts each get their own labelled group, and
-     the gap between groups is larger than the gap between rows — otherwise the
-     three read as one long list with headings dropped into it. */
   .search-suggestions {
     display: flex;
     flex-direction: column;
     gap: var(--space-3);
   }
 
-  /* ---- placeholder rows ----
-
-     The example rows shown when the merchant has not picked any suggestion
-     products. They borrow the card's own classes, so only what marks them as
-     examples is set here: no pointer, muted copy, and a placeholder drawing
-     that fills the media tile at the card's 1:1 ratio. */
+  /* ---- placeholder rows ---- */
   .search-card--placeholder {
     cursor: default;
   }
@@ -650,7 +473,6 @@
     background-color: var(--search-tile);
   }
 
-  /* Hover belongs to rows that go somewhere. */
   .search-card--placeholder:hover {
     background-color: transparent;
   }
@@ -737,9 +559,6 @@
     background-color: var(--search-tile);
   }
 
-  /* A recent chip is the `<li>` itself, holding two real buttons: the term runs
-     the search, the cross forgets it. One button with a nested cross would be
-     invalid HTML and would put the cross out of reach of the keyboard. */
   .search-chip--recent {
     padding-inline-end: 0.5rem;
   }
@@ -810,13 +629,6 @@
     gap: var(--space-3);
   }
 
-  /* base.css styles `[data-result]` itself as the row — a flex box with its own
-     padding, gap and selected background, from when a suggestion was a line of
-     text. Here the row is the `<a>` inside it, and leaving the old rule in place
-     made the option a flex container that shrink-wrapped the card to its
-     content: three cards ending in a ragged line halfway across the panel.
-     The attribute is repeated so this matches the old rule's specificity and
-     wins on file order rather than by shouting. */
   .search-card-item[data-result],
   .search-card-item[data-result][data-selected] {
     display: block;
@@ -844,9 +656,6 @@
     transition: background-color var(--transition-fast), border-color var(--transition-fast);
   }
 
-  /* The modal gives each row a card; the drawer leaves them flat. Both are the
-     design — a narrow panel with bordered rows reads as a stack of boxes, and a
-     wide one with flat rows reads as an unfinished table. */
   .predictive-search--overlay[data-layout='modal'] .search-card,
   .predictive-search--overlay[data-layout='modal'] .search-panel__idle .search-card {
     border: 1px solid var(--color-border);
@@ -905,8 +714,6 @@
     text-transform: uppercase;
     color: var(--color-heading);
 
-    /* Two lines, then ellipsis. A long article title in a suggestion row must
-       not push the price out of the panel. */
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
@@ -946,9 +753,6 @@
     color: var(--color-accent-text);
   }
 
-  /* The stars follow the store's accent rather than the heading colour they use
-     on a product card: at this size a row of near-black stars reads as a row of
-     dirt. */
   .search-card__rating .rating__stars {
     gap: 0.1rem;
   }
@@ -963,11 +767,6 @@
     color: var(--search-accent);
   }
 
-  /* Colour is deliberately not set here. The saving badge takes the store's own
-     Badge colours › Sale, the same values the product cards use, so a merchant
-     who changes them changes them everywhere. Those rules are in @layer
-     overrides in base.css and would beat anything written here in any case —
-     an override in this file would be dead code that looks alive. */
   .search-card__badge {
     align-self: start;
     font-size: 1.1rem;
@@ -1046,8 +845,6 @@
     margin-block-start: var(--space-3);
   }
 
-  /* The grid empty state is now this component. The old rule set a padded,
-     centred, grey block on the wrapper, which fought the layout above. */
   .product-grid__empty {
     padding-block: 0;
   }
@@ -1066,15 +863,11 @@
       transition: none;
     }
 
-    /* Without the entrance scale the clear button still has to stay centred. */
     .predictive-search .search-form__reset,
     .predictive-search .search-form__reset[data-visible] {
       transform: translateY(-50%);
     }
 
-    /* The spinner still has to say "working", so it pulses in place rather than
-       rotating. Removing the animation outright would leave a static ring that
-       looks like a broken icon. */
     .predictive-search[data-loading] .search-form__spinner {
       animation: search-pulse 1.4s ease-in-out infinite;
     }
@@ -1090,8 +883,6 @@
       }
     }
 
-    /* `search.js` already stops rotating the prompt under reduced motion, so
-       this only removes the travel from the single state it settles in. */
     .search-form__prompt[data-swap] {
       transform: none;
     }

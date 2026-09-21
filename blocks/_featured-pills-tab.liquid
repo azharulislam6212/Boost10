@@ -1,67 +1,12 @@
 {% doc %}
-  blocks/_featured-pills-tab.liquid
-
   One option in a **Pill tabs** strip: the pill the customer presses, and the
   panel of blocks it opens.
-
-  ## The pill is built from a template, not from a string
-
-  The pill belongs in the rail and the panel belongs in the panel area, and
-  `{% content_for 'blocks' %}` emits one stream into one container — so the
-  pill travels with the panel and `<tab-group>` in `assets/tabs.js` moves it.
-
-  It travels as a `<template>` rather than as text on a `data-` attribute,
-  because the pill has a mark in it: a glyph, a filled shape behind it and a
-  ring around that, drawn by `snippets/icon-mark.liquid`. An SVG escaped into an
-  attribute is markup that no longer looks like markup — nothing formats it,
-  nothing checks it, and the shared mark snippet could not be used to produce
-  it. A template is inert markup the browser has already parsed, and `tabs.js`
-  clones it.
-
-  `data-tab-label` stays, and stays authoritative: it is what a panel with no
-  template falls back to, and it is the accessible name either way.
-
-  ## The mark is the theme's, not this block's
-
-  Shape, Ring and the icon colours are `snippets/icon-mark.liquid` — the same
-  three groups the Feature icon, the Highlight tile, the Accordion row and the
-  footer's Utility item offer, with the same ids. A merchant who has drawn one
-  mark in this theme has drawn this one.
-
-  What is *not* here is what the mark becomes when its option is chosen. That
-  lives on the strip, because "the selected one fills in" is a property of the
-  set rather than of any member of it — see the note in
-  `blocks/_featured-pills-tabs.liquid`.
-
-  ## The tick is markup, not a pseudo-element
-
-  The small check that appears on the chosen option's mark is a real span in the
-  template, hidden by CSS until `aria-selected` says otherwise. A
-  `::after` carrying a glyph would be a character no screen reader can be told
-  to ignore and no merchant can recolour without a second stylesheet; this one
-  is `aria-hidden`, coloured by two settings on the strip, and simply not
-  rendered when the merchant switches it off.
-
-  ## The panel holds blocks, not a field
-
-  Anything the theme has goes inside, plus the two private blocks this section
-  adds — a **Checklist row** and a **Step card**. A panel that could only hold
-  prose would be a panel that cannot hold the composition it was drawn for.
-
-  Private — the leading underscore — because a panel outside a strip is a
-  `role="tabpanel"` with no tab, which is markup a screen reader has to
-  apologise for. It is addable inside **Pill tabs** and nowhere else.
 {% enddoc %}
 
 {%- liquid
   assign s = block.settings
   assign label = s.label | default: 'Tab'
 
-  comment
-    Icons only, no uploads. The pill is a few characters wide sitting in a
-    track, and an image in it is a second thing to size, crop and describe for a
-    slot where the theme's glyph set already covers what an option means.
-  endcomment
   assign has_icon = false
   if s.icon_source == 'icon' and s.icon != blank
     assign has_icon = true
@@ -72,44 +17,9 @@
   endcapture
   assign icon_size = icon_px | plus: 0
 
-  comment
-    The space between the blocks stacked in the panel.
-
-    `gap_vertical` / `gap_vertical_mobile` rather than a name of this block's
-    own, because that is the pair `blocks/card-content.liquid`,
-    `blocks/image-card.liquid` and `blocks/_tab.liquid` already use for exactly
-    this — one stack, one value per breakpoint — and a merchant who has spaced
-    one of those has spaced this.
-
-    The mobile value falls back to the desktop one rather than to a constant, so
-    a panel saved before the setting existed keeps a single consistent stack
-    instead of tightening at 749px for no reason the merchant chose.
-
-    `| default: | plus: 0` and not a blank test: an unset range is nil in
-    Shopify and Undefined elsewhere, and only one of those is blank — the
-    difference that emits `--tab-content-gap:px` and takes the whole style
-    attribute down with it.
-  endcomment
   assign gap_block = s.gap_vertical | default: 24 | plus: 0
   assign gap_block_mobile = s.gap_vertical_mobile | default: gap_block | plus: 0
 
-  comment
-    ## The option's typography rides in the template
-
-    The same three-part arrangement every text block in this theme uses — the
-    named presets are `.block-text--*` classes in `assets/base.css` pointing at
-    the tokens Theme settings › Typography writes, `block-typography` emits only
-    the Custom preset and the colour, and `.tabs__tab-label` in
-    `assets/header.css` reads the properties both of them set.
-
-    It works here for the same reason the mark does: `tabs.js` clones the
-    `<template>` into the button, and a clone carries its classes and its style
-    attribute with it.
-
-    Not `.block-text` itself — that class also sets `flex` and `inline-size`,
-    and this span is a run of words inside a button, not a box. The typography
-    is the part worth sharing.
-  endcomment
   assign preset = s.preset | default: 'default'
 
   assign label_classes = 'tabs__tab-label block-text--' | append: preset
@@ -141,24 +51,12 @@
   --tab-content-gap-mobile: {{ gap_block_mobile }}px;
 {%- endcapture -%}
 
-{%- comment -%}
-  `tabindex="0"` because the panel is a scroll container of its own once the
-  content is long enough, and a scrollable region has to be reachable from the
-  keyboard. `id`, `aria-labelledby` and `hidden` are set by `tabs.js` as it
-  builds the buttons, so they are not written twice here.
-{%- endcomment -%}
 <div
   class="tabs__panel featured-pills__panel"
   role="tabpanel"
   id="Tab-{{ block.id }}"
   data-tab-label="{{ label | escape }}"
-  {%- comment -%}
-    Presence, not a value: `tabs.js` tests the attribute with `!= null`, so an
-    unchecked box has to emit nothing at all rather than
-    `data-tab-selected="false"`. Only the first panel carrying it wins, which is
-    what makes two merchants ticking two boxes a harmless setting rather than a
-    broken strip.
-  {%- endcomment -%}
+
   {% if s.selected %}data-tab-selected{% endif %}
   tabindex="0"
   data-block-spacing
@@ -170,34 +68,18 @@
       <span class="featured-pills__tab-mark icon-mark" aria-hidden="true" style="{{ icon_mark_style | strip_newlines | strip }}">
         {% render 'icon-mark', block: s %}
         {% render 'icon', icon: s.icon, size: icon_size %}
-        {%- comment -%}
-          Shown only while this option is the chosen one — `assets/header.css`
-          keys that off the button's own `aria-selected`, so nothing has to be
-          added or removed as the customer moves along the strip.
-        {%- endcomment -%}
+
         {%- if s.show_check -%}
           <span class="featured-pills__tab-check">{% render 'icon', icon: 'check', size: 10 %}</span>
         {%- endif -%}
       </span>
     {%- elsif s.show_check -%}
-      {%- comment -%}
-        The same tick with nothing to pin it to. An option with no glyph still
-        wants to say it is the chosen one — the numbered routine chooser in the
-        *How it works* panel is exactly that — so the badge falls back to the
-        button's own corner, which `.tabs__tab` is already `position: relative`
-        for. One element, one pair of colours, two places it can land.
-      {%- endcomment -%}
+
       <span class="featured-pills__tab-check featured-pills__tab-check--alone" aria-hidden="true">
         {% render 'icon', icon: 'check', size: 10 %}
       </span>
     {%- endif -%}
 
-    {%- comment -%}
-      A number before the name — "01 Morning Recovery". It is part of the
-      accessible name deliberately, unlike the flag below: a strip of steps read
-      out without its numbering is a strip whose order is invisible to anyone
-      not looking at it.
-    {%- endcomment -%}
     {%- if s.number != blank -%}
       <span class="featured-pills__tab-number">{{ s.number | escape }}</span>
     {%- endif -%}
@@ -206,16 +88,6 @@
       {{- label | escape -}}
     </span>
 
-    {%- comment -%}
-      The flag above the option — "Most Popular" on a plan chooser, "New" on a
-      collection strip. It rides in the same template as the name because it
-      belongs to the button, not to the panel: it is what the strip says about
-      the option before the option is chosen.
-
-      `aria-hidden` and not part of the accessible name. The name is the facet,
-      and a screen reader announcing "Most Popular Ingredients" as one string
-      turns a marketing flag into part of the choice.
-    {%- endcomment -%}
     {%- if s.pill != blank -%}
       <span class="tabs__tab-pill" style="{{ pill_style | strip_newlines | strip }}" aria-hidden="true">
         {{- s.pill | escape -}}
@@ -223,14 +95,6 @@
     {%- endif -%}
   </template>
 
-  {%- comment -%}
-    The animation goes on a layer inside the panel, not on the panel itself.
-    A panel already animates when the option changes — `tab-panel-rise` in
-    `assets/header.css`, which fires because `hidden` is `display: none` and a
-    box that starts being rendered starts its animations. Two animations on one
-    element is one of them winning per frame, so this one takes the layer under
-    it and staggers the blocks, which is what **Stagger between items** offers.
-  {%- endcomment -%}
   <motion-effect
     class="tabs__panel-content featured-pills__panel-content"
     {% render 'motion-attrs', kind: 'text', block: s, children: true %}
@@ -239,11 +103,6 @@
   </motion-effect>
 </div>
 
-{%- comment -%}
-  Every setting below is a control a merchant reaches in the editor, and the
-  schema is one element's styling surface: splitting it to get under Theme
-  Check's count of 40 would split the thing the settings style.
-{%- endcomment -%}
 {% # theme-check-disable ExcessiveSettingsCount %}
 {% schema %}
 {

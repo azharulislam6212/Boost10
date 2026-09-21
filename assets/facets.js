@@ -1,26 +1,5 @@
 /**
- * facets.js — Boost10
- *
  * Collection and search filtering.
- *
- *   <facet-filters>  Owns the active filter state and the URL
- *   <facet-drawer>   The mobile filter drawer
- *   <price-range>    Dual-handle min/max, backed by two real number inputs
- *   <sort-by>        Sort order
- *
- * The division of labour matters. `<facet-filters>` decides *what* the results
- * should be and produces a URL; `<results-list>` decides *how* the new results
- * appear and where focus lands. Neither reaches into the other beyond one public
- * method call.
- *
- * Everything is built on a real `<form method="get">` containing real inputs
- * whose names are Shopify's filter parameters. With JavaScript disabled the form
- * submits and the server filters, which is not a fallback so much as the source
- * of truth: this module reads the same form the server would have received.
- *
- * History is written with `pushState`, so Back returns to the previous filter
- * state rather than leaving the store, and a filtered view can be shared or
- * bookmarked.
  *
  * @module @theme/facets
  */
@@ -36,19 +15,6 @@ import { announce, announceUrgent, clamp, debounce, formatMoney, storage, themeS
    <facet-filters>
    ========================================================================== */
 
-/**
- * Markup:
- *
- *   <facet-filters data-section-id="main-collection" data-results="ProductGrid">
- *     <form data-ref="form">
- *       <input type="checkbox" name="filter.v.option.color" value="Blue">
- *       <price-range>…</price-range>
- *       <button type="submit" class="no-js-only">Apply</button>
- *     </form>
- *     <div data-ref="active">…removable pills…</div>
- *     <button data-ref="clear">Clear all</button>
- *   </facet-filters>
- */
 export class FacetFilters extends BaseComponent {
   static requiredRefs = ['form'];
 
@@ -61,20 +27,15 @@ export class FacetFilters extends BaseComponent {
   setup() {
     this.#currentUrl = window.location.href;
 
-    // Submit is the no-JS path and stays functional; here it is intercepted so
-    // the page does not reload.
     this.on(this.refs.form, 'submit', (event) => {
       event.preventDefault();
       this.apply();
     });
 
-    // Checkbox and radio changes apply immediately. Price ranges debounce
-    // themselves inside <price-range> and dispatch a change when settled.
     this.on(this.refs.form, 'change', this.#onChange);
 
     this.on(this, 'click', this.#onClick);
 
-    // Back and forward must restore the results, not just the URL.
     this.on(window, 'popstate', () => this.apply({ url: window.location.href, push: false }));
 
     this.#syncActiveCount();
@@ -85,7 +46,7 @@ export class FacetFilters extends BaseComponent {
     this.#request = null;
   }
 
-  /* --------------------------------------------------------- public API -- */
+  /* --------------------------------------------------------- public API -- ---- */
 
   /**
    * @returns {string} The section id to re-render.
@@ -112,10 +73,6 @@ export class FacetFilters extends BaseComponent {
 
   /**
    * Build the URL the current form state represents.
-   *
-   * Empty values are dropped, and `page` is always dropped: changing a filter
-   * while on page four should show page one of the new results, not an empty
-   * page four.
    *
    * @returns {string}
    */
@@ -148,8 +105,6 @@ export class FacetFilters extends BaseComponent {
 
     if (target === this.#currentUrl && !url) return false;
 
-    // Clicking three filters quickly must not race: only the last request may
-    // paint, or the grid ends up showing a filter combination nobody chose.
     this.#request?.abort();
     this.#request = new AbortController();
 
@@ -228,7 +183,7 @@ export class FacetFilters extends BaseComponent {
     await this.apply();
   }
 
-  /* ---------------------------------------------------------- internals -- */
+  /* ---------------------------------------------------------- internals -- ---- */
 
   /**
    * @returns {HTMLInputElement[]}
@@ -250,11 +205,6 @@ export class FacetFilters extends BaseComponent {
   /**
    * Re-render the filter controls themselves.
    *
-   * Counts next to each value change as other filters are applied — "Blue (12)"
-   * becomes "Blue (3)" — and values with no matches are disabled by the server.
-   * Morphing rather than replacing keeps open filter groups open and keeps focus
-   * on the checkbox the customer just used.
-   *
    * @param {string} html
    * @private
    */
@@ -267,8 +217,6 @@ export class FacetFilters extends BaseComponent {
     const nextActive = parsed.querySelector('facet-filters [data-ref="active"]');
     if (nextActive && this.refs.active instanceof HTMLElement) morph(this.refs.active, nextActive);
 
-    // The drawer shows the same filters; keep it in step so opening it after
-    // filtering does not show stale counts.
     const drawer = document.querySelector('facet-drawer [data-ref="form"]');
     if (drawer && nextForm && drawer !== this.refs.form) morph(drawer, nextForm.cloneNode(true));
   }
@@ -297,7 +245,6 @@ export class FacetFilters extends BaseComponent {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
 
-    // <price-range> and <sort-by> announce their own settled values.
     if (target.closest('price-range')) return;
 
     this.apply();
@@ -341,17 +288,7 @@ defineComponent('facet-filters', FacetFilters);
    <facet-drawer>
    ========================================================================== */
 
-/**
- * The mobile filter drawer.
- *
- * On small screens filters are applied on close rather than on each tap. Every
- * tap triggering a network request and a grid re-render behind a drawer the
- * customer cannot see is both wasteful and disorienting — the result count is
- * announced for results they are not looking at.
- *
- * The footer therefore shows a live count and an apply button, and the drawer
- * defers to `<facet-filters>` for the actual work.
- */
+/** The mobile filter drawer. */
 export class FacetDrawer extends DrawerComponent {
   get overlayType() {
     return 'facets';
@@ -387,29 +324,7 @@ defineComponent('facet-drawer', FacetDrawer);
    <price-range>
    ========================================================================== */
 
-/**
- * A min/max price filter.
- *
- * Two real `<input type="number">` controls carry the value and the names
- * Shopify expects, so the filter works without JavaScript and is announced
- * correctly. The dual-handle slider on top of them is decorative and
- * `aria-hidden`: a custom two-thumb slider that is genuinely accessible is
- * considerably harder than it looks, and the number inputs already are.
- *
- * The two values are kept from crossing, and a change is only reported once the
- * customer stops adjusting — a filter request per pixel of drag is unusable.
- *
- * Markup:
- *
- *   <price-range data-min="0" data-max="25000">
- *     <input data-ref="min" type="number" name="filter.v.price.gte" min="0" max="250">
- *     <input data-ref="max" type="number" name="filter.v.price.lte" min="0" max="250">
- *     <div data-ref="track" aria-hidden="true">
- *       <span data-ref="fill"></span>
- *     </div>
- *     <output data-ref="output"></output>
- *   </price-range>
- */
+/** A min/max price filter. */
 export class PriceRange extends BaseComponent {
   static requiredRefs = ['min', 'max'];
 
@@ -433,7 +348,7 @@ export class PriceRange extends BaseComponent {
     this.#paint();
   }
 
-  /* --------------------------------------------------------- public API -- */
+  /* --------------------------------------------------------- public API -- ---- */
 
   /**
    * @returns {number} Lowest selectable price, in cents.
@@ -458,18 +373,14 @@ export class PriceRange extends BaseComponent {
     return { min, max };
   }
 
-  /**
-   * Clear both ends.
-   */
+  /** Clear both ends. */
   reset() {
     this.refs.min.value = '';
     this.refs.max.value = '';
     this.#paint();
   }
 
-  /**
-   * Report the settled range to `<facet-filters>`.
-   */
+  /** Report the settled range to `<facet-filters>`. */
   commit() {
     const { min, max } = this.value;
 
@@ -483,13 +394,10 @@ export class PriceRange extends BaseComponent {
     this.closest('facet-filters')?.apply?.({ focus: false });
   }
 
-  /* ---------------------------------------------------------- internals -- */
+  /* ---------------------------------------------------------- internals -- ---- */
 
   /**
    * Stop the two ends crossing.
-   *
-   * The input being edited wins, and the other one moves out of its way, which
-   * is less surprising than snapping the value the customer just typed.
    *
    * @param {HTMLInputElement} edited
    * @private
@@ -539,21 +447,7 @@ defineComponent('price-range', PriceRange);
    <sort-by>
    ========================================================================== */
 
-/**
- * The sort order control.
- *
- * A plain `<select name="sort_by">` inside the filter form, so it submits with
- * everything else when JavaScript is unavailable. Changing it applies
- * immediately, without moving focus — the customer is still in the select, and
- * pulling focus to the grid mid-interaction would close the native picker on
- * mobile.
- *
- * Markup:
- *
- *   <sort-by>
- *     <select data-ref="select" name="sort_by">…</select>
- *   </sort-by>
- */
+/** The sort order control. */
 export class SortBy extends BaseComponent {
   static requiredRefs = ['select'];
 
@@ -584,8 +478,6 @@ export class SortBy extends BaseComponent {
       return;
     }
 
-    // No filter form on this template: fall back to a plain navigation, which is
-    // what the select would have done inside a form.
     const url = new URL(window.location.href);
     url.searchParams.set('sort_by', this.value);
     url.searchParams.delete('page');
@@ -599,28 +491,7 @@ defineComponent('sort-by', SortBy);
    <layout-toggle>
    ========================================================================== */
 
-/**
- * Switch a product grid between grid and list.
- *
- * The choice is a display preference, not a filter, so it lives in
- * `localStorage` rather than the URL. Putting it in the URL would mean two
- * addresses for the same products — bad for sharing, worse for indexing, and it
- * would survive being sent to someone who prefers the other view.
- *
- * It writes an attribute and nothing else. The layout itself is CSS: one grid
- * that becomes rows when `data-view="list"` is set. Rebuilding the markup would
- * mean re-rendering every card to change a column count.
- *
- * Hidden below 750px, where a list view of full-width rows and a two-column grid
- * are close enough that the control costs more than it gives.
- *
- * Markup:
- *
- *   <layout-toggle data-target="ProductGrid-abc">
- *     <button data-view-option="grid" aria-pressed="true">…</button>
- *     <button data-view-option="list" aria-pressed="false">…</button>
- *   </layout-toggle>
- */
+/** Switch a product grid between grid and list. */
 export class LayoutToggle extends BaseComponent {
   setup() {
     this.on(this, 'click', (event) => {
@@ -666,10 +537,7 @@ export class LayoutToggle extends BaseComponent {
 
     try {
       storage.set('collection-view', next);
-    } catch {
-      // A display preference that cannot persist still works for this page, and
-      // is not worth telling anyone about.
-    }
+    } catch {}
 
     if (shouldAnnounce) announce(themeString(next === 'list' ? 'viewList' : 'viewGrid', ''));
   }

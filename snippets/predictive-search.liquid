@@ -1,27 +1,6 @@
 {% doc %}
   Renders the search field and everything that hangs off it.
 
-  The input is a real `<input type="search" name="q">` inside a
-  `<form action="/search">`, so pressing Enter with JavaScript disabled runs a
-  normal search. Everything else is enhancement.
-
-  The ARIA wiring is the combobox pattern: the input owns `role="combobox"`,
-  `aria-expanded` and `aria-controls`, and `<search-list>` reports the active
-  option through `aria-activedescendant` on the input. Focus never leaves the
-  field — moving it into the suggestions closes the mobile keyboard.
-
-  ## Two variants, one snippet
-
-    overlay  The drawer and the modal. A head row with the field, a column of
-             recent searches and suggested tags, and a results column that shows
-             merchant-picked suggestions until the customer types.
-    inline   A field with a dropdown beneath it. Used on the 404 page, where
-             there is no panel to fill and no room for a sidebar.
-
-  The idle column is not decoration. An empty search panel asks the customer to
-  guess what the store sells; recent searches, tags and a few chosen products
-  give them something to click before they have typed a character.
-
   @param {string} [id] - Input id. Default SearchInput
   @param {string} [variant] - 'overlay' | 'inline'. Default 'inline'
   @param {string} [layout] - 'modal' | 'drawer'. Overlay only, drives the head row
@@ -42,13 +21,6 @@
     assign is_overlay = true
   endif
 
-  comment
-    Three placeholder fields in Theme settings, rotated one at a time. A single
-    static placeholder in a supplement store says nothing; rotating prompts
-    show three things the customer could actually ask for. The first is what
-    renders server-side, so there is never an empty field before the script
-    loads, and it is the only one a customer with JavaScript off ever sees.
-  endcomment
   assign prompt_1 = settings.search_input_placeholder
   if prompt_1 == blank
     assign prompt_1 = 'search.placeholder' | t
@@ -64,25 +36,12 @@
 
   assign suggested_tags = settings.search_suggested_tags | default: '' | split: ','
 
-  comment
-    Count on a product_list setting, with size as the fallback. The two are
-    interchangeable on this drop depending on the platform version, and a nil
-    count compared against zero fails silently — the merchant picks six
-    products, the panel shows none, and there is nothing to debug.
-  endcomment
   assign suggestion_products = settings.suggestion_product_list
   assign suggestion_count = suggestion_products.count | default: suggestion_products.size | default: 0
 
   assign suggestion_collections = settings.suggestion_collection_list
   assign suggestion_collection_count = suggestion_collections.count | default: suggestion_collections.size | default: 0
 
-  comment
-    Articles come from a blog picker rather than an article picker, because
-    Shopify has no article_list setting. Taking the newest few from the chosen
-    blog is also the behaviour a merchant actually wants: the panel stays
-    current on its own instead of pointing at three posts from last spring
-    until someone remembers to change them.
-  endcomment
   assign articles_limit = settings.suggestion_articles_count | default: 3
   assign suggestion_blog = blogs[settings.suggestion_blog]
   assign suggestion_articles = suggestion_blog.articles
@@ -102,16 +61,7 @@
     assign show_suggestion_articles = false
   endif
 
-  comment
-    Whether anything at all sits in the idle column. The Browse all link is
-    rendered from this rather than from the product group alone — a panel
-    showing only collections still needs its way out.
-  endcomment
   assign has_suggestions = false
-  comment
-    The products group counts even with nothing chosen, because it falls back to
-    placeholder rows — and a column with rows in it still needs its way out.
-  endcomment
   if show_suggestion_products
     assign has_suggestions = true
   endif
@@ -131,14 +81,7 @@
   data-recent-limit="{{ settings.recent_searches_limit | default: 6 }}"
   {% if settings.show_recent_searches == false %}data-recent-disabled{% endif %}
 >
-  {%- comment -%}
-    The head row exists only in the overlay. Inline — the 404 page — the field
-    is the whole component, and a heading and a close button above it would be
-    furniture for a panel that is not there.
 
-    The drawer shows the title; the modal hides it in CSS rather than dropping
-    it from the markup, so the dialog keeps its accessible name in both layouts.
-  {%- endcomment -%}
   {%- if is_overlay -%}
     <div class="search-panel__head">
       <h2 class="search-panel__title">{{ 'search.title' | t }}</h2>
@@ -165,25 +108,10 @@
         enterkeyhint="search"
       >
 
-      {%- comment -%}
-        The animated prompt. Empty in the markup and filled by JavaScript, which
-        also clears the input's own `placeholder` at the same moment — so a
-        customer without JavaScript keeps the plain placeholder above and never
-        sees an empty field, and there is no frame where both are painted.
-
-        `aria-hidden` because the field already has a real `<label>`, and
-        `pointer-events: none` in CSS so a click on the words lands in the input.
-      {%- endcomment -%}
       <span class="search-form__prompt" data-ref="prompt" aria-hidden="true"></span>
 
       <input type="hidden" name="options[prefix]" value="last">
 
-      {%- comment -%}
-        No `hidden` attribute: `display: none` cannot transition, and this button
-        appears and disappears between keystrokes. CSS hides it with
-        `visibility` instead — still out of the accessibility tree, still out of
-        the tab order via `tabindex`, but able to fade.
-      {%- endcomment -%}
       <button
         type="button"
         class="search-form__reset"
@@ -194,13 +122,6 @@
         {% render 'icon', icon: 'close', size: 16 %}
       </button>
 
-      {%- comment -%}
-        The spinner lives inside the submit control and sits on top of the
-        magnifier rather than beside it. Both are absolutely centred in the same
-        circle, so the swap is two opacity changes and nothing in the field
-        moves — a loader that takes its own space would push the field's
-        contents sideways on every keystroke.
-      {%- endcomment -%}
       <button type="submit" class="search-form__submit" aria-label="{{ 'search.submit' | t }}">
         {% render 'icon', icon: 'search', size: 18 %}
         <span class="search-form__spinner" aria-hidden="true"></span>
@@ -212,11 +133,7 @@
       {%- liquid
         assign search_close_label = 'accessibility.close_search' | t
       -%}
-      {%- comment -%}
-        Secondary rather than primary. The green submit control sits a few
-        pixels away inside the field; two green circles side by side, one of
-        which cancels and one of which searches, is a coin toss.
-      {%- endcomment -%}
+
       {% render 'button',
          label: search_close_label,
          id: 'SearchClose',
@@ -233,12 +150,7 @@
 
     <div class="search-panel__body" data-lenis-prevent>
       <div class="search-panel__aside">
-        {%- comment -%}
-          Recent searches are per-browser, so the list is written by JavaScript.
-          The section around it ships hidden and is revealed once there is
-          something in it — an empty "Recent searches" heading is worse than no
-          heading at all.
-        {%- endcomment -%}
+
         <section class="search-block search-recent" data-ref="recent" hidden>
           <div class="search-block__head">
             <h3 class="search-block__title">
@@ -277,28 +189,11 @@
 
       <div class="search-panel__main">
         <div class="predictive-search__panel" id="{{ panel_id }}" data-ref="panel" hidden>
-          {%- comment -%}
-            Filled by sections/predictive-search.liquid. Empty on first render so
-            nothing flashes before the customer has typed anything.
-          {%- endcomment -%}
+
         </div>
 
-        {%- comment -%}
-          The idle column. Hidden by CSS the moment the panel opens, rather than
-          removed, so returning to an empty field brings it straight back with
-          no second request.
-        {%- endcomment -%}
         <div class="search-panel__idle" data-ref="idle">
-          {%- comment -%}
-            Three merchant-curated groups, each independently switchable, each
-            rendered through the same card as a real suggestion — so what the
-            customer sees before typing is shaped exactly like what they see
-            after, and the panel does not appear to change layout mid-search.
 
-            `selectable: false` throughout: these rows sit outside the combobox
-            popup, and `role="option"` on a list item that no listbox owns is
-            invalid ARIA rather than a harmless extra attribute.
-          {%- endcomment -%}
           {%- if show_suggestion_products -%}
             <section class="search-suggestions">
               <p class="search-group__title">
@@ -317,12 +212,7 @@
                   {%- endfor -%}
                 </ul>
               {%- else -%}
-                {%- comment -%}
-                  Nothing chosen yet. A heading over an empty column reads as a
-                  panel that failed to load, so the shape of the list is shown
-                  with example rows instead — clearly marked as examples, and
-                  not links.
-                {%- endcomment -%}
+
                 {% render 'predictive-search-placeholder', count: 3 %}
               {%- endif -%}
             </section>

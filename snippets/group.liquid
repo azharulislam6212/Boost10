@@ -2,77 +2,14 @@
   A group: a flex container that holds other blocks and carries its own size,
   background, border and link.
 
-  ## Alignment always means the same thing
-
-  The hardest part of a layout control is that "Left" has to mean left whether
-  the group stacks or sits side by side — but in CSS it is `align-items` in one
-  case and `justify-content` in the other. Exposing the CSS properties directly
-  is why so many builders have an Alignment control that moves things vertically
-  half the time.
-
-  So the merchant gets two controls with fixed meanings:
-
-    Alignment  always the horizontal axis
-    Position   always the vertical axis
-
-  and this snippet writes them to two custom properties, `--group-inline` and
-  `--group-block`. `base.css` then decides which CSS property reads which, based
-  on direction. One place knows about the swap; the merchant never does.
-
-  ## Distribution is separate from alignment
-
-  "Space between" is not an alignment — it is what happens to the *gaps*, and it
-  only exists on the main axis. Rather than adding a fourth option to Alignment
-  that silently does nothing when the group is stacked, it is its own control,
-  shown only when the group is horizontal. No option in this block is ever
-  inert.
-
-  ## Width, and why Fill is not 100%
-
-  Inside a horizontal parent, "Fill" has to mean *take the space that is left*,
-  which is `flex: 1`, not `width: 100%` — the latter overflows as soon as there
-  is a sibling. Fit is `flex: 0 0 auto`, Custom is `flex: 0 0 <n>%`. All three
-  behave correctly in a stacked parent too, where there is no space to compete
-  for.
-
-  Mobile takes its own width because the desktop answer is usually wrong on a
-  phone: two 50% columns want to be one 100% column, and that is a different
-  value rather than a scale of the same one.
-
-  ## The link
-
-  A group that is a link cannot be an `<a>`: it contains blocks, and blocks
-  contain buttons and links of their own — an `<a>` inside an `<a>` is invalid
-  and browsers recover from it unpredictably.
-
-  Instead the group stays a `<div>` and an absolutely positioned `<a>` covers
-  it. Anything genuinely interactive inside raises itself above that overlay in
-  `base.css`, so a button inside a linked group is still a button and the rest
-  of the surface is still the link.
-
-  ## Built on, rather than forked
-
-  Three parameters exist only so another block can be a group without copying
-  one: `extra_classes` to name itself, `tag` to be a different element, and
-  `attributes` for whatever that element needs. `blocks/image-card.liquid` uses
-  all three — it is a group whose background is the picture and whose wrapper is
-  a `<motion-effect>`, and it adds no layout code of its own.
-
-  The alternative is a second flex container with its own alignment swap, its
-  own width pair and its own idea of what Fill means. There is one of those in
-  the theme and this is it.
-
   @param {object} settings - Block settings
   @param {string} [children] - Rendered child blocks
-  @param {string} [extra_classes] - Extra classes for the wrapper, so a block
-    built on top of a group can name itself without forking this snippet
+  @param {string} [extra_classes] - Extra classes for the wrapper, so a block built on top of a group can name itself without forking this snippet
   @param {string} [tag] - Wrapper element. Default: `div`
   @param {string} [attributes] - Raw attributes for the wrapper
-  @param {string} [styles] - Declarations appended to the wrapper's own `style`,
-    because a second `style` attribute on the same tag is dropped by the browser
+  @param {string} [styles] - Declarations appended to the wrapper's own `style`, because a second `style` attribute on the same tag is dropped by the browser
   @param {boolean} [priority] - Eager-load the background image. Above the fold only
-  @param {string} [placeholder] - Placeholder to draw when the background image is
-    not uploaded yet. Off unless a caller asks for it
+  @param {string} [placeholder] - Placeholder to draw when the background image is not uploaded yet. Off unless a caller asks for it
   @param {string} [shopify_attributes] - Editor attributes
 
   @example
@@ -176,19 +113,6 @@
       assign width_mobile_size = 'fit-content'
   endcase
 
-  comment
-    Tablet is the only one of the three that can say "not my problem".
-
-    Desktop and mobile always answer, because there is no wider tier behind
-    them to fall through to. A tablet left alone should render whatever
-    desktop renders, and the way to mean that is to emit nothing: the
-    stylesheet's tablet rule falls back to `--group-width`, so an unset tier
-    costs no declaration and cannot drift from the desktop value it copies.
-
-    An empty string rather than a "desktop" keyword, matching the Mobile
-    ratio control - a merchant reads "Same as desktop" either way, and blank
-    is the value a select with no stored answer already has.
-  endcomment
   assign width_tablet_value = blank
   assign width_tablet_size = blank
 
@@ -360,20 +284,9 @@
 -%}
 
 {%- capture group_style -%}
-  {%- comment -%}
-    Declarations, not an attribute. `{% render 'spacing' %}` emits its own
-    `style="…"`, and this element already has one — a tag with two `style`
-    attributes keeps the first and the browser drops the rest, so every padding
-    slider on the group block was moving a value the page never saw. The
-    `data-block-spacing` hook goes on by hand below, since that is the selector
-    `base.css` applies the padding through.
-  {%- endcomment -%}
+
   {%- render 'spacing', block: settings, declarations: true -%}
-  {%- comment -%}
-    `--group-gap` is kept as the single-value shorthand some other markup still
-    reads. The two axes are what `base.css` uses for this element, in the CSS
-    `gap: <row> <column>` order.
-  {%- endcomment -%}
+
   --group-gap: {{ gap_base }}px;
   --group-gap-x: {{ gap_x }}px;
   --group-gap-y: {{ gap_y }}px;
@@ -384,20 +297,7 @@
     --group-swipe-width: {{ column_width_mobile }}%;
   {%- endif -%}
   --group-inline: {{ inline_axis }};
-  {%- comment -%}
-    The alignment on its own, with no distribution folded into it.
 
-    `--group-inline` is the main axis and legitimately carries `space-between`
-    on a row, where it lands on `justify-content`. Once that row stacks on a
-    phone the same value lands on `align-items`, and `align-items:
-    space-between` is not valid — the declaration is dropped and the stack
-    falls back to `stretch`. That is how a right-hand button ends up spanning
-    the full width on a phone.
-
-    So the raw alignment travels alongside it and the mobile rule prefers this
-    one. A group saved before this property existed has no `--group-align` and
-    falls back to `--group-inline`, exactly as it behaved before.
-  {%- endcomment -%}
   --group-align: {{ alignment_axis }};
   --group-block: {{ block_axis }};
   --group-width: {{ width_value }};
@@ -415,11 +315,7 @@
     --group-border-style: {{ border_line }};
     --group-border-color: {{ border_paint }};
   {%- endif -%}
-  {%- comment -%}
-    A frosted panel. The blur is the group's because a panel that blurs what is
-    behind it is a container decision, not a new kind of container — the card in
-    the FAQ banner is a group on a photograph, and so is every other one.
-  {%- endcomment -%}
+
   {%- assign backdrop_blur = settings.backdrop_blur | default: 0 | plus: 0 -%}
   {%- if backdrop_blur > 0 -%}
     --group-backdrop-blur: {{ backdrop_blur }}px;
@@ -428,10 +324,7 @@
   {%- if background_color != '' and has_media == false -%}
     --group-background: {{ background_color }};
   {%- endif -%}
-  {%- comment -%}
-    Last, so a caller building on this snippet can override a property it set
-    rather than having to fork the whole capture to change one value.
-  {%- endcomment -%}
+
   {{- styles -}}
 {%- endcapture -%}
 
@@ -456,21 +349,12 @@
     {% render 'background-media', settings: settings, priority: priority, placeholder: placeholder %}
   {%- endif -%}
 
-  {%- comment -%}
-    The children sit in their own layer so they stay above the background media
-    and above the link overlay. Without it a group with a background would put
-    its own backdrop over its contents.
-  {%- endcomment -%}
   <div class="block-group__content">
     {{- children -}}
   </div>
 
   {%- if has_link -%}
-    {%- comment -%}
-      `aria-label` falls back to the URL only if the merchant left it blank,
-      which is worse than a real label but far better than a link a screen
-      reader announces as nothing at all.
-    {%- endcomment -%}
+
     <a
       class="block-group__link"
       href="{{ link_url }}"

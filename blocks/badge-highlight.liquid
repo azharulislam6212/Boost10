@@ -1,61 +1,6 @@
-{% comment %}
-  blocks/badge-highlight.liquid
-
+{% doc %}
   One trust badge: an icon, an optional pill, a heading and some text.
-
-  ## The icon is the Feature icon's, control for control
-
-  The glyph, the shape behind it and the ring around that are the same three
-  groups `blocks/_feature-icon.liquid` offers, with the same setting ids, the
-  same labels and the same meanings — Icon / Shape / Ring. A merchant who has
-  styled a feature card already knows this panel, and a designer specifying one
-  mark specifies both.
-
-  What is deliberately *not* copied is the connectors. Those are the feature
-  card's spine, tying a title and a paragraph into one column; a badge is a tile
-  with its words beside the mark, and there is nothing above or below for a
-  hairline to join.
-
-  Two additions the shared vocabulary needed:
-
-    Dotted ring   the badge's old frame offered it and tiles in the theme use
-                  it. `stroke-dasharray` with round caps draws it, so it is one
-                  more dash pattern rather than a second code path.
-
-    Gradient fill **Fill color** is a `color_background`, because the design's
-                  mark is a green gradient squircle. The Feature icon's is a
-                  flat `color`; a gradient is a superset and nothing about a
-                  flat colour changes.
-
-  ### The old frame settings still render
-
-  Before this the icon sat in `icon_frame_*` — a style, a size, a px width, a
-  *percentage* radius, a colour and a background. Those ids are gone from the
-  panel but every one of them is still read, as the fallback beneath the new
-  setting, so a badge saved against the old vocabulary draws exactly the mark it
-  drew before: the frame becomes a Shape with a Ring at zero offset, which is
-  the same picture by a different name. The moment a merchant touches the new
-  controls their value wins and the legacy read is over.
-
-  ## The custom SVG is a source, not a race
-
-  Custom SVG, an upload and the theme set used to be tried in that order, and a
-  merchant discovered which had won by clearing fields until the right mark
-  appeared. **Icon** now states the source and only its own field is shown —
-  the same rule `blocks/subheading.liquid` keeps.
-
-  Pasted SVG is not escaped — it cannot be, or the field is useless — and that is
-  the merchant's own input from their own admin, the same trust boundary
-  Shopify's Custom Liquid uses. It is wrapped in a span rather than inserted
-  bare, so a paste missing its closing tag breaks one badge instead of the
-  section below it.
-
-  ## The link wraps nothing
-
-  When a link is set, a stretched pseudo-element covers the tile rather than an
-  anchor wrapping the content. Wrapping gives a screen reader one link named with
-  every word in the badge, and swallows anything interactive added later.
-{% endcomment %}
+{% enddoc %}
 
 {%- liquid
   assign s = block.settings
@@ -65,14 +10,6 @@
     assign has_link = true
   endif
 
-  comment
-    ---- where the mark comes from ----
-
-    Stated, not raced. `icon_source` is the new control; a badge saved before it
-    existed has nothing in it, and for those the old order — pasted SVG, then an
-    upload, then the theme set — is reproduced here so the mark they are showing
-    is the mark they keep.
-  endcomment
   assign icon_source = s.icon_source
   if icon_source == blank
     if s.custom_svg != blank
@@ -84,12 +21,6 @@
     endif
   endif
 
-  comment
-    The field belonging to the source has to actually hold something. A merchant
-    who picks Image and has not uploaded one yet gets the words on their own
-    rather than an empty box holding a gap open — the same rule
-    `blocks/subheading.liquid` and `blocks/_feature-icon.liquid` both keep.
-  endcomment
   assign has_icon = false
   if icon_source == 'icon' and s.icon != blank and s.icon != 'none'
     assign has_icon = true
@@ -104,16 +35,6 @@
   endcapture
   assign icon_size = icon_px | plus: 0
 
-  comment
-    ---- the surface ----
-
-    The alpha goes into the colour rather than onto the element, the same split
-    `blocks/card-content.liquid` sets out at length: `opacity` here would fade
-    the icon and the words along with the tile they are read against.
-
-    Default 100, so a badge saved before the slider existed paints exactly the
-    colour it was given.
-  endcomment
   assign background_paint = ''
   if s.background != blank
     assign background_alpha = s.background_opacity | default: 100 | plus: 0
@@ -121,34 +42,9 @@
     assign background_paint = s.background | color_modify: 'alpha', background_alpha
   endif
 
-  comment
-    ---- the box ----
-
-    A fixed width and height, because a row of these is a row of tiles and tiles
-    that size themselves to their own sentence are a row of different boxes.
-    Zero is the off switch and the value a badge saved before this existed
-    carries, so those keep sizing to their content exactly as they did.
-
-    `min-` rather than a hard size — see the note in `base.css`. A merchant who
-    writes four lines into a 142px tile gets a taller tile rather than text
-    spilling out of it.
-  endcomment
   assign box_width = s.width | default: 0 | plus: 0
   assign box_height = s.height | default: 0 | plus: 0
 
-  comment
-    ---- the mark ----
-
-    The glyph, the shape behind it and the ring around that are resolved by
-    `snippets/icon-mark.liquid`, which four blocks in this theme now share. What
-    is left here is whether there is a mark at all: the box carries a size, so an
-    empty one is a hole in the row holding a gap open beside words that have
-    nothing to sit next to.
-
-    `shape_default: 'none'` because a tile with Shape unset draws a bare glyph.
-    There is no box of this block's own for a ring to trace, which is the case
-    that parameter exists to describe.
-  endcomment
   assign has_shape = false
   if s.shape != blank and s.shape != 'none'
     assign has_shape = true
@@ -156,34 +52,8 @@
     assign has_shape = true
   endif
 
-  comment
-    Frosted, for a tile read against a photograph. Same property, same rule
-    shape and same caveat as `blocks/card-content.liquid`: `backdrop-filter`
-    samples what is painted underneath, so over a flat colour it has nothing to
-    frost and appears to do nothing. Zero by default, so no tile that existed
-    before this gains a filter.
-  endcomment
   assign backdrop_blur = s.backdrop_blur | default: 0 | plus: 0
 
-  comment
-    ---- a border that is a gradient ----
-
-    **Border color** is a `color_background`, so the merchant can hand it either
-    a flat colour or a gradient — the same field type the Group block's surface
-    already uses, and the only one in Shopify that returns a gradient at all.
-
-    A gradient cannot go through `border-color`: that property takes a colour,
-    and a `linear-gradient(...)` handed to it is an invalid declaration the
-    browser drops, which renders as no border at all rather than as an error the
-    merchant can see. So the two cases take two different routes — a real border
-    for a colour, a masked ring painted in `::before` for a gradient — and this
-    is the test that decides which.
-
-    `contains 'gradient'` rather than a parse: every gradient CSS can express
-    has the word in its own name — `linear-gradient`, `radial-gradient`,
-    `conic-gradient` and the `repeating-` forms — and no notation for a flat
-    colour contains it.
-  endcomment
   assign border_is_gradient = false
   if s.border_color contains 'gradient'
     assign border_is_gradient = true
@@ -197,26 +67,6 @@
     assign classes = classes | append: ' badge-highlight--gradient-border'
   endif
 
-  comment
-    The colour scheme is the parent's unless the merchant says otherwise — the
-    same control, spelled the same way, as `blocks/group.liquid`.
-
-    It defaults the other way round from the Group block's, on purpose. A group
-    is a container and often wants a surface of its own; a badge is a tile that
-    sits inside one, and painting it a second scheme puts a rectangle of colour
-    behind every item in a row that already has a background.
-
-    That default is also what keeps this setting from changing anything that
-    existed before it. This block had no scheme control at all and never painted
-    one, so `false` here would have given every badge already in a theme a
-    background it had never had — the section's scheme resolved and painted
-    behind each tile. Inheriting is the behaviour they have; the picker is the
-    new thing, and it is opt-in.
-
-    `nil` rather than `blank` for the unset test: `false == blank` is true in
-    Liquid, so a blank check would read a merchant's deliberate "off" as "not
-    answered" and silently turn inheriting back on.
-  endcomment
   assign inherit_scheme = s.inherit_color_scheme
   if inherit_scheme == nil
     assign inherit_scheme = true
@@ -236,22 +86,7 @@
       --badge-border-color: {{ s.border_color }};
     {%- endif -%}
   {%- endif -%}
-  {%- comment -%}
-    ---- which way the words run ----
 
-    Separate from **Icon position**, because they answer different questions.
-    Icon position lays the tile out — glyph above the words, beside them, or the
-    pair centred as a column — and until now the text alignment came along with
-    it: the row arrangements said nothing, so the words took whatever the
-    container was doing. A tile in a right-aligned group came out right-aligned
-    with its icon on the left, which is a tile nobody chose and could not fix
-    from its own settings.
-
-    `inherit` is the default and emits nothing at all, so every tile already in
-    a theme keeps the alignment it has — including the centred one, whose
-    `text-align: center` is part of the Icon position: Center layout and is not
-    this setting's to undo.
-  {%- endcomment -%}
   {%- if s.text_alignment != blank and s.text_alignment != 'inherit' -%}
     --badge-text-align: {{ s.text_alignment }};
   {%- endif -%}
@@ -264,13 +99,6 @@
   {%- if backdrop_blur > 0 -%}--badge-backdrop-blur: {{ backdrop_blur }}px;{%- endif -%}
 {%- endcapture -%}
 
-{%- comment -%}
-  The mark's properties belong on the mark and not on the tile. They are custom
-  properties, so writing them on the tile would inherit them down just the same
-  — but `.icon-mark` is matched on the *presence* of each name in the element's
-  own `style` attribute, and an inherited value is invisible to that test. It is
-  what keeps a mark that set nothing from being restyled.
-{%- endcomment -%}
 {%- capture icon_mark_style -%}
   {%- render 'icon-mark', block: s, declarations: true, size: icon_size, shape_default: 'none' -%}
 {%- endcapture -%}
@@ -281,11 +109,7 @@
   style="{{ badge_style | strip_newlines | strip }}"
   {{ block.shopify_attributes }}
 >
-  {%- comment -%}
-    The box is only rendered when there is a mark to put in it. It carries a
-    size of its own, so an empty one is a hole in the row holding a gap open
-    beside words that have nothing to sit next to.
-  {%- endcomment -%}
+
   {%- if has_icon or has_shape -%}
     <div class="badge-highlight__icon icon-mark" style="{{ icon_mark_style | strip_newlines | strip }}">
       {% render 'icon-mark', block: s, size: icon_size, shape_default: 'none' %}
@@ -335,11 +159,6 @@
   </div>
 </div>
 
-{%- comment -%}
-  Every setting below is a control a merchant reaches in the editor, and the
-  schema is one element's styling surface: splitting it to get under Theme
-  Check's count of 40 would split the thing the settings style.
-{%- endcomment -%}
 {% # theme-check-disable ExcessiveSettingsCount %}
 {% schema %}
 {

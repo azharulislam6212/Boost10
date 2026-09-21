@@ -1,77 +1,6 @@
 {% doc %}
-  blocks/accordion-row.liquid
-
   One row of an **Accordion** — a question, or any other short label, and
   whatever answers it.
-
-  Nothing here is about FAQs. The block was called `faq-row` and lived beside a
-  `faq-accordion`, which read as a section-specific pair and kept merchants from
-  reaching for it anywhere else. It is a general disclosure row: shipping terms
-  under a product, a spec table on a landing page, a "what's included" list in a
-  footer column. `question` is still the setting id, because renaming a stored id
-  would empty the field on every row already published.
-
-  ## The answer is blocks, not a rich text field
-
-  It used to be one `richtext` setting, which meant an answer could only ever be
-  prose. Half the questions a store actually gets are answered better by
-  something else — a size table, a delivery banner, an image of the returns
-  label, a button to the policy page — and none of that fits in a rich text
-  field.
-
-  So the panel is `{% content_for 'blocks' %}` and the row accepts `@theme`:
-  every block the theme has is available inside an answer, and the Text block is
-  what the preset puts there, so the default row is still a question and a
-  paragraph. Nothing here knows what a Text block is.
-
-  ## Still a `<details>`
-
-
-  The disclosure is native, so the answer is on the page with JavaScript off,
-  `<summary>` is already a button with an expanded state to a screen reader, and
-  the browser's own in-page search finds the text. Nothing here re-implements
-  that with a `<button>` and an `aria-expanded` of its own.
-
-  The open and close motion belongs to `<accordion-element>` in
-  `assets/modules.js` — a measured WAAPI height animation that every other
-  disclosure group in the theme already uses. This file contributes markup, not a
-  second animation system: the panel is a plain wrapper precisely so that
-  animation has a single box to measure.
-
-  ## Two icons in one summary, and only one of them means "open"
-
-  The toggle is `snippets/icon.liquid` like everything else — a **plus** whose
-  upright bar travels onto the crossbar and stops there as a minus, or a
-  **chevron** that turns. It used to be two pseudo-elements crossed in CSS,
-  which is the same glyph drawn a second time in a second place.
-
-  The icon beside the question is content, and it does not move at all. That is
-  worth stating because it did: the group rule in `assets/base.css` rotated
-  every `.icon` inside an open summary, so a truck or a padlock a merchant had
-  chosen turned upside down along with the marker. The rule names the chevron
-  and the plus now.
-
-  ## The icon is the theme's shared mark
-
-  `snippets/icon-mark.liquid` resolves the Shape and the Ring, the same three
-  groups `blocks/_feature-icon.liquid` and `blocks/badge-highlight.liquid`
-  offer. It emits nothing until a merchant chooses something, so the tile below
-  — 12px of room around the glyph, 6px corners, the accent at a fifth strength —
-  is still exactly what an untouched row draws.
-
-  ## The icon source is the Subheading block's, by reference
-
-  `blocks/subheading.liquid` settled how an icon is chosen in this theme —
-  **None**, **Icon** or **Image**, one field per source, the chosen one shown and
-  the others hidden — and the same four setting ids are used here (`icon_source`,
-  `icon`, `icon_image`, `icon_image_alt`) so a merchant who has configured a
-  Subheading already knows this control. The glyph comes from
-  `snippets/icon.liquid` and an upload from `snippets/image.liquid`, which is
-  where every other icon and image in the theme comes from.
-
-  Only the box is this file's own, and it is derived rather than configured: the
-  merchant sets **Icon size** and the tile around it follows, so the two can
-  never disagree.
 {% enddoc %}
 
 {%- liquid
@@ -94,28 +23,11 @@
 
   assign toggle = s.toggle_style | default: 'plus'
 
-  comment
-    ---- the frame ----
-
-    One border decision, three lines. The frame around the row, the tile behind
-    the leading icon and the tile behind the toggle all take it, because three
-    controls for three lines a merchant will always set the same way is three
-    chances for them to disagree.
-
-    `none` is a zero width rather than `border-style: none`, so the row keeps
-    its box either way and turning the border off does not move the text.
-  endcomment
   assign border_style = s.border_style | default: 'none'
   assign border_width = 0
   if border_style != 'none'
     assign border_width = s.border_width | default: 1 | plus: 0
 
-    comment
-      With no colour picked the line is `currentColor`, which the colour filters
-      cannot take an alpha channel from — there is no channel to read until the
-      scheme resolves it in the browser. `color-mix` fades it at that point
-      instead, so an unset colour is a hairline rather than a hard rule.
-    endcomment
     if s.border_color == blank
       assign border_paint = 'color-mix(in srgb, currentColor 20%, transparent)'
     else
@@ -129,31 +41,6 @@
   # can be set smaller than the thing it contains.
   assign icon_box = icon_size | plus: 12
 
-  comment
-    ---- the question's typography ----
-
-    The theme's, by reference, in the three parts every text block here uses:
-
-      the named presets   `.block-text--h4` and its eight siblings in
-                          `assets/base.css`, which point `--block-font-*` at the
-                          tokens `css-variables.liquid` writes from Theme
-                          settings › Typography
-      Custom and colour   `snippets/block-typography.liquid`, which emits only
-                          what a class cannot know
-      the consumption     `.accordion-row__question` in `assets/base.css` reads those
-                          properties, with its own values as the fallback
-
-    Not `.block-text` itself. That class also sets `flex` and `inline-size`, and
-    this span is a flex item of the summary row already taking the line between
-    the icon and the toggle. The typography half is the part worth sharing; the
-    layout half belongs to the row.
-
-    Same arrangement and the same setting ids as `blocks/_tab.liquid` — a
-    merchant who has styled a tab name has styled a question.
-
-    `default` is the default, so a row saved before this existed emits no class
-    that resolves and no declarations, and looks exactly as it did.
-  endcomment
   assign preset = s.preset | default: 'default'
 
   assign question_classes = 'accordion-row__question block-text--' | append: preset
@@ -166,13 +53,6 @@
   {%- render 'block-typography', block: s -%}
 {%- endcapture -%}
 
-{%- comment -%}
-  The mark's properties go on the tile and not on the row. They are custom
-  properties, so writing them further up would inherit them down here just the
-  same — but `.icon-mark` is matched on the *presence* of each name in the
-  element's own `style` attribute, which is what keeps a mark that set nothing
-  from being restyled. An inherited value is invisible to that test.
-{%- endcomment -%}
 {%- capture icon_mark_style -%}
   {%- render 'icon-mark', block: s, declarations: true -%}
 {%- endcapture -%}
@@ -195,12 +75,6 @@
     {%- endif -%}
   {%- endcapture -%}
 
-  {%- comment -%}
-    A row animates as one thing. There is no stagger setting on it, because the
-    only two boxes inside are the question and the answer — and the answer is
-    hidden until it is opened, so "one after the other" would be a delay on
-    nothing. The list cascades from the Accordion above it instead.
-  {%- endcomment -%}
   <motion-effect
     class="accordion-row-motion"
     {% render 'motion-attrs', kind: 'text', block: s %}
@@ -214,13 +88,7 @@
   >
     <summary class="accordion-row__summary">
       {%- if has_icon -%}
-        {%- comment -%}
-          No `aria-hidden` on the tile. `snippets/icon.liquid` already hides the
-          glyphs it renders, and an upload carries its own **Alt text** field —
-          hiding the wrapper would silently discard whatever the merchant typed
-          into it. Each source keeps its own semantics, as in the Subheading
-          block.
-        {%- endcomment -%}
+
         <span class="accordion-row__icon icon-mark" style="{{ icon_mark_style | strip_newlines | strip }}">
           {% render 'icon-mark', block: s %}
           {%- if icon_source == 'image' -%}
@@ -239,10 +107,6 @@
         {{- question -}}
       </span>
 
-      {%- comment -%}
-        Decorative. `<summary>` conveys the expanded state already, so labelling
-        this would announce the same thing twice.
-      {%- endcomment -%}
       <span class="accordion-row__toggle" aria-hidden="true">
         {%- if toggle == 'arrow' -%}
           {% render 'icon', icon: 'chevron-down', size: 14, class: 'accordion-row__chevron' %}
@@ -252,12 +116,6 @@
       </span>
     </summary>
 
-    {%- comment -%}
-      A plain wrapper, deliberately. `<accordion-element>` animates the height of
-      the `<details>` itself and measures this box to find the end value; a
-      `grid-template-rows` trick here would animate against that measurement and
-      land with a visible jump.
-    {%- endcomment -%}
     <div class="accordion-row__panel">
       <div class="accordion-row__answer">
         {% content_for 'blocks' %}
@@ -267,11 +125,6 @@
   </motion-effect>
 {%- endif -%}
 
-{%- comment -%}
-  Every setting below is a control a merchant reaches in the editor, and the
-  schema is one element's styling surface: splitting it to get under Theme
-  Check's count of 40 would split the thing the settings style.
-{%- endcomment -%}
 {% # theme-check-disable ExcessiveSettingsCount %}
 {% schema %}
 {

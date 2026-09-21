@@ -1,80 +1,11 @@
 {% comment %}
-  sections/comparison-table.liquid
-
-  The honest comparison: one column of claims, the store's own product beside
-  them, and two or more alternatives the customer can swap between.
-
-  ## Why it is not `sections/feature-cards.liquid` with four cards
-
-  A row of cards says four things that happen to sit next to each other. A
-  comparison says one thing about each of four products, six times over, and the
-  whole argument is in the alignment: *Third-party lab tested* has to be on the
-  same line in every column or the customer is reading four lists rather than
-  one table. Cards cannot promise that — each one is as tall as its own content
-  — and a merchant who types a claim into the second card and forgets the third
-  gets a table that looks right and lies.
-
-  So the rows are real rows. `blocks/_comparison-table.liquid` is one CSS grid
-  and every column is a `subgrid` inside it, which means a claim that wraps to
-  two lines grows *its* row in every column at once. Nothing is measured in
-  JavaScript and nothing is a fixed height.
-
-  ## Why it is not `assets/compare.js`
-
-  That is the product comparison drawer: a customer ticks products on a
-  collection page and the theme renders their real prices, options and
-  inventory side by side. It is about the catalogue, it is stored per browser,
-  and it is off until a merchant turns it on.
-
-  This is a piece of marketing. The claims are the merchant's, the alternatives
-  are categories rather than products — *Hydration powder*, *Energy drops* — and
-  nothing in it is fetched. The two never want the same settings and never want
-  the same markup.
-
-  ## What this file is, and what it is not
-
-  It is the frame and nothing else: the container, the colour scheme, the
-  background media, the four border widths, the two sets of corners, the gaps
-  behind a Desktop/Mobile switch, the margins, the stack layer and the whole
-  spacing group. Every id here is one `sections/expert-quote.liquid` and
-  `sections/featured-pills.liquid` already carry, resolved through the same
-  `snippets/spacing.liquid`, `snippets/background-media.liquid` and
-  `snippets/container.liquid`. A merchant who has arranged one of those has
-  arranged this one.
-
-  Everything with content in it is a block, and they all arrive through one
-  `{% content_for 'blocks' %}`:
-
-    The heading cluster   `blocks/section-header.liquid` — the theme's own,
-                          with a Subheading and a Text block inside it
-    The table             `blocks/_comparison-table.liquid`
-    The buttons           a Group of `blocks/button.liquid`
-    The reassurance row   a Group of `blocks/icon-with-text.liquid`
-
-  Only the table is new. The rest of the drawn design is blocks this theme
-  already has, arranged by the preset — which is the point of a block theme and
-  the reason this section's own schema is as short as it is.
-
-  ## The container is Compact
-
-  The drawing puts the table in 1090px of a 1440px page, which is the theme's
-  **Compact** width to within a rounding error. It is a select like every other
-  section's, so a merchant who wants the table to run wider has the same five
-  choices here as anywhere else.
+  Comparison table — the claims down the left, your product beside them, and
+  alternatives the customer can swap between.
 {% endcomment %}
 
 {%- liquid
   assign s = section.settings
 
-  comment
-    The background is the colour scheme's until the merchant says otherwise:
-    either a colour — or, as the preset ships it, the soft horizontal wash the
-    section was drawn on — or a picture behind the whole section.
-
-    Emitted as a real `background` declaration rather than a custom property
-    because `color-scheme-container` paints a background *and* a gradient image,
-    and only the shorthand clears both.
-  endcomment
   assign background_media = s.background_media | default: 'none'
   assign has_background_media = false
   if background_media != 'none'
@@ -86,24 +17,6 @@
     assign background_paint = s.background_color | default: ''
   endif
 
-  comment
-    ---- the frame ----
-
-    One width per side rather than one for the box, summed into `border_any` so
-    the three properties are emitted only when at least one side is drawn — a
-    zero-width border with a colour on it is three declarations that paint
-    nothing.
-
-    Opacity goes into the colour rather than onto the element: `opacity` on the
-    section would fade the table along with its frame. With no colour picked the
-    border is `currentColor`, which the colour filters cannot take an alpha
-    channel from, so `color-mix` does the same fade in the browser instead and
-    both paths honour the slider.
-
-    Identical to `sections/expert-quote.liquid` and
-    `sections/featured-pills.liquid` by construction, not by coincidence — same
-    ids, same resolution, same stylesheet shape.
-  endcomment
   assign border_line = s.border_style | default: 'none'
 
   assign bw_top = 0
@@ -128,29 +41,6 @@
     endif
   endif
 
-  comment
-    ---- corners ----
-
-    Four corners, twice — one set per device, behind the same Desktop/Mobile
-    switch the padding and the gaps already use.
-
-    The top pair ships at 40 and the bottom pair at 0, because a section is a
-    band that lifts away from what is above it and sits flush on what is below:
-    a rounded bottom edge leaves two slivers of the page showing through under
-    it. They are four sliders rather than one number and a rule, so a merchant
-    who wants a fully rounded card can still have one.
-
-    They reach CSS as a single border-radius shorthand, in the order that
-    property takes — top-left, top-right, bottom-right, bottom-left. Nothing in
-    the stylesheet reads them as a bare number, which is what makes sending a
-    shorthand safe.
-
-    A phone gets its own four because the same number does not read the same at
-    both widths: 40px is a soft lift across 1400px and a heavy scoop out of a
-    390px screen. Each mobile corner falls back to its desktop value when the
-    setting is missing entirely, so a section saved before these existed keeps
-    one shape at every width.
-  endcomment
   assign r_tl = s.border_radius_top_left | default: 40 | plus: 0
   assign r_tr = s.border_radius_top_right | default: 40 | plus: 0
   assign r_bl = s.border_radius_bottom_left | default: 0 | plus: 0
@@ -164,20 +54,6 @@
   assign margin_top = s.margin_top | default: 0 | plus: 0
   assign margin_bottom = s.margin_bottom | default: 0 | plus: 0
 
-  comment
-    ---- the gaps ----
-
-    A Desktop/Mobile pair behind one switch, the shape every other section in
-    the theme uses. Both pairs are published unconditionally and
-    `assets/base.css` picks which applies at a given width, because the pair the
-    merchant is not looking at in the editor is still the pair the other
-    breakpoint renders.
-
-    `plus: 0` rather than `default` alone, which would replace a deliberate 0.
-    Each mobile axis falls back to its desktop value when the setting is absent
-    entirely, so a section saved before the mobile pair existed renders as it
-    did; one added since gets the schema default, which is half the desktop one.
-  endcomment
   assign gap_x = s.gap_horizontal | default: 40 | plus: 0
   assign gap_y = s.gap_vertical | default: 40 | plus: 0
   assign gap_x_mobile = s.gap_horizontal_mobile | default: gap_x | plus: 0
@@ -217,22 +93,11 @@
     {% render 'background-media', settings: s %}
   {%- endif -%}
 
-  {%- comment -%}
-    One stream, in the order the merchant arranged it. The table is a block in
-    the same way the heading and the buttons are blocks, so a store that wants
-    the call to action above the table drags it there rather than asking for a
-    setting that would only ever have two values.
-  {%- endcomment -%}
   <div class="comparison-section__inner {% render 'container', width: s.container_width %}">
     {% content_for 'blocks' %}
   </div>
 </div>
 
-{%- comment -%}
-  Every setting below is a control a merchant reaches in the editor, and the
-  schema is one element's styling surface: splitting it to get under Theme
-  Check's count of 40 would split the thing the settings style.
-{%- endcomment -%}
 {% # theme-check-disable ExcessiveSettingsCount %}
 {% schema %}
 {

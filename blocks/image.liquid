@@ -1,47 +1,7 @@
 {% doc %}
-  blocks/image.liquid
-
   An image, through `snippets/image.liquid` — so it gets the full ratio list,
   mobile art direction, the srcset ladder and the fade-in on load for free
   rather than reimplementing any of it here.
-
-  ## Size
-
-  Width is two settings, not one: a type and a value. `Fit` hugs the image's own
-  width, `Fill` takes the container, `Custom` takes a percentage. Mobile has its
-  own pair because the desktop answer is usually wrong on a phone — a 40% image
-  beside text becomes a 100% image above it, and that is a different value
-  rather than a scale of the same one.
-
-  Each type writes both a `flex` and an `inline-size`, for the same reason the
-  group block does: an image block at the top level of a section is not a flex
-  item, so `flex` alone is inert there and every image came out full width.
-
-  `Height: Fill` stretches to the tallest thing beside it — the case that makes
-  an image sit flush with a text column in a horizontal group. It needs an
-  explicit fit, because filling a box of unknown ratio means either cropping or
-  letterboxing and only the merchant knows which is wanted.
-
-  ## Borders
-
-  Thickness, colour, **opacity** and radius. Opacity is applied to the colour
-  with `color_modify` rather than to the element, because `opacity` on the
-  element would fade the image too.
-
-  ## Animation
-
-  Resolved by `snippets/motion-attrs.liquid`, so this block inherits the theme's
-  three-level cascade — block setting › section setting › theme setting — and
-  the master switch in Theme settings › Animations still turns everything off.
-
-  The block's own list is the full set the image family supports rather than the
-  five it offered before. Every value here is a real preset in
-  `assets/motion-engine.js`; nothing is offered that would silently fall back.
-
-  `target: 'img'` animates the image inside the wrapper, not the wrapper. That
-  matters for `zoom-in` and the reveals: a wrapper with `overflow: hidden` is
-  what gives a reveal something to reveal from, and animating the wrapper itself
-  would move the mask along with the content.
 {% enddoc %}
 
 {%- liquid
@@ -113,14 +73,7 @@
 -%}
 
 {%- capture block_style -%}
-  {%- comment -%}
-    Spacing is pulled in as declarations rather than as its own attribute.
-    `{% render 'spacing' %}` emits `style="…"` of its own, and this element
-    already has one — two `style` attributes on a tag and the browser keeps the
-    first and silently drops the rest, which is why the four padding sliders on
-    this block moved a value that never reached the page. The `data-block-spacing`
-    hook is written by hand below, because that is what `base.css` selects on.
-  {%- endcomment -%}
+
   {%- render 'spacing', block: s, declarations: true -%}
   --image-flex: {{ width_flex }};
   --image-width: {{ width_size }};
@@ -141,11 +94,7 @@
   style="{{ block_style | strip_newlines | strip }}"
   {{ block.shopify_attributes }}
 >
-  {%- comment -%}
-    The link wraps only the media, never the caption. A caption is a description
-    of the image, not part of the target, and putting it inside the anchor makes
-    a screen reader announce the whole thing as the link text.
-  {%- endcomment -%}
+
   {%- if has_link -%}
     <a
       href="{{ link_url }}"

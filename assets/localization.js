@@ -1,40 +1,5 @@
 /**
- * localization.js — Boost10
- *
  * `<localization-form>` — the country/region and language selectors.
- *
- * Shopify's localization form is a real `<form>` posting to
- * `/localization`, containing a hidden input and one submit button per option.
- * That is the only supported way to change market or locale, and it works with
- * JavaScript disabled. This element does not replace it — it wraps it, turning a
- * list of a hundred and fifty submit buttons into a searchable disclosure.
- *
- * The list is rendered by Liquid from `localization.available_countries`, with
- * flags, currency codes and localised country names already in place. Nothing is
- * fetched and nothing is sorted here; the filter only hides rows.
- *
- * Accessibility: the trigger is a real button with `aria-expanded`, the panel is
- * a listbox of buttons, Escape closes and returns focus, and the filtered count
- * is announced so a screen reader user knows the list changed under them.
- *
- * Markup:
- *
- *   <localization-form data-type="country">
- *     <form method="post" action="{{ routes.root_url }}localization" id="CountryForm">
- *       <input type="hidden" name="_method" value="put">
- *       <input type="hidden" name="country_code" value="{{ localization.country.iso_code }}" data-ref="input">
- *
- *       <button type="button" data-ref="trigger" aria-expanded="false" aria-controls="CountryPanel">…</button>
- *
- *       <div data-ref="panel" id="CountryPanel" hidden>
- *         <input type="search" data-ref="filter">
- *         <ul data-ref="list" role="listbox">
- *           <li><button type="submit" name="country_code" value="GB" data-option data-label="United Kingdom">…</button></li>
- *         </ul>
- *         <p data-ref="empty" hidden>…</p>
- *       </div>
- *     </form>
- *   </localization-form>
  *
  * @module @theme/localization
  */
@@ -42,21 +7,10 @@
 import { BaseComponent, defineComponent } from '@theme/component';
 import { debounce, themeString, announce, getFocusableElements } from '@theme/utilities';
 
-
 export class LocalizationForm extends BaseComponent {
   static requiredRefs = ['trigger', 'panel'];
 
   setup() {
-    // The panel stops being hidden by the `hidden` attribute the moment this
-    // element takes charge of it.
-    //
-    // `hidden` is `display: none`, and `display: none` cannot be transitioned in
-    // either direction — the panel appeared in one frame and vanished in one
-    // frame however carefully the animation was written. The attribute stays in
-    // the markup so the panel is properly hidden before this script runs, and
-    // from here on the open state is `data-open` on this element, which CSS can
-    // animate, while `inert` does the job `hidden` was doing for focus and for
-    // assistive technology.
     this.refs.panel.removeAttribute('hidden');
 
     this.close();
@@ -79,23 +33,13 @@ export class LocalizationForm extends BaseComponent {
       const filter = debounce((value) => this.filter(value), 150);
       this.on(this.refs.filter, 'input', (event) => filter(event.target.value));
 
-      // The field is always shown, and the threshold that used to hide it is
-      // gone.
-      //
-      // It was a reasonable-sounding rule — a search box over a handful of
-      // options is noise, and on a phone it opens a keyboard over the very list
-      // it is meant to help with — and it was wrong here for one reason: what a
-      // customer looks for in this control is a currency, and a store selling in
-      // two markets is exactly where the field disappeared. The search box was
-      // in the markup the whole time and simply never rendered.
       this.refs.filter.closest('[data-filter-wrapper]')?.removeAttribute('hidden');
     }
 
-    // Arrow keys move through the options once the panel is open.
     this.on(this.refs.panel, 'keydown', this.#onPanelKeydown);
   }
 
-  /* --------------------------------------------------------- public API -- */
+  /* --------------------------------------------------------- public API -- ---- */
 
   /**
    * @returns {boolean}
@@ -128,9 +72,6 @@ export class LocalizationForm extends BaseComponent {
   open() {
     if (this.isOpen) return;
 
-    // Two open selectors overlap and neither is usable. Closing the other one
-    // first is also what makes the hand-off read properly: it animates out on
-    // the same curve this one animates in on, rather than blinking away.
     for (const other of document.querySelectorAll('localization-form[data-open]')) {
       if (other !== this) other.close?.();
     }
@@ -140,9 +81,6 @@ export class LocalizationForm extends BaseComponent {
     this.refs.panel.removeAttribute('aria-hidden');
     this.refs.trigger.setAttribute('aria-expanded', 'true');
 
-    // One frame later, so the panel is interactive and in place before focus
-    // lands in it. Focusing an element that is still mid-transition is what
-    // makes a browser jump the page to it.
     const first = this.refs.filter instanceof HTMLElement ? this.refs.filter : this.#selectedOption();
     requestAnimationFrame(() => {
       if (this.isOpen) first?.focus({ preventScroll: true });
@@ -153,10 +91,6 @@ export class LocalizationForm extends BaseComponent {
     this.removeAttribute('data-open');
     this.refs.trigger.setAttribute('aria-expanded', 'false');
 
-    // `inert` immediately, not after the animation: it takes the panel out of
-    // the tab order and out of the accessibility tree straight away, which is
-    // what `hidden` used to do. The fade out is CSS, keyed off `data-open`, and
-    // is unaffected by it.
     this.refs.panel.setAttribute('inert', '');
     this.refs.panel.setAttribute('aria-hidden', 'true');
   }
@@ -172,11 +106,6 @@ export class LocalizationForm extends BaseComponent {
   /**
    * Hide options that do not match a term.
    *
-   * Matching is done on `data-label`, which Liquid renders with the localised
-   * country name. Matching on the button's text would also match the currency
-   * code, so typing "USD" would surface every country that happens to use it —
-   * which is occasionally useful and mostly confusing.
-   *
    * @param {string} term
    */
   filter(term) {
@@ -187,9 +116,6 @@ export class LocalizationForm extends BaseComponent {
     let visible = 0;
 
     for (const option of this.options) {
-      // `data-label` first, then the row's own text — which is what carries the
-      // currency code. Matching only `data-label` meant typing "USD" found
-      // nothing, in the one control where a currency is what people search for.
       const label = `${option.dataset.label || ''} ${option.textContent || ''}`.toLowerCase();
       const matches = needle === '' || label.includes(needle);
 
@@ -210,7 +136,7 @@ export class LocalizationForm extends BaseComponent {
     );
   }
 
-  /* ---------------------------------------------------------- internals -- */
+  /* ---------------------------------------------------------- internals -- ---- */
 
   /**
    * @returns {HTMLElement|null}

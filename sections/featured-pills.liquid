@@ -1,78 +1,11 @@
 {% comment %}
-  sections/featured-pills.liquid
-
   One subject, told four ways: a heading cluster, a strip of pill-shaped
   options under it, and one panel of blocks per option.
-
-  ## Why it is not `sections/main-faq.liquid` with a different preset
-
-  The FAQ's tab strip is a rail of names beside a column of answers — the
-  question is which answer you want, and the strip is a table of contents. This
-  is the opposite reading: four facets of the *same* product, each a small
-  composition of its own, and the strip is a set of equally weighted choices
-  rather than a list to walk down. That is why the options carry a mark rather
-  than only a word, and why the panel is a full-width stage instead of a column
-  of prose.
-
-  A merchant who wants questions and answers should reach for the FAQ. A
-  merchant who has one product and four stories about it — what is in it, how it
-  works, where it comes from, what the company believes — should reach for this.
-
-  ## What this file is, and what it is not
-
-  It is the frame, the two axes and the background. Everything with content in
-  it is a block, and every block that only makes sense here is private:
-
-    Pill tabs        `blocks/_featured-pills-tabs.liquid`
-    One pill + panel `blocks/_featured-pills-tab.liquid`
-    Checklist row    `blocks/_featured-pills-check.liquid`
-    Step card        `blocks/_featured-pills-step.liquid`
-
-  Private — the leading underscore — because each one is a piece of this
-  composition rather than a component the theme offers. A checklist row dropped
-  into a footer is a row with nothing to be a row of; a panel outside a strip is
-  a `role="tabpanel"` with no tab. They are addable here and nowhere else.
-
-  Everything else the preset builds with is a block the theme already had: the
-  heading cluster is a **Section header** holding a **Subheading** and a
-  **Text**, and the panels are **Group**, **Card content**, **Image card**,
-  **Image**, **Button** and **Highlight** — none of which knows it is in this
-  section.
-
-  ## The shell is `sections/featured-offer.liquid`'s, setting id for setting id
-
-  Container, colour scheme, background media, the four border widths, the eight
-  corner radii behind a Desktop/Mobile switch, the gaps behind another, the
-  minimum height, the margins, the stack layer and the whole spacing group —
-  every id here is one that section already carries, and both reach them through
-  `snippets/spacing.liquid`, `snippets/background-media.liquid` and
-  `snippets/container.liquid` rather than reimplementing any of it. A merchant
-  who has arranged a Featured offer has arranged this one.
-
-  What it adds is nothing. That is the point: a fifth section with a fifth
-  vocabulary for padding is a fifth place to look for the same slider.
-
-  ## The layout is a flex container of the section's own children
-
-  The heading cluster sits above the strip because they are siblings in a
-  column, not because a selector went looking for either of them. A merchant who
-  deletes the heading is left with a section that still lays out, and one who
-  switches **Direction** to Horizontal gets the heading beside the strip without
-  a second preset existing to describe that arrangement.
 {% endcomment %}
 
 {%- liquid
   assign s = section.settings
 
-  comment
-    The background is the colour scheme's until the merchant says otherwise:
-    either a colour of their own — the soft wash the preset ships — or a picture
-    behind the whole section.
-
-    The colour is emitted as a real `background` declaration rather than a
-    custom property because `color-scheme-container` paints a background *and* a
-    gradient image, and only the shorthand clears both.
-  endcomment
   assign background_media = s.background_media | default: 'none'
   assign has_background_media = false
   if background_media != 'none'
@@ -84,24 +17,6 @@
     assign background_paint = s.background_color | default: ''
   endif
 
-  comment
-    ---- the frame ----
-
-    One width per side rather than one for the box, summed into `border_any` so
-    the three properties are emitted only when at least one side is drawn — a
-    zero-width border with a colour on it is three declarations that paint
-    nothing.
-
-    Opacity goes into the colour rather than onto the element: `opacity` on the
-    section would fade the panels along with their frame. With no colour picked
-    the border is `currentColor`, which the colour filters cannot take an alpha
-    channel from, so `color-mix` does the same fade in the browser instead and
-    both paths honour the slider.
-
-    Identical to `sections/featured-offer.liquid` and
-    `sections/expert-quote.liquid` by construction, not by coincidence — same
-    ids, same resolution, same stylesheet shape.
-  endcomment
   assign border_line = s.border_style | default: 'none'
 
   assign bw_top = 0
@@ -126,23 +41,6 @@
     endif
   endif
 
-  comment
-    ---- corners ----
-
-    Four corners, twice — one set per device, behind the same Desktop/Mobile
-    switch the padding and the gaps already use.
-
-    They reach CSS as a single border-radius shorthand, in the order that
-    property takes — top-left, top-right, bottom-right, bottom-left. Nothing in
-    the stylesheet reads them as a bare number, which is what makes sending a
-    shorthand safe.
-
-    A phone gets its own four because the same number does not read the same at
-    both widths: 40px is a soft lift across 1400px and a heavy scoop out of a
-    390px screen. Each mobile corner falls back to its desktop value when the
-    setting is missing entirely, so a section saved before these existed keeps
-    one shape at every width.
-  endcomment
   assign r_tl = s.border_radius_top_left | default: 40 | plus: 0
   assign r_tr = s.border_radius_top_right | default: 40 | plus: 0
   assign r_bl = s.border_radius_bottom_left | default: 0 | plus: 0
@@ -156,46 +54,15 @@
   assign margin_top = s.margin_top | default: 0 | plus: 0
   assign margin_bottom = s.margin_bottom | default: 0 | plus: 0
 
-  comment
-    ---- the floor ----
-
-    A minimum, not a height. The section grows past it whenever a panel needs
-    the room — and the four panels here are four different heights by nature, so
-    the floor is what stops the page jumping as the customer moves between them.
-
-    Zero is the off switch and is what an untouched section carries, which is
-    why this is emitted unconditionally: `min-block-size: 0px` is what the box
-    would do anyway, so there is no state where writing it changes a layout that
-    was not asking for it.
-  endcomment
   assign min_height = s.min_height | default: 0 | plus: 0
   assign min_height_mobile = s.min_height_mobile | default: min_height | plus: 0
 
-  comment
-    ---- layout ----
-
-    The Group block's vocabulary rather than a second one invented here:
-    Alignment is always the horizontal axis and Position always the vertical,
-    and `assets/base.css` decides which CSS property reads which from the
-    direction. `snippets/group.liquid` sets out why that swap lives in one place.
-
-    This file does not guess which child is which. Horizontal is a flex row of
-    the section's own children, so the heading cluster and the strip sit side by
-    side because they are siblings.
-  endcomment
   assign direction = s.direction | default: 'column'
   assign is_row = false
   if direction == 'row'
     assign is_row = true
   endif
 
-  comment
-    Two settings, one control. The horizontal list carries the distribution
-    options on top of the three alignments, because on a row they land on the
-    same `justify-content` and only one of the two could win. On a column they
-    would be inert, so that list is the plain three and the merchant never sees
-    an option that does nothing.
-  endcomment
   if is_row
     assign alignment_setting = s.alignment_row | default: 'center'
   else
@@ -211,12 +78,6 @@
       assign alignment_axis = 'start'
   endcase
 
-  comment
-    The alignment with the distribution folded in, and the plain one beside it.
-    They differ exactly when a distribution is chosen, and the phone stack needs
-    the plain one: `space-between` is valid on the `justify-content` it feeds on
-    a desktop row and invalid on the `align-items` it would feed once stacked.
-  endcomment
   assign inline_axis = alignment_axis
   if is_row
     case alignment_setting
@@ -236,22 +97,6 @@
       assign block_axis = 'start'
   endcase
 
-  comment
-    ---- the gaps ----
-
-    A Desktop/Mobile pair behind one switch, the shape every other section in
-    the theme uses. Both pairs are published unconditionally and
-    `assets/base.css` picks which applies at a given width, because the pair the
-    merchant is not looking at in the editor is still the pair the other
-    breakpoint renders.
-
-    `plus: 0` rather than `default` alone, which would replace a deliberate 0 —
-    a gap a merchant can legitimately want when the strip is meant to sit flush
-    under the heading. Each mobile axis falls back to its desktop value when the
-    setting is absent entirely, so a section saved before the mobile pair existed
-    renders as it did; one added since gets the schema default, which is half the
-    desktop one.
-  endcomment
   assign gap_x = s.gap_horizontal | default: 40 | plus: 0
   assign gap_y = s.gap_vertical | default: 40 | plus: 0
   assign gap_x_mobile = s.gap_horizontal_mobile | default: gap_x | plus: 0
@@ -262,13 +107,6 @@
     assign content_classes = content_classes | append: ' featured-pills__content--stack-mobile'
   endif
 
-  comment
-    Reverse is `flex-direction: row-reverse`, not a second ordering of the
-    blocks — the markup stays in the order a screen reader and a keyboard read
-    it, and only the paint order changes. That is also why it is row-only: a
-    reversed *column* would put the panels above the heading that names them for
-    everybody using the page without sight of it.
-  endcomment
   if is_row and s.reverse
     assign content_classes = content_classes | append: ' featured-pills__content--reverse'
   endif
@@ -314,12 +152,7 @@
   {%- endif -%}
 
   <div class="featured-pills__inner {% render 'container', width: s.container_width %}">
-    {%- comment -%}
-      `children: true` staggers the direct children — the heading cluster, then
-      the strip — so the section arrives as one cascade rather than as a wall
-      that appears at once. The stagger is a setting; at its default of 0 they
-      simply arrive together.
-    {%- endcomment -%}
+
     <motion-effect
       class="{{ content_classes }}"
       data-easing="outQuint"
@@ -331,11 +164,6 @@
   </div>
 </div>
 
-{%- comment -%}
-  Every setting below is a control a merchant reaches in the editor, and the
-  schema is one element's styling surface: splitting it to get under Theme
-  Check's count of 40 would split the thing the settings style.
-{%- endcomment -%}
 {% # theme-check-disable ExcessiveSettingsCount %}
 {% schema %}
 {

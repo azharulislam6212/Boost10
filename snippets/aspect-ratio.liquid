@@ -1,47 +1,7 @@
 {% doc %}
   One ratio keyword, resolved to a CSS `aspect-ratio` value.
 
-  ## Why this is not ten strings in each caller
-
-  The names are the theme's vocabulary — every image control in every block and
-  section offers the same list — and the numbers behind them live here, once.
-  They used to live in two `case` blocks inside `snippets/image.liquid`, which
-  was fine while an `<img>` was the only thing that had a shape.
-  `blocks/image-card.liquid` gives the *card* the ratio, because its picture is
-  a background rather than an element, and a third copy of "portrait means
-  4 / 5" is the copy that ends up disagreeing with the other two.
-
-      portrait       4 / 5
-      3-4            3 / 4
-      2-3            2 / 3
-      9-16           9 / 16
-      1-1            1 / 1
-      5-4            5 / 4
-      4-3            4 / 3
-      3-2            3 / 2
-      16-9           16 / 9
-      aspect-ratio   the image's own ratio
-
-  Anything else is passed through, so a caller with a genuine one-off can hand
-  over `5 / 7` and it lands in the declaration untouched.
-
-  ## The names this theme shipped with
-
-  `square`, `landscape`, `wide`, `tall`, `long` and `adapt` were the old
-  vocabulary. Every schema, template and caller in the theme has been moved off
-  them, but they still resolve, and deleting them is not a tidy-up worth doing:
-  an unrecognised keyword does not fail loudly here — it falls through `else`
-  and is emitted raw, and `aspect-ratio: long` is a declaration the browser
-  drops on the floor. The image then has no reserved box and the layout moves
-  as it loads. Six `when` branches are cheaper than that.
-
-  One of them changed meaning and is the reason to read this twice: **portrait
-  was 3 / 4 and is now 4 / 5**. It is the only name in either list that means
-  something different than it used to, so a stored `portrait` that predates the
-  migration renders slightly shorter than it did. `3-4` is the name that keeps
-  the old shape.
-
-  @param {string} [ratio] - One of the names above, or a raw `aspect-ratio` value
+  @param {string} [ratio] - A ratio keyword from the `case` below, or a raw `aspect-ratio` value
   @param {image} [image] - Read for its own ratio when `ratio` is `aspect-ratio`
   @param {string} [fallback] - Used for `aspect-ratio` when the image has no ratio. Default: 1
 
@@ -54,17 +14,6 @@
 {% enddoc %}
 
 {%- liquid
-  comment
-    Two lists in one `case`, in this order: the ten names every image control
-    offers, tallest first — the same order the merchant reads them in — and then
-    the old vocabulary, kept resolving so that nothing already saved can reach
-    the `else` branch and be emitted as an invalid declaration.
-
-    Both sit outside the `case` rather than beside the branches they describe.
-    A `case` takes `when` and `else`; anything else between them is parsed
-    and thrown away, and a comment that depends on that is a comment betting the
-    whole page on an implementation detail.
-  endcomment
   assign key = ratio | default: 'aspect-ratio'
 
   case key

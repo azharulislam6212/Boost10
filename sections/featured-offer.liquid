@@ -1,100 +1,11 @@
 {% comment %}
-  sections/featured-offer.liquid
-
   One offer over a photograph: a panel on one side, highlight cards on the
   other, and a strip of details under both.
-
-  ## Why it is not a subscription section
-
-  It was drawn as one, and the Theme Store requirements are the reason it is
-  not. Subscriptions there are the Selling Plan API — a merchant creates selling
-  plans and the theme has to show the selected plan through to the cart. This
-  section has no part in that: its options are links, so a strip that said
-  "Every month / Every 2 months" would advertise a purchase flow the section
-  cannot carry out, and the customer would arrive at a page with nothing
-  subscribed.
-
-  So the option chooser stayed and the subscription vocabulary went. A merchant
-  whose store does sell subscriptions can label the options however their app
-  requires and point each one at the right page; every other merchant gets a
-  chooser for sizes, tiers, bundles or plans. The section is honest about being
-  a promotion either way.
-
-  The same requirement is why the preset carries no ratings, review counts or
-  customer totals. Fabricated figures are listed there as false data and claims,
-  alongside fake countdowns and stock levels, and a number a merchant has to
-  remember to go and delete is a number some store will ship.
-
-  ## The shell is `sections/main-faq.liquid`'s, setting id for setting id
-
-  Container, colour scheme, background media, the four border widths, the two
-  radii, the margins, the layout vocabulary and the gaps — every id here is one
-  that section already carries, and both reach them through
-  `snippets/spacing.liquid`, `snippets/background-media.liquid` and
-  `snippets/container.liquid` rather than reimplementing any of it. A merchant
-  who has arranged an FAQ section has arranged this one.
-
-  What it adds is a minimum height. A panel over a photograph is a hero, and a
-  hero sized only by its content is as tall as whichever paragraph the merchant
-  last edited. The two sliders are a floor, not a height: the section still
-  grows when the content needs more room.
-
-  ## The background drifts, and it is never an empty box
-
-  Parallax is `snippets/background-image.liquid`'s, reached by two settings the
-  Group block already carries. It stands down on touch and under
-  `prefers-reduced-motion`, and it is one shared ticker rather than a scroll
-  listener per section.
-
-  The placeholder is the other half of the same idea. A section whose whole
-  subject is a photograph should show the shape of one before anything is
-  uploaded, so `background-media` is asked for a placeholder here — the panel
-  lands on a picture-shaped box in the editor rather than on the colour scheme,
-  and the merchant can see the layout they are filling in.
-
-  ## The option chooser is `blocks/tabs.liquid`, not a control of its own
-
-  Several options, one selected, and a button under the selected one that goes
-  to that option's page. That is a tablist with one panel each, so it is the
-  theme's tab block set to **Segmented** with a **Button** block inside each
-  tab, and the keyboard behaviour, the sliding marker, the ARIA and the whole
-  button system come with it.
-
-  Three things were added to the tab blocks to make it, and each is generic:
-
-    Segmented           `blocks/tabs.liquid` — the filled track and the options
-                        sharing its width. A Monthly/Yearly switch wants it too.
-    A flag on a tab     `blocks/_tab.liquid` — a short word above an option.
-                        It ships empty; it is the merchant's to write.
-    The tab that opens  `blocks/_tab.liquid` — so the option a merchant leads
-                        with need not be the one listed first, which would
-                        change the order a customer reads and a keyboard walks.
-
-  ## Everything else is blocks the theme already had
-
-  The panel is a **Card content** with a background and a border. The label is a
-  **Subheading**, the heading and the paragraph are **Text**, the cards are
-  **Badge highlight** and the short notes are **Icon with text**. The preset
-  wires them together; none of them knows it is in this section.
-
-  That is also why the layout controls matter more than they look. The section
-  is a flex container of its own children, so the panel sits beside the cards
-  because they are siblings — not because a selector went looking for them —
-  and a merchant who deletes one is left with a section that still lays out
-  rather than one with a hole in it.
 {% endcomment %}
 
 {%- liquid
   assign s = section.settings
 
-  comment
-    The background is the colour scheme's until the merchant says otherwise:
-    either a colour of their own, or a picture behind the whole section.
-
-    The colour is emitted as a real `background` declaration rather than a
-    custom property because `color-scheme-container` paints a background *and* a
-    gradient image, and only the shorthand clears both.
-  endcomment
   assign background_media = s.background_media | default: 'none'
   assign has_background_media = false
   if background_media != 'none'
@@ -106,20 +17,6 @@
     assign background_paint = s.background_color | default: ''
   endif
 
-  comment
-    ---- the frame ----
-
-    One width per side rather than one for the box, summed into `border_any` so
-    the three properties are emitted only when at least one side is drawn — a
-    zero-width border with a colour on it is three declarations that paint
-    nothing.
-
-    Opacity goes into the colour rather than onto the element: `opacity` on the
-    section would fade the offer along with its frame. With no colour picked the
-    border is `currentColor`, which the colour filters cannot take an alpha
-    channel from, so `color-mix` does the same fade in the browser instead and
-    both paths honour the slider.
-  endcomment
   assign border_line = s.border_style | default: 'none'
 
   assign bw_top = 0
@@ -144,29 +41,6 @@
     endif
   endif
 
-  comment
-    ---- corners ----
-
-    Four corners, twice — one set per device, behind the same Desktop/Mobile
-    switch the padding and the gaps already use.
-
-    The top pair ships at 40 and the bottom pair at 0, because a section is a
-    band that lifts away from what is above it and sits flush on what is below:
-    a rounded bottom edge leaves two slivers of the page showing through under
-    it. They are four sliders rather than one number and a rule, so a merchant
-    who wants a fully rounded card can still have one.
-
-    They reach CSS as a single border-radius shorthand, in the order that
-    property takes — top-left, top-right, bottom-right, bottom-left. Nothing in
-    the stylesheet reads them as a bare number, which is what makes sending a
-    shorthand safe.
-
-    A phone gets its own four because the same number does not read the same at
-    both widths: 40px is a soft lift across 1400px and a heavy scoop out of a
-    390px screen. Each mobile corner falls back to its desktop value when the
-    setting is missing entirely, so a section saved before these existed keeps
-    one shape at every width.
-  endcomment
   assign r_tl = s.border_radius_top_left | default: 40 | plus: 0
   assign r_tr = s.border_radius_top_right | default: 40 | plus: 0
   assign r_bl = s.border_radius_bottom_left | default: 0 | plus: 0
@@ -179,52 +53,15 @@
   assign margin_top = s.margin_top | default: 0 | plus: 0
   assign margin_bottom = s.margin_bottom | default: 0 | plus: 0
 
-  comment
-    ---- the floor ----
-
-    A minimum, not a height. The section grows past it whenever the content
-    needs the room, so a merchant who adds a fourth promise to the panel gets a
-    taller section rather than a scrollbar inside one.
-
-    Zero is the off switch and is what an untouched section carries, which is
-    why this is emitted unconditionally: `min-block-size: 0px` is what the box
-    would do anyway, so there is no state where writing it changes a layout that
-    was not asking for it.
-
-    The phone falls back to the desktop number rather than to a constant. A hero
-    900px tall on a laptop is most of a phone screen, so the two are nearly
-    always different — but a section saved before the mobile slider existed
-    should keep the one height it was given.
-  endcomment
   assign min_height = s.min_height | default: 0 | plus: 0
   assign min_height_mobile = s.min_height_mobile | default: min_height | plus: 0
 
-  comment
-    ---- layout ----
-
-    The Group block's vocabulary rather than a second one invented here:
-    Alignment is always the horizontal axis and Position always the vertical,
-    and `assets/base.css` decides which CSS property reads which from the
-    direction. `snippets/group.liquid` sets out why that swap lives in one
-    place.
-
-    This file does not guess which child is which. Horizontal is a flex row of
-    the section's own children, so the offer panel and the proof cards sit side
-    by side because they are siblings.
-  endcomment
   assign direction = s.direction | default: 'row'
   assign is_row = false
   if direction == 'row'
     assign is_row = true
   endif
 
-  comment
-    Two settings, one control. The horizontal list carries the distribution
-    options on top of the three alignments, because on a row they land on the
-    same `justify-content` and only one of the two could win. On a column they
-    would be inert, so that list is the plain three and the merchant never sees
-    an option that does nothing.
-  endcomment
   if is_row
     assign alignment_setting = s.alignment_row | default: 'start'
   else
@@ -240,12 +77,6 @@
       assign alignment_axis = 'start'
   endcase
 
-  comment
-    The alignment with the distribution folded in, and the plain one beside it.
-    They differ exactly when a distribution is chosen, and the phone stack needs
-    the plain one: `space-between` is valid on the `justify-content` it feeds on
-    a desktop row and invalid on the `align-items` it would feed once stacked.
-  endcomment
   assign inline_axis = alignment_axis
   if is_row
     case alignment_setting
@@ -254,13 +85,6 @@
     endcase
   endif
 
-  comment
-    `stretch` is offered here and not on the FAQ's list because this section's
-    two columns are panels rather than runs of text: an offer panel that ends
-    where its paragraph ends, beside a taller column of proof cards, reads as an
-    unfinished box. It is the vertical axis, so it only ever reaches
-    `align-items`, where `stretch` is valid.
-  endcomment
   case s.position
     when 'center'
       assign block_axis = 'center'
@@ -272,22 +96,6 @@
       assign block_axis = 'start'
   endcase
 
-  comment
-    ---- the gaps ----
-
-    A Desktop/Mobile pair behind one switch, the shape every other section in
-    the theme uses. Both pairs are published unconditionally and
-    `assets/base.css` picks which applies at a given width, because the pair the
-    merchant is not looking at in the editor is still the pair the other
-    breakpoint renders.
-
-    `plus: 0` rather than `default` alone, which would replace a deliberate 0 —
-    a gap a merchant can legitimately want when the panel is meant to sit flush
-    against the cards beside it. Each mobile axis falls back to its desktop
-    value when the setting is absent entirely, so a section saved before the
-    mobile pair existed renders as it did; one added since gets the schema
-    default, which is half the desktop one.
-  endcomment
   assign gap_x = s.gap_horizontal | default: 24 | plus: 0
   assign gap_y = s.gap_vertical | default: 24 | plus: 0
   assign gap_x_mobile = s.gap_horizontal_mobile | default: gap_x | plus: 0
@@ -298,18 +106,6 @@
     assign content_classes = content_classes | append: ' featured-offer__content--stack-mobile'
   endif
 
-  comment
-    Reverse is `flex-direction: row-reverse`, not a second ordering of the
-    blocks — the markup stays in the order a screen reader and a keyboard read
-    it, and only the paint order changes. That is also why it is row-only: a
-    reversed *column* would put the guarantees above the offer for everybody
-    using the page without sight of it.
-
-    What it is for is the mirrored arrangement, where the photograph's subject
-    is on the other side of the frame and the panel has to move off it. Which
-    side is a design decision rather than a rebuild, so it is a checkbox and not
-    a second preset that would need every change made to it twice.
-  endcomment
   if is_row and s.reverse
     assign content_classes = content_classes | append: ' featured-offer__content--reverse'
   endif
@@ -350,34 +146,16 @@
   data-section-id="{{ section.id }}"
   style="{{ section_style | strip_newlines | strip }}"
 >
-  {%- comment -%}
-    `priority: true` because this section is a hero and a hero is above the
-    fold. A lazy background here is the largest paint on the page arriving after
-    everything around it, which is the one picture in a theme worth loading
-    eagerly.
 
-    `placeholder` is opt-in in `background-media`, and this is a section that
-    wants it: the whole layout is a panel read against a photograph, so before
-    one is uploaded the merchant should be looking at a picture-shaped box
-    rather than at flat scheme colour with the panel floating on it. It is drawn
-    only when Image is the chosen background and none has been picked — a
-    merchant who wants no picture chooses None and gets nothing.
-  {%- endcomment -%}
   {%- if has_background_media -%}
     {% render 'background-media',
        settings: s,
        priority: true,
        placeholder: 'hero-apparel-1' %}
   {%- endif -%}
-  
 
   <div class="featured-offer__inner {% render 'container', width: s.container_width %}">
-    {%- comment -%}
-      `children: true` staggers the direct children — the offer panel, then the
-      proof cards, then the guarantees — so the section arrives as one cascade
-      rather than as a wall that appears at once. The stagger is a setting; at
-      its default of 0 they simply arrive together.
-    {%- endcomment -%}
+
     <motion-effect
       class="{{ content_classes }}"
       data-easing="outQuint"
@@ -389,11 +167,6 @@
   </div>
 </div>
 
-{%- comment -%}
-  Every setting below is a control a merchant reaches in the editor, and the
-  schema is one element's styling surface: splitting it to get under Theme
-  Check's count of 40 would split the thing the settings style.
-{%- endcomment -%}
 {% # theme-check-disable ExcessiveSettingsCount %}
 {% schema %}
 {

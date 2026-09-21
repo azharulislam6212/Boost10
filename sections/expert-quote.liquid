@@ -1,106 +1,11 @@
 {% comment %}
-  sections/expert-quote.liquid
-
   One endorsement, said by a named person, with the products it is about
   scattered around them.
-
-  ## Why it is not `sections/testimonials.liquid`
-
-  Testimonials is a row of customers: several cards, each a different voice,
-  each equally weighted, and the design's job is to make a quantity of praise
-  legible. This is the opposite shape — a single voice given the whole width,
-  with a face under it and a line drawn from the words to the face so the eye
-  makes the connection before it reads the name.
-
-  A merchant who wants five reviews should reach for Testimonials. A merchant
-  who has one expert, one founder or one practitioner whose word carries the
-  section should reach for this.
-
-  ## What this file is, and what it is not
-
-  It is the frame and the two axes. Everything with content in it is a block:
-
-    Quote and expert   `blocks/_expert-quote-lead.liquid`
-    Featured picture   `blocks/_expert-quote-feature.liquid`
-    Scattered picture  `blocks/_expert-quote-image.liquid`
-
-  The first two are rendered with `content_for 'block'` rather than through
-  `content_for 'blocks'`. That makes them editable but undeletable and
-  undraggable, which is what they should be: a section called Expert quote with
-  the quote dragged into the scatter is a section a merchant can break by
-  accident. Same mechanism, same reason, as `sections/testimonials.liquid`'s
-  header and intro panel.
-
-  The scattered pictures are ordinary repeatable blocks, so the drawing's two
-  are a starting point rather than a limit.
-
-  ## The shell is `sections/featured-offer.liquid`'s, setting id for setting id
-
-  Container, colour scheme, background media, the four border widths, the two
-  radii, the gaps behind a Desktop/Mobile switch, the margins, the stack layer
-  and the whole spacing group — every id here is one that section already
-  carries, and both reach them through `snippets/spacing.liquid`,
-  `snippets/background-media.liquid` and `snippets/container.liquid` rather than
-  reimplementing any of it. A merchant who has arranged a Featured offer has
-  arranged this one.
-
-  ## The stage is a flex row and the scatter is `order`, not `position`
-
-  The drawing has two photographs floating either side of the centre column,
-  staggered so neither lines up with the other. The obvious way to build that is
-  `position: absolute` and two pairs of coordinates, and it is the wrong way:
-  absolutely positioned children are out of flow, so the section is only as tall
-  as its centre column and a merchant who picks a taller photograph gets one
-  hanging out of the bottom of the section and over whatever follows it.
-
-  So the stage is an ordinary flex row — a picture before the featured one, the
-  featured one, a picture after it — and which side a picture lands on is
-  `order` rather than source position. Source order stays the order a screen
-  reader announces and the Tab key follows: the quote, then the person, then the
-  pictures. The stagger is `margin-block-start` on each picture, which is in
-  flow, so the row grows to hold whatever the merchant offsets — and a negative
-  one lifts a picture up beside the expert, which is the arrangement the drawing
-  has.
-
-  ## The row narrows, it does not wrap
-
-  Above the phone the row is `nowrap`. A flex line breaks on the items' basis,
-  before shrinking is ever considered, so a row a few pixels too wide does not
-  come out a few pixels narrower — it wraps, and a wrapped scatter is not a
-  scatter: the picture after the expert drops to a second line and its lift,
-  which is a negative margin, pulls it up over the featured picture. Every
-  tablet held in portrait sat in the band where that happened. Narrowing the
-  scattered pictures is what `flex: 1 1` on them was always asking for.
-
-  A phone keeps `wrap`, because there the featured picture is a line of its own
-  and the wrap is the layout, and it keeps the arrangement it has always had
-  under that: the scattered pictures at the size and the angle they are set to,
-  shoulder to shoulder. The room a tilt is given on the wider two is switched
-  back off there, in one place at the bottom of the expert-quote rules in
-  `assets/base.css`.
-
-  ## One rhythm, many styles
-
-  The pictures keep moving after they arrive, and the settings for that are
-  split deliberately. **How far** and **how fast** are here, so every picture in
-  the section moves to one rhythm and a merchant tunes the whole composition
-  from one place. **Which way** — float, sway, zoom, orbit — and **how far into
-  the cycle** are on each picture, because pictures rising and falling in unison
-  is a lift rather than a drift.
 {% endcomment %}
 
 {%- liquid
   assign s = section.settings
 
-  comment
-    The background is the colour scheme's until the merchant says otherwise:
-    either a colour — or, as the preset ships it, the soft horizontal wash the
-    section was drawn on — or a picture behind the whole section.
-
-    Emitted as a real `background` declaration rather than a custom property
-    because `color-scheme-container` paints a background *and* a gradient image,
-    and only the shorthand clears both.
-  endcomment
   assign background_media = s.background_media | default: 'none'
   assign has_background_media = false
   if background_media != 'none'
@@ -112,24 +17,6 @@
     assign background_paint = s.background_color | default: ''
   endif
 
-  comment
-    ---- the frame ----
-
-    One width per side rather than one for the box, summed into `border_any` so
-    the three properties are emitted only when at least one side is drawn — a
-    zero-width border with a colour on it is three declarations that paint
-    nothing.
-
-    Opacity goes into the colour rather than onto the element: `opacity` on the
-    section would fade the quote along with its frame. With no colour picked the
-    border is `currentColor`, which the colour filters cannot take an alpha
-    channel from, so `color-mix` does the same fade in the browser instead and
-    both paths honour the slider.
-
-    Identical to `sections/featured-offer.liquid` and `sections/main-faq.liquid`
-    by construction, not by coincidence — same ids, same resolution, same
-    stylesheet shape.
-  endcomment
   assign border_line = s.border_style | default: 'none'
 
   assign bw_top = 0
@@ -154,29 +41,6 @@
     endif
   endif
 
-  comment
-    ---- corners ----
-
-    Four corners, twice — one set per device, behind the same Desktop/Mobile
-    switch the padding and the gaps already use.
-
-    The top pair ships at 40 and the bottom pair at 0, because a section is a
-    band that lifts away from what is above it and sits flush on what is below:
-    a rounded bottom edge leaves two slivers of the page showing through under
-    it. They are four sliders rather than one number and a rule, so a merchant
-    who wants a fully rounded card can still have one.
-
-    They reach CSS as a single border-radius shorthand, in the order that
-    property takes — top-left, top-right, bottom-right, bottom-left. Nothing in
-    the stylesheet reads them as a bare number, which is what makes sending a
-    shorthand safe.
-
-    A phone gets its own four because the same number does not read the same at
-    both widths: 40px is a soft lift across 1400px and a heavy scoop out of a
-    390px screen. Each mobile corner falls back to its desktop value when the
-    setting is missing entirely, so a section saved before these existed keeps
-    one shape at every width.
-  endcomment
   assign r_tl = s.border_radius_top_left | default: 40 | plus: 0
   assign r_tr = s.border_radius_top_right | default: 40 | plus: 0
   assign r_bl = s.border_radius_bottom_left | default: 0 | plus: 0
@@ -189,59 +53,14 @@
   assign margin_top = s.margin_top | default: 0 | plus: 0
   assign margin_bottom = s.margin_bottom | default: 0 | plus: 0
 
-  comment
-    ---- the gaps ----
-
-    A Desktop/Mobile pair behind one switch, the shape every other section in
-    the theme uses. Both pairs are published unconditionally and
-    `assets/base.css` picks which applies at a given width, because the pair the
-    merchant is not looking at in the editor is still the pair the other
-    breakpoint renders.
-
-    `plus: 0` rather than `default` alone, which would replace a deliberate 0 —
-    a gap a merchant can legitimately want when a scattered picture is meant to
-    sit flush against the featured one. Each mobile axis falls back to its
-    desktop value when the setting is absent entirely, so a section saved before
-    the mobile pair existed renders as it did; one added since gets the schema
-    default, which is half the desktop one.
-  endcomment
   assign gap_x = s.gap_horizontal | default: 24 | plus: 0
   assign gap_y = s.gap_vertical | default: 24 | plus: 0
   assign gap_x_mobile = s.gap_horizontal_mobile | default: gap_x | plus: 0
   assign gap_y_mobile = s.gap_vertical_mobile | default: gap_y | plus: 0
 
-  comment
-    ---- the shared rhythm ----
-
-    How far a picture travels and how long it takes, inherited by every picture
-    block in the section as custom properties. The style and the phase are each
-    picture's own — see the note at the top on why the split falls there.
-
-    Published unconditionally: a picture whose style is None carries no
-    animation at all, so there is no state where these reach something that was
-    not asking for them.
-  endcomment
   assign motion_distance = s.motion_distance | default: 18 | plus: 0
   assign motion_duration = s.motion_duration | default: 4000 | plus: 0
 
-  comment
-    One slider, four styles — so the distance has to reach the keyframes as
-    three different types: a length for Float and Orbit, an angle for Sway, a
-    plain multiplier for Zoom.
-
-    Converted here rather than in the stylesheet, and that is not a preference.
-    A rotation cannot be derived from a length in CSS without dividing one
-    length by another to strip the unit, and `calc(0deg - 18px * 0.12)` is
-    simply invalid — mixing the two types makes the whole expression invalid at
-    computed-value time, so `rotate` fell back to `none` and Sway did nothing at
-    all. The unit-stripping form that does work, `calc(var(--d) / 1px * 1deg)`,
-    is CSS Values 4 division and not a thing to rely on across every browser the
-    theme supports.
-
-    The ratios are chosen so the four styles read as about the same amount of
-    movement at a given setting: at 18px a picture travels 18px, tips 4.5°, or
-    grows 9%.
-  endcomment
   assign motion_angle = motion_distance | times: 25 | divided_by: 100.0
   assign motion_scale = motion_distance | times: 5 | divided_by: 1000.0 | plus: 1
 
@@ -287,26 +106,10 @@
   {%- endif -%}
 
   <div class="expert-quote__inner {% render 'container', width: s.container_width %}">
-    {%- comment -%}
-      `<figure>` rather than a stack of divs: a quotation with the pictures it
-      is about is exactly what the element is for, and it lets the quote be a
-      real `<blockquote>` and the name a real `<cite>` inside the lead block
-      instead of two paragraphs styled to look like an attribution.
 
-      No `<figcaption>`, deliberately. It has to be the figure's first or last
-      child to count as one, and the name sits several levels down in the middle
-      of the lead — so it would be a `<figcaption>` in name only, announced as a
-      caption by nothing.
-    {%- endcomment -%}
     <figure class="expert-quote__figure">
       {% content_for 'block', type: '_expert-quote-lead', id: 'expert-quote-lead' %}
 
-      {%- comment -%}
-        The stage. The featured picture is written first so it is read first;
-        which side each scattered picture lands on is decided by `order` in
-        `assets/base.css` from the block's own Placement setting, and the source
-        order the keyboard and the screen reader follow never changes.
-      {%- endcomment -%}
       <div class="{{ stage_classes }}">
         {% content_for 'block', type: '_expert-quote-feature', id: 'expert-quote-feature' %}
 
@@ -316,11 +119,6 @@
   </div>
 </div>
 
-{%- comment -%}
-  Every setting below is a control a merchant reaches in the editor, and the
-  schema is one element's styling surface: splitting it to get under Theme
-  Check's count of 40 would split the thing the settings style.
-{%- endcomment -%}
 {% # theme-check-disable ExcessiveSettingsCount %}
 {% schema %}
 {

@@ -1,79 +1,10 @@
 {% doc %}
-  blocks/_featured-pills-tabs.liquid
-
   The pill chooser at the top of **Featured pills**, and the panels it opens.
-
-  ## It is the theme's tab group, not a second one
-
-  The markup is `snippets/tab-group.liquid` — the rail, the marker, the panel
-  area and the whole ARIA contract — and the behaviour is `<tab-group>` in
-  `assets/tabs.js`. Both were written generic for exactly this: a third caller
-  that needs a different *look* and none of a different implementation.
-
-  So the keyboard walk, the measured marker that slides rather than switches,
-  the strip that scrolls instead of wrapping, the drag on a desktop pointer and
-  the panel that rises on every change all arrive with the snippet. What this
-  file adds is a class — `tabs--pills` — and the settings that paint it.
-
-  ## Why it is private, and why it is not `blocks/tabs.liquid`
-
-  `blocks/tabs.liquid` is the theme's general strip: Plain and Segmented, a
-  vertical rail, a divider, a rail width. Its vocabulary is a table of contents
-  beside an answer.
-
-  This one is a row of equally weighted facets, each with a mark of its own, and
-  its vocabulary is a *track* — an outlined lozenge the options sit inside, a
-  rule that travels under the chosen one, and a mark that fills in when its
-  option is picked. Adding all of that to the general block would be six
-  settings every FAQ in every store has to scroll past to reach the two it uses.
-
-  Private — the leading underscore — because a chooser with nothing to choose
-  between is not a block, and the panels it opens are this section's own.
-
-  ## The strip is empty in the markup
-
-  Each nested **Pill** renders a `role="tabpanel"` carrying `data-tab-label`,
-  and `<tab-group>` builds the buttons from those labels — cloning the
-  `<template data-tab-button>` each panel ships so the mark, the number and the
-  flag travel with the option they belong to.
-
-  This is not a shortcut, it is the only shape that works.
-  `{% content_for 'blocks' %}` produces one stream of output, and the buttons
-  and the panels have to end up in two different containers. No Liquid emits
-  nested blocks twice. Either the buttons are generated from the panels, or the
-  merchant types every option's name a second time into this block's settings
-  and keeps two lists in sync by hand.
-
-  With JavaScript off every panel stays visible and stacks. All of the content
-  is reachable; only the switching is missing.
-
-  ## A note on the range settings below
-
-  Shopify validates every `range` for `(max - min) / step <= 101`, and a range
-  that fails it does not fail alone: the schema is rejected whole and *every*
-  setting in this block reads as undefined, so the first thing that breaks is a
-  preset elsewhere reporting an unrelated setting as missing. Both radius
-  sliders stop at 50, which is a lozenge at any strip height this block
-  produces.
 {% enddoc %}
 
 {%- liquid
   assign s = block.settings
 
-  comment
-    Three looks, one strip.
-
-    **Pills** is this section's own: an outlined track with the options at their
-    natural widths inside it and a rule travelling under the chosen one.
-    **Segmented** and **Plain** are `blocks/tabs.liquid`'s two, offered here so a
-    merchant who wants the filled switch or the bare row does not have to swap
-    the block out to get it — the classes are that file's, so both look exactly
-    as they do everywhere else in the theme.
-
-    All three are horizontal. A track running down the side of a page with the
-    options stacked in it is a menu, not a chooser, so the orientation is fixed
-    rather than offered and then quietly ignored.
-  endcomment
   assign strip_style = s.strip_style | default: 'pills'
 
   assign classes = 'tabs--block featured-pills__tabs'
@@ -84,51 +15,11 @@
       assign classes = classes | append: ' tabs--pills'
   endcase
 
-  comment
-    ---- the marker ----
-
-    A rule, a filled pill, or nothing.
-
-    **Rule** is the drawn design: the chosen option keeps the track's own
-    background and gains a line above and below it, which reads as a page
-    selected out of a set rather than as a button pressed. It is the default for
-    Pills and it is why the marker is still a travelling element — the line
-    slides between options, and a line that appears and disappears would be two
-    states rather than one control.
-
-    **Fill** is the pill every other strip in the theme draws. **None** hides
-    the marker entirely, for a strip whose options say which is chosen with
-    their own mark and their own colour.
-  endcomment
   assign marker_style = s.marker_style | default: 'rule'
   if strip_style == 'pills'
     assign classes = classes | append: ' tabs--pills-marker-' | append: marker_style
   endif
 
-  comment
-    ---- what **Width** actually sizes ----
-
-    The track, not the block.
-
-    `blocks/tabs.liquid` sizes the whole group, which is right there: a vertical
-    rail beside a column of prose is one box and it is as wide as the merchant
-    says. Here it would be wrong twice over. The group holds the panels as well
-    as the strip, so a fit-width group is a *panel* as wide as four option names
-    — the composition inside it would be squeezed into a 600px column in the
-    middle of a 1400px section, and nothing about the control the merchant
-    touched said anything about the panel.
-
-    So the group is always Fill and this setting reaches the track alone: Fit is
-    a lozenge as wide as the options in it, Fill stretches it across the section
-    with the options sharing the room. Where a fit track sits is **Alignment**
-    below, which is the rail's `justify-content`.
-
-    Two properties per answer, not one, and for the reason
-    `snippets/group.liquid` sets out at length: `flex` only means anything to a
-    flex item, and the track is one — but an `inline-size` is what sizes it if
-    the rail is ever not a flex container. They agree, so neither context is a
-    special case.
-  endcomment
   if s.width == 'fill'
     assign track_flex = '1 1 auto'
     assign track_size = '100%'
@@ -137,11 +28,6 @@
     assign track_size = 'auto'
   endif
 
-  comment
-    Where the track sits when it is narrower than the section, and where the
-    panels line up under it. One control, because a track pushed to the left
-    with the panels centred under it is two decisions that can disagree.
-  endcomment
   case s.alignment
     when 'start'
       assign align_axis = 'start'
@@ -151,23 +37,12 @@
       assign align_axis = 'center'
   endcase
 
-  comment
-    The line around each option. `none` is a zero width rather than
-    `border-style: none`, so the buttons keep the same box either way and
-    choosing None does not resize the strip.
-  endcomment
   assign tab_border_style = s.tab_border_style | default: 'none'
   assign tab_border_width = 0
   if tab_border_style != 'none'
     assign tab_border_width = s.tab_border_width | default: 1 | plus: 0
   endif
 
-  comment
-    The track's own outline, resolved the same way and for the same reason. With
-    no colour picked it is `currentColor` faded by `color-mix`, because the
-    colour filters cannot take an alpha channel from a keyword — the pattern
-    every border in this theme uses.
-  endcomment
   assign track_border_style = s.track_border_style | default: 'dashed'
   assign track_border_width = 0
   if track_border_style != 'none'
@@ -222,47 +97,14 @@
   {%- endif -%}
   --tabs-tab-padding-block: {{ s.tab_padding_block | default: 10 | plus: 0 }}px;
   --tabs-tab-padding-inline: {{ s.tab_padding_inline | default: 20 | plus: 0 }}px;
-  {%- comment -%}
-    ---- the option's own surface ----
 
-    A track with a background and options with none is the main strip: one
-    lozenge, the options reading as regions of it. A track with *no* background
-    and options that each carry one is the other arrangement the design uses —
-    the numbered routine chooser, which is three white pills on the section's
-    own colour with nothing drawn around them.
-
-    Both are the same component with the paint moved, so this is a setting and
-    not a second strip style. Left empty it emits nothing and the option is
-    transparent, which is what every strip in the theme did before it existed.
-
-    The chosen option takes the second colour when one is given and keeps the
-    first when it is not — a strip whose selection is said by a rule or a mark
-    does not need its pill to change as well.
-  {%- endcomment -%}
   {%- if s.tab_background != blank -%}
     --tabs-tab-background: {{ s.tab_background }};
   {%- endif -%}
   {%- if s.tab_background_active != blank -%}
     --tabs-tab-background-active: {{ s.tab_background_active }};
   {%- endif -%}
-  {%- comment -%}
-    ---- the two tab colours ----
 
-    Two fields, because they are two decisions: the colour an option's name is,
-    and the colour the chosen one becomes.
-
-    **Tab color** has no default: left alone it emits nothing, the name inherits
-    the surrounding text colour, and the strip renders against whatever colour
-    scheme it landed in. **Selected tab text color** likewise, because on this
-    strip the chosen option keeps the track's background — there is no filled
-    marker behind it to guarantee a contrast against, so guessing white would be
-    wrong on every light track.
-
-    Setting the first switches the dimming off. A merchant who has said what
-    colour an unselected name is has already answered the question the opacity
-    was guessing at, and leaving it on would serve them a paler version of the
-    colour they picked.
-  {%- endcomment -%}
   {%- if s.tab_color != blank -%}
     --tabs-tab-color: {{ s.tab_color }};
     --tabs-tab-idle-opacity: 1;
@@ -270,17 +112,7 @@
   {%- if s.tab_active_color != blank -%}
     --tabs-tab-active-color: {{ s.tab_active_color }};
   {%- endif -%}
-  {%- comment -%}
-    What the chosen option's mark becomes. Emitted here rather than on each
-    panel because "the selected one is filled green" is a property of the strip:
-    a merchant setting it four times, once per option, is four places for it to
-    drift out of step.
 
-    Each is read by `.tabs--pills .tabs__tab[aria-selected='true'] .icon-mark`
-    in `assets/header.css` as an override of the `--icon-mark-*` properties the
-    panel's own mark published, so an option that never chose a Shape is
-    untouched and keeps drawing the glyph on its own.
-  {%- endcomment -%}
   {%- if s.mark_active_fill != blank -%}
     --tabs-mark-active-fill: {{ s.mark_active_fill }};
   {%- endif -%}
@@ -293,36 +125,19 @@
   {%- if s.mark_check_color != blank -%}
     --tabs-mark-check-color: {{ s.mark_check_color }};
   {%- endif -%}
-  {%- comment -%}
-    Whether the chosen option keeps its ring.
 
-    A property rather than a class because the answer is an opacity and CSS has
-    no way to ask "did the merchant pick a fill?" — which is the question this
-    is standing in for. The drawn design fills the chosen mark in solid and the
-    dotted ring around it has nothing left to do, so Off is the default; a strip
-    whose marks are rings rather than discs turns it on and keeps them.
-  {%- endcomment -%}
   {%- if s.mark_active_ring -%}
     --tabs-mark-active-ring-opacity: 1;
   {%- else -%}
     --tabs-mark-active-ring-opacity: 0;
   {%- endif -%}
-  {%- comment -%}
-    The group fills the section; the track is what **Width** sizes. See the note
-    above on why those are two different boxes.
-  {%- endcomment -%}
+
   --tabs-flex: 1 1 0%;
   --tabs-width: 100%;
   --tabs-track-flex: {{ track_flex }};
   --tabs-track-width: {{ track_size }};
 {%- endcapture -%}
 
-{%- comment -%}
-  Captured, because the shell has to wrap it. `blocks/tabs.liquid` and
-  `blocks/section-header.liquid` hand their children on the same way: a block
-  stream is a string once it is captured, and a snippet can put a string
-  anywhere.
-{%- endcomment -%}
 {%- capture panels -%}
   {% content_for 'blocks' %}
 {%- endcapture -%}
@@ -331,29 +146,6 @@
   data-block-spacing {{ block.shopify_attributes }}
 {%- endcapture -%}
 
-{%- comment -%}
-  The animation wraps the strip rather than replacing it: `<tab-group>` has to
-  be the custom element `assets/tabs.js` defines, so the one that animates goes
-  around it and takes the width with it — a wrapper that did not would leave the
-  strip sized to its content inside a full-width box.
-
-  Its two targets are the rail and the panels, so **Stagger between items** means
-  the options arrive and then what they open.
-{%- endcomment -%}
-{%- comment -%}
-  The no-JS escape hatch for the rule in `assets/header.css` that shows only the
-  selected panel until `<tab-group>` upgrades.
-
-  That rule exists because four full compositions stacked is not a fallback, it
-  is a wall — and the theme editor replays it on every re-render. But it is
-  keyed on `:not(:defined)`, which never stops matching if the module never
-  arrives, and then three quarters of the section is unreachable.
-
-  `<noscript>` is rendered only when scripting is off, which is exactly the case
-  where the upgrade will not happen. The declaration is unlayered, and an
-  unlayered rule beats every `@layer` regardless of specificity or order, so it
-  needs no `!important` and no selector arms race with the stylesheet.
-{%- endcomment -%}
 <noscript>
   <style>
     tab-group.featured-pills__tabs:not(:defined) .tabs__panel { display: block; }
@@ -375,11 +167,6 @@
      attributes: tab_attributes %}
 </motion-effect>
 
-{%- comment -%}
-  Every setting below is a control a merchant reaches in the editor, and the
-  schema is one element's styling surface: splitting it to get under Theme
-  Check's count of 40 would split the thing the settings style.
-{%- endcomment -%}
 {% # theme-check-disable ExcessiveSettingsCount %}
 {% schema %}
 {

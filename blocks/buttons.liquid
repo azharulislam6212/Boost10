@@ -1,42 +1,5 @@
 {% doc %}
-  blocks/buttons.liquid
-
   Two buttons side by side.
-
-  A separate block rather than "add the button block twice", because a pair of
-  buttons is a single design decision: they share alignment, they share a size,
-  they wrap together on mobile, and the second is almost always the quieter one.
-  Two independent blocks give a merchant two ways to get that subtly wrong.
-
-  ## What each button owns, and what the pair owns
-
-  Everything that makes the two read as a *pair* is set once: size, corner
-  radius, border, width, icon size, hover effect, alignment. A merchant cannot
-  accidentally ship a large pill beside a small square, because there is nowhere
-  to express that.
-
-  Everything that distinguishes them is per button: label, link, new tab,
-  variant, the six Custom colours, and the icon. That is the full set the
-  standalone Button block offers, so a design moved from one block to the other
-  loses nothing.
-
-  ## Defaults
-
-  Both buttons start Primary, Solid icon badge, right arrow — the theme's house
-  call to action — and the second is authored Secondary so the pair has an
-  obvious hierarchy the moment it is added. Nothing here is a new class or a new
-  styling mechanism: every value below is one that `snippets/button.liquid`
-  already accepts.
-
-  ## Why a placeholder in the editor
-
-  A button with no label renders nothing, which is right on a live page and
-  wrong in the Theme Editor: an empty block has no box to click, nothing to
-  highlight when it is selected, and nothing that visibly changes when a setting
-  moves — so the preview looks broken rather than empty. In `design_mode` only,
-  a blank label falls back to a placeholder, so both buttons are always present
-  and every edit is visible immediately. On a live page a blank label still
-  renders nothing at all.
 {% enddoc %}
 
 {%- liquid
@@ -47,12 +10,6 @@
   endcapture
   assign icon_size = icon_px | plus: 0
 
-  comment
-    One `style` attribute, never two. The spacing snippet emits its own by
-    default, and a tag carrying two of them keeps the first and silently drops
-    the second — which is how a padding slider ends up moving a value that never
-    reaches the page. Declarations only, concatenated into the tag below.
-  endcomment
   capture pair_spacing
     render 'spacing', block: s, declarations: true
   endcapture
@@ -64,11 +21,6 @@
     assign label_2 = label_2 | default: 'Button'
   endif
 
-  comment
-    The six Custom properties, per button. Written only for the button actually
-    set to Custom, and named to match what `base.css` reads so nothing has to
-    translate between the two.
-  endcomment
   assign colors_1 = ''
   if s.style_1 == 'custom'
     if s.custom_1_background != blank
@@ -113,12 +65,6 @@
     endif
   endif
 
-  comment
-    Radius and thickness fall through to Theme settings unless the merchant
-    moved them off "theme" — a -1 sentinel rather than 0, because 0 is a
-    legitimate value a merchant may want and cannot otherwise express. Shared,
-    because two buttons in a pair with different corner radii is not a design.
-  endcomment
   assign shape = ''
   assign radius = s.corner_radius | default: -1 | plus: 0
   if radius >= 0
@@ -132,24 +78,12 @@
   assign inline_1 = colors_1 | append: shape
   assign inline_2 = colors_2 | append: shape
 
-  comment
-    `button--custom-size` is the size class; `button--custom` is the colour
-    variant. One name for two independent choices meant whichever rule came
-    second silently won.
-  endcomment
   assign size_class = s.size | default: 'medium'
   if size_class == 'custom'
     assign size_class = 'custom-size'
   endif
 -%}
 
-{%- comment -%}
-  The entrance is on the wrapper, and only on the wrapper — the pair arrives as
-  one gesture rather than as two buttons racing each other. `block_level: true`
-  maps any word- or letter-splitting preset the section inherits onto the
-  whole-element preset that travels the same way, so neither label is ever torn
-  apart. Everything inside the buttons is still the hover effects' business.
-{%- endcomment -%}
 <motion-effect
   class="block-buttons block-buttons--{{ s.alignment | default: 'start' }}"
   data-block-spacing
@@ -200,11 +134,6 @@
   {%- endif -%}
 </motion-effect>
 
-{%- comment -%}
-  Every setting below is a control a merchant reaches in the editor, and the
-  schema is one element's styling surface: splitting it to get under Theme
-  Check's count of 40 would split the thing the settings style.
-{%- endcomment -%}
 {% # theme-check-disable ExcessiveSettingsCount %}
 {% schema %}
 {

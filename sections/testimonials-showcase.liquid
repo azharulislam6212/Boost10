@@ -1,81 +1,11 @@
 {% comment %}
-  sections/testimonials-showcase.liquid
-
   A column of proof beside lanes of video reviews that never stop moving, and
   the modal one of them opens.
-
-  ## It is a new section, not a mode of `sections/testimonials.liquid`
-
-  That section is a row of written reviews against a filled panel, driven by
-  `<carousel-slider>`, and every one of its settings styles that. This one is a
-  wall of faces on a loop with no arrows, no slides and no pagination — the two
-  share a subject and nothing else. Folding it in would have meant a Layout
-  select whose two options had almost no settings in common, and a merchant
-  scrolling past forty controls that do nothing in the mode they picked.
-
-  So nothing in `sections/testimonials.liquid`, `blocks/_testimonial-*.liquid`
-  or `assets/testimonial-product.js` is touched by this file. The private blocks
-  here are `_showcase-*` and the component is `<testimonial-showcase>`; the two
-  sections can sit on the same page without meeting.
-
-  ## The surface is the theme's, setting id for setting id
-
-  Colour scheme, background media, the four border widths, the opacity slider,
-  the eight corner radii, the margins, the container, the animation family —
-  every id here is the one `sections/feature-cards.liquid` and
-  `sections/testimonials.liquid` already carry, and all three reach them through
-  `snippets/spacing.liquid`, `snippets/background-media.liquid` and
-  `snippets/container.liquid` rather than reimplementing them. A merchant who
-  has set up either of those sections has set up this one.
-
-  ## Two columns, and the lanes own the second
-
-  Above 990px the copy sits beside the lanes; below it, above them. The intro is
-  a fixed column and the lanes take what is left, because the lanes are the part
-  that can absorb any width — a card is a ratio — and a column of text that
-  grows to 700px is a column nobody finishes reading.
-
-  `--sv-intro-width` is published by the intro block and read by the grid here,
-  exactly as `--tc-intro-width` works in `sections/testimonials.liquid`: the
-  block owns its box, the section owns where the box sits. At 0 the intro takes
-  an equal share instead, which is what a section with one lane wants.
-
-  ## The lanes are blocks
-
-  One `_showcase-column` per lane, each with its own direction, speed, offset
-  and list of reviews. `blocks/_showcase-column.liquid` documents why that is a
-  block rather than a **Columns** number, and the short version is that a
-  merchant can answer "why is that one going the wrong way" about a setting and
-  cannot about an index.
-
-  Speed, direction and pause-on-hover are the three controls this section was
-  asked for, and they land in two places on purpose: the first two belong to a
-  lane, because two lanes travelling the same way at the same speed is the one
-  arrangement the design does not want; the last is the section's, because a
-  customer's pointer does not know which lane it is over.
-
-  ## Nothing is fetched for a video nobody opens
-
-  Every card carries its poster and a `<template>`, and the modal is one element
-  for the whole section rather than one per review — see
-  `snippets/showcase-video-modal.liquid` and
-  `assets/testimonial-showcase.js` for both halves of that.
-
-  ## The modal lives outside the container
-
-  It is rendered after the section's own markup rather than inside it. A
-  `<dialog>` in the browser's top layer is not affected by an ancestor's
-  `overflow`, `transform` or `filter` — but the theme editor's section wrapper
-  and the background media's clip are both ancestors that would otherwise
-  contain it during the entrance animation, before it is promoted.
 {% endcomment %}
 
 {%- liquid
   assign s = section.settings
 
-  comment
-    ---- the surface, from `sections/feature-cards.liquid` ----
-  endcomment
   assign background_media = s.background_media | default: 'none'
   assign has_background_media = false
   if background_media != 'none'
@@ -87,15 +17,6 @@
     assign background_paint = s.background_color | default: ''
   endif
 
-  comment
-    Opacity goes into the colour rather than onto the element: `opacity` on the
-    section would fade the cards along with the frame.
-
-    With no colour picked the border is `currentColor`, which the colour filters
-    cannot take an alpha channel from — there is nothing to read until the
-    scheme resolves in the browser. `color-mix` does the same fade at that point
-    instead, so both paths honour the slider.
-  endcomment
   assign border_line = s.border_style | default: 'none'
 
   assign bw_top = 0
@@ -121,18 +42,6 @@
     endif
   endif
 
-  comment
-    ---- corners ----
-
-    Four corners, twice — one set per device, behind the same Desktop/Mobile
-    switch the padding and the gaps already use. Same defaults and the same
-    reasoning as `sections/testimonials.liquid`: a section is a band that lifts
-    away from what is above it and sits flush on what is below, and 40px reads
-    as a soft lift across 1400px and as a heavy scoop out of a 390px screen.
-
-    They reach CSS as one `border-radius` shorthand, in the order that property
-    takes — top-left, top-right, bottom-right, bottom-left.
-  endcomment
   assign r_tl = s.border_radius_top_left | default: 40 | plus: 0
   assign r_tr = s.border_radius_top_right | default: 40 | plus: 0
   assign r_bl = s.border_radius_bottom_left | default: 0 | plus: 0
@@ -146,13 +55,6 @@
   assign margin_top = s.margin_top | default: 0 | plus: 0
   assign margin_bottom = s.margin_bottom | default: 0 | plus: 0
 
-  comment
-    ---- the two columns ----
-
-    `plus: 0` rather than `default` alone on the mobile pair: 0 is a gap a
-    merchant can legitimately want on a phone — the lanes flush under the copy —
-    and `default` would replace it with half the desktop value every time.
-  endcomment
   assign gap_x = s.gap_horizontal | default: 56 | plus: 0
   assign gap_y = s.gap_vertical | default: 40 | plus: 0
 
@@ -171,24 +73,6 @@
     assign lane_gap_mobile = 16
   endif
 
-  comment
-    ---- the inner content box ----
-
-    The section itself pads nothing by default, because the lanes are supposed
-    to run off the top and bottom edges of the band — a card cut in half by the
-    frame is what says the column carries on past it, and 80px of section
-    padding turns that into a tidy row of whole cards floating in a box.
-
-    So the inset the copy needs lives here instead, on the column the copy sits
-    in. The lanes bleed; the words do not. A merchant who wants the old
-    behaviour back raises **Section padding** and lowers this, and both controls
-    are in the editor rather than one of them being a number in a stylesheet.
-
-    Four sides behind the same Desktop/Mobile switch the rest of the section
-    uses, and the `nil` test rather than `default` for the mobile four: 0 is an
-    answer a merchant can mean on a phone, and `default` would overwrite it with
-    the desktop value every time.
-  endcomment
   assign content_pt = s.content_padding_top | default: 80 | plus: 0
   assign content_pb = s.content_padding_bottom | default: 80 | plus: 0
   assign content_pl = s.content_padding_left | default: 0 | plus: 0
@@ -214,27 +98,8 @@
   assign media_position = s.media_position | default: 'end'
   assign align_items = s.align_items | default: 'center'
 
-  comment
-    The intro's column, stated on the section rather than read back from the
-    block.
-
-    `sections/testimonials.liquid` reads `--tc-intro-width` off its panel and
-    uses it in the grid above it, which is a custom property travelling *up* the
-    tree — they inherit downwards only, so that expression has always resolved
-    to its fallback. This one is the section's own number, set on the element
-    that owns the grid, and the block keeps a width of its own for the case a
-    merchant wants the copy narrower than the column it sits in.
-
-    At 0 the column takes an equal share, which is what a section with one lane
-    and a centred intro wants.
-  endcomment
   assign intro_width = s.intro_width | default: 0 | plus: 0
 
-  comment
-    `false == blank` is true in Liquid, so a blank check would read "off" as
-    "not set" and turn these back on. `nil` is the only value that means the
-    merchant has not answered yet.
-  endcomment
   assign show_intro = s.show_intro
   if show_intro == nil
     assign show_intro = true
@@ -255,19 +120,8 @@
     assign modal_autoplay = false
   endif
 
-  comment
-    ---- the modal ----
-
-    One id per section, so two of these on one page cannot open each other's
-    videos. It is also what the cards' play buttons fall back to through
-    `data-overlay-open` when the component has not upgraded yet.
-  endcomment
   assign modal_id = 'showcase-video-' | append: section.id
 
-  comment
-    The accent the intro's score and the cards' stars fall back to, so the
-    pieces stay in step with each other without either knowing about the other.
-  endcomment
   assign accent = s.accent_color | default: ''
 
   assign lane_stagger = s.animation_stagger | default: 140 | plus: 0
@@ -324,15 +178,7 @@
   <div class="{% render 'container', width: s.container_width %}">
     <div class="showcase__layout showcase__layout--media-{{ media_position }}{% if show_intro or show_stats %} showcase__layout--split{% endif %}">
       {%- if show_intro or show_stats -%}
-        {%- comment -%}
-          `children: true` staggers the column's own parts — the score row, the
-          heading, the copy, the buttons — so the section opens as one cascade
-          rather than as a wall of text arriving at once.
 
-          `kind: 'text'` because that is what this column is. The lanes opposite
-          take the image family, where the presets move a panel rather than
-          splitting it into words.
-        {%- endcomment -%}
         <motion-effect
           class="showcase__intro"
           {% render 'motion-attrs', kind: 'text', section: s, children: true %}
@@ -347,15 +193,6 @@
         </motion-effect>
       {%- endif -%}
 
-      {%- comment -%}
-        One `<motion-effect>` around all the lanes with `data-target=".showcase-lane"`
-        and a stagger, rather than an effect on each lane. A lane is a merchant
-        block — `{% content_for 'blocks' %}` renders them all in one call and
-        passes no index — so there is no `forloop.index0` to turn into a
-        per-lane delay. Targeting rather than `data-children` is deliberate: the
-        effect's child is the custom element, not the lanes inside it, and a
-        selector still finds them where a child list would not.
-      {%- endcomment -%}
       <motion-effect
         class="showcase__media"
         {% render 'motion-attrs',
@@ -377,17 +214,8 @@
   </div>
 </div>
 
-{%- comment -%}
-  Outside the section root — see the note at the head of this file on why a
-  dialog cannot be rendered inside an element that may clip or transform it.
-{%- endcomment -%}
 {% render 'showcase-video-modal', id: modal_id, settings: s %}
 
-{%- comment -%}
-  Every setting below is a control a merchant reaches in the editor, and the
-  schema is one element's styling surface: splitting it to get under Theme
-  Check's count of 40 would split the thing the settings style.
-{%- endcomment -%}
 {% # theme-check-disable ExcessiveSettingsCount %}
 {% schema %}
 {

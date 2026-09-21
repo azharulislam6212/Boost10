@@ -1,33 +1,5 @@
 /**
- * media-gallery.js — Boost10
- *
  * `<media-gallery>` and `<media-thumbnails>` — the product media viewer.
- *
- * The gallery is a scroll-snapping list of media, the same mechanism as
- * `<carousel-slider>`, plus the parts that are specific to product media:
- * thumbnails that stay in sync, video and 3D models that only load when asked,
- * and pausing anything playing when the customer moves to another item.
- *
- * The stage is a scroll container rather than an absolutely positioned stack.
- * That means every image is in the document at its natural position, lazy
- * loading works, and a customer can swipe through media before any JavaScript
- * has run. A stack of `position: absolute` slides with `opacity: 0` downloads
- * every image immediately and shows nothing until a script sorts it out.
- *
- * Markup:
- *
- *   <media-gallery data-layout="stacked">
- *     <div data-ref="stage" tabindex="0" role="group" aria-label="…">
- *       <div data-media data-media-id="123" data-media-type="image">…</div>
- *       <div data-media data-media-id="124" data-media-type="video">
- *         <deferred-media>…</deferred-media>
- *       </div>
- *     </div>
- *     <media-thumbnails data-ref="thumbnails">
- *       <button data-thumbnail data-media-id="123" aria-current="true">…</button>
- *     </media-thumbnails>
- *     <p data-ref="status" class="visually-hidden" role="status"></p>
- *   </media-gallery>
  *
  * @module @theme/media-gallery
  */
@@ -53,12 +25,6 @@ export class MediaGallery extends BaseComponent {
   /**
    * The arrows and readout rendered by `snippets/carousel-controls.liquid`.
    *
-   * The gallery is not a `<carousel-slider>` — it coordinates zoom, video
-   * playback and the thumbnail strip, none of which the carousel would
-   * simplify — but it renders the same control bar so the product page and the
-   * collection carousels stay visually identical. `@theme/carousel-controls` is
-   * the shared part; nothing about the carousel leaks in here.
-   *
    * @type {import('@theme/carousel-controls').ControlRefs}
    */
   #external = { previous: null, next: null, current: null, total: null, bar: null };
@@ -67,8 +33,6 @@ export class MediaGallery extends BaseComponent {
     this.#activeId = this.media[0]?.dataset.mediaId ?? null;
     this.#external = findExternalControls(this.id);
 
-    // Controls may be nested or detached; either way the buttons step the
-    // gallery rather than reaching into it.
     this.on(this, 'click', (event) => {
       const button = event.target instanceof Element ? event.target.closest('[data-ref="previous"], [data-ref="next"]') : null;
       if (!button) return;
@@ -89,8 +53,6 @@ export class MediaGallery extends BaseComponent {
     this.on(this.refs.stage, 'scroll', onScroll, { passive: true });
     this.on(this.refs.stage, 'keydown', this.#onKeydown);
 
-    // Thumbnails report their own clicks rather than this element reaching into
-    // them, so the two stay independently testable.
     this.on(this, 'click', (event) => {
       const thumb = event.target instanceof Element ? event.target.closest('[data-thumbnail]') : null;
       if (!thumb) return;
@@ -110,7 +72,7 @@ export class MediaGallery extends BaseComponent {
     this.#observer = null;
   }
 
-  /* --------------------------------------------------------- public API -- */
+  /* --------------------------------------------------------- public API -- ---- */
 
   /**
    * @returns {HTMLElement[]}
@@ -136,9 +98,6 @@ export class MediaGallery extends BaseComponent {
   /**
    * Show a specific media item.
    *
-   * Called directly by `<media-coordinator>` when the variant changes, and by
-   * thumbnail clicks.
-   *
    * @param {string|number} mediaId
    * @param {Object} [options]
    * @param {boolean} [options.animate=true]
@@ -150,8 +109,6 @@ export class MediaGallery extends BaseComponent {
     const target = this.media.find((item) => item.dataset.mediaId === id);
     if (!target) return false;
 
-    // Anything playing in the item being left must stop, or a customer ends up
-    // with audio from an image they can no longer see.
     this.#pauseAllExcept(target);
 
     this.refs.stage.scrollTo({
@@ -162,29 +119,21 @@ export class MediaGallery extends BaseComponent {
     this.#setActive(id);
 
     if (focusStage) {
-      // Focus the stage, not the media: focusing an image says nothing useful,
-      // and focusing a video steals the play button's own announcement.
       this.refs.stage.focus({ preventScroll: true });
     }
 
     return true;
   }
 
-  /**
-   * Pause every video and model in the gallery.
-   */
+  /** Pause every video and model in the gallery. */
   pauseAll() {
     this.#pauseAllExcept(null);
   }
 
-  /* ---------------------------------------------------------- internals -- */
+  /* ---------------------------------------------------------- internals -- ---- */
 
   /**
    * Derive the active item from the scroll position.
-   *
-   * Reading the scroll offset rather than tracking an index keeps the state
-   * correct however the customer moved: swipe, trackpad, keyboard, thumbnail, or
-   * a browser restoring scroll on a Back navigation.
    *
    * @private
    */
@@ -233,10 +182,6 @@ export class MediaGallery extends BaseComponent {
   /**
    * Moves by one item, clamped at both ends.
    *
-   * Clamped rather than wrapping, because the arrows are disabled at the ends
-   * and a control that looks dead but still acts is worse than one that does
-   * neither.
-   *
    * @param {number} delta
    */
   step(delta) {
@@ -273,8 +218,6 @@ export class MediaGallery extends BaseComponent {
     renderControls(controls, index + 1, count);
     toggleControls(controls, count > 1);
 
-    // Disabled at the ends. The gallery does not loop unless the merchant asked
-    // for it, so the first and last item are real boundaries.
     const loop = this.dataset.loop === 'true';
     controls.previous?.classList.toggle('carousel-button--disabled', !loop && index <= 0);
     controls.next?.classList.toggle('carousel-button--disabled', !loop && index >= count - 1);
@@ -310,8 +253,6 @@ export class MediaGallery extends BaseComponent {
       }
 
       for (const frame of item.querySelectorAll('iframe')) {
-        // Both YouTube and Vimeo accept a postMessage pause. Sending both is
-        // harmless: each ignores the other's vocabulary.
         frame.contentWindow?.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*');
         frame.contentWindow?.postMessage('{"method":"pause"}', '*');
       }
@@ -361,17 +302,7 @@ defineComponent('media-gallery', MediaGallery);
    <media-thumbnails>
    ========================================================================== */
 
-/**
- * The thumbnail strip.
- *
- * A list of buttons, not links, because they change what is displayed rather
- * than navigating. `aria-current` marks the active one, and the strip scrolls
- * the active thumbnail into view when the gallery moves — otherwise swiping
- * through ten images leaves the thumbnails showing the first three.
- *
- * `setActive()` is called directly by `<media-gallery>`. No event, no listener:
- * the gallery owns the active media, and this displays it.
- */
+/** The thumbnail strip. */
 export class MediaThumbnails extends BaseComponent {
   /**
    * @returns {HTMLElement[]}
@@ -396,7 +327,6 @@ export class MediaThumbnails extends BaseComponent {
       if (current) active = thumb;
     }
 
-    // `nearest` scrolls the strip and leaves the page alone.
     active?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   }
 }

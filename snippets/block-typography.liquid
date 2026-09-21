@@ -2,61 +2,7 @@
   Resolves a text block's typography and colour settings into CSS custom
   properties.
 
-  ## What lives here and what lives in CSS
-
-  The named presets — Paragraph, Subheading, Heading 1–6 — are **not** resolved
-  here. Each one is a class in `assets/base.css` that points `--block-font-*` at
-  the matching theme token:
-
-      .block-text--h2 { --block-font-size: var(--font-h2-size); … }
-
-  That is deliberate. Those tokens are already written by
-  `snippets/css-variables.liquid` from Theme settings › Typography, so a preset
-  that referenced them through Liquid would be a second copy of the same map,
-  free to drift. A class hands the resolution to the cascade and keeps Theme
-  settings the single source of truth: change H2 in theme settings and every
-  block on the Heading 2 preset follows, with no re-render of anything.
-
-  This snippet therefore emits **only** what a class cannot know:
-
-    * the Custom preset's per-block overrides
-    * the colour the merchant chose, including a literal gradient
-
-  A block on any other preset emits nothing from the typography half, so it
-  inherits the class and the global scale underneath it.
-
-  ## Why custom properties rather than declarations
-
-  `font-size: 2.4rem` written inline beats every stylesheet including the mobile
-  media query, and there is no way to write a breakpoint into a style attribute.
-  `--block-font-size: 2.4rem` is read by a rule in `base.css` that can still swap
-  it below 750px.
-
-  ## Colour is one setting, four outcomes
-
-  `color` replaces the old pair of `gradient` + `text_color` selects, which could
-  contradict each other — a stored colour still applying underneath a gradient
-  the merchant switched to later. One select cannot:
-
-    inherit   nothing emitted; the colour scheme wins
-    muted     the scheme's accent/muted text colour
-    custom    the merchant's swatch, from Appearance › Text colour
-    gradient  no colour at all — `--block-text-gradient` instead, and
-              `.block-text--gradient` in `base.css` owns the clip
-
-  Gradient text needs `background-image` plus `color: transparent` set together;
-  one without the other is invisible text. So the solid colour is not emitted in
-  that branch at all.
-
   @param {object} block - `block.settings`
-
-  Setting ids read:
-    preset, font_family, font_weight, font_size, font_size_mobile,
-    line_height, letter_spacing, text_transform, color, text_color_custom,
-    text_gradient
-
-  Returns: a semicolon-terminated declaration list with no `style=` wrapper, so
-  the caller can concatenate it with its own properties into one attribute.
 
   @example
     <div class="block-text" style="{% render 'block-typography', block: block.settings %}">
@@ -82,21 +28,11 @@
       assign out = out | append: '--block-font-weight:' | append: block.font_weight | append: ';'
     endif
 
-    comment
-      Sizes are stored in px because that is what a merchant thinks in, and
-      emitted in rem against the 62.5% root so a customer who enlarged their
-      browser text keeps that preference. Same conversion as css-variables.
-    endcomment
     if block.font_size != blank
       assign size_rem = block.font_size | divided_by: 10.0
       assign out = out | append: '--block-font-size:' | append: size_rem | append: 'rem;'
     endif
 
-    comment
-      Mobile falls back to the desktop value rather than to the global scale.
-      A merchant who set 72px desktop and left mobile alone wants 72px, not the
-      theme's H2 — surprising them with a third value is worse than being large.
-    endcomment
     if block.font_size_mobile != blank
       assign size_mobile_rem = block.font_size_mobile | divided_by: 10.0
       assign out = out | append: '--block-font-size-mobile:' | append: size_mobile_rem | append: 'rem;'
@@ -104,10 +40,6 @@
       assign out = out | append: '--block-font-size-mobile:' | append: size_rem | append: 'rem;'
     endif
 
-    comment
-      Keyword to number, matching the maps in css-variables.liquid exactly.
-      If those change, change these in the same commit.
-    endcomment
     case block.line_height
       when 'tight'
         assign out = out | append: '--block-line-height:1.15;'
@@ -140,22 +72,12 @@
 
   case color_mode
     when 'muted'
-      comment
-        The scheme's muted text colour is `--color-accent-text`. An earlier
-        version of this snippet emitted `var(--color-subtext)`, which no colour
-        scheme defines — so "Subtext" silently did nothing at all.
-      endcomment
       assign out = out | append: '--block-text-color:var(--color-accent-text);'
     when 'custom'
       if block.text_color_custom != blank
         assign out = out | append: '--block-text-color:' | append: block.text_color_custom | append: ';'
       endif
     when 'gradient'
-      comment
-        No solid colour in this branch — see the note above. `color_background`
-        returns a gradient string, or a flat colour if the merchant picked one,
-        and either is a valid `background-image` value.
-      endcomment
       if block.text_gradient != blank
         assign out = out | append: '--block-text-gradient:' | append: block.text_gradient | append: ';'
       endif

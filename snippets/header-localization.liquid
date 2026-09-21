@@ -1,34 +1,6 @@
 {% doc %}
   Country and language selectors for the header and for the menu drawer.
 
-  Both wrap Shopify's own `localization` form, which is the only supported way
-  to change market or locale and is the only version that works with JavaScript
-  off. `<localization-form>` turns a submit button per country into a searchable
-  disclosure; it does not replace the form.
-
-  ## Ref names are namespaced, and that is what stops the drawer crashing
-
-  `BaseComponent` collects every `[data-ref]` under an element and skips the ones
-  inside a nested component — but only if that component is *already registered*.
-  `<market-picker>` is lazy-loaded, so when the drawer upgraded first it adopted
-  this panel as a second `refs.panel`, turned its own into an array, and
-  `refs.panel.animate` threw on open and on close.
-
-  Load order is a race nobody should have to win, so the name no longer
-  collides: `menu`, not `panel`.
-
-  ## Two instances, two id prefixes
-
-
-  The header and the drawer both render this, so every id here is prefixed. Two
-  panels sharing `#CountryPanel` means `aria-controls` on the drawer's trigger
-  points at the header's panel, and a screen reader announces the state of a
-  control the customer cannot see.
-
-  The section settings gate visibility, not the theme settings, so a merchant
-  can show the language switch in the drawer and keep it out of a crowded
-  header.
-
   @param {string} [context] - `header` or `drawer`. Default: header
   @param {object} [section]
 
@@ -58,7 +30,6 @@
     assign font_stack = 'var(--font-accent-family, var(--font-heading-family))'
   endif
 -%}
-
 
 {%- if show_country or show_language -%}
   <div class="market-picker market-picker--{{ scope }}" style="--localization-font: {{ font_stack }};">
@@ -94,15 +65,7 @@
             hidden
           >
             <div class="market-picker__inner">
-            {%- comment -%}
-              Always rendered, shown by CSS. A pointer reaches any row of a
-              250-country list in one flick; a thumb does not, and on a phone the
-              panel is short enough that scrolling to Zimbabwe is a real cost. So
-              the default is `auto`: hidden on desktop, shown on mobile.
 
-              Rendering it and hiding it, rather than rendering it conditionally,
-              is what lets one breakpoint change the answer without a reload.
-            {%- endcomment -%}
             <div class="market-picker__search" data-filter-wrapper>
               <label class="visually-hidden" for="{{ id_prefix }}CountryFilter">
                 {{ 'localization.search_countries' | t }}
@@ -116,11 +79,6 @@
               >
             </div>
 
-            {%- comment -%}
-              A plain list of submit buttons. `role="listbox"` was removed: these
-              options submit a form and reload the page, and a listbox promises
-              a selection that stays put.
-            {%- endcomment -%}
             <ul class="market-picker__list" data-ref="list" role="list">
               {%- for country in localization.available_countries -%}
                 <li>

@@ -1,64 +1,5 @@
 /**
- * comparison-table.js — Boost10
- *
- * `<comparison-table>` — the chooser on the Comparison table section, and the
- * three things about that table Liquid cannot know.
- *
- * ## It does not build the table, and that is the point
- *
- * The grid, the columns, the rows, the dividers and the marks are all rendered
- * by `blocks/_comparison-table.liquid` and laid out by `assets/base.css`. With
- * this module absent every alternative column is on screen, named, complete and
- * readable — the same shape `assets/collection-tabs.js` settled into, and for
- * the same reason: a table that hides half its content behind a script and then
- * fails to load that script has hidden it from search engines as well as from
- * customers.
- *
- * What is left here is what Liquid genuinely cannot do, because `block.blocks`
- * does not exist and `forloop` does not reach inside `{% content_for 'blocks' %}`
- * — a block cannot read its siblings, its children or its own position:
- *
- *   1. **Build each chooser's list.** The list *is* the set of alternative
- *      columns, so every column publishes its own name on
- *      `data-comparison-name` and this reads them all. The alternative is the
- *      merchant typing four names into four columns and keeping them in step by
- *      hand. Same mechanism as `<tab-group>` building its buttons from its
- *      panels.
- *
- *   2. **Correct the two counts.** `--ct-rows` and the column count are
- *      settings because the grid needs both before any child renders. Here they
- *      are re-read from the DOM, so a merchant who adds a seventh claim and
- *      forgets the slider still gets a table with seven rows in it.
- *
- *   3. **Name every mark.** A tick announces as nothing. The markup ships
- *      *Yes* / *No*; this upgrades it to *Third-party lab tested: Yes*, because
- *      it can count a cell's position and Liquid cannot.
- *
- * ## Choosing swaps rather than duplicates
- *
- * Picking *Recovery capsules* in a slot that is not currently showing it moves
- * that column into the slot. If it was already in another slot the two trade
- * places, rather than the same column appearing twice with the customer left to
- * work out why one of their comparisons vanished.
- *
- * ## Markup
- *
- *   <comparison-table data-rows="6" data-slots="2" data-slots-tablet="1" data-slots-mobile="1">
- *     <div data-comparison-column data-comparison-role="features"> … </div>
- *     <div data-comparison-column data-comparison-role="brand"> … </div>
- *     <div data-comparison-column data-comparison-role="product" data-comparison-name="Hydration powder">
- *       <div class="comparison-column__head">
- *         <button data-comparison-trigger aria-expanded="false">
- *           <span data-comparison-trigger-label>Hydration powder</span>
- *         </button>
- *         <div data-comparison-panel role="listbox" hidden></div>
- *       </div>
- *       <div data-comparison-cell data-comparison-kind="cross">
- *         <span data-comparison-mark><svg …><span data-comparison-answer>No</span></span>
- *       </div>
- *       …
- *     </div>
- *   </comparison-table>
+ * The chooser on the Comparison table section.
  *
  * @element comparison-table
  * @module @theme/comparison-table
@@ -82,8 +23,8 @@ export class ComparisonTable extends BaseComponent {
   #features = null;
 
   /**
-   * Which alternative column is in which slot, left to right. Indices into
-   * `#alternatives`; its length is how many slots this breakpoint has.
+   * Which alternative column is in which slot. Indices into #alternatives.
+   *
    * @type {number[]}
    */
   #slots = [];
@@ -103,9 +44,6 @@ export class ComparisonTable extends BaseComponent {
     this.#labelMarks();
     this.#resize();
 
-    // One listener per query rather than one resize handler: a breakpoint
-    // change is the only width that matters here, and `change` fires once at
-    // the crossing instead of on every pixel of a drag.
     for (const query of [TABLET, MOBILE]) {
       this.on(window.matchMedia(query), 'change', () => this.#resize());
     }
@@ -113,16 +51,9 @@ export class ComparisonTable extends BaseComponent {
     this.on(this, 'click', this.#onClick);
     this.on(this, 'keydown', this.#onKeydown);
 
-    // Closing needs a listener outside this element, which is why it is not
-    // delegated. `pointerdown` rather than `click` so a press that starts
-    // outside the panel closes it before the thing under it reacts.
     this.on(document, 'pointerdown', this.#onDocumentPointerDown);
 
     if (isDesignMode()) {
-      // The editor selects blocks the customer cannot see. A column past the
-      // slot count is `hidden`, so clicking it in the sidebar scrolled to
-      // nothing and read as a broken block. Bring it into the first slot
-      // instead and let the editor's own scroll land on something visible.
       this.on(document, 'shopify:block:select', (event) => {
         const target = /** @type {Event} */ (event).target;
         if (!(target instanceof HTMLElement) || !this.contains(target)) return;
@@ -143,7 +74,7 @@ export class ComparisonTable extends BaseComponent {
     this.#close();
   }
 
-  /* ------------------------------------------------------------- reading -- */
+  /* ------------------------------------------------------------- reading -- ---- */
 
   #read() {
     this.#columns = /** @type {HTMLElement[]} */ (
@@ -154,14 +85,7 @@ export class ComparisonTable extends BaseComponent {
     this.#alternatives = this.#columns.filter((column) => column.dataset.comparisonRole === 'product');
   }
 
-  /**
-   * The two numbers the grid needs before any child has rendered, re-read from
-   * the children that have now rendered.
-   *
-   * Rows is the longest column rather than the claims column, so a table whose
-   * claims column is shorter than an answer column still has a track for every
-   * answer instead of dropping the last one into an implicit row of its own.
-   */
+  /** Re-reads the row count from the cells that actually rendered. */
   #applyCounts() {
     let rows = 0;
     for (const column of this.#columns) {
@@ -172,13 +96,11 @@ export class ComparisonTable extends BaseComponent {
     this.classList.toggle('comparison-grid--no-labels', this.#features === null);
   }
 
-  /* ------------------------------------------------------------- layout -- */
+  /* ------------------------------------------------------------- layout -- ---- */
 
   /**
-   * How many alternatives this width shows, and which ones. The assignment is
-   * kept across a breakpoint change wherever it still fits, so a customer who
-   * picked *Energy drops* on a phone and then rotated the device is still
-   * looking at Energy drops.
+   * How many alternatives this width shows, and which ones. A choice is kept
+   * across a breakpoint change wherever it still fits.
    */
   #resize() {
     const count = Math.max(1, Number(this.#slotCount()) || 1);
@@ -190,8 +112,6 @@ export class ComparisonTable extends BaseComponent {
       next.push(typeof kept === 'number' && kept < this.#alternatives.length ? kept : -1);
     }
 
-    // Fill the gaps with whichever columns are not spoken for, in their own
-    // order, so the default arrangement is the merchant's arrangement.
     let candidate = 0;
     for (let position = 0; position < next.length; position += 1) {
       if (next[position] !== -1) continue;
@@ -211,15 +131,7 @@ export class ComparisonTable extends BaseComponent {
     return Number(this.dataset.slots ?? 2);
   }
 
-  /**
-   * Writes the arrangement to the DOM.
-   *
-   * Placement is `order` and `hidden`, never `grid-column`. Columns carry a
-   * definite row span and no column position, so the grid places them into
-   * successive tracks in order-modified document order — which means moving one
-   * is one property, and a column that is `display: none` stops being a grid
-   * item and leaves no empty track behind it.
-   */
+  /** Writes the arrangement to the DOM. */
   #apply() {
     if (this.#features) this.#features.style.order = '0';
 
@@ -246,14 +158,10 @@ export class ComparisonTable extends BaseComponent {
     for (const column of this.#alternatives) this.#buildPanel(column);
   }
 
-  /* ------------------------------------------------------------ chooser -- */
+  /* ------------------------------------------------------------ chooser -- ---- */
 
   /**
    * Fills one column's listbox with every alternative there is.
-   *
-   * Rebuilt on every arrangement change rather than patched, because what marks
-   * the chosen one — `aria-selected`, and the weight `assets/base.css` hangs off
-   * it — is a property of the arrangement rather than of the option.
    *
    * @param {HTMLElement} column
    */
@@ -269,8 +177,6 @@ export class ComparisonTable extends BaseComponent {
     panel.id = panelId;
     trigger.setAttribute('aria-controls', panelId);
 
-    // The button does something now, so it stops saying it does not. See the
-    // note in `blocks/_comparison-column.liquid` on why it ships this way.
     trigger.removeAttribute('aria-disabled');
 
     const label = column.querySelector('[data-comparison-trigger-label]');
@@ -291,13 +197,7 @@ export class ComparisonTable extends BaseComponent {
   }
 
   /**
-   * A column's name, from the attribute it publishes and then from the label
-   * Liquid already rendered into its trigger.
-   *
-   * The second fallback is what keeps the untranslated word out of this file:
-   * the placeholder for an unnamed column is `sections.comparison_table.alternative`
-   * in `locales/en.default.json`, rendered by the column, and read back from
-   * there rather than repeated here in English.
+   * A column's name: its published attribute, else its rendered trigger label.
    *
    * @param {HTMLElement} column
    * @returns {string}
@@ -339,10 +239,6 @@ export class ComparisonTable extends BaseComponent {
   /**
    * Puts the chosen alternative in this column's slot.
    *
-   * When it is already in another slot the two trade places. Showing the same
-   * column twice would silently drop whichever comparison it replaced, and a
-   * customer who cannot see what happened cannot undo it.
-   *
    * @param {HTMLElement} column The column whose chooser was used.
    * @param {number} index Index into `#alternatives`.
    */
@@ -358,14 +254,12 @@ export class ComparisonTable extends BaseComponent {
     this.#apply();
     this.#labelMarks();
 
-    // Focus follows the arrangement: the slot the customer was using is still
-    // in the same place on screen, so its trigger is where they left it.
     const moved = this.#alternatives[index];
     const trigger = moved?.querySelector('[data-comparison-trigger]');
     if (trigger instanceof HTMLElement) trigger.focus();
   }
 
-  /* ---------------------------------------------------------- open/close -- */
+  /* ---------------------------------------------------------- open/close -- ---- */
 
   /** @param {HTMLElement} panel */
   #openPanel(panel) {
@@ -398,10 +292,7 @@ export class ComparisonTable extends BaseComponent {
   }
 
   /**
-   * Moves the listbox's active option. The panel keeps the focus and
-   * `aria-activedescendant` names the option, which is the pattern a collapsed
-   * listbox wants — a roving `tabindex` over the options would put every one of
-   * them in the tab order the moment the panel opened.
+   * Moves the listbox's active option via aria-activedescendant.
    *
    * @param {HTMLElement} panel
    * @param {HTMLElement} option
@@ -482,19 +373,9 @@ export class ComparisonTable extends BaseComponent {
     this.#close();
   };
 
-  /* ------------------------------------------------------------- naming -- */
+  /* ------------------------------------------------------------- naming -- ---- */
 
-  /**
-   * Gives every mark the claim it answers.
-   *
-   * The markup ships *Yes* or *No*, which is already better than a mark that
-   * announces as nothing, but it is only half a sentence: the other half is the
-   * row, and a row is a position rather than an ancestor. This is the one place
-   * that position is knowable, so this is where the two halves are joined.
-   *
-   * Re-run after a swap, because the column in a slot changed and the marks in
-   * it now answer the same claims with different answers.
-   */
+  /** Gives every mark the claim it answers. */
   #labelMarks() {
     if (!this.#features) return;
 
@@ -514,10 +395,6 @@ export class ComparisonTable extends BaseComponent {
         const claim = claims[index];
         if (!answer || !claim) return;
 
-        // Kept on the element so a second pass reads the answer rather than a
-        // sentence it wrote itself. `getAttribute` rather than `dataset`,
-        // because `querySelector` returns an `Element` and only `HTMLElement`
-        // has a `dataset`.
         const base = answer.getAttribute('data-comparison-base') ?? (answer.textContent ?? '').trim();
         answer.setAttribute('data-comparison-base', base);
 

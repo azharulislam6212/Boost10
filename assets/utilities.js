@@ -1,21 +1,7 @@
 /**
- * utilities.js — Boost10
- *
  * Pure, dependency-free helpers. This module imports nothing and touches no
  * component: it is the bottom of the dependency graph, and everything else may
  * import it safely.
- *
- * Contents:
- *   - Network        fetchConfig, RequestError, CartError, parseResponse, getRoute
- *   - Timing         debounce, throttle, rafThrottle, wait, nextFrame
- *   - Money          formatMoney
- *   - Announcements  announce, announceUrgent
- *   - Storage        storage.get / set / remove / has (guarded)
- *   - Environment    prefersReducedMotion, isTouchDevice, matchesQuery
- *   - Visibility     isVisible, isInViewport, onVisible
- *   - Focus          getFocusableElements, trapFocus, releaseFocus
- *   - Gestures       createSwipeDetector, createPinchDetector
- *   - Misc           clamp, uniqueId, escapeHtml, parseJSONScript, setCssVar
  *
  * @module @theme/utilities
  */
@@ -65,10 +51,6 @@ export class CartError extends RequestError {
 /**
  * Builds the request init for every mutating call in the theme.
  *
- * All POST/PUT/DELETE traffic must go through this so that headers, content
- * type and body serialisation stay identical everywhere. Never hand-roll a
- * fetch init object.
- *
  * @param {'json'|'javascript'|'html'} [type='json'] Value used for `Accept`.
  * @param {Object} [options]
  * @param {string} [options.method='POST']
@@ -92,7 +74,6 @@ export function fetchConfig(type = 'json', { method = 'POST', body = null, signa
     'X-Requested-With': 'XMLHttpRequest'
   };
 
-  // FormData sets its own multipart boundary; setting Content-Type breaks it.
   if (!isFormData) {
     baseHeaders['Content-Type'] = type === 'javascript' ? 'application/javascript' : 'application/json';
   }
@@ -115,9 +96,6 @@ export function fetchConfig(type = 'json', { method = 'POST', body = null, signa
 
 /**
  * Parses a response and throws a typed error when the request failed.
- *
- * The Shopify Cart API answers some failures with HTTP 200 and a `status` field
- * in the body, so checking `response.ok` alone is not enough.
  *
  * @param {Response} response
  * @param {Object} [options]
@@ -147,9 +125,6 @@ export async function parseResponse(response, { ErrorClass = RequestError, fallb
 
 /**
  * Resolves a Shopify route from the global `Theme.routes` map.
- *
- * Routes must never be hardcoded: markets prefix URLs with a locale segment, so
- * a literal `/cart/add.js` silently breaks on every non-primary market.
  *
  * @param {string} name Key from `Theme.routes`, e.g. `'cartAdd'`.
  * @param {Object} [options]
@@ -330,9 +305,6 @@ const MONEY_PATTERN = /\{\{\s*(\w+)\s*\}\}/;
 /**
  * Formats an integer number of cents using a Shopify money format string.
  *
- * Never build price strings by hand: merchants configure separators and decimal
- * behaviour per store, and several markets use a comma decimal separator.
- *
  * @param {number|string} cents Amount in the store's minor unit.
  * @param {string} [format] Defaults to `Theme.shop.moneyFormat`.
  * @returns {string}
@@ -404,9 +376,6 @@ export function formatMoney(cents, format) {
  * Writes into one of the two shared live regions rendered by
  * `snippets/live-region.liquid`.
  *
- * Components must never create their own `aria-live` container: duplicates make
- * screen readers announce the same message more than once.
- *
  * @param {string} message Already-translated text.
  * @param {'polite'|'assertive'} [priority='polite']
  */
@@ -418,7 +387,6 @@ export function announce(message, priority = 'polite') {
 
   if (!region) return;
 
-  // Clearing first guarantees a re-announcement when the text is unchanged.
   region.textContent = '';
   requestAnimationFrame(() => {
     region.textContent = message;
@@ -455,21 +423,13 @@ function canUseStorage() {
     window.localStorage.removeItem(probe);
     storageAvailable = true;
   } catch {
-    // Safari private mode, disabled cookies, or a full quota.
     storageAvailable = false;
   }
 
   return storageAvailable;
 }
 
-/**
- * Shop-scoped, failure-tolerant `localStorage` wrapper.
- *
- * Every key is namespaced with `Theme.storageKey`, so a merchant's development
- * and live stores never read each other's data. Every method degrades to a
- * no-op rather than throwing, because storage access throws outright in Safari
- * private browsing.
- */
+/** Shop-scoped, failure-tolerant `localStorage` wrapper. */
 export const storage = {
   /**
    * @param {string} key
@@ -678,9 +638,6 @@ export function getFocusableElements(container) {
 /**
  * Traps Tab navigation inside a container until the returned function runs.
  *
- * Prefer a native `<dialog>` with `showModal()`, which traps focus for free.
- * Use this only for overlays that cannot be a real dialog element.
- *
  * @param {HTMLElement} container
  * @param {Object} [options]
  * @param {HTMLElement|null} [options.initialFocus] Defaults to the first focusable child.
@@ -740,9 +697,6 @@ export function trapFocus(container, { initialFocus = null, signal } = {}) {
 
 /**
  * Horizontal and vertical swipe detection using Pointer Events.
- *
- * The detector never calls `preventDefault` on move, so vertical page scrolling
- * stays native. Constrain the axis in CSS with `touch-action` instead.
  *
  * @param {HTMLElement} element
  * @param {Object} handlers
@@ -911,9 +865,6 @@ export function uniqueId(prefix = 'b10') {
 /**
  * Escapes a string for safe insertion into markup.
  *
- * Prefer `textContent` or `morph()`. Reach for this only when building an
- * attribute value that genuinely has to be a string.
- *
  * @param {string} value
  * @returns {string}
  */
@@ -928,31 +879,6 @@ export function escapeHtml(value) {
 
 /**
  * Reads a `<script type="application/json">` payload rendered by Liquid.
- *
- * Takes either the script element itself, or a container and a selector to find
- * it inside.
- *
- * ## Why both forms
- *
- * The two-argument form was the only one, and **every caller in the theme used
- * the one-argument form** — `parseJSONScript(this.querySelector('[data-variants]'))`
- * and four more like it. With no selector, `container.querySelector(undefined)`
- * searched for an element named `undefined`, found nothing, and returned the
- * fallback. Silently, every time, because a missing payload is a legitimate
- * state for this function and had nothing to warn about.
- *
- * What that cost:
- *
- *   `<variant-picker>`           `#variants` was always `[]`, so no combination
- *                                ever matched and every option change announced
- *                                "unavailable" — the picker looked alive and
- *                                selected nothing.
- *   `<selling-plan-selector>`    no allocations, so no frequencies and no
- *                                subscription prices.
- *   `<shipping-calculator>`      no provinces.
- *
- * Accepting the element is the fix rather than editing five call sites, because
- * the call sites were reading the more obvious of the two signatures.
  *
  * @param {ParentNode|Element|null} source The script element, or a container to search.
  * @param {string} [selector] Required only when `source` is a container.
@@ -974,18 +900,6 @@ export function parseJSONScript(source, selector, fallback = null) {
 /**
  * Read JSON out of an *attribute* rather than out of an element's text.
  *
- * The two look interchangeable and are not, and `parseJSONScript` being the
- * only one that existed is how `<shipping-calculator>` came to parse the word
- * "---" as JSON on every cart page. Shopify's `country_option_tags` puts each
- * country's province list in `data-provinces` on the `<option>` itself, and
- * that option's *text* is a country name — or, for the divider it emits under
- * the shop's own country, three hyphens. Handing that element to a function
- * that reads `textContent` is a parse error on the first load and no provinces
- * ever.
- *
- * An absent attribute is the fallback rather than a warning: a country with no
- * provinces legitimately has none, and there is nothing to report.
- *
  * @param {Element|null|undefined} element
  * @param {string} attribute
  * @param {*} [fallback=null]
@@ -1005,21 +919,6 @@ export function parseJSONAttribute(element, attribute, fallback = null) {
 
 /**
  * Where a button's words live.
- *
- * Two components rewrite an add-to-cart button's text as the customer changes
- * things — `product-form.js` swaps "Add to cart" for "Pre-order" or "Sold out",
- * and `quick-add.js` appends the price and the chosen option to whatever the
- * form wrote. Both used to set `button.textContent`, which replaces every child
- * the button has, so the button could hold text and nothing else: a spinner or
- * an icon inside it survived exactly until the first variant change and then
- * silently vanished. `sections/quick-add.liquid` carried a note saying so, and
- * `assets/base.css` draws that button's arrow badge as a `::after` for the same
- * reason — a pseudo-element is not a child, so `textContent` cannot reach it.
- *
- * A `[data-button-label]` span is the other half of that: the writers aim at it
- * when it is there, so everything beside it is out of the blast radius. Absent,
- * they write the button itself and behave exactly as they always did, which is
- * what keeps every other button in the theme working untouched.
  *
  * @param {HTMLElement} button
  * @returns {HTMLElement} The element to write the label into.
@@ -1056,49 +955,21 @@ export function getCssVar(name, target = document.documentElement) {
 /**
  * Reference count, so nested overlays (a quick add opening the cart drawer)
  * only release the page when the last one closes.
+ *
  * @type {number}
  */
 let scrollLockCount = 0;
 
-
-/**
- * Freezes page scrolling while an overlay is open.
- *
- * Three things happen, and all three are needed:
- *   1. `<smooth-scrollbar>.stop()` is called directly, so Lenis stops driving
- *      the document. No event, no registry: the overlay owns the decision and
- *      calls the method on the element that owns the behaviour.
- *   2. `--scrollbar-width` is published so fixed elements can compensate and
- *      the page does not shift sideways when the scrollbar disappears.
- *   3. The body is pinned with `position: fixed`, which is the only technique
- *      that reliably stops rubber-band scrolling on iOS Safari.
- *
- * Applied as inline styles rather than a class, so scroll locking works before
- * base.css exists and cannot be defeated by merchant CSS.
- */
+/** Freezes page scrolling while an overlay is open. */
 export function lockScroll() {
   scrollLockCount += 1;
   if (scrollLockCount > 1) return;
 
-  // `overflow: hidden` on the root, and nothing else.
-  //
-  // This used to pin the body: `position: fixed` with `top: -scrollY`. That
-  // stops the page scrolling, and it also takes the body out of flow - which
-  // leaves `position: sticky` with no scrolling ancestor to stick to. The header
-  // stopped being pinned and dropped back to where it sits in the document,
-  // which is the top of the page. Opening a country picker or a drawer therefore
-  // looked like the page had jumped to the top; closing it put the scroll back
-  // and the header re-stuck, which looked like the header dropping down.
-  //
-  // The root overflow does the same job without moving anything. The scroll
-  // position is untouched, so there is nothing to restore and nothing to jump.
   const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
 
   document.documentElement.style.setProperty('--scrollbar-width', `${scrollbarWidth}px`);
   document.documentElement.classList.add('scroll-locked');
 
-  // Stopped before the class lands, so the smooth scroller is not still
-  // animating into a page that has just stopped scrolling.
   document.querySelector('smooth-scrollbar')?.stop?.();
 }
 
@@ -1113,10 +984,6 @@ export function unlockScroll() {
   document.documentElement.classList.remove('scroll-locked');
   document.documentElement.style.removeProperty('--scrollbar-width');
 
-  // No `scrollTo` here. The page never moved, so putting it back is what used to
-  // move it: the stored offset was read before the lock and written after it,
-  // and any drift between the two - a smooth scroller mid-animation, a resize,
-  // an anchor - arrived as a jump the moment an overlay closed.
   document.querySelector('smooth-scrollbar')?.start?.();
 }
 
@@ -1127,22 +994,14 @@ export function isScrollLocked() {
   return scrollLockCount > 0;
 }
 
-
 /* ==========================================================================
    Disclosure mechanics
    --------------------------------------------------------------------------
    Opening and closing a `<details>` with a transition, and measuring a panel
    that has no height until it is open.
-
-   These live here rather than in `header.js` because none of them know anything
-   about navigation: they take a `<details>`, they read `data-` attributes, and
-   they leave the styling to whatever stylesheet is in charge. The header uses
-   them for its menus and its drawer; anything else that discloses can too.
    ========================================================================== */
 
 /** Ceiling for waiting on `transitionend`, in case a panel never transitions. */
-// Longer than `--panel-speed` (420ms), because this is the net under the
-// transform's own `transitionend`, not a second way of ending the reveal.
 const DISCLOSURE_FALLBACK = 600;
 
 /** How long the reveal will wait for a panel's height to settle, in frames. */
@@ -1161,14 +1020,6 @@ export function panelOf(details) {
 /**
  * Give a measured panel a pixel height to animate to, and take it away again.
  *
- * A `<details>` panel has no height until it is open, and no *known* height once
- * it is — `auto` cannot be transitioned. So the height is written in pixels for
- * the duration of the transition and released afterwards, which is what lets a
- * submenu opening inside an already-open panel still grow it.
- *
- * Only panels marked `data-mobile-panel` are measured; the desktop ones animate
- * a transform inside a clip and need no height at all.
- *
  * @param {HTMLElement|null} panel
  * @param {'open'|'close'} direction
  */
@@ -1176,8 +1027,6 @@ export function measurePanel(panel, direction) {
   if (!panel || !panel.hasAttribute('data-mobile-panel')) return;
 
   if (direction === 'close') {
-    // From its current height, not from `auto`, or there is nothing to animate
-    // away from.
     panel.style.blockSize = `${panel.scrollHeight}px`;
     void panel.offsetHeight;
     panel.style.blockSize = '0px';
@@ -1201,31 +1050,6 @@ export function measurePanel(panel, direction) {
 /**
  * Release the panel's clip once its reveal has finished.
  *
- * The clip exists so the inner element can slide out from behind the header.
- * Held past the reveal it also cuts off anything a child disclosure opens
- * sideways, so it comes off the moment the transition ends.
- *
- * Which transition, though — and that is where this was wrong.
- *
- * The inner animates two properties, and they are not the same length:
- *
- *   transform  var(--panel-speed)   420ms
- *   opacity    var(--panel-fade)    200ms
- *
- * `{ once: true }` took the first `transitionend` to arrive, which is opacity's,
- * at 200ms. The clip came off 220ms before the panel had finished sliding — with
- * the inner still translated up, roughly halfway through its travel. Released
- * from the clip it was suddenly painted outside the panel, over the header,
- * before dropping the rest of the way. That is the jump when a mega menu opens.
- *
- * It shows most once the header is stuck, because there the panel opens hard
- * against a solid bar and the overshoot is drawn across it. At the top of the
- * page the same overshoot lands on a transparent header over the banner, where
- * it reads as part of the frosted panel and is easy to miss.
- *
- * So: the transform, specifically. The listener is removed by hand rather than
- * with `once`, because `once` would have been spent on the opacity event.
- *
  * @param {HTMLDetailsElement} details
  */
 export function settleDisclosure(details) {
@@ -1239,7 +1063,6 @@ export function settleDisclosure(details) {
 
   /** @param {TransitionEvent} [event] */
   const done = (event) => {
-    // Anything bubbling up from inside the panel is not this panel arriving.
     if (event && event.target !== inner) return;
     if (event && event.propertyName !== 'transform') return;
 
@@ -1252,20 +1075,11 @@ export function settleDisclosure(details) {
 
   inner?.addEventListener('transitionend', done);
 
-  // The safety net, for the cases where `transitionend` will not fire at all —
-  // a panel with no transition, a tab backgrounded mid-open. It has to outlast
-  // the transform, or it would release the clip early on its own.
   details.dataset.settleTimer = String(window.setTimeout(done, DISCLOSURE_FALLBACK));
 }
 
 /**
  * Open a `<details>` with a transition.
- *
- * `open` has to be set first — the panel is `display: none` until it is, and a
- * transition on a display-none element never starts. `data-open` follows two
- * frames later, because the browser has not laid the panel out until the frame
- * after `open`, and a transition whose start and end are computed in one layout
- * pass jumps straight to the end.
  *
  * @param {HTMLDetailsElement} details
  */
@@ -1279,24 +1093,11 @@ export function openDisclosure(details) {
   const summary = details.querySelector('[data-nav-summary], summary');
   summary?.setAttribute('aria-expanded', 'true');
 
-  // The reveal waits for the panel's height to stop changing.
-  //
-  // A dropdown is text: it has its final height the moment `open` is set, and
-  // two frames was plenty. A mega menu is not. Its carousel only discovers its
-  // track width when the panel gains a size, and it relays out then — after
-  // the reveal has already started. The inner element is translating by `-101%`
-  // of a height that is no longer the height it began from, so the panel lurches
-  // halfway through. That is why the dropdowns were smooth and the mega menus
-  // were not.
-  //
-  // Two identical measurements and the reveal begins. The cap stops a panel with
-  // something genuinely animating inside it from never opening at all.
   const panel = panelOf(details);
   let lastHeight = -1;
   let frames = 0;
 
   const reveal = () => {
-    // A close may have been requested while we were waiting.
     if (details.dataset.state !== 'open') return;
 
     details.setAttribute('data-open', '');
@@ -1325,11 +1126,6 @@ export function openDisclosure(details) {
 /**
  * Close a `<details>`, waiting for the transition before removing `open`.
  *
- * Removing `open` immediately puts the panel back to `display: none` on the same
- * frame and the closing animation is never seen. The timeout is the safety net
- * for the cases where `transitionend` will not fire: reduced motion, a panel
- * with no transition, a tab backgrounded mid-close.
- *
  * @param {HTMLDetailsElement} details
  */
 export function closeDisclosure(details) {
@@ -1338,8 +1134,6 @@ export function closeDisclosure(details) {
   details.dataset.state = 'closed';
   clearTimeout(Number(details.dataset.settleTimer));
 
-  // The clip goes back on before the panel starts moving, so a submenu hanging
-  // outside it is cut off rather than left floating over the page.
   details.removeAttribute('data-settled');
   details.removeAttribute('data-open');
   measurePanel(panelOf(details), 'close');
@@ -1359,12 +1153,6 @@ export function closeDisclosure(details) {
     return;
   }
 
-  // The same mistake in the other direction, and the same fix.
-  //
-  // This took whichever `transitionend` arrived first from anywhere inside the
-  // panel — which is opacity's, at 200ms, while the inner is still sliding back
-  // up. `open` was removed then, the panel went to `display: none`, and the
-  // closing half of the animation was cut off partway.
   const panel = panelOf(details);
   const inner = panel?.querySelector(':scope > .nav__panel-inner, :scope > .drawer-nav__panel-inner');
   const watched = inner ?? panel;

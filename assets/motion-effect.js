@@ -1,61 +1,6 @@
 /**
- * motion-effect.js — Boost10
- *
  * `<motion-effect>` is the declarative face of the motion engine. A Liquid
  * section requests an animation without a line of JavaScript:
- *
- *   <motion-effect data-effect="words-slide-up">
- *     <h2>{{ section.settings.heading }}</h2>
- *   </motion-effect>
- *
- *   <motion-effect data-effect="reveal-up" data-target="img">
- *     {{ image }}
- *   </motion-effect>
- *
- *   <motion-effect data-effect="fade-up" data-children data-stagger="90">
- *     {%- for block in section.blocks -%}<div>…</div>{%- endfor -%}
- *   </motion-effect>
- *
- * On load and on scroll are one code path. `reveal()` observes the element, and
- * IntersectionObserver fires immediately for anything already on screen, so
- * above-the-fold content animates during the first paint window with a short
- * cascade, and everything below animates as the customer scrolls to it. Lenis
- * scrolls the real document, so nothing here needs to know it exists.
- *
- * Content is hidden by JavaScript, not by CSS. The resting state is written
- * inline at the moment this element takes charge, so if the script never loads,
- * nothing was ever hidden — a failed animation must not cost a sale.
- *
- * Attributes, all optional:
- *
- *   data-effect          Preset name. See the table below. Default: fade-up
- *   data-target          Selector for descendants to animate instead of the host
- *   data-children        Animate direct children, staggered
- *   data-duration        Milliseconds. Overrides the preset default
- *   data-delay           Milliseconds before the first target
- *   data-stagger         Milliseconds between targets
- *   data-distance        Travel distance in pixels for slide and reveal presets
- *   data-threshold       Intersection ratio required to trigger (default 0.12)
- *   data-root-margin     Intersection root margin
- *   data-once            "false" to replay every time it enters the viewport
- *   data-load-cascade    "false" to opt out of the on-load stagger
- *   data-speed           Parallax rate, or marquee pixels per second
- *   data-direction       left | right, for marquee
- *   data-axis            x | y, for parallax
- *   data-pause-on-hover  "false" to keep a marquee running under the pointer
- *
- * Text presets (the element's text is split automatically):
- *   split-text, words-slide-up, words-rotate-in, words-slide-from-right,
- *   letters-slide-up, letters-slide-down, letters-fade-in,
- *   letters-fade-in-random
- *
- * Image and block presets:
- *   fade, fade-in, fade-up, slide-up, slide-down, slide-left, slide-right,
- *   zoom-in, zoom-out, reveal-left, reveal-right, reveal-up, reveal-down,
- *   scale, blur
- *
- * Continuous effects, which run instead of an entrance animation:
- *   parallax, marquee
  *
  * @module @theme/motion-effect
  */
@@ -72,9 +17,6 @@ export class MotionEffect extends BaseComponent {
    * a block hands it and animates it — it never reads `this.refs`, so it must
    * not stop a ref inside it from reaching the component around it.
    *
-   * That matters most for a **Group**: `snippets/group.liquid` renders one as a
-   * `<motion-effect>` whenever its animation is left on, which is the default,
-   * so every ref a merchant arranges inside a Group sits behind one of these.
    * @type {boolean}
    */
   static refBoundary = false;
@@ -85,11 +27,9 @@ export class MotionEffect extends BaseComponent {
   /** @type {{ destroy: () => void }|null} */
   #instance = null;
 
-  /* ------------------------------------------------------------ lifecycle */
+  /* ------------------------------------------------------------ lifecycle ---- */
 
   setup() {
-    // `setup()` runs again whenever the element is moved in the DOM, which
-    // morphing does routinely, so any previous run must be undone first.
     this.#teardownEffect();
 
     const effect = this.dataset.effect || 'fade-up';
@@ -111,21 +51,16 @@ export class MotionEffect extends BaseComponent {
     this.#teardownEffect();
   }
 
-  /* --------------------------------------------------------- public API -- */
+  /* --------------------------------------------------------- public API -- ---- */
 
-  /**
-   * Replay the animation from its resting state.
-   *
-   * Used by the Theme Editor hook below, and available to sections that swap
-   * their own content without a full section render.
-   */
+  /** Replay the animation from its resting state. */
   replay() {
     this.removeAttribute('data-motion-revealed');
     for (const target of this.#targets()) target.removeAttribute('data-motion-revealed');
     this.setup();
   }
 
-  /* ------------------------------------------------------------ effects -- */
+  /* ------------------------------------------------------------ effects -- ---- */
 
   /**
    * @param {string} effect
@@ -142,19 +77,6 @@ export class MotionEffect extends BaseComponent {
 
     const targets = this.#targets();
 
-    // The handoff from the stylesheet to this component, stated on the host.
-    //
-    // `snippets/critical-style.liquid` hides an armed `<motion-effect>` before
-    // the first paint. Hiding from JavaScript alone means the browser paints
-    // the content at full opacity and this module then yanks it back to the
-    // resting state — which is exactly the flash-then-jump on reload. The
-    // stylesheet lets go the moment `data-motion-pending` appears here, and
-    // both states are `opacity: 0`, so the handoff itself is invisible.
-    //
-    // It has to be written here rather than left to `reveal()`. For a splitting
-    // preset with a `data-target`, `reveal()` is handed the target, so its own
-    // `data-motion-pending` lands on a child and the host would stay hidden for
-    // the life of the page. `onReveal` closes the same loop at the other end.
     this.setAttribute('data-motion-pending', '');
 
     this.#cancelReveal = reveal(preset.split && targets.length === 1 ? targets[0] : this, {
@@ -163,8 +85,6 @@ export class MotionEffect extends BaseComponent {
         this.removeAttribute('data-motion-pending');
         this.setAttribute('data-motion-revealed', '');
       },
-      // Text presets split their own target, so no explicit target list is
-      // passed for them unless the section asked for several elements.
       targets: preset.split && targets.length <= 1 ? undefined : targets,
       duration: this.#number('duration'),
       delay: this.#number('delay'),
@@ -172,11 +92,6 @@ export class MotionEffect extends BaseComponent {
       distance: this.#number('distance'),
       threshold: this.#number('threshold'),
       rootMargin: this.dataset.rootMargin,
-      // A named curve from the engine's own table, or a raw `cubic-bezier(…)`.
-      // `reveal()` has always accepted one; there was simply no way for a
-      // section to ask for it, so every element on the page used its preset's
-      // default however long it was told to run for. At a second and a half an
-      // ease-in-out reads as a hesitation followed by a lunge.
       easing: this.dataset.easing ? EASING[this.dataset.easing] || this.dataset.easing : undefined,
       once: this.dataset.once !== 'false',
       loadCascade: this.dataset.loadCascade !== 'false'
@@ -209,16 +124,6 @@ export class MotionEffect extends BaseComponent {
   /**
    * The element a marquee actually translates.
    *
-   * `marquee()` moves the element it is handed and treats that element's
-   * *parent* as the clipping viewport. `#targets()` returns the host when no
-   * `data-target` is set, which made the host itself the moving part and its
-   * parent — the section wrapper, which does not clip — the viewport. The
-   * result was the whole bar sliding off the page once and never coming back.
-   *
-   * So a marquee resolves its track explicitly: an opted-in `[data-marquee-track]`
-   * first, then a `data-target` if the section gave one, then the single child
-   * that is doing the job anyway. The host is never returned.
-   *
    * @returns {HTMLElement}
    * @private
    */
@@ -234,13 +139,10 @@ export class MotionEffect extends BaseComponent {
     return /** @type {HTMLElement} */ (this.firstElementChild ?? this);
   }
 
-  /* ------------------------------------------------------------ helpers -- */
+  /* ------------------------------------------------------------ helpers -- ---- */
 
   /**
    * Resolve which elements the effect applies to.
-   *
-   * With no `data-target` or `data-children`, the host element is the target,
-   * which keeps the common case to a single attribute.
    *
    * @returns {HTMLElement[]}
    * @private
@@ -278,15 +180,13 @@ export class MotionEffect extends BaseComponent {
     this.#instance?.destroy();
     this.#instance = null;
 
-    // Split text has to be reassembled, or a second setup would split the
-    // already-split spans and produce one letter per span per run.
     for (const target of this.#targets()) {
       if (target.hasAttribute('data-motion-split')) unsplitText(target);
     }
     if (this.hasAttribute('data-motion-split')) unsplitText(this);
   }
 
-  /* ------------------------------------------------------- theme editor -- */
+  /* ------------------------------------------------------- theme editor -- ---- */
 
   /**
    * Replay when a merchant selects the section, so the effect they just chose is
@@ -314,34 +214,7 @@ defineComponent('motion-effect', MotionEffect);
    <parallax-media>
    ========================================================================== */
 
-/**
- * Background parallax for a hero.
- *
- * Moves a media layer at a fraction of the scroll speed. Three things keep this
- * from being the usual janky implementation:
- *
- * **It writes a custom property, never `top` or `margin`.** The property feeds a
- * `translate3d` in CSS, so the work happens on the compositor and never triggers
- * layout.
- *
- * **The loop stops when the element leaves the viewport.** An IntersectionObserver
- * switches the rAF loop off entirely, so a hero at the top of a long page costs
- * nothing for the rest of the scroll.
- *
- * **Reduced motion means not starting at all.** Parallax is decorative movement
- * tied to scrolling with no user control — exactly what the preference exists to
- * switch off, and there is no slower parallax that becomes acceptable. It is
- * also off on touch, where scroll is driven by a finger and the lag between the
- * two layers reads as a rendering fault rather than an effect.
- *
- * The media is scaled slightly in CSS so the shifted layer never exposes an edge.
- *
- * Markup:
- *
- *   <parallax-media data-speed="0.3">
- *     <img …>
- *   </parallax-media>
- */
+/** Background parallax for a hero. */
 export class ParallaxMedia extends BaseComponent {
   /** Transparent to refs for the same reason `MotionEffect` is. @type {boolean} */
   static refBoundary = false;
@@ -409,9 +282,6 @@ export class ParallaxMedia extends BaseComponent {
     const rect = this.getBoundingClientRect();
     const viewport = window.innerHeight;
 
-    // How far through the viewport this element sits, from roughly -1 (below)
-    // to 1 (above). Reading the rect is the only layout query, and it happens
-    // once per frame rather than once per scroll event.
     const progress = (rect.top + rect.height / 2 - viewport / 2) / viewport;
     const offset = progress * this.speed * rect.height * -1;
 

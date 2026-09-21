@@ -1,39 +1,5 @@
 /**
- * gift-card-recipient-form.js — Boost10
- *
  * `<gift-card-recipient-form>` — sends a gift card straight to its recipient.
- *
- * Shopify reads four line item properties on a gift card product:
- * `Recipient email`, `Recipient name`, `Message` and `Send on`. Setting them
- * makes Shopify email the card on the chosen date. The property names are fixed
- * by the platform, so they are never translated — only their labels are.
- *
- * Three details that are easy to get wrong and expensive to miss:
- *
- *   1. **Disabled fields are not submitted.** That is exactly what is wanted
- *      here: an empty `Recipient email` property on every gift card order would
- *      be noise in the merchant's admin, and Shopify treats the *presence* of
- *      the property as the instruction to send. So the fields stay disabled
- *      until the customer opts in.
- *   2. **`Send on` in the past never sends.** Shopify accepts the value and then
- *      silently does nothing, so the guard has to be in the theme.
- *   3. **Validation has to run before add-to-cart.** `<product-form>` calls
- *      `validate()` and stops the submit if it fails, otherwise a customer buys
- *      a gift card that will never reach anyone.
- *
- * Markup:
- *
- *   <gift-card-recipient-form>
- *     <input type="checkbox" data-ref="toggle" id="…">
- *     <div data-ref="fields" hidden>
- *       <input name="properties[Recipient email]" data-ref="email" type="email" disabled>
- *       <input name="properties[Recipient name]" data-ref="name" disabled>
- *       <textarea name="properties[Message]" data-ref="message" maxlength="200" disabled></textarea>
- *       <input name="properties[Send on]" type="date" data-ref="sendOn" disabled>
- *       <p data-ref="counter"></p>
- *       <p data-ref="error" role="alert" hidden></p>
- *     </div>
- *   </gift-card-recipient-form>
  *
  * @module @theme/gift-card-recipient-form
  */
@@ -56,8 +22,6 @@ export class GiftCardRecipientForm extends BaseComponent {
     }
 
     if (this.refs.email) {
-      // Clear the error as soon as the customer starts fixing it, rather than
-      // leaving a red message under a field they have already corrected.
       this.on(this.refs.email, 'input', () => this.#error(''));
     }
 
@@ -65,7 +29,7 @@ export class GiftCardRecipientForm extends BaseComponent {
     this.setEnabled(this.refs.toggle.checked, { silent: true });
   }
 
-  /* --------------------------------------------------------- public API -- */
+  /* --------------------------------------------------------- public API -- ---- */
 
   /**
    * @returns {boolean}
@@ -97,8 +61,6 @@ export class GiftCardRecipientForm extends BaseComponent {
     this.toggleAttribute('data-enabled', enabled);
 
     for (const field of this.refs.fields.querySelectorAll('input, textarea, select')) {
-      // Values are kept, not cleared: a customer who unticks and re-ticks the
-      // box should not have to type the address again.
       field.disabled = !enabled;
     }
 
@@ -114,9 +76,6 @@ export class GiftCardRecipientForm extends BaseComponent {
 
   /**
    * Check the recipient details.
-   *
-   * Called by `<product-form>` before it submits. Returns true when the card is
-   * for the buyer, or when the recipient details are complete.
    *
    * @returns {boolean}
    */
@@ -152,12 +111,7 @@ export class GiftCardRecipientForm extends BaseComponent {
     return true;
   }
 
-  /**
-   * Clear every field and switch back to buying for yourself.
-   *
-   * Called after a successful add to cart, so the next gift card does not
-   * inherit the previous recipient.
-   */
+  /** Clear every field and switch back to buying for yourself. */
   reset() {
     for (const field of this.refs.fields.querySelectorAll('input, textarea')) {
       if (field.type === 'checkbox') continue;
@@ -169,7 +123,7 @@ export class GiftCardRecipientForm extends BaseComponent {
     this.#renderCounter();
   }
 
-  /* ---------------------------------------------------------- internals -- */
+  /* ---------------------------------------------------------- internals -- ---- */
 
   /**
    * Bound the date picker to a sensible window.

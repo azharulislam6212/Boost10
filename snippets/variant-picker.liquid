@@ -1,19 +1,6 @@
 {% doc %}
   Renders the variant selector.
 
-  The controls are real radio inputs inside the product form, with names Shopify
-  understands. With JavaScript disabled the form still submits the chosen
-  variant, and a screen reader gets a grouped set of radios rather than divs
-  pretending to be one.
-
-  Which options render as swatches is a setting, not a hardcoded "Color", so a
-  store selling by Flavour gets swatches on the option it actually uses. See
-  SWATCHES.md.
-
-  Combinations that do not exist are marked, never removed or disabled. Hiding an
-  unavailable size tells the customer nothing; a disabled radio cannot be focused,
-  so a keyboard user can no longer discover the value exists at all.
-
   @param {product} product
   @param {object} section
   @param {boolean} [update_url] - Default true
@@ -24,7 +11,7 @@
   @param {object} [current]
   @param {string} [form_id]
   @param {boolean} [is_size_option]
-  @param {boolean} [no_script] - Default true. Set false on a surface that only exists because JavaScript ran — see the note on the fallback below.
+  @param {boolean} [no_script] - Default true. Set false on a surface that only exists because JavaScript ran.
   @param {string} [resolved_shape]
   @param {string} [this_picker]
 
@@ -36,28 +23,10 @@
   assign current = product.selected_or_first_available_variant
   assign swatch_names = settings.swatch_option_names | default: 'Colour, Color' | downcase | split: ','
 
-  comment
-    Every control here is outside the <form> and reaches it by `form=`, so the
-    id is resolved once. It was previously spelled out at each use site, which
-    is how the swatch row and the hidden id input could drift apart.
-
-    A caller may name the form instead. `form_id` was already documented as a
-    parameter and was then overwritten on the next line, so a surface whose form
-    is not called `<section id>-product-form` — the quick add drawer, where one
-    section id serves every product — pointed all of its controls at a form that
-    was not on the page. With no JavaScript that is a picker wired to nothing.
-  endcomment
   unless form_id
     assign form_id = section.id | append: '-product-form'
   endunless
 
-  comment
-    The product page passes its own values; the theme settings are the fallback
-    so a store that never opens the block still renders consistently. `default`
-    is not used for the type, because "none" is a real choice a merchant can
-    make and `default` would treat it as unset only if it were blank — it is
-    not, so a plain assignment with a blank test is what is wanted.
-  endcomment
   assign resolved_swatch_type = swatches_type
   if resolved_swatch_type == blank
     assign resolved_swatch_type = settings.swatches_type | default: 'theme'
@@ -82,11 +51,6 @@
     {%- liquid
       assign option_key = option.name | downcase | strip
 
-      comment
-        A size-like option gets its own picker type, because "Small / Medium /
-        Large" reads well as buttons while a 20-value shoe size list does not.
-        The test is the same one the size guide below uses, kept in one place.
-      endcomment
       assign is_size_option = false
       if option_key contains 'size' or option_key contains 'length' or option_key contains 'fit'
         assign is_size_option = true
@@ -95,16 +59,6 @@
       assign is_swatch = false
       if resolved_swatch_type != 'none'
         for name in swatch_names
-          comment
-            The filter is hoisted into its own `assign`. Liquid does not accept a
-            filter inside an `if` condition — `if name | strip == option_key` is a
-            parse error, and a parse error in a snippet takes the whole snippet
-            down: the variant picker rendered nothing at all, on the product page
-            and in the quick add drawer alike.
-
-            `snippets/product-card.liquid` already spells the same comparison this
-            way, for the same reason.
-          endcomment
           assign swatch_name = name | strip
           if swatch_name == option_key
             assign is_swatch = true
@@ -113,10 +67,6 @@
         endfor
       endif
 
-      comment
-        Swatches win over the picker type: an option the merchant nominated as a
-        colour is a colour whether or not the rest of the page uses dropdowns.
-      endcomment
       assign this_picker = picker_type
       if is_size_option
         assign this_picker = size_picker_type
@@ -136,21 +86,12 @@
         <span class="variant-picker__selected" data-selected-value>{{ option.selected_value }}</span>
       </legend>
 
-      {%- comment -%}
-        The size guide sits beside the option it explains, and only beside a size
-        option. A chart under a colour picker is a chart nobody reads.
-      {%- endcomment -%}
       {%- if is_size_option -%}
         {% render 'size-chart-modal', product: product, option_name: option.name, id: section.id %}
       {%- endif -%}
 
       {%- if this_picker == 'swatches' -%}
-        {%- comment -%}
-          The row is delegated rather than drawn here. `advanced-swatches` owns
-          the availability test, the accessible name, the unavailable marking and
-          the overflow control; duplicating that inline is how the two drifted
-          apart in the first place.
-        {%- endcomment -%}
+
         {% render 'advanced-swatches',
            product: product,
            option: option,
@@ -159,11 +100,7 @@
            shape: resolved_shape %}
 
       {%- elsif this_picker == 'dropdowns' -%}
-        {%- comment -%}
-          A real <select> named for the option, so it posts the same value the
-          radios would and needs no JavaScript to submit. `<variant-picker>`
-          listens for change on the fieldset either way.
-        {%- endcomment -%}
+
         {%- assign select_id = section.id | append: '-select-' | append: option.position -%}
         <label class="visually-hidden" for="{{ select_id }}">{{ option.name }}</label>
         <div class="variant-picker__dropdown">
@@ -206,25 +143,6 @@
     </fieldset>
   {%- endfor -%}
 
-  {%- comment -%}
-    The no-JS fallback, and the two reasons it is conditional and unnamed.
-
-    `data-ref` is gone from it. A browser parses `<noscript>` contents as plain
-    text, so this `<select>` is not an element on a normally loaded page and the
-    picker's single `idInput` ref was the hidden input below. Markup fetched into
-    the quick add modal, though, is parsed by `DOMParser` — which parses with
-    scripting disabled — and there this became a real element answering to the
-    same ref name. `refs` returns an array when a name is used twice, and
-    `#syncIdInput()` treated it as one element: the write went nowhere and the
-    `dispatchEvent` that followed threw, which aborted `#commit()` before it could
-    announce `variant:change`. Nothing here needs a ref; `#syncIdInput()` is the
-    JavaScript path and this is the one where it never runs.
-
-    `no_script` then removes it altogether on a surface that only exists because
-    JavaScript ran. It would still be form-associated by `form=` in the modal, and
-    it comes first in tree order, so `new FormData(form).get('id')` answered with
-    this select's value — which nothing updates — rather than with the live one.
-  {%- endcomment -%}
   {%- unless no_script == false -%}
     <noscript>
       <label class="visually-hidden" for="{{ section.id }}-variant-select">{{ 'products.variants.legend' | t }}</label>

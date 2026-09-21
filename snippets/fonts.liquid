@@ -1,37 +1,6 @@
 {% doc %}
   Renders every @font-face the merchant's typography settings can actually
   reach, and preloads only the two faces that block first paint.
-
-  Why this is not a fixed list of four faces
-  ------------------------------------------
-  The typography schema lets a merchant pick any weight from 300 to 900 for
-  paragraph, default, menu, button, h1-h6 and the custom style. A face that is
-  never declared cannot be downloaded, so the browser falls back to CSS font
-  matching: it either snaps the text to the nearest declared weight (a chosen
-  500 silently renders as 400) or synthesises a fake bold. Both look wrong on a
-  premium theme, and both are invisible in the editor, because the merchant
-  sees the same wrong rendering the customer does.
-
-  So the weights are collected from the settings themselves rather than
-  hardcoded. Declaring a face is cheap - it is CSS text in the document head,
-  nothing more. A font file is only fetched when text on the current page
-  actually matches that face, so a page with no <em> never pays for the italic.
-  Preloads are the opposite: eager and unconditional, which is why only two are
-  emitted here.
-
-  Weight resolution
-  -----------------
-  `font_modify` returns nil when the family has no such variant, so every face
-  is nil-guarded. A Google font shipping only 400 and 700 will simply not
-  produce a 500, and CSS font matching handles the fallback - the same outcome
-  as before, but now every family that *does* have the variant gets it.
-
-  Accepts:
-  - (nothing) - reads settings.type_body_font, type_header_font,
-    type_accent_font and the per-role weight settings directly.
-
-  Usage:
-  {% render 'fonts' %}
 {% enddoc %}
 
 {%- liquid
@@ -130,20 +99,6 @@
   assign preload_heading = h1_face_source | font_modify: 'weight', h1_weight
   assign preload_heading = preload_heading | default: h1_face_source
 -%}
-
-{%- comment -%}
-  No preconnect to `fonts.shopifycdn.com` either.
-
-  The two preloads below point at that origin and sit on the next lines of the
-  same head, so the browser opens the connection for them regardless. The
-  preconnect was asking for a handshake that a request two lines later was about
-  to ask for anyway - it bought no measurable time and cost a slot against the
-  four a page should keep.
-
-  A preload is the stronger hint of the two in any case: it opens the connection
-  *and* fetches the file, at high priority, rather than opening a connection and
-  hoping something uses it.
-{%- endcomment -%}
 
 {%- unless body_font.system? -%}
   {{ preload_body | font_url | preload_tag: as: "font", type: "font/woff2" }}

@@ -1,54 +1,6 @@
 {% doc %}
   Builds the `data-options` JSON that `<carousel-slider>` reads.
 
-  ## The contract
-
-  One snippet is the only place in the theme that turns merchant settings into
-  carousel configuration. Everything it emits is valid JSON — no trailing commas,
-  no bare Liquid values, no `nil` leaking through as an empty token — because a
-  single malformed character makes `JSON.parse` throw and the component falls
-  back to its defaults with the merchant's every setting silently discarded.
-  That is what "the carousel works but none of the settings do" looks like.
-
-  Fragments are collected into an array and joined with a comma at the end
-  rather than each one guessing whether it needs a leading comma. The old
-  version made that guess in five places and `extra` had to be documented as
-  "must start with a comma", which is the kind of contract that breaks the first
-  time somebody uses it.
-  ## Units
-
-  `carousel_speed` is the transition duration in **milliseconds** (100–1500) and
-  `carousel_autoplay_delay` is the pause between slides in **seconds** (2–15).
-  They are different controls: a slow fade should not also mean a slow
-  slideshow. Every section schema must define them with those ranges — the
-  announcement bar used to declare `carousel_speed` as 3–12 seconds, so it asked
-  for a five *millisecond* transition and its slides snapped instantly.
-
-  ## Loop
-
-  A loop needs at least twice `slidesPerView` slides: below that there are not
-  enough of them to fill the viewport on the far side of the seam, and the
-  component refuses the loop and rewinds instead. Pass `count` and this makes the
-  same call up front, so the JSON says what will actually happen.
-
-  ## Direction
-
-  `direction: 'vertical'` turns the same configuration on its side. Everything
-  else keeps its meaning — `columns_*` is then how many slides are on screen
-  down the column rather than across the row, which is what `slidesPerView`
-  means in both axes and why no second set of parameters was added for it.
-
-  Two things follow, and both are handled here so no caller has to know:
-
-  A vertical carousel **must** advance a whole screen at a time. Horizontally a
-  customer can see the row move under a half-slide of peek; vertically there is
-  no peek, and a one-slide step reads as a list that scrolled by itself. So
-  `slidesPerGroup` is pinned to the whole slide count at each breakpoint.
-
-  And `spaceBetween` measured from `column-gap` would be the wrong axis, so
-  `assets/carousel.js` reads `row-gap` instead when the element says it is
-  vertical. That is the only place in the component that has to know.
-
   @param {object} settings - Section or block settings
   @param {number} [count] - Slide count. Enables the loop guard. columns_desktop / columns_tablet / columns_mobile (number)
   @param {string} [pagination] - none | dots | numbers | progress | controls
@@ -70,13 +22,6 @@
     {% render 'carousel-options', settings: section.settings, direction: 'vertical', columns_desktop: 3 %}
 {% enddoc %}
 
-{%- comment -%}
-  Slides per breakpoint comes from `carousel-slides`, never from arithmetic
-  here. `carousel-vars` renders the same snippet for the CSS custom properties
-  that size the slides before this JSON is ever parsed, and the two must agree
-  exactly — if they drift, the JSON and the layout describe two different
-  carousels.
-{%- endcomment -%}
 {%- capture spv_mobile -%}
   {%- render 'carousel-slides', settings: settings, viewport: 'mobile',
       columns_mobile: columns_mobile,
@@ -156,7 +101,6 @@
     endif
   endif
 
-
   assign pagination_style = pagination | default: settings.carousel_pagination | default: 'none'
   case pagination_style
     when 'numbers'
@@ -170,23 +114,6 @@
   endcase
 -%}
 
-{%- comment -%}
-  ---- fragments ----
-  Each `capture` is one complete `"key": value` pair with no punctuation of its
-  own. `join: ','` supplies every comma exactly once.
-{%- endcomment -%}
-
-{%- comment -%}
-  Vertical adds `slidesPerGroup` at every breakpoint and nothing else — the
-  slide counts are the same numbers in both axes. It is emitted as part of this
-  fragment rather than as a separate one because `breakpoints` is a single
-  object: a second fragment carrying its own `"breakpoints"` key would be valid
-  JSON whose later copy silently replaced the first.
-
-  `ceil` because `slidesPerGroup` must be a whole number and a vertical carousel
-  never peeks, so the only way a fraction reaches here is a peek setting left
-  over from when the section was horizontal.
-{%- endcomment -%}
 {%- liquid
   assign is_vertical = false
   if direction == 'vertical'
@@ -214,22 +141,10 @@
 
 {%- assign fragments = fragment_slides | append: '|' | append: fragment_motion -%}
 
-{%- comment -%}
-  Only emitted when the caller asked for one. Left out, `assets/carousel.js`
-  and `carousel-vars` fall through to `--grid-gap-x`, so the carousel's spacing
-  matches the grid it turns into at the other breakpoint. The component never
-  reads this value: the gap is a CSS `gap` on the track and nothing else.
-{%- endcomment -%}
-{%- comment -%}
-  `-1` is the sentinel for "the caller said nothing", because `0` is a real and
-  meaningful value here and `nil == blank` is engine-dependent. Comparing a
-  coerced number against a sentinel behaves the same in every Liquid.
-{%- endcomment -%}
 {%- assign gap = space_between | default: -1 | plus: 0 -%}
 {%- if gap >= 0 -%}
   {%- assign fragments = fragments | append: '|"spaceBetween":' | append: gap -%}
 {%- endif -%}
-
 
 {%- if use_autoplay -%}
   {%- capture fragment_autoplay -%}
@@ -250,41 +165,6 @@
   {%- assign fragments = fragments | append: '|' | append: extra_clean -%}
 {%- endif -%}
 
-{%- comment -%}
-  ---- output ----
-
-  The braces are literal template text inside a `capture`, never a quoted string
-  passed through `append`. Building them with a quoted open-brace and
-  close-brace, appended around the value, reads perfectly well and is what this
-  used to be — but Shopify's parser rejects it:
-
-    Liquid syntax error: Variable ... was not properly terminated
-    with regexp: /\}\}/
-
-  A variable tag is tokenised by scanning forward for the first close-brace
-  pair, and that happens before any string quoting is understood. So a
-  close-brace inside quotes is read as the start of the terminator rather than
-  as content, and the tag ends in the middle of itself. The same hazard applies
-  to an open-brace in an `assign`, which is why the fade fragment above is a
-  capture too.
-
-  Note that this comment cannot quote the offending syntax either: a comment
-  body is still tokenised, so an example written out in full would reintroduce
-  the error it is describing.
-
-  Every brace in this file is therefore either template text on its own line, or
-  part of a real output tag. None is ever inside quotes.
-
-  The line breaks between the open brace, the value and the close brace below
-  are load-bearing for the same reason: on one line, a literal open brace
-  immediately followed by an output tag would tokenise as the start of that tag
-  instead. `strip_newlines` removes them again before the attribute is written.
-
-  `escape` is what makes the result safe inside a double-quoted attribute: it
-  turns every `"` into `&quot;`, which the browser decodes back to real JSON
-  before `dataset.options` ever sees it. Emitting raw quotes would end the
-  attribute at the first key.
-{%- endcomment -%}
 {%- capture options_json -%}
 {
 {{- fragments | split: '|' | join: ',' -}}

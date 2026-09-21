@@ -1,129 +1,11 @@
 {% comment %}
-  sections/product-bundle.liquid
-
   Build-your-own-bundle: a category-filtered product list on one side, a tray of
   slots on the other, and a discount that grows as the tray fills.
-
-  ## Why it is not `sections/bundle-builder.liquid`
-
-  Bundle builder is a paginated product *grid* with a list of slots beside it —
-  a collection page with a tray bolted on. This is the arrangement in the
-  drawings: a short, curated, category-switched list of wide rows, and a tray
-  that is the centrepiece rather than a sidebar. The two have different markup at
-  every level, so they are two sections and a merchant picks the one that matches
-  what they are selling. Neither is deleted by the other.
-
-  What they do share is the honest part, and they share it by construction — see
-  "The discount is display only" below.
-
-  ## The two drawings, and which one this is
-
-  
-  `Bundle Product-1` gives every slot a discount label: 10%, 15%, 25%, 30%, 35%,
-  40%, escalating as the tray fills. `Bundle Product-2` drops the labels, puts a
-  free-shipping bar in their place, and gives each filled slot a quantity
-  stepper.
-
-  Both are here, behind **Tray style**, because they are not the same offer:
-
-    ladder    Design 1. The reason to add a sixth product is a bigger discount.
-              One `Amount off products` automatic discount per tier in Shopify
-              admin, each with its own minimum quantity, and no app.
-
-    quantity  Design 2. The reason to add a sixth product is that you want six.
-              One automatic discount, or none at all.
-
-  Ladder is the default because it is the stronger offer and because the theme
-  already has the settings for it.
-
-  ## The discount is display only, and the section says so
-
-  A theme cannot create a discount. There is no storefront API that prices a cart
-  differently, and the Theme Store rejects a theme that tries — a cart that
-  disagrees with checkout is worse than no discount at all.
-
-  So what happens here is: the tray shows the tier the customer has reached, the
-  lines are added to the cart with `_bundle_discount` on them, and the money comes
-  off at checkout through an automatic discount the merchant creates in
-  **Discounts**. The **Discount tiers** panel says exactly that, on the panel,
-  where a merchant setting the percentages will read it.
-
-  Per-slot labels are read as *unlocks*, not as per-item pricing, for the same
-  reason: a Shopify discount applies to the order, so a slot badge saying "25%
-  Off" has to mean "filling this slot unlocks 25% off" or it is a claim about a
-  line that will not be true at checkout. Reached tiers are marked; unreached
-  ones are dimmed and marked as locked.
-
-  ## The shell is `sections/expert-quote.liquid`'s, setting id for setting id
-
-  Container, colour scheme, background media, the four border widths, the two
-  sets of corners, the gaps behind a Desktop/Mobile switch, the margins, the
-  stack layer and the whole spacing group. Every id here is one that section
-  already carries, and both reach them through `snippets/spacing.liquid`,
-  `snippets/background-media.liquid` and `snippets/container.liquid`.
-
-  ## Everything inside it is a block
-
-    Header      `blocks/section-header.liquid` through `content_for 'block'` —
-                editable, undeletable, undraggable. A section called Product
-                bundle whose heading has been dragged into the tray is a section
-                a merchant can break by accident.
-
-    The rest    `{% content_for 'blocks' %}`, and the tree is the merchant's:
-
-                  Group ── Tabs ── Category
-                                   Category
-                                   Category
-                  Group ── Build your own bundle
-                           Slot box
-                           Bundle total
-
-  This used to be a picker column and a tray welded into this file, with the
-  categories as the only blocks — so "the tabs" and "the tray" were positions in
-  a template, and there was exactly one arrangement of this section in the
-  world. A merchant who wanted the tray above the picker, or a Text block
-  between the heading and the boxes, had nowhere to put it.
-
-  Now `<product-bundle>` is a flex row of whatever the merchant put in it. Every
-  `data-ref` the component reads — the slots, the note, the total, the submit —
-  is collected from anywhere inside the element, so which block renders which
-  piece is not something `assets/product-bundle.js` has to know.
-
-  ## Most of the settings did not move with the markup
-
-  Card height, rows on screen, the tier ladder, the tray's wording: all still
-  `section.settings`, read by the blocks. Moving them into the blocks would have
-  emptied every one of them on every store already running this section, in
-  exchange for a tree that renders exactly the same. The blocks are the
-  arrangement; the section is still the design.
-
-  Two groups *did* go, both for the same reason — two settings doing one job are
-  two settings that can disagree:
-
-    to the Group    The tray's width, background, corners, padding and Sticky on
-                    desktop. A **Group** already offers all five, and offers
-                    them better.
-
-    to Bundle tabs  The whole **Category tabs** panel — the four pill colours,
-                    the border, the corners, the height, the type, the space
-                    between the pills and between the strip and the products.
-                    They belong to the strip, not to the section around it, and
-                    a section with two strips in it can now have two designs.
-                    `blocks/_product-bundle-tabs.liquid` writes the same
-                    `--bundle-tab-*` properties this file used to.
 {% endcomment %}
 
 {%- liquid
   assign s = section.settings
 
-  comment
-    ---- the background ----
-
-    The colour scheme's, until the merchant says otherwise: either a colour, or a
-    picture behind the whole section. Emitted as a real `background` shorthand
-    rather than a custom property because `color-scheme-container` paints a
-    background *and* a gradient image, and only the shorthand clears both.
-  endcomment
   assign background_media = s.background_media | default: 'none'
   assign has_background_media = false
   if background_media != 'none'
@@ -135,17 +17,6 @@
     assign background_paint = s.background_color | default: ''
   endif
 
-  comment
-    ---- the frame ----
-
-    One width per side, summed into `border_any` so the three properties are
-    emitted only when at least one side is drawn. Opacity goes into the colour
-    rather than onto the element: `opacity` on the section would fade the tray
-    along with its frame.
-
-    Identical to `sections/expert-quote.liquid` and `sections/featured-offer.liquid`
-    by construction, not by coincidence.
-  endcomment
   assign border_line = s.border_style | default: 'none'
 
   assign bw_top = 0
@@ -170,15 +41,6 @@
     endif
   endif
 
-  comment
-    ---- corners ----
-
-    Four corners, twice, behind the same Desktop/Mobile switch the padding and
-    the gaps already use. A phone gets its own four because 40px is a soft lift
-    across 1400px and a heavy scoop out of a 390px screen. Each mobile corner
-    falls back to its desktop value when the setting is missing entirely, so a
-    section saved before these existed keeps one shape at every width.
-  endcomment
   assign r_tl = s.border_radius_top_left | default: 0 | plus: 0
   assign r_tr = s.border_radius_top_right | default: 0 | plus: 0
   assign r_bl = s.border_radius_bottom_left | default: 0 | plus: 0
@@ -192,45 +54,14 @@
   assign margin_top = s.margin_top | default: 0 | plus: 0
   assign margin_bottom = s.margin_bottom | default: 0 | plus: 0
 
-  comment
-    ---- the gaps ----
-
-    A Desktop/Mobile pair behind one switch, the shape every other section in the
-    theme uses. Both pairs are published unconditionally and `assets/base.css`
-    picks which applies at a given width, because the pair the merchant is not
-    looking at in the editor is still the pair the other breakpoint renders.
-
-    `plus: 0` rather than `default` alone, which would replace a deliberate 0.
-  endcomment
   assign gap_x = s.gap_horizontal | default: 48 | plus: 0
   assign gap_y = s.gap_vertical | default: 16 | plus: 0
   assign gap_x_mobile = s.gap_horizontal_mobile | default: gap_x | plus: 0
   assign gap_y_mobile = s.gap_vertical_mobile | default: gap_y | plus: 0
 
-  comment
-    ---- the tray ----
-
-    `slots` is how many boxes are drawn. `tray_style` decides whether each box
-    carries a tier badge (the first drawing) or a quantity stepper (the second).
-  endcomment
   assign slots = s.bundle_size | default: 6 | plus: 0
   assign tray_style = s.tray_style | default: 'ladder'
 
-  comment
-    ---- the tiers ----
-
-    Six checkbox-and-percentage pairs, one per slot, rather than a free-text
-    field: a merchant typing "3:30, 4:40" gets it wrong once and then cannot see
-    why the bar never moves.
-
-    They are serialised into one `quantity:percent` attribute for the component,
-    which stays agnostic about how many tiers exist — the same contract
-    `assets/bundle-builder.js` already reads, so the two sections describe a tier
-    ladder the same way.
-
-    Only tiers that fall within the tray are published. A tier at 6 items on a
-    four-slot tray is a promise the tray cannot keep.
-  endcomment
   assign tier_parts = ''
   for i in (1..6)
     assign enable_key = 'tier_' | append: i | append: '_enable'
@@ -242,24 +73,6 @@
   endfor
   assign tiers = tier_parts | split: ',' | join: ','
 
-  comment
-    ---- the per-slot discount ----
-
-    A tier is a rung on a ladder: "reach three items and the tray is 25% off".
-    A slot discount is a different offer that happens to be configured beside it
-    — "whatever goes in slot one comes with CODE and 56% off it" — and the two
-    are not interchangeable, which is why this is its own panel and its own
-    payload rather than another number folded into `data-tiers`.
-
-    Serialised as JSON rather than as a third and fourth field on the attribute.
-    A discount code is merchant-typed free text and the attribute format is
-    comma-and-colon separated, so a code with a comma in it would silently take
-    the next slot's place.
-
-    Only what a slot actually has is emitted. A slot with no code and no value is
-    absent from the array, and the tray falls back to the ladder for it — which
-    is exactly the behaviour every store already running this section has.
-  endcomment
   assign slot_discounts = ''
   for i in (1..slots)
     assign code_key = 'tier_' | append: i | append: '_code'
@@ -270,15 +83,6 @@
     assign slot_code = s[code_key] | default: '' | strip
     assign slot_type = s[type_key] | default: 'percentage'
 
-    comment
-      The slot's own value, never the tier's. They are separate fields on
-      purpose: `tier_N_percent` is the ladder, which every store already using
-      this section has set, and reading it here would have turned six configured
-      rungs into six per-slot discounts on upgrade. Unset means unset, and an
-      unset slot falls back to the ladder exactly as before.
-
-      Money in cents, to match every other price the component handles.
-    endcomment
     assign slot_value = 0
     if slot_type == 'amount'
       assign slot_value = s[slot_amount_key] | default: 0 | times: 100 | round
@@ -303,13 +107,6 @@
   endfor
   assign slot_discounts = slot_discounts | split: '||' | join: ','
 
-  comment
-    The element is a flex row and nothing more. Which side the tray is on used
-    to be a select here that swapped a grid's columns; it is the order of two
-    Groups now, which is both more direct and more capable — a merchant who
-    wants the tray above the picker at every width can say that too, and could
-    not before.
-  endcomment
   assign layout_classes = 'product-bundle__layout'
 -%}
 
@@ -325,32 +122,7 @@
   --product-bundle-gap-y-mobile: {{ gap_y_mobile }}px;
   --product-bundle-slot-columns: {{ s.slot_columns | default: 3 }};
   --product-bundle-accent: {{ s.accent_color | default: '#03D26F' }};
-  {%- comment -%}
-    The tab strip's design is not here any more.
 
-    Its four colours, its border, its corners, its height and its type are all
-    settings on `blocks/_product-bundle-tabs.liquid`, which writes the same
-    `--bundle-tab-*` properties onto its own element. A strip styles itself,
-    and a section with two of them can have two different ones — which it could
-    not when the numbers lived up here.
-
-    The cascade still runs three deep and no rule has to know which level won:
-
-      the pill's own   `style=` from the Category block
-      the strip's      the same property on the Tabs block
-      the scheme's     the fallback written into each `var()` in base.css
-  {%- endcomment -%}
-  {%- comment -%}
-    The card's height and the space between two of them, as lengths, because
-    that is what CSS needs and what `carousel-vars` is handed for
-    `--carousel-gap`. The carousel's own height is built from them in
-    `assets/base.css` against the slide count the architecture already writes.
-
-    The image inside the card is not set here. It is the card's height less the
-    padding above and below it, which is how `Bundle-Porduct-Card.svg` is drawn
-    — 145 less twice 17.5 is 110 — so the two can never be set to numbers that
-    do not fit each other.
-  {%- endcomment -%}
   --product-bundle-row-size: {{ s.row_height | default: 145 }}px;
   --product-bundle-row-gap: {{ s.row_gap | default: 13 }}px;
   --product-bundle-row-size-mobile: {{ s.row_height_mobile | default: 124 }}px;
@@ -358,33 +130,7 @@
   --product-bundle-card-padding-block: {{ s.card_padding | default: 17.5 }}px;
   --product-bundle-card-radius: {{ s.card_radius | default: 24 }}px;
   --product-bundle-media-radius: {{ s.media_radius | default: 14 }}px;
-  {%- comment -%}
-    ---- the product card's colours ----
 
-    Four, in two pairs: what a card is made of, and what it becomes once it is
-    in the bundle.
-
-    Each is emitted only when the merchant has set it, for the reason the tab
-    strip's four colours are — a property that exists but is empty invalidates
-    the whole declaration it is used in, so the card would lose its background
-    rather than fall through to the next level. Absence is what lets the level
-    below apply, and there are three of those: the card's own colour here, the
-    colour scheme the card carries (**Card colour scheme**, which is what the
-    `color-scheme-container` on each `<li>` resolves), and the section's scheme
-    behind that.
-
-    The foreground is one setting and not four, and it reaches the title, both
-    prices, the dotted rule and the add control through `--bundle-card-ink` in
-    `assets/base.css`. Those all read `--color-heading` when nothing is set
-    here, which is exactly what they read before this setting existed — so an
-    untouched card is unchanged, and a merchant who sets one colour does not
-    then have to find the other three.
-
-    The selected pair is separate because a card in the bundle is a state rather
-    than a variant: it was an accent ring on the same surface, which is legible
-    on a pale card and invisible on a dark one. The ring colour is now the
-    merchant's too, and still falls back to the section's accent.
-  {%- endcomment -%}
   {%- if s.card_background != blank -%}
     --product-bundle-card-background: {{ s.card_background }};
   {%- endif -%}
@@ -436,61 +182,16 @@
       data-bundle-label="{{ s.tray_heading | escape }}"
       data-quick-add="{{ settings.enable_quick_add }}"
     >
-      {%- comment -%}
-        The per-slot discounts, as JSON, read once by `assets/product-bundle.js`.
 
-        Rendered here and not on the slot boxes, because the tray is what owns
-        them: a slot's discount has to be known for the total and for the line
-        properties whether or not the Slot box block is the thing that draws it,
-        and a merchant is free to arrange those blocks — or leave one out.
-
-        The array is the merchant's settings and nothing else. What a slot costs
-        with one applied is worked out from it in one place, so the number on the
-        box and the number in the total cannot disagree.
-      {%- endcomment -%}
       <script type="application/json" data-bundle-discounts>
         [{{ slot_discounts }}]
       </script>
 
-      {%- comment -%}
-        ---------- what the merchant arranged ----------
-
-        One `content_for 'blocks'`, and that is the whole of the layout.
-
-        This used to be a picker column and a tray welded together here, with the
-        categories as the section's only blocks — so "the tabs" and "the tray"
-        were positions in a template rather than things a merchant could move,
-        and there was exactly one arrangement of this section in the world.
-
-        Now the pieces are blocks and the arrangement is theirs:
-
-          Group ───── Tabs ───── Category
-                                 Category
-                                 Category
-          Group ───── Build your own bundle
-                      Slot box
-                      Bundle total
-
-        Two Groups side by side is the drawing. One Group, or three, or the tray
-        above the picker on a phone, are all the same blocks in a different
-        order — and a Text block, an Image or a set of Buttons drop in anywhere
-        among them, because a Group takes any block in the theme.
-
-        `<product-bundle>` stays the element around all of it. Every `data-ref`
-        the component reads — the slots, the note, the total, the submit — is
-        collected from anywhere inside it, so which block renders which piece is
-        not something `assets/product-bundle.js` has to know.
-      {%- endcomment -%}
       {% content_for 'blocks' %}
     </product-bundle>
   </div>
 </div>
 
-{%- comment -%}
-  Every setting below is a control a merchant reaches in the editor, and the
-  schema is one element's styling surface: splitting it to get under Theme
-  Check's count of 40 would split the thing the settings style.
-{%- endcomment -%}
 {% # theme-check-disable ExcessiveSettingsCount %}
 {% schema %}
 {

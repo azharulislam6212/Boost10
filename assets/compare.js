@@ -1,40 +1,5 @@
 /**
- * compare.js — Boost10
- *
  * `<product-compare>` and `<compare-trigger>` — side-by-side product comparison.
- *
- * Off by default. It is genuinely useful for a store selling twelve variants of
- * one technical product, and clutter for a store selling t-shirts, so it is a
- * merchant setting rather than an assumption.
- *
- * Everything is stored in the browser, namespaced per shop, and nothing is sent
- * anywhere. A theme that stored comparison data server-side would be doing an
- * app's job, which the Theme Store rejects — and it would also mean a customer's
- * comparison list following them across devices, which nobody expects from a
- * feature they used once.
- *
- * The comparison table itself is rendered by Liquid through the Section
- * Rendering API, so prices, badges, swatches and translated attribute names are
- * correct without being rebuilt in JavaScript.
- *
- * Markup:
- *
- *   <compare-trigger data-product-handle="mango-protein">
- *     <button type="button" data-ref="button" aria-pressed="false">…</button>
- *   </compare-trigger>
- *
- *   <product-compare data-section-id="compare" data-limit="4">
- *     <button data-ref="open" hidden>…</button>
- *     <span data-ref="count"></span>
- *     <drawer-component id="CompareDrawer">
- *       <dialog data-ref="dialog">
- *         <div data-ref="panel">
- *           <div data-ref="content" data-compare-content></div>
- *           <button data-ref="clear">…</button>
- *         </div>
- *       </dialog>
- *     </drawer-component>
- *   </product-compare>
  *
  * @module @theme/compare
  */
@@ -122,9 +87,7 @@ export const compareList = {
     return this.add(handle);
   },
 
-  /**
-   * Empty the list.
-   */
+  /** Empty the list. */
   clear() {
     this._write([]);
   },
@@ -138,8 +101,6 @@ export const compareList = {
    * @private
    */
   _write(handles) {
-    // `storage` swallows quota and private-mode failures and returns false. The
-    // feature then degrades to not persisting rather than throwing on click.
     storage.set(STORAGE_KEY, handles);
 
     document.dispatchEvent(
@@ -155,13 +116,7 @@ export const compareList = {
    <compare-trigger>
    ========================================================================== */
 
-/**
- * The add-to-compare control on a product card.
- *
- * Rendered hidden by Liquid and revealed here, so a store with the feature
- * turned off never ships a button that does nothing. `aria-pressed` carries the
- * state, because this is a toggle, not a link.
- */
+/** The add-to-compare control on a product card. */
 export class CompareTrigger extends BaseComponent {
   static requiredRefs = ['button'];
 
@@ -190,9 +145,7 @@ export class CompareTrigger extends BaseComponent {
     return this.dataset.productHandle || '';
   }
 
-  /**
-   * Reflect the shared list.
-   */
+  /** Reflect the shared list. */
   render() {
     const active = compareList.has(this.handle);
 
@@ -210,13 +163,7 @@ defineComponent('compare-trigger', CompareTrigger);
    <product-compare>
    ========================================================================== */
 
-/**
- * The comparison bar and drawer.
- *
- * The bar appears once two products are selected — comparing one product with
- * nothing is not a comparison — and the table is fetched only when the drawer is
- * opened, not on every toggle.
- */
+/** The comparison bar and drawer. */
 export class ProductCompare extends BaseComponent {
   /** @type {AbortController|null} */
   #request = null;
@@ -247,7 +194,6 @@ export class ProductCompare extends BaseComponent {
       });
     }
 
-    // Removing a product from inside the table.
     this.on(this, 'click', (event) => {
       const remove = event.target instanceof Element ? event.target.closest('[data-compare-remove]') : null;
       if (!(remove instanceof HTMLElement)) return;
@@ -264,7 +210,7 @@ export class ProductCompare extends BaseComponent {
     this.#request = null;
   }
 
-  /* --------------------------------------------------------- public API -- */
+  /* --------------------------------------------------------- public API -- ---- */
 
   /**
    * @returns {HTMLElement|null}
@@ -334,9 +280,7 @@ export class ProductCompare extends BaseComponent {
     }
   }
 
-  /**
-   * Reflect the shared list in the bar.
-   */
+  /** Reflect the shared list in the bar. */
   render() {
     const count = compareList.handles.length;
 
@@ -345,7 +289,6 @@ export class ProductCompare extends BaseComponent {
     }
 
     if (this.refs.open instanceof HTMLElement) {
-      // Two is the minimum that makes the word "compare" mean anything.
       this.refs.open.hidden = count < 2;
       this.refs.open.textContent = themeString('compareTriggerCount', '', { count });
     }
@@ -353,8 +296,6 @@ export class ProductCompare extends BaseComponent {
     this.toggleAttribute('data-visible', count > 0);
     this.dataset.count = String(count);
 
-    // The rendered table is stale the moment the list changes, and the drawer
-    // may be open while it happens.
     const key = compareList.handles.join(',');
     if (key !== this.#rendered && this.drawer?.isOpen) {
       this.#rendered = '';

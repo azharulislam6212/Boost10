@@ -2,53 +2,10 @@
   Background media for any section or block: none, an image, or a video, with an
   optional overlay.
 
-  ## One entry point
-
-  A section that wants a background should not have to know whether the merchant
-  picked an image or a video, nor the order the layers stack in, nor that the
-  overlay must sit above the media and below the content. It renders this and
-  passes the settings through.
-
-  That matters most for the thing that is easy to get wrong: the media layer has
-  to be `position: absolute` inside a `position: relative` host, and the content
-  has to establish a stacking context above it. Every section that hand-rolls
-  this gets it right once and then breaks it the next time a dropdown inside the
-  section renders behind the overlay.
-
-  ## Ordering
-
-      background-media          absolute, fills the host, `z-index: 0`
-        ├─ image or video       the layer itself
-        └─ overlay              on top of the media
-      …section content…         must be `position: relative`
-
-  The host needs `position: relative` and the content needs to sit above this.
-  `.has-background-media` in `base.css` does both, so a caller adds that class
-  and nothing else.
-
-  ## Reuse
-
-  Nothing here knows about groups. Any section can render it:
-
-      <div class="my-section has-background-media">
-        {% render 'background-media', settings: section.settings %}
-        <div class="my-section__content">…</div>
-      </div>
-
-  @param {object} [settings] - A settings object carrying the keys below. Passing the whole object means a section adds background support by adding settings, with no change to its markup.
+  @param {object} [settings] - A settings object carrying the `background_*`, `image_*`, `video_*` and `overlay_*` keys.
   @param {boolean} [priority] - Eager-load the image. Above-the-fold only.
-  @param {string} [placeholder] - Draw this placeholder when Image is chosen and
-    none is uploaded. Opt-in: a section that merely offers a background wants an
-    empty slot to stay empty, and a block whose whole subject is the photograph
-    wants to show its shape before anything is uploaded.
+  @param {string} [placeholder] - Draw this placeholder when Image is chosen and none is uploaded. Opt-in
   @param {string} [classes] - Extra classes on the wrapper.
-
-  Settings read:
-    background_media    none | image | video
-    image, image_mobile, image_position, image_parallax, image_parallax_speed
-    video, video_url, video_poster, video_position, video_loop
-    overlay_enabled, overlay_style, overlay_color, overlay_gradient,
-    overlay_opacity
 
   @example
     {% render 'background-media', settings: block.settings %}
@@ -93,11 +50,6 @@
   endcase
 -%}
 
-{%- comment -%}
-  Nothing selected, or selected but never filled in — a merchant who chose Video
-  and has not uploaded one yet. Rendering an empty positioned wrapper would put
-  a stacking context over the content for no reason.
-{%- endcomment -%}
 {%- if has_layer -%}
   <div class="background-media {{ classes }}" aria-hidden="true">
     {%- case media -%}
@@ -115,12 +67,7 @@
         {%- endif -%}
 
       {%- when 'video' -%}
-        {%- comment -%}
-          The video branch has its own poster picker rather than borrowing the
-          image branch's. Sharing one control meant "Image" stayed on screen
-          after the merchant chose Video, which reads as a leftover rather than
-          as the poster it actually was.
-        {%- endcomment -%}
+
         {% render 'background-video',
            video: settings.video,
            video_url: settings.video_url,

@@ -1,77 +1,10 @@
 {% doc %}
   blocks/_showcase-video.liquid — private to `blocks/_showcase-column.liquid`.
-
-  One video review: a face, a play control, and what they said written over the
-  foot of their own photograph.
-
-  ## The card is one box, not a picture with a caption under it
-
-  `.showcase-card` is a one-cell grid and everything in it occupies that cell —
-  the photograph, the scrim over it, and the words. The row is as tall as the
-  taller of the two, so a long quote grows the card and stretches the picture
-  with it rather than spilling off the bottom of a fixed frame.
-
-  That is why the ratio is on the media rather than on the card. A card with
-  `aspect-ratio` on itself is a box that ignores its own contents; a media cell
-  with one is a *preferred* height that the grid row is free to beat.
-
-  ## Nothing is fetched for a video nobody opens
-
-  The card carries a `<template>` holding a whole `<deferred-media>` — poster,
-  play control, and a second `<template>` with the real video or embed. Markup
-  inside a template is inert: no fetch, no decode, no metadata request. A lane
-  of twelve reviews costs twelve posters' worth of `<img>` and nothing else
-  until one is pressed, at which point
-  `assets/testimonial-showcase.js` clones that template into the section's
-  modal.
-
-  Two templates rather than one because they switch off two different things.
-  The outer one keeps the modal's poster out of the page; the inner one is
-  `<deferred-media>`'s own contract, and keeps the video out of the modal until
-  the play badge is pressed there too.
-
-  ## The play control is a button, and the card is not a link
-
-  A card that navigates cannot also open a video without the first tap doing
-  something nobody asked for. So the picture is not a link, the play control is
-  a `<button>`, and it carries the reviewer's name as its accessible label —
-  "Play Myrna T.'s video" rather than twelve buttons all called "Play".
-
-  The lanes clone their cards to loop, so the button's handler is delegated from
-  the section rather than bound here: a listener attached at build time would be
-  missing from every copy, which is most of what is on the screen.
-
-  ## The verified seal is drawn here rather than in `snippets/icon.liquid`
-
-  It is two shapes that have to sit inside each other — a scalloped disc and the
-  tick on it — and the icon snippet renders one path with one stroke. Adding a
-  case for it would mean either a seal with no tick or a second icon that only
-  makes sense stacked on the first.
-
-  ## Three copies of every default
-
-  The schema default, the `| default:` beside the setting that reads it, and the
-  column preset in the section. They have to agree: a card created from a preset
-  that omits a setting has nothing stored, so it falls through to the Liquid
-  fallback while the editor panel shows the schema's number.
 {% enddoc %}
 
 {%- liquid
   assign s = block.settings
 
-  comment
-    ---- what there is to play ----
-
-    A hosted video is a file in Shopify's CDN — real playback control, real
-    posters, `video_tag` writing the sources. A URL is YouTube or Vimeo and an
-    iframe. Both are supported because merchants have their footage in both
-    places, and the hosted path is better in every measurable way.
-
-    Truthiness for the object and `''` for the string: nil is falsy in every
-    Liquid engine, and `nil != blank` is not consistently false in all of them.
-    That difference decides whether a merchant with only a URL gets an embed or
-    an empty `<video>`.
-  endcomment
   assign hosted = false
   if s.video
     assign hosted = true
@@ -84,12 +17,6 @@
     assign has_video = true
   endif
 
-  comment
-    The card's own picture, and the modal's poster, are the same image resolved
-    once. A merchant who uploads a video gets its `preview_image` without being
-    asked for a still; picking one overrides it, which is worth doing when the
-    first frame is a fade from black.
-  endcomment
   assign poster = s.image
   if poster == blank and hosted
     assign poster = s.video.preview_image
@@ -103,29 +30,11 @@
     assign show_verified = true
   endif
 
-  comment
-    The button says whose video it is. Twelve buttons called "Play" is twelve
-    identical stops in a screen reader's list of controls, and the name is the
-    only thing that tells them apart.
-  endcomment
   assign play_label = 'sections.testimonials_showcase.play_video' | t
   if author != ''
     assign play_label = 'sections.testimonials_showcase.play_video_by' | t: name: author
   endif
 
-  comment
-    ---- the frame ----
-
-    The theme's border group, resolved exactly as `blocks/_testimonial-card.liquid`
-    resolves its own, with one addition: Gradient. The design draws a stroke that
-    is bright at one corner and gone at the other, which a single border colour
-    cannot express — so that option paints a gradient into a pseudo-element and
-    masks its middle out, and the plain styles keep using a real border.
-
-    A blank colour has no alpha channel to read until the scheme resolves in the
-    browser, so `color_modify` cannot fade it and `color-mix` does that job at
-    paint time instead.
-  endcomment
   assign border_line = s.border_style | default: 'gradient'
   assign border_width = 0
   assign border_paint = ''
@@ -152,14 +61,6 @@
   assign radius = s.border_radius | default: 20 | plus: 0
   assign radius_mobile = s.border_radius_mobile | default: radius | plus: 0
 
-  comment
-    ---- the scrim ----
-
-    A gradient rather than a flat tint, and a height rather than a full cover:
-    the words need a dark floor to sit on and the face above them does not need
-    dimming. `--sv-scrim-height` is where the gradient starts, as a share of the
-    card.
-  endcomment
   assign scrim_paint = ''
   if s.scrim_color != blank
     assign scrim_alpha = s.scrim_opacity | default: 90 | plus: 0
@@ -169,18 +70,6 @@
 
   assign scrim_height = s.scrim_height | default: 62 | plus: 0
 
-  comment
-    ---- the play control ----
-
-    Sized from one number. The glyph, the disc and the ring around it are all
-    derived from `play_size`, so a merchant moves one slider rather than three
-    that can be set out of proportion with each other.
-  endcomment
-  comment
-    Resolved here rather than in the `render` argument: filters are not allowed
-    on arguments passed to `render`, and the tag fails to parse rather than
-    ignoring them.
-  endcomment
   assign star_size = s.star_size | default: 11 | plus: 0
 
   assign play_size = s.play_size | default: 48 | plus: 0
@@ -191,12 +80,6 @@
 
   assign card_ratio = s.card_ratio | default: '3-4'
 
-  comment
-    `sizes` describes the widest this card is ever painted. A lane is a column
-    about a third of the row on a desktop and a fixed-width card on a phone, so
-    a wrong hint here is a photograph arriving three sizes larger than the box
-    it fills — once per card, and the lanes clone their cards.
-  endcomment
   assign card_sizes = '(min-width: 990px) 360px, (min-width: 750px) 320px, 80vw'
 
   assign card_classes = 'showcase-card'
@@ -269,11 +152,6 @@
        sizes: card_sizes %}
   </div>
 
-  {%- comment -%}
-    Decoration, and it says so. The words above it are the content and the
-    gradient exists so they can be read over a photograph nobody chose for its
-    contrast.
-  {%- endcomment -%}
   <span class="showcase-card__scrim" aria-hidden="true"></span>
 
   {%- if has_video -%}
@@ -289,24 +167,13 @@
     </button>
   {%- endif -%}
 
-  {%- comment -%}
-    `data-block-spacing` is on the body rather than on the card, and that is not
-    a mistake. The four padding sliders are the room around the *words*; the
-    card itself is a photograph that runs to its own corners, and padding on it
-    would inset the picture instead.
-  {%- endcomment -%}
   <div class="showcase-card__body" data-block-spacing>
     {%- if author != blank or rating > 0 -%}
       <div class="showcase-card__head">
         {%- if author != blank -%}
           <span class="showcase-card__identity">
             {%- if show_verified -%}
-              {%- comment -%}
-                A seal, not a claim. The word "Verified" is not written out here
-                because the design has no room for it beside the name — so it is
-                `aria-hidden` and the sentence that carries the meaning is the
-                one on the button and in the quote itself.
-              {%- endcomment -%}
+
               <svg
                 class="showcase-card__seal"
                 viewBox="0 0 24 24"
@@ -349,14 +216,7 @@
   </div>
 
   {%- if has_video -%}
-    {%- comment -%}
-      The modal's contents, held inert until the play control is pressed.
 
-      Both the outer element and the inner one are templates and they switch off
-      two different things — see the note at the head of this file. Cloning the
-      outer one puts a `<deferred-media>` in the modal with a poster and nothing
-      loaded; pressing that poster is what fetches the footage.
-    {%- endcomment -%}
     <template data-showcase-video>
       <deferred-media class="showcase-media" data-autoplay="false">
         <button
@@ -373,12 +233,6 @@
              placeholder: 'hero-apparel-2',
              sizes: '(min-width: 990px) 880px, 100vw' %}
 
-          {%- comment -%}
-            The rotating badge. The ring of text is one `textPath` around a
-            circle rather than letters positioned one at a time, so it stays
-            legible at any size and a merchant can write their own words into
-            it. It spins in CSS and stops under `prefers-reduced-motion`.
-          {%- endcomment -%}
           <span class="showcase-media__badge" aria-hidden="true">
             <svg class="showcase-media__badge-ring" viewBox="0 0 100 100" focusable="false">
               <defs>
@@ -413,13 +267,7 @@
                    image_size: '1280x',
                    class: 'showcase-media__player' }}
           {%- else -%}
-            {%- comment -%}
-              `external_video_url` builds the embed with the flags a review needs
-              — it starts on press, it does not trail into unrelated videos, and
-              it carries no channel branding. It is deliberately *not* muted:
-              somebody pressing play on a testimonial is there for what the
-              person says.
-            {%- endcomment -%}
+
             {{ external
                | external_video_url:
                    autoplay: true,
@@ -439,11 +287,6 @@
   {%- endif -%}
 </article>
 
-{%- comment -%}
-  Every setting below is a control a merchant reaches in the editor, and the
-  schema is one element's styling surface: splitting it to get under Theme
-  Check's count of 40 would split the thing the settings style.
-{%- endcomment -%}
 {% # theme-check-disable ExcessiveSettingsCount %}
 {% schema %}
 {

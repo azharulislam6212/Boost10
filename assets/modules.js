@@ -1,23 +1,5 @@
 /**
- * modules.js — Boost10
- *
  * The small interactive primitives that appear throughout the theme:
- *
- *   <accordion-element>  Disclosure group, optionally single-open
- *   <tabs-element>       Tab list following the ARIA authoring practices
- *   <show-more>          Collapsed content with an expand control
- *   <deferred-media>     Click-to-load video, model and embed
- *
- * All four are progressive enhancements over markup that already works. The
- * accordion is native `<details>`, so it opens and closes with JavaScript
- * disabled. Tabs are anchor links to real headings. `<show-more>` renders all
- * of its content, and only collapses it once the script confirms it can expand
- * it again. `<deferred-media>` holds a real `<template>` whose contents are a
- * plain iframe or video element.
- *
- * That ordering matters more than it looks. A collection page that hides half
- * its content behind a script and then fails to load that script has hidden the
- * content from search engines as well as from customers.
  *
  * @module @theme/modules
  */
@@ -49,57 +31,10 @@ function nearestAccordion(element) {
 /**
  * A group of `<details>` disclosures with animated height and optional
  * single-open behaviour.
- *
- * Markup:
- *
- *   <accordion-element data-single>
- *     <details>
- *       <summary>Question</summary>
- *       <div>Answer</div>
- *     </details>
- *   </accordion-element>
- *
- * No `data-ref` anywhere, and the block above used to show two — written as
- * `data-ref="item[]"`, a repeated-ref syntax this theme does not have.
- * `#collectRefs` takes the attribute's value verbatim and builds an array when
- * a name appears more than once, so `item[]` would only ever produce a ref
- * called `item[]`. This element has never read one: `#items()` finds its
- * disclosures with `querySelectorAll` and `nearestAccordion()`, which is what
- * lets a Menu inside a Group inside a Column still be part of the group.
- * `<tabs-element>` below carried the same fiction and did require the ref, so
- * there it disabled the component outright.
- *
- * Height is animated by measuring the panel and running a WAAPI animation on
- * the `<details>` element, rather than by animating `max-height` to an arbitrary
- * large value. The arbitrary value is what makes accordions feel slow when the
- * content is short and clipped when it is long.
- *
- * `morph()` preserves the `open` attribute on `<details>`, so an accordion stays
- * open across a section re-render.
- *
- * ## Collapsing only on small screens
- *
- * `data-collapse-below="750"` makes the group an accordion below that width and
- * a plain list of open sections above it. Footer columns are the usual case:
- * four headed lists side by side on a desktop, four tappable rows on a phone.
- *
- * This is managed here rather than in CSS because a closed `<details>` hides its
- * content in the user agent stylesheet, and no CSS rule reliably reopens it
- * across browsers. The `open` attribute has to actually change, so `matchMedia`
- * drives it — and above the breakpoint the summaries are marked `data-static`,
- * which the stylesheet uses to remove the pointer cursor and the marker.
  */
 export class AccordionElement extends BaseComponent {
   /**
    * What is running on an item, and which way it is going.
-   *
-   * The direction is the half that was missing. Without it `open()` and
-   * `close()` could only ask the DOM, and the DOM's answer during a close is
-   * "open" — `open` stays set until the animation lands. So a second click
-   * while a row was closing started a *second* close from the top, and a click
-   * on another row in single-open mode re-closed a row that was already on its
-   * way shut. Knowing the direction is what makes both a no-op and makes
-   * reversing mid-flight possible.
    *
    * @type {WeakMap<HTMLDetailsElement, {animation: Animation, fade: Animation|null, direction: 'open'|'close'}>}
    */
@@ -123,7 +58,7 @@ export class AccordionElement extends BaseComponent {
     this.#query = null;
   }
 
-  /* --------------------------------------------------------- public API -- */
+  /* --------------------------------------------------------- public API -- ---- */
 
   /**
    * @param {HTMLDetailsElement} item
@@ -132,8 +67,6 @@ export class AccordionElement extends BaseComponent {
     const running = this.#animations.get(item);
 
     if (running?.direction === 'open') return;
-    // `item.open` is still true through a close, so "already open" is only a
-    // reason to stop when nothing is closing it.
     if (item.open && running?.direction !== 'close') return;
 
     if (this.dataset.single !== undefined && this.dataset.single !== 'false') {
@@ -155,9 +88,7 @@ export class AccordionElement extends BaseComponent {
     this.#animateClose(item);
   }
 
-  /**
-   * Open every item. Used by print stylesheets and by in-page search.
-   */
+  /** Open every item. Used by print stylesheets and by in-page search. */
   openAll() {
     for (const item of this.#items()) {
       item.open = true;
@@ -172,7 +103,7 @@ export class AccordionElement extends BaseComponent {
     return Number.isFinite(value) && value > 0 ? value : null;
   }
 
-  /* ---------------------------------------------------------- internals -- */
+  /* ---------------------------------------------------------- internals -- ---- */
 
   /**
    * Open everything above the breakpoint, restore the authored state below it.
@@ -194,8 +125,6 @@ export class AccordionElement extends BaseComponent {
 
         if (expanded) {
           item.open = true;
-          // The summary is no longer a control, so it must not be a tab stop or
-          // announce itself as expandable.
           summary?.setAttribute('data-static', '');
           summary?.setAttribute('tabindex', '-1');
         } else {
@@ -212,24 +141,6 @@ export class AccordionElement extends BaseComponent {
 
   /**
    * Every disclosure this group owns, at any depth.
-   *
-   * It used to be `:scope > details, :scope > * > details` — one level, or two.
-   * That was enough while a footer column was a block in a flat list, and
-   * stopped being enough the moment the footer grew a hierarchy: a Menu inside a
-   * Group inside a Column is three levels down, so the accordion found nothing,
-   * marked nothing static, and every column on a phone stayed a wall of links.
-   *
-   * Depth is now unbounded and ownership is what limits the search instead. A
-   * `<details>` inside a nested accordion belongs to that group, not to this
-   * one, and a block that opted out with `data-no-collapse` is not a disclosure
-   * at all — it is markup that happens to be a `<details>` so it can share one
-   * stylesheet with the ones that are.
-   *
-   * Ownership is decided by walking up to the nearest element that *is* an
-   * accordion, not by matching the tag name `accordion-element`. A subclass
-   * registered under its own name — `<footer-columns>` — is still an accordion,
-   * and a `closest('accordion-element')` test silently returns nothing for
-   * every disclosure inside one.
    *
    * @returns {HTMLDetailsElement[]}
    * @private
@@ -255,14 +166,12 @@ export class AccordionElement extends BaseComponent {
    * @private
    */
   #onSummaryClick(event, item) {
-    // Above the breakpoint the summary is decoration, not a control.
     if (this.hasAttribute('data-static')) {
       event.preventDefault();
       return;
     }
 
     if (prefersReducedMotion()) {
-      // Let the browser do it. There is nothing to animate.
       if (item.open) return;
       if (this.dataset.single !== undefined && this.dataset.single !== 'false') {
         for (const other of this.#items()) {
@@ -289,10 +198,6 @@ export class AccordionElement extends BaseComponent {
     const panel = this.#panelOf(item);
     if (!panel || prefersReducedMotion()) return;
 
-    // Where the row is *right now*, read before the running animation is
-    // cancelled — cancelling drops the fill and snaps the box back to its
-    // natural height, so a reversal measured after it would start from a
-    // height the customer never saw.
     const running = this.#animations.get(item);
     const from = running ? item.getBoundingClientRect().height : null;
     running?.animation.cancel();
@@ -301,14 +206,6 @@ export class AccordionElement extends BaseComponent {
     const start = from ?? this.#closedHeight(item);
     const end = item.offsetHeight;
 
-    // The height is animated on the `<details>` itself, so for the whole of the
-    // animation the element is shorter than the content inside it. Without this
-    // the content simply overflows and is painted at full height from the first
-    // frame — the panel appears instantly and only the box around it grows,
-    // which is what "the accordion doesn't animate" looks like on a phone.
-    //
-    // `overflow` is not an animatable property, so it cannot ride along in the
-    // keyframes; it is set here and cleared when the animation settles.
     this.#clip(item, true);
 
     this.#run(item, 'open', start, end, panel, 300, 'cubic-bezier(0.16, 1, 0.3, 1)');
@@ -316,17 +213,6 @@ export class AccordionElement extends BaseComponent {
 
   /**
    * The closed height of a row, measured exactly rather than guessed at.
-   *
-   * It used to be `summary.offsetHeight`, which is the summary's own box and
-   * not the row's: it misses the border and any padding the `<details>` carries
-   * of its own. The close animation therefore ended a few pixels short of where
-   * the row actually settles, and the last thing the customer saw was the row
-   * snapping back up to meet it — the jump.
-   *
-   * Hiding the panel gives the real number. `open` is deliberately left alone:
-   * toggling it would fire two `toggle` events per click and reset the panel's
-   * scroll position, and a closed `<details>` draws exactly the same box as an
-   * open one whose panel is `display: none`.
    *
    * @param {HTMLDetailsElement} item
    * @returns {number}
@@ -349,14 +235,6 @@ export class AccordionElement extends BaseComponent {
   /**
    * Run one height animation and own the cleanup after it.
    *
-   * `fill: 'both'` is the whole reason this is shared. Without a fill the
-   * animated height is dropped the instant the animation finishes, and the
-   * `finished` promise resolves a microtask later — so a closing row painted
-   * one frame back at its full open height before `open = false` reached it.
-   * That frame is the jump. With the fill, the row holds the height it landed
-   * on until this method has changed the DOM under it and released the fill in
-   * that order.
-   *
    * @param {HTMLDetailsElement} item
    * @param {'open'|'close'} direction
    * @param {number} start
@@ -373,10 +251,6 @@ export class AccordionElement extends BaseComponent {
       fill: 'both',
     });
 
-    // The fade is on the panel, not on the `<details>`. Fading the whole row
-    // took the question with it, so every toggle dimmed the one line that
-    // should stay put. It also runs short of the height so the answer has
-    // arrived before the box stops moving.
     const fade = panel.animate(
       direction === 'open' ? [{ opacity: 0 }, { opacity: 1 }] : [{ opacity: 1 }, { opacity: 0 }],
       { duration: Math.round(duration * 0.7), easing: 'ease-out', fill: 'both' }
@@ -386,8 +260,6 @@ export class AccordionElement extends BaseComponent {
 
     animation.finished
       .then(() => {
-        // Another click already took the row over; that animation owns the
-        // element and its cleanup now.
         if (this.#animations.get(item)?.animation !== animation) return;
         this.#animations.delete(item);
 
@@ -398,19 +270,12 @@ export class AccordionElement extends BaseComponent {
         item.style.removeProperty('height');
         this.#clip(item, false);
       })
-      .catch(() => {
-        // Cancelled by a reversal. The animation that replaced this one is
-        // already clipping the element and owns the cleanup.
-      });
+      .catch(() => {});
   }
 
   /**
    * Clip the item to its animating height, and put back whatever `overflow` it
    * had before.
-   *
-   * A `<details>` in this theme can legitimately carry `overflow: visible` for
-   * a focus ring or a dropdown, so the previous value is preserved rather than
-   * assumed — and only ever restored by the animation that set it.
    *
    * @param {HTMLDetailsElement} item
    * @param {boolean} on
@@ -459,9 +324,6 @@ export class AccordionElement extends BaseComponent {
 
     this.#clip(item, true);
 
-    // Decelerating into the closed state rather than accelerating out of it.
-    // The old ease-in-out spent its last frames moving fastest, which is what
-    // made a close read as a snap even when the arithmetic was right.
     this.#run(item, 'close', start, end, panel, 260, 'cubic-bezier(0.33, 0, 0.2, 1)');
   }
 }
@@ -472,43 +334,9 @@ defineComponent('accordion-element', AccordionElement);
    <footer-columns>
    --------------------------------------------------------------------------
    The footer panel's grid, measured from its own children.
-
-   Every block a merchant adds to the footer arrives through one
-   `{% content_for 'blocks' %}`, and — as `sections/header.liquid` already
-   notes — a section cannot iterate those blocks: `section.blocks` returns
-   nothing for them. So the three numbers the panel's layout depends on cannot
-   be worked out in Liquid, however the section is written:
-
-     --panel-tracks         one `fr` track per column, in the width share each
-                            column carries, so three at 100% and one at 150%
-                            become `1fr 1fr 1fr 1.5fr`
-     --panel-card-rows      the rows the card covers — however many rows the
-                            columns actually took, plus the policy links' row
-                            when there is one. Declaring them as the *explicit*
-                            grid is what lets the card say `1 / -1` and have that
-                            mean "not the utility rows", which are implicit and
-                            land underneath
-     --aside-column         the track the column carrying the divider sits in
-     --policy-span          how many tracks the policy links run across: up to
-                            the aside, so they stop at the rule instead of
-                            passing under the newsletter
-
-   Each column already publishes its own width as `--column-width`, so this
-   reads them off the children rather than being told. It extends
-   `AccordionElement` rather than sitting beside it because the same element is
-   both the grid and the thing that collapses on a phone.
-
-   The stylesheet has a working fallback for all three, so a page where this
-   never runs still gets a sensible footer — equal columns and a card around the
-   first two rows — rather than a broken one.
    ========================================================================== */
 
-/**
- * How many columns share a row before the next one wraps.
- *
- * Not a limit on how many columns a footer may have — a seventh is fine, it
- * simply starts a second row.
- */
+/** How many columns share a row before the next one wraps. */
 const FOOTER_MAX_COLUMNS = 6;
 
 export class FooterColumns extends AccordionElement {
@@ -528,9 +356,6 @@ export class FooterColumns extends AccordionElement {
     super.setup();
     this.#measure();
 
-    // The theme editor adds, removes and reorders blocks in place, and a column
-    // resized with the width slider rewrites its own `style` attribute. Both
-    // change the answer, and neither re-runs `setup()`.
     this.#watcher = new MutationObserver(() => this.#schedule(true));
     this.#watcher.observe(this, {
       childList: true,
@@ -539,9 +364,6 @@ export class FooterColumns extends AccordionElement {
       attributeFilter: ['style', 'data-divider'],
     });
 
-    // The number of rows the columns occupy changes with the width, so the
-    // measurement has to follow it. One observer on the grid itself catches the
-    // breakpoint, an orientation change and a resized editor preview alike.
     if (typeof ResizeObserver === 'function') {
       this.#resizer = new ResizeObserver(() => this.#schedule(true));
       this.#resizer.observe(this);
@@ -550,11 +372,6 @@ export class FooterColumns extends AccordionElement {
 
   /**
    * Coalesce measurements to one per frame.
-   *
-   * Setting the track list changes the layout, which is what the row count is
-   * read from — and writing a property from inside a ResizeObserver callback
-   * can schedule another one. A frame between them keeps that from becoming a
-   * loop, and keeps a burst of editor mutations to a single pass.
    *
    * @private
    */
@@ -589,52 +406,23 @@ export class FooterColumns extends AccordionElement {
       return;
     }
 
-    // Six tracks at most.
-    //
-    // One track per column reads well up to about six and then stops being a
-    // footer: a seventh column makes seven columns of roughly two hundred pixels
-    // each, and every menu inside them wraps. Capping the track list is what
-    // makes the seventh column wrap to a second row instead — grid puts anything
-    // that does not fit the declared tracks on the next row by itself, which is
-    // exactly the behaviour wanted, and the row count below measures the result
-    // rather than assuming one row.
     const tracks = columns
       .slice(0, FOOTER_MAX_COLUMNS)
       .map((el) => {
-        // `--column-width` is a percentage share, not a size: 150% next to three
-        // 100%s means "half again as wide as one of those", which is what an
-        // `fr` already means.
         const share = parseFloat(getComputedStyle(el).getPropertyValue('--column-width'));
         return `${Number.isFinite(share) && share > 0 ? (share / 100).toFixed(4) : 1}fr`;
       })
       .join(' ');
 
-    // Where the aside sits, as a track number.
-    //
-    // It used to be pinned to the last track with `-2 / -1`, on the assumption
-    // that the column carrying the divider is the last one. Add a sixth column
-    // after it and that assumption is simply false: the aside was yanked to the
-    // end of the row, the columns behind it shuffled up, and — because the aside
-    // also spans down beside the policy links — the policy row could no longer
-    // fit on its own row and dropped through to an implicit one *below the card*,
-    // taking a column with it. That is the block that went missing.
-    //
-    // Measured, it lands wherever the merchant actually put it.
     const asideIndex = columns.findIndex((el) => el.hasAttribute('data-divider'));
     const hasAside = asideIndex >= 0;
 
-    // The policy links run up to the aside, and across everything when there is
-    // no aside to stop at. Never fewer than one track, and never more than the
-    // grid actually has — which is the capped count, not the column count.
     const trackCount = Math.min(columns.length, FOOTER_MAX_COLUMNS);
     const span = Math.min(Math.max(hasAside ? asideIndex : trackCount, 1), trackCount);
 
     this.style.setProperty('--panel-tracks', tracks);
     this.style.setProperty('--policy-span', String(span));
 
-    // Only pin the aside when it is on the first row of tracks. Past that it is
-    // an ordinary column on a later row, and pinning it to a track it does not
-    // sit in would drag it back up.
     const pinAside = hasAside && asideIndex < trackCount;
 
     if (pinAside) {
@@ -643,24 +431,8 @@ export class FooterColumns extends AccordionElement {
       this.style.removeProperty('--aside-column');
     }
 
-    // The attribute is what the stylesheet keys the placement off. Without it,
-    // the rule's definite row would still apply once the aside had wrapped past
-    // the last track: an item with a definite row and an automatic column is
-    // placed before the fully automatic ones, so the aside would jump back up to
-    // the first row and push an ordinary column down in its place.
     this.toggleAttribute('data-aside-pinned', pinAside);
 
-    // How far the aside reaches down.
-    //
-    // In the design it spans its own row and the policy links' row, so its rule
-    // runs the full height of the card. That only holds while those two rows are
-    // adjacent — which they are in the ordinary footer, and are not the moment
-    // a full-width block joins them inside the card. Then the aside is asking to
-    // span across a row that needs every track, the grid resolves the conflict
-    // by pushing that block further down, and the rows the aside reserved are
-    // left empty: a gap in the middle of the card with nothing in it.
-    //
-    // So it only spans when the shape it was drawn for is actually there.
     const others = children.filter(
       (el) =>
         el !== policy &&
@@ -676,18 +448,6 @@ export class FooterColumns extends AccordionElement {
 
     this.toggleAttribute('data-measured', true);
 
-    // The row count has to be read back from the laid-out grid rather than
-    // assumed, because how many rows these blocks occupy is not a fact about the
-    // markup: side by side the columns are one row, stacked on a phone they are
-    // one row each, and a narrow window can wrap them into any number in
-    // between. Setting the tracks above is what decides it, so this reads the
-    // answer after that has taken effect.
-    //
-    // And it counts every block that belongs *inside* the card, not just the
-    // columns. A full-width block among them — the brand block, say — takes a
-    // row of its own, and counting only columns left the card one or two rows
-    // short: it closed above the policy links, which then sat outside a card
-    // they are supposed to be in.
     const rows = this.#rowCount();
     const value = 'auto '.repeat(rows).trim();
 
@@ -695,11 +455,6 @@ export class FooterColumns extends AccordionElement {
 
     this.style.setProperty('--panel-card-rows', value);
 
-    // Changing the explicit rows can change the layout that was just measured —
-    // a first pass with too few rows pushes a block into an implicit one, and
-    // the corrected grid pulls it back. One more pass settles it. The guard is
-    // there because "measure, write, re-measure" is exactly the shape a layout
-    // loop takes, and this one must always stop.
     if (this.#passes < 4) {
       this.#passes += 1;
       this.#schedule();
@@ -708,10 +463,6 @@ export class FooterColumns extends AccordionElement {
 
   /**
    * How many grid rows the card covers.
-   *
-   * Everything except the rows the design puts *below* the card: the utility
-   * rows and the legal band. Those are the blocks that land in implicit rows,
-   * which is what puts them outside it.
    *
    * @returns {number}
    * @private
@@ -733,43 +484,7 @@ defineComponent('footer-columns', FooterColumns);
    <tabs-element>
    ========================================================================== */
 
-/**
- * A tab list implementing the ARIA authoring practices roving tabindex pattern.
- *
- * Markup:
- *
- *   <tabs-element>
- *     <div role="tablist">
- *       <button role="tab" id="tab-1" aria-controls="panel-1">One</button>
- *     </div>
- *     <div role="tabpanel" id="panel-1" aria-labelledby="tab-1">…</div>
- *   </tabs-element>
- *
- * Keyboard support: arrow keys move between tabs and activate them, Home and End
- * jump to the ends. Only the selected tab is in the tab order, so Tab moves past
- * the whole group in one press rather than through every tab in it.
- *
- * ## The roles are the contract, and nothing else is
- *
- * This used to require `data-ref="tab"`, and it asked for it in a syntax that
- * does not exist — the block above read `data-ref="tab[]"`, and `#collectRefs`
- * takes the attribute verbatim, so that would have produced a ref named `tab[]`
- * and never one named `tab`. No caller could have satisfied it. The cart
- * drawer, the only thing in the theme that uses this element, wrote correct
- * ARIA and no refs at all, so every drawer logged *"missing required refs: tab.
- * Component disabled"* and the notes, discount and shipping tabs did nothing a
- * pointer or a keyboard could see.
- *
- * Reading the roles instead is also what `<tab-group>` in `assets/tabs.js`
- * already does — "deliberately generic: it reads `role="tab"` and
- * `role="tabpanel"` and nothing else" — so the two tab components in this theme
- * now ask for the same thing. A tab strip cannot omit these roles and still be
- * a tab strip, which is what makes them the right contract: there is no valid
- * markup left that this element refuses to drive.
- *
- * Tabs are collected from inside the `[role="tablist"]` rather than from the
- * whole element, so a tab group nested inside one of the panels keeps its own.
- */
+/** A tab list implementing the ARIA authoring practices roving tabindex pattern. */
 export class TabsElement extends BaseComponent {
   setup() {
     const tabs = this.#tabs();
@@ -787,7 +502,7 @@ export class TabsElement extends BaseComponent {
     }
   }
 
-  /* --------------------------------------------------------- public API -- */
+  /* --------------------------------------------------------- public API -- ---- */
 
   /**
    * @param {number} index
@@ -816,7 +531,7 @@ export class TabsElement extends BaseComponent {
     return Number(this.dataset.selected) || 0;
   }
 
-  /* ---------------------------------------------------------- internals -- */
+  /* ---------------------------------------------------------- internals -- ---- */
 
   /**
    * @returns {HTMLElement[]}
@@ -830,13 +545,6 @@ export class TabsElement extends BaseComponent {
   /**
    * The panels, in document order, which is the order their tabs are in — the
    * two are paired by index in `select()`.
-   *
-   * That holds because a tab strip is rendered as one list followed by one
-   * panel per entry, from the same loop or the same set of conditions; the cart
-   * drawer's three are each behind the same `if` as their tab. Pairing on
-   * `aria-controls` instead would survive a caller that emitted them in
-   * different orders, at the cost of a lookup on every keystroke for a shape
-   * nothing in the theme produces.
    *
    * @returns {HTMLElement[]}
    * @private
@@ -887,24 +595,7 @@ defineComponent('tabs-element', TabsElement);
    <show-more>
    ========================================================================== */
 
-/**
- * Collapses long content behind an expand control.
- *
- * Markup:
- *
- *   <show-more data-height="180">
- *     <div data-ref="content">…long description…</div>
- *     <button data-ref="button" aria-expanded="false"
- *             data-label-more="{{ 'general.actions.show_more' | t }}"
- *             data-label-less="{{ 'general.actions.show_less' | t }}">
- *       {{ 'general.actions.show_more' | t }}
- *     </button>
- *   </show-more>
- *
- * The content is only collapsed if it is actually taller than the threshold,
- * and the control removes itself when it is not needed. A "show more" button
- * that expands nothing is worse than no button.
- */
+/** Collapses long content behind an expand control. */
 export class ShowMore extends BaseComponent {
   static requiredRefs = ['content', 'button'];
 
@@ -916,8 +607,6 @@ export class ShowMore extends BaseComponent {
 
     this.on(this.refs.button, 'click', () => this.toggle());
 
-    // Fonts and images land after first paint and change the height, so the
-    // decision has to be re-made rather than taken once on load.
     this.#observer = new ResizeObserver(rafThrottle(() => this.#measure()));
     this.#observer.observe(this.refs.content);
   }
@@ -927,7 +616,7 @@ export class ShowMore extends BaseComponent {
     this.#observer = null;
   }
 
-  /* --------------------------------------------------------- public API -- */
+  /* --------------------------------------------------------- public API -- ---- */
 
   /**
    * @returns {boolean}
@@ -948,7 +637,7 @@ export class ShowMore extends BaseComponent {
     this.#setExpanded(false);
   }
 
-  /* ---------------------------------------------------------- internals -- */
+  /* ---------------------------------------------------------- internals -- ---- */
 
   /**
    * @param {boolean} expanded
@@ -969,7 +658,6 @@ export class ShowMore extends BaseComponent {
       text.textContent = label;
     }
 
-    // Once fully open the cap is removed, so later content growth is not clipped.
     if (expanded) {
       content.addEventListener(
         'transitionend',
@@ -1020,27 +708,7 @@ defineComponent('show-more', ShowMore);
    <deferred-media>
    ========================================================================== */
 
-/**
- * Loads heavy media only once the customer asks for it.
- *
- * Markup:
- *
- *   <deferred-media data-autoplay="false">
- *     <button data-ref="poster" aria-label="{{ 'accessibility.play_video' | t }}">
- *       {{ image }}
- *     </button>
- *     <template data-ref="template">
- *       <iframe src="…" title="…" allow="autoplay"></iframe>
- *     </template>
- *   </deferred-media>
- *
- * A YouTube embed costs upwards of half a megabyte and a dozen requests before
- * anyone presses play. Keeping it in a `<template>` means the markup is real,
- * server-rendered and translated, but nothing is fetched until it is wanted.
- *
- * `data-autoplay` loads on first scroll into view instead of on click, which is
- * appropriate for a background video and never for anything with sound.
- */
+/** Loads heavy media only once the customer asks for it. */
 export class DeferredMedia extends BaseComponent {
   static requiredRefs = ['template'];
 
@@ -1068,7 +736,7 @@ export class DeferredMedia extends BaseComponent {
     this.#cancelObserve = null;
   }
 
-  /* --------------------------------------------------------- public API -- */
+  /* --------------------------------------------------------- public API -- ---- */
 
   /**
    * Insert the template's contents and start playback where applicable.
@@ -1093,13 +761,9 @@ export class DeferredMedia extends BaseComponent {
     const media = this.querySelector('video, iframe, model-viewer');
 
     if (media instanceof HTMLVideoElement) {
-      media.play().catch(() => {
-        // Autoplay was refused, which is the browser working as intended.
-        // The controls are visible, so the customer can start it themselves.
-      });
+      media.play().catch(() => {});
     }
 
-    // Focus the media so a keyboard user is not left on a hidden poster button.
     if (media instanceof HTMLElement && this.dataset.autoplay !== 'true') {
       media.setAttribute('tabindex', '-1');
       media.focus({ preventScroll: true });
@@ -1115,7 +779,7 @@ export class DeferredMedia extends BaseComponent {
     return this.#loaded;
   }
 
-  /* ---------------------------------------------------------- internals -- */
+  /* ---------------------------------------------------------- internals -- ---- */
 
   /** @private */
   #loadWhenVisible() {
@@ -1144,33 +808,7 @@ defineComponent('deferred-media', DeferredMedia);
    <share-button>
    ========================================================================== */
 
-/**
- * Share a link.
- *
- * Uses the device share sheet when the browser has one, and copies to the
- * clipboard when it does not. Both paths end the same way — the customer has the
- * link — so there is no third state to design for.
- *
- * ## Why no row of network buttons
- *
- * The classic Facebook/X/Pinterest row is four third-party requests, four
- * tracking opportunities, and four links that break whenever a network changes
- * its share URL format. The share sheet already lists every app the customer
- * actually uses, including the ones a theme would never think to add, and the
- * clipboard fallback works everywhere else.
- *
- * `navigator.share` must be called from a user gesture and rejects with
- * `AbortError` when the customer closes the sheet. That is a choice, not a
- * failure, so it is swallowed rather than reported — telling someone "sharing
- * failed" because they changed their mind is worse than saying nothing.
- *
- * Markup:
- *
- *   <share-button data-url="https://…" data-title="Product name">
- *     <button data-ref="button">Share</button>
- *     <span data-ref="feedback" hidden></span>
- *   </share-button>
- */
+/** Share a link. */
 export class ShareButton extends BaseComponent {
   static requiredRefs = ['button'];
 
@@ -1212,8 +850,6 @@ export class ShareButton extends BaseComponent {
         await navigator.share({ title: this.title, url: this.url });
         return;
       } catch (error) {
-        // Closing the sheet is a decision, not an error. Anything else falls
-        // through to the clipboard rather than leaving the customer with nothing.
         if (error?.name === 'AbortError') return;
       }
     }
@@ -1232,8 +868,6 @@ export class ShareButton extends BaseComponent {
       this.#confirm(themeString('shareCopied', ''));
       return true;
     } catch {
-      // Clipboard access is blocked in some contexts. Selecting the URL is the
-      // last resort, and it is what people reach for anyway.
       this.#selectFallback();
       return false;
     }

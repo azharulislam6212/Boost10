@@ -1,55 +1,5 @@
 {% doc %}
   blocks/_feature-title.liquid — private to `blocks/_feature-card.liquid`.
-
-  The line that names the feature.
-
-  ## It is the Text block's typography, by reference
-
-  The root carries `.block-text` and `.block-text--<preset>`, and the colour and
-  the Custom preset come from `snippets/block-typography.liquid`. So the presets
-  here *are* the presets in Theme settings › Typography: changing Heading 5
-  there moves every card on that preset, with nothing to re-render and no second
-  copy of the type map in this file.
-
-  What this block adds to a Text block is the two things a Text block cannot
-  know about: the heading level, and the line clamp.
-
-  ## Level and size are two settings because they are two questions
-
-  A feature row under an `h2` section heading wants `h3`; the same row as the
-  only thing on a landing page wants `h2`. Nothing here can see which, so the
-  merchant says — and the *size* is the preset, chosen separately, so an `h4`
-  that has to look like an `h5` does not have to lie about its level to a screen
-  reader or to Google.
-
-  `p` is offered as a level for the case where the card sits under a heading
-  that already covers it and a fourth `h3` on the page would be noise.
-
-  ## Clamping is off by default
-
-  A feature title is two or three words. A clamp exists for the merchant who
-  writes a sentence and wants the row to stay level, and at 0 it emits no
-  properties and no class at all — `-webkit-line-clamp` on an unclamped element
-  still costs a `display: -webkit-box`, which changes how the text lays out.
-
-  ## The heading is inside the `.block-text`, not the `.block-text` itself
-
-  Every rule the Text block relies on is written for a `.block-text.rte`
-  wrapper with the real tags inside it:
-
-      .block-text:not(--default).rte :is(h1…h6)   take the preset's type
-      .block-text--colored.rte :is(h1…h6)         take the chosen colour
-      .block-text--gradient :is(h1…h6)            clip the gradient to the text
-      .block-text.rte > :is(h1…h6):first-child    lose the long-form margin
-
-  All four are descendant selectors, so putting the class on the heading itself
-  would match none of them — the type would still work, because that is read off
-  the element, and the gradient would silently do nothing. Which is the failure
-  worth designing out: a colour setting that looks applied in the panel and is
-  invisible on the page.
-
-  So the shape here is `blocks/text.liquid`'s shape, and this file adds a tag
-  choice and a clamp to it rather than a second way of drawing text.
 {% enddoc %}
 
 {%- liquid
@@ -62,13 +12,6 @@
 
   assign classes = 'feature-title-block block-text rte block-text--' | append: preset
 
-  comment
-    `--colored` only once the merchant has actually picked a colour, and never
-    alongside `--gradient`. The rule it turns on hands the colour down to the
-    heading inside, and doing that unconditionally would repaint a heading that
-    was meant to keep `--color-heading` from the colour scheme. Same condition,
-    same reason, as `blocks/text.liquid`.
-  endcomment
   if color_mode == 'gradient'
     assign classes = classes | append: ' block-text--gradient'
   elsif color_mode != 'inherit' and color_mode != blank

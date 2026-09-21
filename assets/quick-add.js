@@ -1,40 +1,6 @@
 /**
- * quick-add.js — Boost10
- *
  * `<quick-add-summary>` — the one piece of the quick add modal that cannot be
  * written in Liquid.
- *
- * The drawing has the add button reading "Add To Cart · $35.92 · Avocados": the
- * price and the chosen option, on the control that commits to them. Both change
- * without a request, so both have to be written here.
- *
- * ## Why this is a separate element and not part of `<product-form>`
- *
- * `product-form.js` owns that button. On every variant change it sets
- * `button.textContent`, which is the right thing for it to do — it is the
- * component that knows whether a variant is available, sold out or a preorder,
- * and those three words are the button's real state.
- *
- * Writing the price from inside that component would mean teaching it about
- * selling plan allocations and money formatting, which belong to the modal.
- * Writing it from a second component that also sets `textContent` would be two
- * writers racing over one node.
- *
- * So this one never competes: it runs after the form has written, and only when
- * the form has left the button **enabled**. A sold-out variant keeps the form's
- * word for it, with no price appended to a button nobody can press.
- *
- * "After" is a `queueMicrotask`, not a guess at listener order. Both components
- * listen for `variant:change` on the same root; the order they were upgraded in
- * decides who hears it first, and that order depends on which custom element
- * definition arrived first — not something markup should have to depend on.
- *
- * ## Bundle mode
- *
- * The same modal chooses a variant for a bundle slot. `<product-bundle>` sets
- * `data-bundle-mode` on the modal while such a request is pending, and the
- * label becomes "Add to bundle" — the button must not promise a cart it is not
- * going to reach. Nothing else about the modal changes.
  *
  * @module @theme/quick-add
  */
@@ -43,23 +9,9 @@ import { BaseComponent, defineComponent } from '@theme/component';
 import { EVENTS } from '@theme/events';
 import { formatMoney, parseJSONScript, themeString, labelTarget } from '@theme/utilities';
 
-/**
- * What joins the label, the price and the chosen option on the add button.
- *
- * It is a constant because it is read as well as written — see `#renderButton`,
- * which recovers the form's own label by splitting the button on it.
- */
+/** What joins the label, the price and the chosen option on the add button. */
 const SEPARATOR = ' · ';
 
-/**
- * Markup:
- *
- *   <quick-add-summary data-product-id="123" data-add-label="Add to cart">
- *   </quick-add-summary>
- *
- * It renders nothing itself. Everything it writes belongs to elements its
- * siblings already put on the page.
- */
 export class QuickAddSummary extends BaseComponent {
   /** @type {Object|null} */
   #product = null;
@@ -93,9 +45,6 @@ export class QuickAddSummary extends BaseComponent {
       this.schedule();
     });
 
-    // The picker's opening position, for the case where this element upgraded
-    // before the picker and the read above fell back to the first variant. See
-    // `VARIANT_READY` in `@theme/events`.
     this.on(this.root, EVENTS.VARIANT_READY, (event) => {
       this.#variantId = Number(event.detail?.variant?.id) || null;
       this.schedule();
@@ -116,14 +65,10 @@ export class QuickAddSummary extends BaseComponent {
     this.schedule();
   }
 
-  /* --------------------------------------------------------- public API -- */
+  /* --------------------------------------------------------- public API -- ---- */
 
   /**
    * The modal, not the document.
-   *
-   * A modal opened over a product page has the page's `<variant-picker>` and
-   * `<product-form>` behind it. Scoping to the fetched content is what stops
-   * this writing the page's button instead of the modal's.
    *
    * @returns {HTMLElement|Document}
    */
@@ -154,7 +99,7 @@ export class QuickAddSummary extends BaseComponent {
     this.#renderButton();
   }
 
-  /* ---------------------------------------------------------- internals -- */
+  /* ---------------------------------------------------------- internals -- ---- */
 
   /** @type {boolean} */
   #pending = false;
@@ -200,24 +145,15 @@ export class QuickAddSummary extends BaseComponent {
   /**
    * Keep each purchase-option card's price in step with the chosen variant.
    *
-   * A product whose flavours are priced differently otherwise shows the first
-   * flavour's price on a card the customer has just moved away from.
-   *
    * @private
    */
   #renderPlanPrices() {
     const variant = this.#variant;
     if (!variant) return;
 
-    // `[data-price-current]` and `[data-price-compare]` are the hooks
-    // `snippets/price.liquid` writes — matching on them rather than on a class
-    // means the markup can be restyled without this silently stopping.
     const oneTime = this.root.querySelector('[data-one-time-price] [data-price-current]');
     if (oneTime instanceof HTMLElement) oneTime.textContent = formatMoney(Number(variant.price));
 
-    // The struck-through figure is part of the same answer. Leaving it on the
-    // previous variant's compare-at is how a customer ends up reading a saving
-    // that was never offered on the size they are looking at.
     const oneTimeCompare = this.root.querySelector('[data-one-time-price] [data-price-compare]');
     if (oneTimeCompare instanceof HTMLElement) {
       const compare = Number(variant.compare_at_price);
@@ -252,18 +188,6 @@ export class QuickAddSummary extends BaseComponent {
   /**
    * Keep one card's saving badge in step with the price above it.
    *
-   * The percentage was the one part of a price nothing updated. The figures
-   * either side of it are rewritten on every flavour change, so a product whose
-   * flavours discount differently showed the new prices with the old card's
-   * percentage between them — two numbers that disagreed, on the line the
-   * customer is deciding from.
-   *
-   * Percentage only, and always. `price.liquid` offers the merchant an amount
-   * or a plain word as well, and honouring that here would mean re-reading
-   * which one they chose from a string this has just replaced. The badge is
-   * hidden outright when there is no saving, so a flavour that is not on sale
-   * does not keep the last one's.
-   *
    * @param {string} scope Selector for the card's price container.
    * @param {number} compare
    * @param {number} price
@@ -285,23 +209,15 @@ export class QuickAddSummary extends BaseComponent {
    * Append the total and the chosen option to whatever `product-form.js` last
    * wrote on the button.
    *
-   * The form's own words are never replaced — they are the state. This adds to
-   * them, and only when the button is something a customer can press.
-   *
    * @private
    */
   #renderButton() {
     const button = this.root.querySelector('product-form [data-ref="submit"]');
     if (!(button instanceof HTMLButtonElement)) return;
 
-    // Sold out, unavailable, loading. The form is saying something more
-    // important than a price, and it keeps the whole button.
     if (button.disabled) return;
 
-    // `<product-bundle>` sets the flag on the modal element, which is an
-    // ancestor of everything the section rendered into it.
     const bundleMode = this.closest('[data-bundle-mode]') !== null;
-
 
     const label = labelTarget(button);
 
@@ -314,8 +230,6 @@ export class QuickAddSummary extends BaseComponent {
     const unit = this.#unitPrice;
     if (Number.isFinite(unit)) parts.push(formatMoney(unit * this.#quantity));
 
-    // The option only earns a place when there is a real one to name. A product
-    // with a single default variant has "Default Title" and nothing to say.
     const variant = this.#variant;
     if (variant && this.#product?.has_only_default_variant === false && variant.title) {
       parts.push(variant.title);

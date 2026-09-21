@@ -1,38 +1,6 @@
 {% doc %}
   Renders the product media gallery.
 
-  The file was empty. `blocks/_product-media-gallery.liquid` renders it, so the
-  product page had no images at all — the one thing a product page cannot do
-  without. Everything it needs already existed: `media-gallery.js` documents the
-  markup it expects, and `base.css` already styles every class below.
-
-  ## Why a scroll container and not a stack of slides
-
-  The stage is a horizontally scrolling, snapping list. Every image sits at its
-  natural position in the document, so lazy loading works, and a customer can
-  swipe through the media before any JavaScript has run. The alternative — a
-  stack of absolutely positioned slides at `opacity: 0` — downloads every image
-  immediately and shows nothing at all until a script sorts it out.
-
-  The stacked layout is the same markup with the scroll axis removed in CSS, so
-  the two layouts share one set of nodes rather than branching here.
-
-  ## Filtering images by option
-
-  When enabled, an image belongs to an option value if its alt text ends with
-  `|option:value`. Images with no such marker are always shown, because shared
-  photography — a size chart, a fabric close-up — belongs to every variant.
-  `filter_images_strict` turns that off for stores that have labelled every file.
-
-  Filtering happens here rather than in JavaScript so the first paint is already
-  correct; `<variant-picker>` re-filters on change.
-
-  ## Video, models and zoom
-
-  Video and 3D models are wrapped in `<deferred-media>`: the poster is a real
-  image and the player lives in a `<template>`, so nothing heavy is fetched
-  until someone presses play. Zoom is opt-in per block and only wraps images.
-
   @param {product} product
   @param {object} section
   @param {object} settings - The block's settings
@@ -62,11 +30,6 @@
 
   assign media_items = product.media
 
-  comment
-    Variant media filtering. `hide_variants` keeps only the media attached to the
-    selected variant plus anything not attached to any variant, which is the
-    behaviour merchants mean by "hide unselected variant media".
-  endcomment
   if s.hide_variants and current.featured_media != blank
     assign kept = ''
     for item in product.media
@@ -85,11 +48,6 @@
     assign kept_ids = kept | split: ','
   endif
 
-  comment
-    Option filtering reads `SEO text|option:value` from the alt text. The value
-    is compared without case, because a merchant typing "Mango" into Files and
-    "mango" into the option is describing the same thing.
-  endcomment
   if s.enable_filter_images
     assign selected_values = ''
     for option in product.options_with_values
@@ -112,10 +70,7 @@
   {% render 'spacing', block: s %}
   {{ block_shopify_attributes }}
 >
-  {%- comment -%}
-    The stage is focusable and labelled as a group so a keyboard user reaches the
-    media and hears what it is before the arrow keys mean anything.
-  {%- endcomment -%}
+
   <div
     class="product-media__stage"
     data-ref="stage"
@@ -253,10 +208,7 @@
         </div>
       {%- endif -%}
     {%- else -%}
-      {%- comment -%}
-        A product with no media still needs a box of the right shape, or the two
-        columns collapse and the buy button jumps up the page.
-      {%- endcomment -%}
+
       <div class="product-media__item product-media__item--empty" data-media data-media-id="0" data-media-type="image">
         {{ 'product-apparel-1' | placeholder_svg_tag: 'product-media__image placeholder-svg' }}
       </div>
@@ -287,10 +239,7 @@
              widths: '120,240' %}
 
           {%- unless item.media_type == 'image' -%}
-            {%- comment -%}
-              A video thumbnail that looks like a photograph is a photograph as
-              far as the customer is concerned, so the type is marked.
-            {%- endcomment -%}
+
             <span class="product-media__thumbnail-badge" aria-hidden="true">
               {% render 'icon', icon: 'play', size: 12 %}
             </span>
@@ -300,17 +249,6 @@
     </media-thumbnails>
   {%- endif -%}
 
-  {%- comment -%}
-    ---------- Navigation and position ----------
-    `navigation` and two of the three `pagination_type` values had no markup at
-    all: only thumbnails were ever rendered, so a merchant choosing "arrows" or
-    "fraction" changed nothing on the page.
-
-    Both now render the shared control components, so the gallery inherits the
-    icon, size, colour and gradient settings the collection carousels use and
-    the two cannot drift apart. `media-gallery.js` drives them through
-    `@theme/carousel-controls`; no carousel element is involved.
-  {%- endcomment -%}
   {%- if product.media.size > 1 -%}
     {%- if pagination == 'controls' -%}
       {% render 'carousel-controls', settings: s, align: 'center' %}
@@ -324,9 +262,5 @@
     {%- endif -%}
   {%- endif -%}
 
-  {%- comment -%}
-    The gallery writes the current position here. Without it a screen reader user
-    swiping through media hears nothing change.
-  {%- endcomment -%}
   <p class="visually-hidden" data-ref="status" role="status"></p>
 </media-gallery>

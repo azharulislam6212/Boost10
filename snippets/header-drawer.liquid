@@ -1,32 +1,6 @@
 {% doc %}
   The mobile menu drawer.
 
-  Rendered from the header section so that it re-renders with it: a merchant
-  changing the menu in the theme editor sees the drawer update in the same
-  repaint as the navigation, rather than after a reload.
-
-  ## Two submenu styles, and only one of them is in the DOM
-
-  **Accordion** nests `<details>` in place. It keeps the customer's position in
-  the list, which is what someone scanning a long menu wants, and it needs no
-  JavaScript at all to open.
-
-  **Slide** moves sideways through panels, one level per screen. It suits deep
-  menus, where a three-level accordion pushes the third level below the fold
-  before it has finished opening.
-
-  Rendering only the chosen one is deliberate. Emitting both and hiding one with
-  CSS doubles the markup of the largest single component on a phone, and every
-  link in the hidden copy is still in the accessibility tree and still found by
-  in-page search.
-
-  ## Mega panels are cloned, not re-rendered
-
-  `{% content_for 'blocks' %}` can only run once, so a mega menu panel cannot
-  also be rendered here. `<mobile-nav>` clones the desktop panel into the
-  placeholder below instead. One source of truth: a merchant editing a panel
-  edits it once and both breakpoints follow.
-
   @param {linklist} menu
   @param {object} [section]
 
@@ -63,12 +37,6 @@
           <h2 class="nav-drawer__title">{{ 'sections.header.menu' | t }}</h2>
         {%- endif -%}
 
-        {%- comment -%}
-          The theme's own button, not a hand-rolled one. It inherits the shared
-          focus ring, the hover behaviour and the icon sizing, so the close
-          control here is the same control as the one in the cart drawer rather
-          than a lookalike that drifts the first time either is restyled.
-        {%- endcomment -%}
         {%- liquid
           assign menu_drawer_close_label = 'accessibility.close_menu' | t
         -%}
@@ -90,7 +58,7 @@
           {% if st.mobile_dividers %}data-dividers="true"{% endif %}
         >
           {%- if mode == 'accordion' -%}
-            {%- comment -%} ---------------- accordion ---------------- {%- endcomment -%}
+
             <ul class="drawer-nav__list" role="list">
               {%- for link in menu.links -%}
                 <li class="drawer-nav__item">
@@ -151,7 +119,7 @@
               {%- endfor -%}
             </ul>
           {%- else -%}
-            {%- comment -%} ------------------ slide ------------------ {%- endcomment -%}
+
             <div class="drawer-nav__screen" data-menu-panel="root" data-menu-root data-active>
               <ul class="drawer-nav__list" role="list">
                 {%- for link in menu.links -%}
@@ -234,11 +202,7 @@
       </div>
 
       <footer class="nav-drawer__footer">
-        {%- comment -%}
-          Same guard as the header's own control in `snippets/header-actions.liquid`:
-          with customer accounts turned off there is no login page for this to
-          reach, so the row is not drawn rather than drawn and dead.
-        {%- endcomment -%}
+
         {%- if st.mobile_show_account and st.show_account and shop.customer_accounts_enabled -%}
           <a
             class="nav-drawer__account"

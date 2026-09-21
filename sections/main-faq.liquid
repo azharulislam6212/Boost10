@@ -1,99 +1,10 @@
 {% comment %}
-  sections/main-faq.liquid
-
   One arrangement: a heading cluster over the questions.
-
-  ## Nothing here is FAQ-specific that did not have to be
-
-  The heading cluster is a static **Section header** block — the same file, the
-  same settings, the same gradient — so there are no heading or text settings on
-  this section to drift from it. Every preset fills it with the block's own
-  *Section header (vertical)* arrangement: a subheading pill, a gradient h2 and
-  a paragraph. Those values are copied rather than referenced because
-  `content_for` names a block *type*, not one of that type's presets — there is
-  no syntax for "insert this block the way its vertical preset would".
-
-  Every preset that puts the cluster at the top of the section, and that is
-  worth stating because two of them used to leave it empty. A static block
-  declared with settings but no `blocks` renders as an empty container: *FAQ:
-  Tabs* and *FAQ: Banner* both did, so adding either gave a merchant a headless
-  section and no obvious way to see that the header was even there — a static
-  block cannot be added from the sidebar, so there was nothing to click. The
-  three children are per-preset rather than shared, because copy written for a
-  column of topics is not the copy for a picture beside a list.
-
-  *FAQ: Image* is the one that leaves it empty on purpose, and it is the case
-  the rule in `base.css` exists for. That arrangement is a picture in one
-  column and everything else in the other, so its heading belongs *inside* the
-  right-hand group, above the questions — a header at the top level of the
-  section is a sibling of the picture, which would make it a third column. So
-  the static cluster is declared with no children and collapses, and a plain
-  **Section header** block does the work where the arrangement needs it.
-
-  ## A preset's blocks are an array, and a template's are a hash
-
-  The two look interchangeable and are not, which is worth writing down because
-  getting it wrong fails silently rather than loudly.
-
-      preset (in this schema)     "blocks": [ { "type": …, "settings": … } ]
-      template (templates/*.json) "blocks": { "<id>": { … } }, "block_order": […]
-
-  A preset written in the template's hash form is not rejected — Shopify simply
-  ignores it, and the merchant adds the section and gets an empty one. So the
-  preset below is an array, and the heading cluster carries `"static": true`
-  with the same `id` the `content_for` tag above names. Static ids never appear
-  in a `block_order`, because a static block cannot be reordered.
-
-  Padding is `snippets/spacing.liquid`, width is `snippets/container.liquid`,
-  and the disclosure animation is `<accordion-element>` from
-  `assets/modules.js`.
-
-  What this file contributes is the arrangement, and the arrangement is a flex
-  container over the section's own children. **Direction** turns it from a stack
-  into a row, which is how the heading cluster ends up beside the questions —
-  they are siblings, and nothing here goes looking for which child is which.
-
-  That is the whole layout switch. A tab strip, a media column and a search field
-  were all settings this section carried, and all three are gone: a store that
-  wants questions beside a picture builds that from blocks rather than from a
-  mode hidden behind a select.
-
-  The layout controls are the Group block's, down to the setting ids — Alignment
-  is always the horizontal axis, Position always the vertical, and `base.css`
-  decides which CSS property reads which. A merchant who has laid out a Group
-  already knows every control here.
-
-  ## The old category block is gone
-
-  `faq-category` packed a whole category into one rich text field, alternating
-  question and answer by paragraph order, and a merchant who mis-ordered one
-  paragraph got a silently wrong page they could not see the cause of. It is
-  replaced by real blocks — an Accordion holding Accordion rows — because a row
-  that is a block can carry an icon, an open-by-default state and its own
-  padding, and none of that survives being encoded as paragraph order.
-
-  ## The surface is the footer's, and deliberately so
-
-  Background, border, corners, animation and padding are the same settings, the
-  same ids and the same snippets `sections/footer.liquid` uses. Nothing here is
-  a second implementation: the picture is `snippets/background-media.liquid`,
-  the reveal is `snippets/motion-attrs.liquid` feeding `<motion-effect>`, and
-  the padding is `snippets/spacing.liquid`. A merchant who has set up one of
-  these panels already knows this one.
 {% endcomment %}
-
 
 {%- liquid
   assign s = section.settings
 
-  comment
-    The background is the colour scheme's until the merchant says otherwise:
-    either a colour of their own, or a picture behind the whole section.
-
-    The colour is emitted as a real `background` declaration rather than a
-    custom property because `color-scheme-container` paints a background *and*
-    a gradient image, and only the shorthand clears both.
-  endcomment
   assign background_media = s.background_media | default: 'none'
   assign has_background_media = false
   if background_media != 'none'
@@ -105,32 +16,8 @@
     assign background_paint = s.background_color | default: ''
   endif
 
-  comment
-    Opacity goes into the colour, not onto the element: `opacity` on the section
-    would fade the questions along with the frame.
-
-    With no colour picked the border is `currentColor`, which the colour filters
-    cannot take an alpha channel from — there is no channel to read until the
-    scheme resolves it in the browser. `color-mix` does the same fade at that
-    point instead, so both paths honour the slider.
-
-    Any style the select offers, not the one value it used to have. Testing for
-    `solid` meant the day Dashed was added the width would fall back to zero and
-    nothing would be drawn — a new option that silently did nothing. `none` is
-    the only value that means no border, so that is what is asked about.
-  endcomment
   assign border_line = s.border_style | default: 'none'
 
-  comment
-    One width per side rather than one for the box. The frame a merchant
-    actually wants here is usually a single rule — a hairline across the top
-    of the section, nothing down the sides — and a single slider could only
-    ever draw all four or none.
-
-    They are summed into `border_any` so the properties are emitted only when
-    at least one side is drawn. A zero-width border with a colour on it is
-    three declarations that paint nothing.
-  endcomment
   assign bw_top = 0
   assign bw_right = 0
   assign bw_bottom = 0
@@ -153,29 +40,6 @@
     endif
   endif
 
-  comment
-    ---- corners ----
-
-    Four corners, twice — one set per device, behind the same Desktop/Mobile
-    switch the padding and the gaps already use.
-
-    The top pair ships at 40 and the bottom pair at 0, because a section is a
-    band that lifts away from what is above it and sits flush on what is below:
-    a rounded bottom edge leaves two slivers of the page showing through under
-    it. They are four sliders rather than one number and a rule, so a merchant
-    who wants a fully rounded card can still have one.
-
-    They reach CSS as a single border-radius shorthand, in the order that
-    property takes — top-left, top-right, bottom-right, bottom-left. Nothing in
-    the stylesheet reads them as a bare number, which is what makes sending a
-    shorthand safe.
-
-    A phone gets its own four because the same number does not read the same at
-    both widths: 40px is a soft lift across 1400px and a heavy scoop out of a
-    390px screen. Each mobile corner falls back to its desktop value when the
-    setting is missing entirely, so a section saved before these existed keeps
-    one shape at every width.
-  endcomment
   assign r_tl = s.border_radius_top_left | default: 40 | plus: 0
   assign r_tr = s.border_radius_top_right | default: 40 | plus: 0
   assign r_bl = s.border_radius_bottom_left | default: 0 | plus: 0
@@ -188,34 +52,12 @@
   assign margin_top = s.margin_top | default: 0 | plus: 0
   assign margin_bottom = s.margin_bottom | default: 0 | plus: 0
 
-  comment
-    ---- layout ----
-
-    The arrangement used to be fixed: one column, heading cluster over the
-    questions. It is now the merchant's, and the controls are the Group block's
-    vocabulary rather than a second one invented here — Alignment is always the
-    horizontal axis, Position always the vertical, and `base.css` decides which
-    CSS property reads which based on the direction. `snippets/group.liquid`
-    explains why that swap lives in one place.
-
-    What this file does not do is guess which child is which. Horizontal is a
-    flex row of the section's own children, so the heading cluster and the
-    accordion sit side by side because they are siblings, not because a
-    selector went looking for them.
-  endcomment
   assign direction = s.direction | default: 'column'
   assign is_row = false
   if direction == 'row'
     assign is_row = true
   endif
 
-  comment
-    Two settings, one control. The horizontal list carries the distribution
-    options on top of the three alignments, because on a row they land on the
-    same `justify-content` and only one of the two could win. On a column they
-    would be inert, so that list is the plain three and the merchant never sees
-    an option that does nothing.
-  endcomment
   if is_row
     assign alignment_setting = s.alignment_row | default: 'start'
   else
@@ -231,12 +73,6 @@
       assign alignment_axis = 'start'
   endcase
 
-  comment
-    The alignment with the distribution folded in, and the plain one beside it.
-    They differ exactly when a distribution is chosen, and the phone stack needs
-    the plain one: `space-between` is valid on the `justify-content` it feeds on
-    a desktop row and invalid on the `align-items` it would feed once stacked.
-  endcomment
   assign inline_axis = alignment_axis
   if is_row
     case alignment_setting
@@ -254,22 +90,6 @@
       assign block_axis = 'start'
   endcase
 
-  comment
-    ---- the gaps ----
-
-    A Desktop/Mobile pair behind one switch, the same control every other
-    section in the theme uses. Both pairs are published unconditionally and
-    `base.css` picks which applies at a given width, because the pair the
-    merchant is not currently looking at in the editor is still the pair the
-    other breakpoint renders.
-
-    `plus: 0` coerces the range to a number rather than relying on `default`
-    alone, which would replace a deliberate 0 — a gap a merchant can legitimately
-    want. Each mobile axis still falls back to its desktop value when the
-    setting is absent entirely, so a section saved before the mobile pair
-    existed renders exactly as it did; a section added since gets the schema
-    default, which is half the desktop one.
-  endcomment
   assign gap_x = s.gap_horizontal | default: 24 | plus: 0
   assign gap_y = s.gap_vertical | default: 24 | plus: 0
   assign gap_x_mobile = s.gap_horizontal_mobile | default: gap_x | plus: 0
@@ -280,18 +100,6 @@
     assign content_classes = content_classes | append: ' faq__content--stack-mobile'
   endif
 
-  comment
-    Reverse is `flex-direction: row-reverse`, not a second ordering of the
-    blocks — the markup stays in the order a screen reader and a keyboard read
-    it, and only the paint order changes. That is also why it is a row-only
-    control: a reversed *column* would put the answers above the heading for
-    everybody using the page without sight of it.
-
-    What it is for is the *FAQ: Image* arrangement, where the picture runs to
-    one screen edge and the questions sit beside it. Which edge is a design
-    decision and not a rebuild, so it is a checkbox rather than a second preset
-    that would then need every change made to it twice.
-  endcomment
   if is_row and s.reverse
     assign content_classes = content_classes | append: ' faq__content--reverse'
   endif
@@ -334,12 +142,7 @@
   {%- endif -%}
 
   <div class="{% render 'container', width: s.container_width %}">
-    {%- comment -%}
-      `children: true` staggers the direct children — the heading cluster, then
-      each accordion — so the section arrives as one cascade rather than as a
-      block of text that appears all at once. The stagger is a setting; at its
-      default of 0 they simply arrive together.
-    {%- endcomment -%}
+
     <motion-effect
       class="{{ content_classes }}"
       data-easing="outQuint"
@@ -352,11 +155,6 @@
   </div>
 </div>
 
-{%- comment -%}
-  Every setting below is a control a merchant reaches in the editor, and the
-  schema is one element's styling surface: splitting it to get under Theme
-  Check's count of 40 would split the thing the settings style.
-{%- endcomment -%}
 {% # theme-check-disable ExcessiveSettingsCount %}
 {% schema %}
 {

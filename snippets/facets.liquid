@@ -1,15 +1,6 @@
 {% doc %}
   Renders the filter and sort form.
 
-  One form for both layouts: the sidebar on desktop and the drawer on mobile
-  render the same markup, and `<facet-filters>` keeps whichever one is not
-  visible in step after a filter change.
-
-  Everything is a real input inside a real `<form method="get">`, with the names
-  Shopify's filtering expects. With JavaScript disabled the Apply button submits
-  and the server filters — which is not a fallback so much as the source of
-  truth, since the module reads the same form the server would have received.
-
   @param {object} results - `collection` or `search`.
   @param {object} section
   @param {string} [context] - sidebar | drawer. Default sidebar.
@@ -30,10 +21,7 @@
   data-results="ProductGrid-{{ section.id }}"
 >
   <form data-ref="form" class="facets__form">
-    {%- comment -%}
-      Search keeps its query and type across a filter change, or filtering a
-      search result silently turns it into a browse of the whole catalogue.
-    {%- endcomment -%}
+
     {%- if results.terms -%}
       <input type="hidden" name="q" value="{{ results.terms | escape }}">
       <input type="hidden" name="options[prefix]" value="last">
@@ -56,26 +44,10 @@
     {%- endif -%}
 
     {%- if section.settings.enable_filtering -%}
-      {%- comment -%}
-        The groups come from `facets-guard.liquid`.
 
-        The body was eighty lines of `case filter.type` written inline here, and
-        it is needed a second time by a layout that renders one dropdown per
-        group without the disclosure wrapper. Two copies of that body would drift
-        the first time swatch rendering changed, so it lives in one file and this
-        renders it.
-
-        With no `filter` passed, that file loops every group and wraps each in a
-        disclosure - which is exactly what this block did.
-      {%- endcomment -%}
       {% render 'facets-guard', results: results, context: layout %}
     {%- endif -%}
 
-    {%- comment -%}
-      The submit button is the no-JavaScript path. It is hidden once the script
-      runs, because filters then apply on change and a stale Apply button implies
-      nothing happened until it is pressed.
-    {%- endcomment -%}
     <noscript>
       <button type="submit" class="button button--primary">{{ 'products.facets.apply' | t }}</button>
     </noscript>

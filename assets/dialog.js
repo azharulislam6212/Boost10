@@ -1,27 +1,8 @@
 /**
- * dialog.js — Boost10
- *
  * Every overlay in the theme: modals, drawers, toasts and the quick option
  * drawer. They live in one file because they share one behaviour — taking over
  * the page, trapping focus, and giving both back cleanly — and duplicating that
  * across four files is how overlays start behaving differently from each other.
- *
- *   <modal-dialog>         Centred modal
- *   <drawer-component>     Edge drawer: start, end, top or bottom
- *   <quick-add-modal>  Drawer that fetches product options on demand
- *
- * Built on the native `<dialog>` element rather than a hand-rolled overlay. The
- * browser then owns the hard parts: the top layer (so nothing can z-index above
- * it), background inertness, and Escape handling. Attempting to reproduce those
- * with `div` and `aria-modal` is where most themes' accessibility fails.
- *
- * Two rules that the rest of the theme depends on:
- *
- *   1. Any scrollable region inside an overlay carries `data-lenis-prevent`.
- *      This class adds it automatically to the body ref, because otherwise
- *      Lenis swallows the wheel event and a tall drawer refuses to scroll.
- *   2. Scroll locking is reference counted through `lockScroll()`, so a quick
- *      view opening the cart drawer does not release the page underneath.
  *
  * @module @theme/dialog
  */
@@ -47,20 +28,6 @@ import {
 /**
  * Base class for anything that covers the page. Not registered: it has no tag
  * of its own and is only ever extended.
- *
- * Expected markup:
- *
- *   <drawer-component id="CartDrawer">
- *     <dialog data-ref="dialog">
- *       <div data-ref="panel">
- *         <button data-overlay-close>…</button>
- *         <div data-ref="body">…scrollable content…</div>
- *       </div>
- *     </dialog>
- *   </drawer-component>
- *
- * Triggers live anywhere in the document and carry
- * `data-overlay-open="<overlay id>"`.
  */
 export class Overlay extends BaseComponent {
   static requiredRefs = ['dialog'];
@@ -77,13 +44,11 @@ export class Overlay extends BaseComponent {
   /** @type {boolean} */
   #open = false;
 
-  /* ------------------------------------------------------------ lifecycle */
+  /* ------------------------------------------------------------ lifecycle ---- */
 
   setup() {
     if (!this.id) this.id = uniqueId('overlay');
 
-    // A tall drawer that will not scroll is almost always this attribute
-    // missing, so it is applied here rather than left to section authors.
     const body = this.refs.body;
     if (body instanceof HTMLElement && !body.hasAttribute('data-lenis-prevent')) {
       body.setAttribute('data-lenis-prevent', '');
@@ -94,7 +59,6 @@ export class Overlay extends BaseComponent {
     this.on(this.refs.dialog, 'cancel', this.#onCancel);
     this.on(this.refs.dialog, 'close', this.#onNativeClose);
 
-    // The element may be re-connected while open, for instance after a morph.
     this.#open = this.refs.dialog.open;
   }
 
@@ -102,7 +66,7 @@ export class Overlay extends BaseComponent {
     if (this.#open) this.#release();
   }
 
-  /* --------------------------------------------------------- public API -- */
+  /* --------------------------------------------------------- public API -- ---- */
 
   /**
    * @returns {boolean}
@@ -120,12 +84,6 @@ export class Overlay extends BaseComponent {
 
   /**
    * How long the entrance runs, in milliseconds.
-   *
-   * A getter and not a constant so a subclass can make it the merchant's —
-   * `<modal-dialog>` reads `data-animation-duration`. Every other overlay keeps
-   * the 320/240 pair this file has always used, because a drawer's length is
-   * part of the drawer feeling attached to the edge it came from rather than
-   * something a store would want to tune.
    *
    * @returns {number}
    */
@@ -155,25 +113,10 @@ export class Overlay extends BaseComponent {
     this.#open = true;
     this.setAttribute('data-state', 'opening');
 
-    // showModal puts the dialog in the top layer and makes everything behind it
-    // inert. Nothing else gives that for free.
     if (!this.refs.dialog.open) this.refs.dialog.showModal();
 
     lockScroll();
 
-    // Started here, awaited below, and the difference matters for any overlay
-    // whose `beforeOpen()` fetches something.
-    //
-    // The entrance used to run *after* that fetch, so a quick add opened in two
-    // beats: the panel appeared instantly at its loading size — no animation at
-    // all, because nothing had started one — the customer watched a spinner in
-    // it, and only once the product had landed did the panel play an entrance
-    // it had already finished making. That is the jump.
-    //
-    // Begun with the dialog instead, the panel animates in while the request is
-    // in flight and is settled by the time the content arrives. For every other
-    // overlay `beforeOpen()` resolves on the same microtask, so this is the
-    // order it always had.
     const entrance = this.animateIn();
 
     await this.beforeOpen();
@@ -206,8 +149,6 @@ export class Overlay extends BaseComponent {
 
     this.#release();
 
-    // Closing the native dialog fires `close`, which is why #onNativeClose
-    // guards against running the teardown twice.
     if (this.refs.dialog.open) this.refs.dialog.close();
 
     this.dispatch(
@@ -258,9 +199,6 @@ export class Overlay extends BaseComponent {
 
     this.#cancelPanelAnimations();
 
-    // `enterDuration` is a getter rather than a constant so a subclass or an
-    // attribute can set it — `<modal-dialog>` reads `data-animation-duration`.
-    // The default is the 320ms every overlay has always used.
     const animation = this.refs.panel.animate(this.enterKeyframes(), {
       duration: this.enterDuration,
       easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
@@ -269,10 +207,7 @@ export class Overlay extends BaseComponent {
 
     try {
       await animation.finished;
-    } catch {
-      // A close/open race can cancel the animation. The next animation owns
-      // the panel's transform, so cancellation is not an error.
-    }
+    } catch {}
   }
 
   /**
@@ -291,9 +226,7 @@ export class Overlay extends BaseComponent {
 
     try {
       await animation.finished;
-    } catch {
-      // A second close/open action may cancel this animation.
-    }
+    } catch {}
   }
 
   /**
@@ -306,7 +239,7 @@ export class Overlay extends BaseComponent {
     ];
   }
 
-  /* ---------------------------------------------------------- internals -- */
+  /* ---------------------------------------------------------- internals -- ---- */
 
   /**
    * Release focus, scroll and trigger state. Idempotent, because a native
@@ -337,9 +270,6 @@ export class Overlay extends BaseComponent {
     const explicit = this.querySelector('[data-overlay-autofocus]');
     if (explicit instanceof HTMLElement) return explicit;
 
-    // Focusing the close button first is the least surprising default: it is
-    // the action a customer is most likely to want, and it never puts the caret
-    // into a search field on a device that will then open the keyboard.
     const close = this.querySelector('[data-overlay-close]');
     return close instanceof HTMLElement ? close : undefined;
   }
@@ -369,9 +299,6 @@ export class Overlay extends BaseComponent {
   /**
    * Close buttons inside the overlay, and clicks on the backdrop.
    *
-   * The backdrop is the `<dialog>` element itself: anything visible sits inside
-   * the panel, so a click whose target is the dialog landed outside the panel.
-   *
    * @param {MouseEvent} event
    * @private
    */
@@ -394,8 +321,6 @@ export class Overlay extends BaseComponent {
    * @private
    */
   #onCancel = (event) => {
-    // Take over Escape so the exit animation runs and focus is restored the
-    // same way it is for every other close path.
     event.preventDefault();
     this.close();
   };
@@ -412,22 +337,6 @@ export class Overlay extends BaseComponent {
 
 /**
  * The entrances a modal can make.
- *
- * A drawer's movement is decided by the edge it comes from, which is why
- * `<drawer-component>` reads `data-placement` and has no choice to offer. A
- * modal has no edge — it is in the middle of the screen — so how it arrives is
- * a design decision, and until now it was one decision made here for every
- * modal in the theme.
- *
- * Each entry is the *opening* frame; the resting frame is added below, and the
- * exit is the whole thing reversed. So a movement is one line here and needs no
- * second keyframe written backwards — which is the way the two used to drift
- * apart in every theme that wrote both.
- *
- * `zoom-out` is the one that is not the reverse of another: it arrives *larger*
- * and settles, which reads as the modal coming towards the customer rather than
- * away from the page. It is the right one over a photograph, where a panel that
- * grows into place competes with the image behind it.
  *
  * @type {Record<string, Keyframe>}
  */
@@ -446,19 +355,6 @@ const MODAL_ENTRANCE_DEFAULT = 'rise';
 /**
  * A centred modal. Used for size guides, share sheets, address forms and
  * anything else that interrupts the page rather than sitting beside it.
- *
- * ## The entrance is the element's, and so is its length
- *
- * `data-animation` picks one of `MODAL_ENTRANCES` and `data-animation-duration`
- * sets how long it runs. Both are attributes rather than settings read from
- * theme config here, because `assets/dialog.js` drives every overlay in the
- * theme and only the Liquid that renders one knows which merchant setting it
- * belongs to — `sections/overlays.liquid` writes them onto the quick add modal
- * from **Theme settings › Product cards › Quick add modal**.
- *
- * The exit is the entrance reversed and a little faster, which it always was.
- * A modal leaving at the same speed it arrived reads as hesitant: the customer
- * has already decided, and the only thing left is to get out of the way.
  */
 export class ModalDialog extends Overlay {
   get overlayType() {
@@ -470,9 +366,6 @@ export class ModalDialog extends Overlay {
    */
   get enterDuration() {
     const value = Number(this.dataset.animationDuration);
-    // Clamped rather than trusted: a merchant slider is a number this file did
-    // not choose, and an overlay that takes three seconds to appear is one the
-    // customer thinks is broken. Zero is allowed and means "no movement".
     return Number.isFinite(value) && value >= 0 ? Math.min(value, 1200) : 320;
   }
 
@@ -487,9 +380,6 @@ export class ModalDialog extends Overlay {
     const name = this.dataset.animation || MODAL_ENTRANCE_DEFAULT;
     const from = MODAL_ENTRANCES[name] ?? MODAL_ENTRANCES[MODAL_ENTRANCE_DEFAULT];
 
-    // The resting frame names both properties whatever the opening frame used,
-    // so a movement that only fades still lands on a known transform rather
-    // than on whatever the stylesheet happens to leave behind.
     return [{ transform: 'none', ...from }, { opacity: 1, transform: 'none' }];
   }
 }
@@ -530,8 +420,6 @@ export class DrawerComponent extends Overlay {
           { opacity: 1, transform: 'translate3d(0, 0, 0)' }
         ];
       default:
-        // `end` is the physical right side in the default LTR theme.
-        // Opening must therefore travel right -> left: 100% -> 0%.
         return [
           { opacity: 0, transform: 'translate3d(100%, 0, 0)' },
           { opacity: 1, transform: 'translate3d(0, 0, 0)' }
@@ -546,36 +434,7 @@ defineComponent('drawer-component', DrawerComponent);
    <quick-add-modal>
    ========================================================================== */
 
-/**
- * A modal that renders a product's options on demand.
- *
- * Nothing is fetched until a customer actually asks for it, which is the whole
- * point: a collection page with forty products would otherwise ship forty
- * hidden variant pickers. The markup that arrives is rendered by Liquid through
- * the Section Rendering API, so translations, money formatting and metafield
- * logic are not duplicated in JavaScript.
- *
- * ## A modal, not a modal
- *
- * It extends `ModalDialog`, so it arrives in the centre of the screen with the
- * modal's own scale-and-rise entrance. That is the difference between quick add
- * and every drawer in the theme, and it is deliberate: a modal is a place a
- * customer goes and comes back from — the cart, the menu, the filters — while
- * quick add is one decision taken on top of the page the customer is already
- * reading. Sliding the page aside to ask which size they want puts a
- * navigational gesture on an inline choice.
- *
- * Only the placement changes. Fetching, focus, Escape, scroll locking and the
- * abort on teardown are all the same code they were, inherited one class higher
- * up rather than rewritten.
- *
- * Triggers pass the product through the trigger element:
- *
- *   <button
- *     data-overlay-open="QuickAdd"
- *     data-product-url="{{ product.url }}"
- *     data-section-id="quick-add">Choose options</button>
- */
+/** A modal that renders a product's options on demand. */
 export class QuickAddModal extends ModalDialog {
   /** @type {AbortController|null} */
   #request = null;
@@ -619,53 +478,8 @@ export class QuickAddModal extends ModalDialog {
       const { fetchSection, applyHTML } = await import('@theme/section-renderer');
       const html = await fetchSection(sectionId, { url, signal: this.#request.signal });
 
-      // A different product is inserted, never morphed onto the last one.
-      //
-      // `morph()` preserves custom element instances on purpose — that is what
-      // keeps a carousel alive across a filter refresh — and in this modal that
-      // is exactly the wrong thing. Every component here reads its product once,
-      // in `setup()`: `<variant-picker>` parses `[data-variants]`,
-      // `<quick-add-summary>` parses `[data-quick-add-product]`,
-      // `<selling-plan-selector>` parses `[data-allocations]`. An element that is
-      // never removed is never set up again, so from the second product onwards
-      // the modal showed one product's markup driven by another product's
-      // components.
-      //
-      // That is the reported bug. Open a product with options and the add button
-      // says "Unavailable"; open a second and it says "Add to cart"; come back to
-      // the first and it *still* says "Add to cart" — not because anything
-      // re-derived it, but because nothing did. Liquid had rendered a fresh
-      // button underneath a `<product-form>` that had stopped listening to it,
-      // and the picker was matching the new radios against the old product's
-      // variant list, which is how a customer could reach add-to-cart with a
-      // variant id that does not belong to the product on screen.
-      //
-      // Emptying the body first turns the morph into a plain insert: everything
-      // is created new and upgrades against its own product's JSON. Nothing is
-      // lost — a different product has no focus, no typed value and no scroll
-      // offset worth carrying across.
-      //
-      // The test is against the url rather than against "is the body empty",
-      // so it also clears the network-error message a previous failure left
-      // behind. Only an explicit `load()` of the product already showing keeps
-      // its markup, which is the one case where morphing is what is wanted.
       if (this.#loadedUrl !== url) body.replaceChildren();
 
-      // `childrenOnly`, and this is the whole of why the modal had no padding.
-      //
-      // `morph()` syncs attributes both ways: it copies the source's onto the
-      // target and removes any the source does not have. Morphing the fetched
-      // `[data-quick-add-content]` wrapper *onto* the body therefore rewrote
-      // `class="modal__body"` as `class="quick-add__content"` and dropped
-      // `data-ref="body"` and `data-lenis-prevent` with it. From the first fetch
-      // onwards the element was no longer the modal body, so it lost the body's
-      // padding, its `overflow-y: auto` — a tall product could not be scrolled —
-      // and its opt-out from Lenis's wheel handling.
-      //
-      // Only the contents are the section's. The body's own identity is this
-      // file's, and `sections/overlays.liquid` carries the two hooks the fetched
-      // wrapper used to bring with it, so `<variant-picker>`, `<product-form>`
-      // and `<quick-add-summary>` still scope themselves to the modal.
       applyHTML(html, body, {
         selector: '[data-quick-add-content]',
         sectionId,
@@ -675,11 +489,6 @@ export class QuickAddModal extends ModalDialog {
     } catch (error) {
       if (error?.name === 'AbortError') return;
 
-      // Forget whatever was last loaded, so `beforeOpen()` cannot decide the
-      // modal is already showing it. Without this, a failed fetch left the error
-      // message in the body and the previous product's url in `#loadedUrl` —
-      // and reopening *that* product skipped the fetch and showed the error
-      // again, with no way back but a page reload.
       this.#loadedUrl = null;
 
       console.error('[Boost10] <quick-add-modal> could not load the product.', error);

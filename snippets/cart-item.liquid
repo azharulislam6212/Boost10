@@ -1,11 +1,6 @@
 {% doc %}
   Renders one cart line.
 
-  Shared by the cart page and the cart drawer, from one file, so the two can
-  never drift apart. `data-key` is what every mutation uses: line indexes shift
-  the moment anything is removed, and using them produces the classic bug where
-  removing the second item removes the third.
-
   @param {line_item} item
   @param {number} index - `forloop.index`, for the no-JS form fallback
   @param {boolean} [compact] - Drawer layout
@@ -33,13 +28,7 @@
 
     {%- unless item.product.has_only_default_variant -%}
       {%- if settings.enable_cart_variant_switcher -%}
-        {%- comment -%}
-          Changing a variant in the cart is a remove plus an add, because
-          Shopify's change endpoint cannot move a line to a different variant.
-          `cart.changeVariant` does both in order and reverts the select if
-          either half fails, so the customer never sees a cart that lost a line
-          and gained nothing.
-        {%- endcomment -%}
+
         <cart-variant-selector
           class="cart-item__variant-switcher"
           data-key="{{ item.key }}"
@@ -67,11 +56,6 @@
       {%- endif -%}
     {%- endunless -%}
 
-    {%- comment -%}
-      A pre-order line has to say so in the cart as well as on the product page.
-      A customer who forgot they were waiting finds out at delivery, and that is
-      a chargeback rather than a support ticket.
-    {%- endcomment -%}
     {%- if settings.enable_preorder -%}
       {%- liquid
         assign is_preorder = false
@@ -120,10 +104,6 @@
       {%- endif -%}
     {%- endif -%}
 
-    {%- comment -%}
-      Properties beginning with an underscore are the theme's own bookkeeping —
-      bundle ids, gift wrap flags — and are not shown to the customer.
-    {%- endcomment -%}
     {%- for property in item.properties -%}
       {%- if property.last != blank and property.first.first != '_' -%}
         <p class="cart-item__property">

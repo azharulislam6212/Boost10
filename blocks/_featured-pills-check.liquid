@@ -1,48 +1,8 @@
 {% doc %}
-  blocks/_featured-pills-check.liquid
-
   One line of a list that is read as a set of promises: a mark, a short label,
   and an optional sentence under it. Five of them stacked are the ingredient
   list in the *Our mission* panel; four are the philosophy list in *Nutrition
   facts*.
-
-  ## Why it is not `blocks/icon-with-text.liquid`
-
-  Icon with text is a glyph beside a sentence, and its job is to sit anywhere —
-  a row of three under a hero, a column in a footer. It has no idea of being one
-  of a set.
-
-  This one does, and that is the whole difference. A list like this says two
-  things at once: here are five facts, *and* this is the one you are looking at.
-  So the row carries a surface of its own that changes with **Highlight this
-  row** — a different fill behind the mark, a different background, a drawn
-  border — and the sentence under the label appears only where a row is worth
-  expanding on. Building that out of a Group with an Icon with text inside it is
-  four blocks per row and twenty for the list, none of which agree with each
-  other by construction.
-
-  Private — the leading underscore — because a row with nothing to be a row of
-  is not a block. It is addable inside a **Pill** and nowhere else.
-
-  ## The mark is the theme's
-
-  Shape, Ring and the icon colours are `snippets/icon-mark.liquid`: the same
-  three groups with the same ids that the Feature icon, the Highlight tile, the
-  Accordion row and the footer's Utility item offer. A merchant who has drawn
-  one mark in this theme has drawn this one, and a change to how a dotted ring
-  is stroked reaches all of them.
-
-  What is added on top is one pair: the fill and the glyph colour the mark takes
-  **while the row is highlighted**. They are settings rather than a hard-coded
-  accent because the highlight is the design's loudest moment and a theme cannot
-  guess a store's accent.
-
-  ## The whole row can be a link, and it is not an `<a>`
-
-  Same reason `snippets/group.liquid` gives: a row holds a label and a sentence
-  and either could one day hold a link of its own, and an `<a>` inside an `<a>`
-  is invalid markup that browsers recover from unpredictably. So the row stays a
-  `<div>` and an absolutely positioned link covers it.
 {% enddoc %}
 
 {%- liquid
@@ -60,35 +20,11 @@
   endcapture
   assign icon_size = icon_px | plus: 0
 
-  comment
-    ---- the surface ----
-
-    Two backgrounds, one of which is only ever painted while the row is the
-    highlighted one. Both are `color_background`, so a merchant can hand either
-    a gradient — which is what the drawn design's quiet rows are: a flat mint
-    that is a gradient of one colour in Shopify's own picker.
-
-    The alpha goes into the colour rather than onto the element, for the reason
-    `blocks/card-content.liquid` sets out: `opacity` here would fade the label
-    the surface exists to sit behind.
-  endcomment
   assign surface_paint = s.background | default: ''
   if highlighted and s.background_highlight != blank
     assign surface_paint = s.background_highlight
   endif
 
-  comment
-    ---- the frame ----
-
-    Resolved the way every border in this theme is: `none` emits nothing at all,
-    and with no colour picked the line is `currentColor` faded by `color-mix`,
-    because the colour filters cannot take an alpha channel from a keyword.
-
-    The highlighted row may draw a line where a quiet one draws none — that is
-    the drawn design — so the style is read from whichever of the two the row
-    currently is, and a merchant who wants the same frame on both simply sets
-    both to the same thing.
-  endcomment
   assign border_line = s.border_style | default: 'none'
   if highlighted
     assign border_line = s.border_style_highlight | default: border_line
@@ -112,12 +48,6 @@
     endif
   endif
 
-  comment
-    Two properties, not one — `flex` only means anything to a flex item, and a
-    row is one only when the panel around it is a flex container. Fill is the
-    default because a list of rows is a column of equal boxes; a row that hugs
-    its own label is a ragged list.
-  endcomment
   if s.width == 'fit'
     assign width_flex = '0 0 auto'
     assign width_size = 'fit-content'
@@ -142,12 +72,7 @@
 
 {%- capture icon_mark_style -%}
   {%- render 'icon-mark', block: s, declarations: true -%}
-  {%- comment -%}
-    Written after the snippet's own properties so they override them, and only
-    while the row is the highlighted one. A row that is not highlighted emits
-    neither, so the mark is exactly what `icon-mark` drew and nothing here has
-    an opinion about it.
-  {%- endcomment -%}
+
   {%- if highlighted -%}
     {%- if s.highlight_fill != blank -%}--icon-mark-fill: {{ s.highlight_fill }};{%- endif -%}
     {%- if s.highlight_icon_color != blank -%}--icon-mark-color: {{ s.highlight_icon_color }};{%- endif -%}
@@ -203,21 +128,13 @@
       </span>
     {%- endif -%}
 
-    {%- comment -%}
-      The sentence under the label. A row that does not have one renders no
-      element at all rather than an empty box the stack gap would still space
-      away from the label.
-    {%- endcomment -%}
     {%- if s.description != blank -%}
       <span class="featured-pills-check__text">{{ s.description }}</span>
     {%- endif -%}
   </span>
 
   {%- if link_url != '' -%}
-    {%- comment -%}
-      `aria-label` falls back to the row's own label, and then to the URL. A
-      link announced as nothing at all is the one outcome worth ruling out.
-    {%- endcomment -%}
+
     <a
       class="featured-pills-check__link"
       href="{{ link_url }}"
@@ -227,11 +144,6 @@
   {%- endif -%}
 </div>
 
-{%- comment -%}
-  Every setting below is a control a merchant reaches in the editor, and the
-  schema is one element's styling surface: splitting it to get under Theme
-  Check's count of 40 would split the thing the settings style.
-{%- endcomment -%}
 {% # theme-check-disable ExcessiveSettingsCount %}
 {% schema %}
 {

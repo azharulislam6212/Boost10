@@ -1,57 +1,5 @@
 {% doc %}
-  blocks/button.liquid
-
   A single button.
-
-  Renders nothing without a label, so an empty block added by accident leaves no
-  stray element on the page.
-
-  A button with no link is still rendered — as a `<button>` rather than an `<a>`
-  — because a merchant may be pairing it with an app. What is never rendered is
-  an `<a>` with no `href`: that is a focusable element that goes nowhere.
-
-  ## Where the design comes from
-
-  Almost nothing here is a colour picker. Variant, size, radius, border
-  thickness and typography all resolve to tokens that Theme settings already
-  writes — `--color-primary-button-*`, `--height-button`, `--radius-button`,
-  `--buttons-border-thickness`, `--font-button-*`. A merchant who restyles
-  buttons once in Theme settings restyles every button in the theme, and a
-  section built before that change follows it without being touched.
-
-  `Custom` is the exception and is deliberately last in the list. It writes the
-  same six custom properties inline, so it slots into the same machinery rather
-  than being a parallel code path — the effects, the sizes and the solid icon
-  badge all keep working underneath it.
-
-  ## Icons and hover
-
-  Both icon styles put the icon in the same place: out at the end of the button,
-  on the surround, beside the label pill — never inline inside the pill next to
-  the words. That is what "the position does not change" means, and it is the
-  reason to reach for a plain icon at all: it is a badge minus the circle.
-
-  The icon style decides what crosses the button on hover:
-
-    Swap — the contents slide across on one continuous travel, and what crosses
-      the button depends on the icon style:
-
-        Solid   the label pill and the badge trade places
-        Default the glyph keeps the side it started on and travels with the
-                words; the whole group is replaced by its copy
-
-      Position and movement are separate things here. A default icon does not
-      change position — it never crosses to the other side — but it does move,
-      because the phrase it belongs to moves.
-
-    Sweep — the hover colour wipes across and the label drifts with it.
-
-  `Auto` takes the swap wherever there is an icon and the sweep for a bare
-  label. Both can be chosen outright, and both can be turned off.
-
-  Only the swap needs JavaScript, and only to measure the slide and inject the
-  duplicate — see `assets/button-element.js`. Everything renders and works
-  before that runs.
 {% enddoc %}
 
 {%- liquid
@@ -65,11 +13,6 @@
   # No `has_icon` flag. Nothing read it: the icon is tested where it is used,
   # so a second name for the same fact could only ever disagree with it.
 
-  comment
-    The six custom properties the Custom variant writes. Emitted only for that
-    variant, so every other button ships a clean tag — and named to match what
-    `base.css` reads, so nothing has to translate between the two.
-  endcomment
   assign custom_colors = ''
   if s.style == 'custom'
     if s.custom_background != blank
@@ -92,11 +35,6 @@
     endif
   endif
 
-  comment
-    Radius and thickness fall through to the theme unless the merchant moved
-    them off "theme" — a -1 sentinel rather than 0, because 0 is a legitimate
-    value a merchant may want and cannot otherwise express.
-  endcomment
   assign shape_style = ''
   assign radius = s.corner_radius | default: -1 | plus: 0
   if radius >= 0
@@ -109,11 +47,6 @@
 
   assign inline_colors = custom_colors | append: shape_style
 
-  comment
-    The size class the stylesheet reads is `button--custom-size`, not
-    `button--custom` — that name belongs to the colour variant, and a button
-    that was both would have had one silently overwrite the other.
-  endcomment
   assign size_class = s.size | default: 'medium'
   if size_class == 'custom'
     assign size_class = 'custom-size'
@@ -122,38 +55,10 @@
 
 {%- if s.label != blank -%}
   {%- capture block_style -%}
-    {%- comment -%}
-      Declarations rather than the spacing snippet's own `style` attribute: two
-      `style` attributes on one tag and the browser keeps the first, which is
-      how padding sliders end up moving a value that never reaches the page.
-    {%- endcomment -%}
+
     {%- render 'spacing', block: s, declarations: true -%}
   {%- endcapture -%}
 
-  {%- comment -%}
-    The entrance is on the wrapper, and only on the wrapper.
-
-    `block_level: true` resolves the same text cascade every heading and
-    paragraph in the section follows, then maps any word- or letter-splitting
-    preset onto the whole-element preset that travels the same way — so a
-    button set to inherit `words-slide-up` slides up as one pill instead of
-    tearing its label into words. Nothing inside the button is touched: the
-    swap and sweep hover effects still own everything within it.
-  {%- endcomment -%}
-  {%- comment -%}
-    Full width has to reach the wrapper, not just the button.
-
-    `.block-button` is a flex column with `align-items` set from the Alignment
-    control, and a flex item's `inline-size: 100%` resolves against the cross
-    size that alignment gives it — which for anything but `stretch` is the
-    button's own content width. So **Width: Full** looked like a control that
-    did nothing: the class landed on the button, the button was already as wide
-    as its label, and 100% of that is the same number.
-
-    The modifier switches the wrapper to `stretch` for that one case, so Full
-    means full at every alignment rather than only when the merchant happens to
-    have left Alignment alone.
-  {%- endcomment -%}
   <motion-effect
     class="block-button block-button--{{ s.alignment | default: 'start' }}{% if s.width == 'full' %} block-button--full{% endif %}"
     data-block-spacing
@@ -184,11 +89,6 @@
   </motion-effect>
 {%- endif -%}
 
-{%- comment -%}
-  Every setting below is a control a merchant reaches in the editor, and the
-  schema is one element's styling surface: splitting it to get under Theme
-  Check's count of 40 would split the thing the settings style.
-{%- endcomment -%}
 {% # theme-check-disable ExcessiveSettingsCount %}
 {% schema %}
 {

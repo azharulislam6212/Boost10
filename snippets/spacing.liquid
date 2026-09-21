@@ -1,121 +1,9 @@
 {% doc %}
   Emits padding as custom properties, for a section or for a block.
 
-  ## Class or attribute — both work
-
-  `base.css` matches either:
-
-      .section-spacing        /  .block-spacing         write it yourself
-      [data-section-spacing]  /  [data-block-spacing]   emitted below
-
-  Reach for the class in new markup. This snippet keeps emitting the attribute
-  because it cannot merge a class into an element that already has a `class`
-  attribute — two `class` attributes on one tag and the browser takes the first,
-  silently dropping every other class on the section root.
-
-  Neither hook involves JavaScript. `[data-*]` in a stylesheet is an ordinary
-  attribute selector: same cascade, same cost as a class, nothing reading it at
-  runtime.
-
-  ## The hook is the whole point
-
-  `base.css` applies this padding through attribute selectors:
-
-      [data-section-spacing] {
-        padding-block-start: var(--section-padding-block-start, 0px);
-        padding-block-end:   var(--section-padding-block-end, 0px);
-      }
-
-  This snippet emitted only the `style` attribute. The custom properties landed
-  on elements that no rule ever selected, so every padding slider in the theme
-  editor moved a value nothing read — present in the UI, dead on the page, in
-  sections and blocks alike. The attribute is what connects them.
-
-  ## Two property sets, not one
-
-  A section pads block-start and block-end and takes an explicit mobile
-  override. A block pads all four sides and, on small screens, either scales the
-  desktop value by a percentage or takes an explicit per-side mobile value where
-  the block offers one. Different shapes, so different property names, matching
-  what `base.css` reads:
-
-      --section-padding-block-start / -end          (+ `-mobile` variants)
-      --block-padding-block-start / -end / -inline-start / -inline-end
-      --block-padding-scale-mobile
-
-  ## Truthiness, not blank comparisons
-
-  Every guard here is either an `if object` test or a number coerced with
-  `| default: 0 | plus: 0`. Neither depends on how a Liquid engine compares an
-  absent value to `blank` — and that comparison is exactly where this went
-  wrong before: an unset `padding_top_mobile` passed the blank test and emitted
-  `--section-padding-block-start-mobile:px`, an invalid declaration that takes
-  the whole rule down with it.
-
-  A hash is truthy and nil is falsy in every Liquid — but truthiness alone is
-  not enough here, because `section` is a global object and is therefore truthy
-  inside every block too. See the note on `section.settings` below.
-
-  ## A slider that exists is written, including at zero
-
-  This used to skip the declaration whenever the value was zero, on the grounds
-  that the fallbacks in `base.css` already resolve to `0px` and writing `0px`
-  restates the stylesheet. Both halves of that were true and the conclusion was
-  still wrong, because a fallback only applies when the property is set nowhere
-  — and there are two places it can be set without this snippet writing it:
-
-      inherited   custom properties inherit, and blocks nest four deep in this
-                  theme. A row inside an accordion inside a tab inside a group
-                  with padding on it inherited that padding, so dragging the
-                  row's own slider to 0 gave it the group's value instead.
-
-      a component `.block-text--has-background` and `.block-subheading--bordered`
-                  set these properties as class-level defaults, so a background
-                  gets breathing room without the merchant going to find the
-                  sliders. At zero the class won and 0 was unreachable.
-
-  So the rule is presence, not value: if the block has the setting at all, its
-  value is written, and `0px` is a value. A block with no padding settings
-  writes nothing and the class defaults still apply — `base.css` keeps them in a
-  `max()` beside the emitted value, which is what makes both true at once.
-
-  Presence is an `if` on the setting rather than a `!= blank` test: nil is falsy
-  in every Liquid engine and **0 is truthy**, which is exactly the distinction
-  needed and exactly the one `blank` cannot make.
-
-  A block's mobile sides follow the same rule, for the same reason: they inherit
-  too, and a heading inside a card with 18px of mobile padding was given 18px of
-  its own the moment its own slider read 0. Nothing is lost by writing them —
-  the "leave at 0 and the desktop value is scaled" path belongs to blocks that
-  offer **Mobile padding** as a percentage instead of per-side fields, and no
-  block in the theme offers both. A block with no mobile fields still writes
-  none, so that path is untouched.
-
-  Sections keep it: their mobile fields say "Leave at 0 to use 60% of the
-  desktop value" on the setting itself, sections do not nest, and nothing
-  inherits `--section-padding-*` from anywhere.
-
-  Left and right are spelled `inline-start` and `inline-end` so they follow the
-  text direction and flip in right-to-left languages.
-
-  ## `declarations: true` — properties only, no attributes
-
-  By default this emits its own `style` attribute. An element that already needs
-  a `style` attribute of its own therefore ends up with two, and a browser keeps
-  the first and silently drops the second — which is how the padding sliders on
-  the text and image blocks moved a value that never reached the page.
-
-  Passing `declarations: true` returns the bare declaration list instead, so the
-  caller can concatenate it into its single attribute. The caller then writes
-  `data-block-spacing` itself, because the hook is what `base.css` selects on.
-
   @param {object} [section] - A section settings object
   @param {object} [block] - A block settings object
   @param {boolean} [declarations] - Return properties only, no `style=` and no `data-*` hook. Defaults to false.
-
-  Pass one or the other. `settings` is not accepted — it is a global drop in
-  Shopify, so a snippet sees it whether or not the caller passed it, and using
-  it as a fallback made every section claim to be a block as well.
 
   @example
     <div {% render 'spacing', block: block.settings %}>
@@ -125,45 +13,6 @@
 {% enddoc %}
 
 {%- liquid
-  comment
-    `settings` is deliberately NOT accepted as an alias for `block`.
-
-    In Shopify Liquid, `settings` is a global drop — the theme's own settings —
-    and a snippet sees globals even when the caller passes nothing. So
-    `block | default: settings` never fell through to nil on a section call: it
-    fell through to the *theme settings object*, which is always truthy. Every
-    section root in the theme came out with both hooks on it:
-
-      class="announcement-bar section-spacing …"
-      data-section-spacing data-block-spacing
-
-    and the stray one is not cosmetic. `[data-block-spacing]` sets all four
-    paddings to `var(--block-padding-*, 0px)`, so it overrode whatever padding
-    the section's own stylesheet gave it with zero — on every section on the
-    page. The one caller that used the alias, `snippets/group.liquid`, now
-    passes `block:` instead.
-
-    The two scopes are mutually exclusive by construction below rather than by
-    the caller remembering to pass only one.
-  endcomment
-  comment
-    `section` is a GLOBAL object in Shopify, not just a parameter.
-
-    A snippet rendered from inside a section sees it whether or not the caller
-    passed it, so `if section` was true for every block on the page and every
-    block came out carrying `data-section-spacing` as well as its own hook. The
-    section rule then applied `--section-padding-*` to a block, which resolves
-    to `0px` and flattened whatever padding the block's own stylesheet gave it.
-
-    Exactly the bug the `settings` alias caused, from exactly the same cause:
-    a parameter name that collides with a global.
-
-    The discriminator is `section.settings`. A real Shopify `section` object has
-    it; a settings hash passed as `section:` does not, because a setting cannot
-    be named `settings`. So the global leaking in is distinguishable from a
-    caller genuinely passing one, without renaming the parameter at sixty call
-    sites.
-  endcomment
   assign section_is_global = false
   if section.settings
     assign section_is_global = true
@@ -172,10 +21,6 @@
   assign is_section = false
   assign is_block = false
 
-  comment
-    Block wins when both are present, which is the case inside every block: the
-    caller passed `block:` and the global `section` came along for the ride.
-  endcomment
   if block
     assign is_block = true
   elsif section and section_is_global == false
@@ -192,12 +37,6 @@
     assign s_top_mobile = section.padding_top_mobile | default: 0 | plus: 0
     assign s_bottom_mobile = section.padding_bottom_mobile | default: 0 | plus: 0
 
-    comment
-      Presence, not value. 0 is truthy in Liquid and nil is not, so this is true
-      for a slider dragged to zero and false for a section that has no such
-      setting — which is the difference that decides whether 0 is a value or an
-      absence.
-    endcomment
     assign has_s_top = false
     if section.padding_top
       assign has_s_top = true
@@ -214,11 +53,6 @@
       assign out = out | append: '--section-padding-block-end:' | append: s_bottom | append: 'px;'
     endif
 
-    comment
-      Mobile is only emitted when the merchant set it. Left at 0 the stylesheet
-      falls back to the desktop value, which is what the "leave at 0 to use the
-      desktop value" hint on those settings promises.
-    endcomment
     if s_top_mobile > 0
       assign out = out | append: '--section-padding-block-start-mobile:' | append: s_top_mobile | append: 'px;'
     endif
@@ -228,25 +62,12 @@
   endif
 
   if is_block
-    comment
-      Both spellings are accepted. Most blocks use padding_top; a few newer ones
-      use the CSS-shaped padding-block-start. Reading either means a block does
-      not have to be rewritten to gain working padding.
-
-      The default filter does not replace 0, only nil, false and empty string —
-      so a merchant's deliberate 0 survives the chain rather than falling
-      through to the other spelling.
-    endcomment
     assign b_top = b.padding_top | default: b['padding-block-start'] | default: 0 | plus: 0
     assign b_bottom = b.padding_bottom | default: b['padding-block-end'] | default: 0 | plus: 0
     assign b_left = b.padding_left | default: b['padding-inline-start'] | default: 0 | plus: 0
     assign b_right = b.padding_right | default: b['padding-inline-end'] | default: 0 | plus: 0
     assign b_scale = b.padding_scale_mobile | default: 0 | plus: 0
 
-    comment
-      Presence, not value — see the note at the top. Either spelling counts as
-      having the setting, and 0 counts as having a value.
-    endcomment
     assign has_b_top = false
     if b.padding_top or b['padding-block-start']
       assign has_b_top = true
@@ -277,13 +98,6 @@
       assign out = out | append: '--block-padding-inline-end:' | append: b_right | append: 'px;'
     endif
 
-    comment
-      Per-device padding. A block that offers a Desktop/Mobile switch writes
-      `padding_top_mobile` and friends, and `base.css` prefers those over the
-      scaled desktop value. A block that does not offer them emits nothing here,
-      so the scale below stays in charge — which is what every existing block
-      relies on.
-    endcomment
     assign b_top_mobile = b.padding_top_mobile | default: 0 | plus: 0
     assign b_bottom_mobile = b.padding_bottom_mobile | default: 0 | plus: 0
     assign b_left_mobile = b.padding_left_mobile | default: 0 | plus: 0
@@ -319,10 +133,6 @@
       assign out = out | append: '--block-padding-inline-end-mobile:' | append: b_right_mobile | append: 'px;'
     endif
 
-    comment
-      The setting is a percentage; the stylesheet multiplies by it, so it has to
-      arrive as a unitless fraction.
-    endcomment
     if b_scale > 0
       assign scale = b_scale | divided_by: 100.0
       assign out = out | append: '--block-padding-scale-mobile:' | append: scale | append: ';'

@@ -1,74 +1,12 @@
 {% comment %}
-  sections/product-highlight-point.liquid
-
   One product, and the things worth saying about it pinned around it — each a
   mark, a number, a name and a line, lighting up in turn as the section scrolls
   past.
-
-  ## Why the points are placed and not laid out
-
-  A grid of five claims under a photograph is `sections/feature-cards.liquid`,
-  and it is the right shape when the claims are independent. These are not:
-  each one is about a *part* of the thing in the middle, and where it sits is
-  how the customer knows which part. "Nut free" beside the cap and "Nut free"
-  under the jar are two different sentences.
-
-  So on a desktop each point carries its own position — two percentages of the
-  stage — and the merchant puts it where the product is. Below 990px there is
-  no room either side of the photograph for that to mean anything, so the
-  positions are dropped entirely and the points become a grid under the
-  picture. See the note in `blocks/_highlight-stage.liquid` on why that is a
-  different layout rather than the same one scaled down.
-
-  ## The light moves with the scroll
-
-  `<highlight-points>` in `assets/highlight-points.js` reads the shared scroll
-  ticker — the same one the parallax backgrounds are on — and lights one point
-  at a time as the stage crosses the viewport. **Scroll window** is how much of
-  that crossing the run uses.
-
-  It degrades to a still picture: without the module every point renders and
-  the one the merchant marked stays lit, which is a complete section rather
-  than an empty one.
-
-  ## What this file is, and what it is not
-
-  It is the frame, the two axes and the background. Everything with content in
-  it is a block, and the two that only make sense here are private:
-
-    The stage       `blocks/_highlight-stage.liquid`
-    One point       `blocks/_highlight-point.liquid`
-
-  The heading cluster is a **Section header** holding a **Subheading** and two
-  **Text** blocks, and the pair of calls to action underneath is a **Group** of
-  **Button**s — none of which knows it is in this section.
-
-  ## The shell is `sections/product-highlight-point.liquid`'s, setting id for setting id
-
-  Container, colour scheme, background media, the four border widths, the eight
-  corner radii behind a Desktop/Mobile switch, the gaps behind another, the
-  minimum height, the margins, the stack layer and the whole spacing group —
-  every id here is one that section already carries, and both reach them
-  through `snippets/spacing.liquid`, `snippets/background-media.liquid` and
-  `snippets/container.liquid`.
-
-  The bottom corners ship at 0, in the schema and in the preset. A section is a
-  band that lifts away from what is above it and sits flush on what is below,
-  and a rounded bottom edge leaves two slivers of the page showing under it.
 {% endcomment %}
 
 {%- liquid
   assign s = section.settings
 
-  comment
-    The background is the colour scheme's until the merchant says otherwise:
-    either a colour of their own — the soft wash the preset ships — or a picture
-    behind the whole section.
-
-    The colour is emitted as a real `background` declaration rather than a
-    custom property because `color-scheme-container` paints a background *and* a
-    gradient image, and only the shorthand clears both.
-  endcomment
   assign background_media = s.background_media | default: 'none'
   assign has_background_media = false
   if background_media != 'none'
@@ -80,24 +18,6 @@
     assign background_paint = s.background_color | default: ''
   endif
 
-  comment
-    ---- the frame ----
-
-    One width per side rather than one for the box, summed into `border_any` so
-    the three properties are emitted only when at least one side is drawn — a
-    zero-width border with a colour on it is three declarations that paint
-    nothing.
-
-    Opacity goes into the colour rather than onto the element: `opacity` on the
-    section would fade the stage along with its frame. With no colour picked
-    the border is `currentColor`, which the colour filters cannot take an alpha
-    channel from, so `color-mix` does the same fade in the browser instead and
-    both paths honour the slider.
-
-    Identical to `sections/featured-offer.liquid` and
-    `sections/expert-quote.liquid` by construction, not by coincidence — same
-    ids, same resolution, same stylesheet shape.
-  endcomment
   assign border_line = s.border_style | default: 'none'
 
   assign bw_top = 0
@@ -122,23 +42,6 @@
     endif
   endif
 
-  comment
-    ---- corners ----
-
-    Four corners, twice — one set per device, behind the same Desktop/Mobile
-    switch the padding and the gaps already use.
-
-    They reach CSS as a single border-radius shorthand, in the order that
-    property takes — top-left, top-right, bottom-right, bottom-left. Nothing in
-    the stylesheet reads them as a bare number, which is what makes sending a
-    shorthand safe.
-
-    A phone gets its own four because the same number does not read the same at
-    both widths: 40px is a soft lift across 1400px and a heavy scoop out of a
-    390px screen. Each mobile corner falls back to its desktop value when the
-    setting is missing entirely, so a section saved before these existed keeps
-    one shape at every width.
-  endcomment
   assign r_tl = s.border_radius_top_left | default: 40 | plus: 0
   assign r_tr = s.border_radius_top_right | default: 40 | plus: 0
   assign r_bl = s.border_radius_bottom_left | default: 0 | plus: 0
@@ -152,47 +55,15 @@
   assign margin_top = s.margin_top | default: 0 | plus: 0
   assign margin_bottom = s.margin_bottom | default: 0 | plus: 0
 
-  comment
-    ---- the floor ----
-
-    A minimum, not a height. The section grows past it whenever the stage needs
-    the room — and the stage is a different height at every breakpoint, so
-    the floor is what keeps the section from collapsing around a photograph that
-    has not been uploaded yet.
-
-    Zero is the off switch and is what an untouched section carries, which is
-    why this is emitted unconditionally: `min-block-size: 0px` is what the box
-    would do anyway, so there is no state where writing it changes a layout that
-    was not asking for it.
-  endcomment
   assign min_height = s.min_height | default: 0 | plus: 0
   assign min_height_mobile = s.min_height_mobile | default: min_height | plus: 0
 
-  comment
-    ---- layout ----
-
-    The Group block's vocabulary rather than a second one invented here:
-    Alignment is always the horizontal axis and Position always the vertical,
-    and `assets/base.css` decides which CSS property reads which from the
-    direction. `snippets/group.liquid` sets out why that swap lives in one place.
-
-    This file does not guess which child is which. Horizontal is a flex row of
-    the section's own children, so the heading cluster and the stage sit side by
-    side because they are siblings.
-  endcomment
   assign direction = s.direction | default: 'column'
   assign is_row = false
   if direction == 'row'
     assign is_row = true
   endif
 
-  comment
-    Two settings, one control. The horizontal list carries the distribution
-    options on top of the three alignments, because on a row they land on the
-    same `justify-content` and only one of the two could win. On a column they
-    would be inert, so that list is the plain three and the merchant never sees
-    an option that does nothing.
-  endcomment
   if is_row
     assign alignment_setting = s.alignment_row | default: 'center'
   else
@@ -208,12 +79,6 @@
       assign alignment_axis = 'start'
   endcase
 
-  comment
-    The alignment with the distribution folded in, and the plain one beside it.
-    They differ exactly when a distribution is chosen, and the phone stack needs
-    the plain one: `space-between` is valid on the `justify-content` it feeds on
-    a desktop row and invalid on the `align-items` it would feed once stacked.
-  endcomment
   assign inline_axis = alignment_axis
   if is_row
     case alignment_setting
@@ -233,22 +98,6 @@
       assign block_axis = 'start'
   endcase
 
-  comment
-    ---- the gaps ----
-
-    A Desktop/Mobile pair behind one switch, the shape every other section in
-    the theme uses. Both pairs are published unconditionally and
-    `assets/base.css` picks which applies at a given width, because the pair the
-    merchant is not looking at in the editor is still the pair the other
-    breakpoint renders.
-
-    `plus: 0` rather than `default` alone, which would replace a deliberate 0 —
-    a gap a merchant can legitimately want when the stage is meant to sit flush
-    under the heading. Each mobile axis falls back to its desktop value when the
-    setting is absent entirely, so a section saved before the mobile pair existed
-    renders as it did; one added since gets the schema default, which is half the
-    desktop one.
-  endcomment
   assign gap_x = s.gap_horizontal | default: 40 | plus: 0
   assign gap_y = s.gap_vertical | default: 40 | plus: 0
   assign gap_x_mobile = s.gap_horizontal_mobile | default: gap_x | plus: 0
@@ -259,13 +108,6 @@
     assign content_classes = content_classes | append: ' product-highlight-point__content--stack-mobile'
   endif
 
-  comment
-    Reverse is `flex-direction: row-reverse`, not a second ordering of the
-    blocks — the markup stays in the order a screen reader and a keyboard read
-    it, and only the paint order changes. That is also why it is row-only: a
-    reversed *column* would put the points above the heading that names them for
-    everybody using the page without sight of it.
-  endcomment
   if is_row and s.reverse
     assign content_classes = content_classes | append: ' product-highlight-point__content--reverse'
   endif
@@ -311,13 +153,7 @@
   {%- endif -%}
 
   <div class="product-highlight-point__inner {% render 'container', width: s.container_width %}">
-    {%- comment -%}
-      `children: true` staggers the direct children — the heading cluster, then
-      the stage, then the buttons — so the section arrives as one cascade rather
-      than as a wall
-      that appears at once. The stagger is a setting; at its default of 0 they
-      simply arrive together.
-    {%- endcomment -%}
+
     <motion-effect
       class="{{ content_classes }}"
       data-easing="outQuint"
@@ -329,11 +165,6 @@
   </div>
 </div>
 
-{%- comment -%}
-  Every setting below is a control a merchant reaches in the editor, and the
-  schema is one element's styling surface: splitting it to get under Theme
-  Check's count of 40 would split the thing the settings style.
-{%- endcomment -%}
 {% # theme-check-disable ExcessiveSettingsCount %}
 {% schema %}
 {

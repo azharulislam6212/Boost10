@@ -1,28 +1,8 @@
 /**
- * morph.js — Boost10
- *
  * A focused DOM morphing algorithm. Given a live element and a freshly rendered
  * one, it mutates the live tree in place so that it matches the new markup,
  * while deliberately preserving the state the browser owns and the server does
  * not know about:
- *
- *   - the focused element, its selection range and its current value
- *   - scroll offsets of the root and of any scrollable descendant
- *   - `open` on `<dialog>` and `<details>` (drawers, accordions, filter groups)
- *   - live media playback, maps and canvases marked `data-morph-preserve`
- *   - custom element instances, which keep their `connectedCallback` state
- *
- * That last point is the reason this file exists at all. Replacing innerHTML
- * would disconnect and reconnect every `<variant-picker>`, `<quantity-selector>`
- * and `<accordion-element>` inside a section, throwing away their state and
- * re-running their setup on every filter click. Morphing keeps the instances.
- *
- * Markup opt-outs, all read from the LIVE node:
- *   data-morph-key            Stable identity, used instead of positional matching
- *   data-morph-preserve       Leave this node and its subtree completely untouched
- *   data-morph-skip-children  Sync attributes only, never descend
- *   data-morph-preserve-value Never overwrite this control's value or checked state
- *   data-morph-force-value    Always overwrite it, even while focused
  *
  * @module @theme/morph
  */
@@ -46,10 +26,6 @@ const OPEN_STATE_ELEMENTS = new Set(['DIALOG', 'DETAILS']);
 
 /**
  * Morph `fromNode` so that it matches `toNode`.
- *
- * The operation is best effort: if anything throws, the live node is left in a
- * usable state by falling back to a child replacement, and the error is logged
- * rather than propagated. A broken morph must never take a storefront down.
  *
  * @param {Element} fromNode The live element. Mutated in place.
  * @param {Element} toNode The freshly rendered element. Never mutated.
@@ -157,7 +133,6 @@ function morphNode(from, to, context) {
 
   morphChildren(from, to, context);
 
-  // A <select> only settles once its <option> children exist.
   if (from.tagName === 'SELECT' && !shouldPreserveValue(from)) {
     syncSelectValue(from, to);
   }
@@ -178,26 +153,11 @@ function morphAttributes(from, to) {
     if (from.getAttribute(name) !== value) from.setAttribute(name, value);
   }
 
-  // Iterate backwards: removing shifts the live NamedNodeMap.
   const fromAttributes = from.attributes;
   for (let i = fromAttributes.length - 1; i >= 0; i -= 1) {
     const { name } = fromAttributes[i];
     if (name.startsWith('data-morph-')) continue;
 
-    // `open` on a dialog or a details element is never removed, even for a
-    // moment. It is not an attribute in the ordinary sense: taking it off a
-    // `<dialog>` that was opened with `showModal()` closes it — top layer gone,
-    // backdrop gone, the page behind it no longer inert — and putting it back is
-    // not an undo, because a dialog restored by its attribute is *non-modal*.
-    // Escape stops closing it and the page behind it becomes clickable through
-    // the overlay.
-    //
-    // `preserveOpenState()` below used to be the answer and could not be: it
-    // runs after this loop, so by the time it restored the attribute the damage
-    // was already done. The cart drawer is the case that matters — every
-    // quantity change re-renders the drawer's own section underneath an open
-    // drawer — and it is exactly the kind of breakage that only shows up on the
-    // second interaction, which is why it survived so long.
     if (name === 'open' && OPEN_STATE_ELEMENTS.has(from.tagName)) continue;
 
     if (!to.hasAttribute(name)) from.removeAttribute(name);
@@ -206,10 +166,6 @@ function morphAttributes(from, to) {
 
 /**
  * Reconcile a form control without discarding what the customer has typed.
- *
- * Rule: the control the customer is currently interacting with keeps its value.
- * Everything else takes the server's value, because the server is the authority
- * on quantities, selected variants and applied filters.
  *
  * @param {Element} from
  * @param {Element} to
@@ -278,15 +234,6 @@ function syncSelectValue(select, next) {
 /**
  * Keep drawers, modals and accordions open across a morph.
  *
- * The server always renders the closed state, so taking its `open` attribute
- * literally would slam every open accordion shut whenever filters refresh.
- *
- * `morphAttributes()` now declines to remove `open` at all, so in the common
- * case there is nothing here to restore. This stays for the other direction —
- * a live node that lost the attribute some other way, and the `data-morph-
- * force-open` opt-out — and because "the customer owns this flag" is worth
- * saying once in a named function rather than only as a `continue` in a loop.
- *
  * @param {Element} from
  * @param {Element} to
  * @private
@@ -314,10 +261,6 @@ function shouldPreserveValue(element) {
 /**
  * Reconcile the child lists of two nodes.
  *
- * Keyed children are matched by `data-morph-key` or `id` regardless of position,
- * so a reordered product grid moves nodes rather than rebuilding them. Unkeyed
- * children fall back to positional matching against a moving cursor.
- *
  * @param {Element} from
  * @param {Element} to
  * @param {Object} context
@@ -344,7 +287,6 @@ function morphChildren(from, to, context) {
       continue;
     }
 
-    // Skip over live nodes that are keyed but claimed later in the new list.
     while (cursor !== null && keyOf(cursor) !== null && keyed.has(keyOf(cursor))) {
       cursor = cursor.nextSibling;
     }
@@ -361,7 +303,6 @@ function morphChildren(from, to, context) {
     if (clone.nodeType === Node.ELEMENT_NODE) context.onNodeAdded?.(clone);
   }
 
-  // Anything still unclaimed is gone from the new markup.
   removeRemaining(from, cursor, keyed, context);
 }
 
@@ -395,7 +336,6 @@ function removeRemaining(parent, cursor, unclaimed, context) {
     const next = node.nextSibling;
     const key = keyOf(node);
 
-    // A keyed node still in the map was never matched, so it is safe to drop.
     if (key === null || unclaimed.has(key)) discard(parent, node, context);
 
     node = next;
@@ -466,9 +406,7 @@ function captureFocus(root) {
     try {
       snapshot.selectionStart = active.selectionStart;
       snapshot.selectionEnd = active.selectionEnd;
-    } catch {
-      /* Some input types throw on selection access. */
-    }
+    } catch {}
   }
 
   return snapshot;
@@ -493,9 +431,7 @@ function restoreFocus(snapshot) {
   if (snapshot.selectionStart !== null && typeof target.setSelectionRange === 'function') {
     try {
       target.setSelectionRange(snapshot.selectionStart, snapshot.selectionEnd);
-    } catch {
-      /* Ignore controls that reject a selection range. */
-    }
+    } catch {}
   }
 }
 

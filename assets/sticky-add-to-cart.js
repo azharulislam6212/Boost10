@@ -1,23 +1,6 @@
 /**
- * sticky-add-to-cart.js — Boost10
- *
  * `<sticky-add-to-cart>` — the buy bar that appears once the real one has
  * scrolled away.
- *
- * Its own module because it is optional: a merchant who turns the bar off should
- * not pay for the code, and a product page is the most performance-sensitive
- * template in the theme.
- *
- * The whole design is one idea. This is a **view** of `<product-form>`, not a
- * second form. Its variant select and quantity field write into the real one and
- * its button calls that form's `submit()`, so there is a single code path to the
- * cart. A second source of truth for the selected variant is precisely the bug
- * that makes sticky bars on other themes add a different variant than the one
- * displayed above them.
- *
- * It appears only once the real button leaves the viewport and hides again when
- * it returns — a sticky bar sitting over the button it duplicates is a bar
- * covering content.
  *
  * @module @theme/sticky-add-to-cart
  */
@@ -30,25 +13,7 @@ import { themeString, formatMoney } from '@theme/utilities';
    <sticky-add-to-cart>
    ========================================================================== */
 
-/**
- * The bar that appears once the real buy button has scrolled away.
- *
- * It is a view of the product form, not a second form. Pressing it calls
- * `submit()` on the real one, so there is a single code path to the cart and the
- * two can never disagree about quantity, variant or selling plan.
- *
- * It only appears once the real button is out of view, and hides again when it
- * returns — a sticky bar sitting over the button it duplicates is just a bar
- * covering content.
- *
- * Markup:
- *
- *   <sticky-add-to-cart data-form="ProductForm" data-watch="AddToCartButton">
- *     <span data-ref="title">…</span>
- *     <span data-ref="price"></span>
- *     <button data-ref="submit">…</button>
- *   </sticky-add-to-cart>
- */
+/** The bar that appears once the real buy button has scrolled away. */
 export class StickyAddToCart extends BaseComponent {
   static requiredRefs = ['submit'];
 
@@ -66,15 +31,8 @@ export class StickyAddToCart extends BaseComponent {
     this.on(this.root, EVENTS.VARIANT_CHANGE, (event) => this.render(event.detail?.variant));
     this.on(this.root, EVENTS.VARIANT_UNAVAILABLE, () => this.render(null));
 
-    // The picker's opening position, for the case where this bar upgraded
-    // before the picker and the read at the end of `setup()` could only see an
-    // element that was not a `<variant-picker>` yet. See `VARIANT_READY` in
-    // `@theme/events`: the same race put "Unavailable" on the main add button.
     this.on(this.root, EVENTS.VARIANT_READY, (event) => this.render(event.detail?.variant ?? null));
 
-    // The inline controls write into the real form rather than holding state.
-    // A second source of truth for the selected variant is the bug that makes
-    // sticky bars add the wrong one.
     if (this.refs.variantSelect) {
       this.on(this.refs.variantSelect, 'change', (event) => {
         this.root.querySelector('variant-picker')?.selectVariant?.(event.target.value);
@@ -92,8 +50,6 @@ export class StickyAddToCart extends BaseComponent {
 
     this.#observeTrigger();
 
-    // `undefined` means "not upgraded yet", not "no variant" — the listener
-    // above is what covers that case.
     const picker = this.root.querySelector?.('variant-picker');
     if (picker && picker.currentVariant !== undefined) this.render(picker.currentVariant);
   }
@@ -103,7 +59,7 @@ export class StickyAddToCart extends BaseComponent {
     this.#observer = null;
   }
 
-  /* --------------------------------------------------------- public API -- */
+  /* --------------------------------------------------------- public API -- ---- */
 
   /**
    * @returns {HTMLElement|Document}
@@ -137,8 +93,6 @@ export class StickyAddToCart extends BaseComponent {
   render(variant) {
     const button = this.refs.submit;
 
-    // Keep the inline select in step when the choice was made in the real
-    // picker, which is the direction this bar usually follows.
     if (this.refs.variantSelect instanceof HTMLSelectElement && variant) {
       this.refs.variantSelect.value = String(variant.id);
     }
@@ -159,7 +113,7 @@ export class StickyAddToCart extends BaseComponent {
     button.textContent = variant.available ? themeString('addToCart', '') : themeString('soldOut', '');
   }
 
-  /* ---------------------------------------------------------- internals -- */
+  /* ---------------------------------------------------------- internals -- ---- */
 
   /** @private */
   #observeTrigger() {

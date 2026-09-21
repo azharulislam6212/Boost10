@@ -1,18 +1,6 @@
 {% doc %}
   Renders the cart drawer.
 
-  Rendered by `sections/cart-drawer.liquid` inside the overlay group, so it is
-  addressable by the Section Rendering API — which is how every cart mutation
-  refreshes it in the same request that changed the cart.
-
-  `data-sections` lists what should re-render alongside it. Keeping the list on
-  the element rather than in JavaScript means a merchant who removes the free
-  shipping bar stops paying for it being rendered.
-
-  The scrollable body carries `data-lenis-prevent`, which `<drawer-component>`
-  also adds defensively — without it Lenis swallows the wheel event and a tall
-  cart refuses to scroll.
-
   @example
     {% render 'cart-drawer' %}
 {% enddoc %}
@@ -91,11 +79,7 @@
           {%- endif -%}
 
           {%- if settings.enable_cart_upsells -%}
-            {%- comment -%}
-              The JSON recommendations endpoint rather than a rendered section,
-              because this row offers a variant selector and the section version
-              would mean a second request to get the variant data.
-            {%- endcomment -%}
+
             <cart-upsell
               class="cart-upsell"
               data-product-id="{{ cart.items.first.product_id }}"
@@ -117,12 +101,6 @@
                     <a class="cart-upsell__title-link" data-upsell-title href="#"></a>
                     <span class="cart-upsell__price" data-upsell-price></span>
 
-                    {%- comment -%}
-                      The label wraps the control rather than pointing at it with
-                      `for`. This markup is a template the drawer clones once per
-                      upsell, so a fixed id would be duplicated across every copy
-                      and `for` would resolve to whichever came first.
-                    {%- endcomment -%}
                     <label class="cart-upsell__variant-label" data-upsell-variant-label>
                       <span class="visually-hidden">{{ 'cart.upsell.choose_variant' | t }}</span>
                       <select class="cart-upsell__variant" data-upsell-variant hidden></select>
@@ -159,10 +137,6 @@
                 <p class="cart-free-gift__notice">{{ 'cart.free_gift.applied_at_checkout' | t }}</p>
               </div>
 
-              {%- comment -%}
-                A button, never automatic. A product appearing in a cart without
-                the customer asking reads as a bug or a trick.
-              {%- endcomment -%}
               <button type="button" class="button button--secondary button--small" data-ref="claim" hidden>
                 {{ 'cart.free_gift.claim' | t }}
               </button>
@@ -186,20 +160,7 @@
 
       {%- if cart.item_count > 0 -%}
         <footer class="drawer__footer cart-drawer__footer">
-          {%- comment -%}
-            The three extras live in tabs rather than stacked open.
 
-            Notes, a promo field and a shipping estimate are each wanted by a
-            minority of customers and by almost none at the same time. Stacked,
-            they push the subtotal and the checkout button below the fold on a
-            phone — which costs conversions from everyone to serve the few.
-
-            `<tabs-element>` gives this arrow-key movement, roving tabindex and
-            the right ARIA. Every panel's contents are the same components used
-            on the cart page, so a customer who opens the drawer and a customer
-            who opens the cart page get the same behaviour, not two
-            implementations of it.
-          {%- endcomment -%}
           {%- liquid
             assign show_note = settings.show_cart_note
             assign show_discount = settings.enable_promo_code
@@ -335,23 +296,13 @@
                   tabindex="0"
                   {% unless first_panel %}hidden{% endunless %}
                 >
-                  {%- comment -%}
-                    The same `<shipping-calculator>` the cart page uses. Rates
-                    come from Shopify's own endpoint, so the drawer never quotes
-                    a price checkout will disagree with.
-                  {%- endcomment -%}
+
                   {% render 'shipping-calculator', id: 'drawer' %}
                 </div>
               {%- endif -%}
             </tabs-element>
           {%- endif -%}
 
-          {%- comment -%}
-            Order-level discounts, required by the Theme Store: the cart must
-            show discount amounts for the whole order, not only per line. These
-            come from Shopify's own applications, so an automatic discount a
-            merchant configured appears here without the theme knowing about it.
-          {%- endcomment -%}
           {%- if cart.cart_level_discount_applications.size > 0 -%}
             <ul class="cart-drawer__discounts" role="list">
               {%- for discount in cart.cart_level_discount_applications -%}

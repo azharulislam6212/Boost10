@@ -1,59 +1,6 @@
 {% doc %}
   Emits the per-carousel colour custom properties as an inline `style` value.
 
-  ## The colour model
-
-  Arrow and dot colours already exist in every colour scheme —
-  `slider_arrow_icon`, `slider_arrow_background`, `slider_arrow_border`, their
-  hover pairs, `slider_indicator_color` and `slider_indicator_active_color`. A
-  merchant who changes a scheme changes every carousel in the store, which is
-  what a scheme is for.
-
-  So this snippet emits nothing at all unless the section asks for custom
-  colours. That is the point: the default path costs zero bytes per section, and
-  only a merchant who wants this one carousel to differ pays for the override.
-
-  ## Three spellings of the same question
-
-  Sections say it one of three ways, and all of them are read here:
-
-      carousel_inherit_scheme  checkbox — on inherits, off overrides. The
-                               current spelling, and the same control
-                               `blocks/group.liquid` uses for the same idea.
-      carousel_color_source    select — `inherit` | `custom`
-      carousel_custom_colors   checkbox — the original spelling, inverted
-
-  The checkbox wins wherever a section has one, then the select, then the old
-  checkbox. Nothing had to be converted for this snippet to keep working, and a
-  section can be moved to the current spelling one at a time.
-
-  Note the inversion: `carousel_inherit_scheme` is true when colours are
-  *inherited*, and `carousel_custom_colors` is true when they are *not*. Reading
-  them as one flag is how the two would quietly swap over.
-
-  ## A scheme first, then the pickers
-
-  **Colour scheme** re-declares the eight slider properties from whichever
-  scheme the merchant picked — not by putting `color-scheme-container` on the
-  carousel, which would paint that scheme's background behind the cards as well.
-  Only the controls change.
-
-  The individual pickers below it are layered on top of that, so a merchant can
-  take a scheme and correct one colour in it rather than filling in all eight.
-  Each one is emitted only when it has a value, which is what makes the layering
-  work: an empty picker leaves the scheme's answer standing.
-
-  ## Gradient
-
-  `carousel_nav_style` can be `gradient`, which paints the arrow background from
-  `carousel_nav_gradient` instead of a flat colour, and the progress bar to
-  match. Border and icon stay flat — a gradient border needs `border-image`,
-  which cannot follow a `border-radius`, and a gradient icon needs the
-  `background-clip: text` trick that makes an 18px glyph illegible.
-
-  Parameters:
-    settings (object, required)  Section settings
-
   @example
     <carousel-slider style="{% render 'carousel-style', settings: section.settings %}">
 {% enddoc %}
@@ -82,11 +29,7 @@
     assign scheme = settings.carousel_color_scheme
   -%}
   {%- capture custom_colors -%}
-    {%- comment -%}
-      The whole set, or none of it. Half a scheme — arrows from one, dots from
-      the section's — is a combination no merchant asked for and no preview
-      shows them before they publish.
-    {%- endcomment -%}
+
     {%- if scheme != blank and scheme.settings != blank -%}
       --color-slider-arrow-icon: rgb({{ scheme.settings.slider_arrow_icon.rgba }});
       --color-slider-arrow-background: rgb({{ scheme.settings.slider_arrow_background.rgba }});
@@ -111,11 +54,6 @@
       --color-slider-arrow-border-hover: {{ settings.carousel_nav_border_hover }};
     {%- endif -%}
 
-    {%- comment -%}
-      Solid and gradient write different properties, so the unused one is left
-      undeclared rather than set to `none` — the stylesheet's `var()` fallback
-      is what picks the scheme colour back up.
-    {%- endcomment -%}
     {%- case nav_style -%}
       {%- when 'gradient' -%}
         --carousel-nav-background: {{ settings.carousel_nav_gradient | default: 'var(--gradient-primary)' }};

@@ -1,47 +1,6 @@
 {% doc %}
   blocks/_article-image.liquid — private.
 
-  The article's picture, and the pills that sit on it.
-
-  ## The frame is this block's, the picture is `snippets/image.liquid`'s
-
-  Ratio, srcset, mobile art direction and the fade-in on load all come from the
-  shared snippet, so this file adds only what a card needs on top: a border, a
-  radius, and the meta that belongs *on* the photograph rather than under it.
-
-  Ratio is the theme's usual seven names through `snippets/aspect-ratio.liquid`,
-  which is why **Landscape** here means the same shape it means on an Image
-  block and on a product card.
-
-  ## The date and the tags are pills on the image, not a line of meta
-
-  In the design they sit along the bottom edge of the picture, over a frosted
-  panel, which is why they are here and not in **Article content**: they are
-  positioned against the photograph and would have nothing to sit on anywhere
-  else. Both are off-switchable because a store whose articles are untagged
-  should not get an empty row of nothing.
-
-  Two tags at most, and that is deliberate rather than configurable. The pills
-  run along one edge of a card that is a third of a row wide; a fifth tag does
-  not wrap onto a second line, it pushes the first four off the picture.
-
-  The tags share a wrapper so a phone can put them on their own line under the
-  date. It is `display: contents` above 750px, so the desktop row is the same
-  single line of pills it was before the wrapper existed.
-
-  ## The image is a link, and it is hidden from assistive technology
-
-  `tabindex="-1"` and `aria-hidden` on the wrapper: the title below is already a
-  link to the same article, and a second one with no text of its own is a stop
-  on the keyboard path that announces nothing. Sighted pointer users still get
-  the whole picture as a target, which is what they expect from a card.
-
-  Both parameters below are optional and both are usually absent: inside
-  `_article-card` this block arrives through `{% content_for 'blocks' %}`, which
-  passes nothing, and the image falls back to the defaults in
-  `snippets/image.liquid`. They are read for the case where a section renders
-  this block itself and can hand them over.
-
   @param {string} [sizes] - `sizes` attribute for the image.
   @param {boolean} [priority] - Eager-load the image.
 {% enddoc %}
@@ -53,15 +12,6 @@
   assign ratio = s.ratio | default: '4-3'
   assign radius = s.border_radius | default: 24 | plus: 0
 
-  comment
-    Opacity goes into the colour rather than onto the element: `opacity` here
-    would fade the photograph along with its frame.
-
-    With no colour picked the border is `currentColor`, which the colour filters
-    cannot take an alpha channel from — there is nothing to read until the
-    scheme resolves in the browser. `color-mix` does the same fade at that point
-    instead, so both paths honour the slider.
-  endcomment
   assign border_width = 0
   if s.border_style != 'none' and s.border_style != blank
     assign border_width = s.border_width | default: 1 | plus: 0
@@ -85,36 +35,6 @@
 -%}
 
 {%- liquid
-  comment
-    ---- what the picture does under a pointer ----
-
-    The same four answers `blocks/_feature-card.liquid` gives, resolved the same
-    way and named from the same place — `t:shared.image_effect` — so "Zoom in"
-    means one thing across the theme and a merchant learns the control once.
-
-    Zoom is a hover effect and Drift is a scroll effect, which is why they are
-    one select rather than a pair of toggles: they animate the same `transform`
-    on the same element, and two controls able to ask for both would resolve to
-    whichever declaration came last in the stylesheet.
-
-    Nothing here needs the picture to be clipped, because it already is:
-    `.article-image-block` carries the corner radius and `overflow: hidden` so
-    the rounded frame never sits over square corners. A scaled photograph is
-    clipped by the same rule, for free.
-
-    Drift is `<parallax-media>`, the element the hero uses, rather than
-    `motion-effect data-effect="parallax"`. The two are different mechanisms:
-    motion-effect translates the element and needs 120px of overscan around it —
-    a number coupled by hand to a clamp in `assets/motion-engine.js` — while
-    `<parallax-media>` writes `--parallax-offset` and lets CSS combine it with a
-    `scale()`, which covers the travel with no second number to keep in step.
-
-    The speed is converted here, not passed through. The engine wants a
-    multiplier and the schema stores a percentage a merchant can reason about;
-    handing 30 to a function that clamps at 0.5 pins every card to maximum
-    strength and the slider stops doing anything.
-    `snippets/background-image.liquid` documents this as the bug it had.
-  endcomment
   assign image_effect = s.hover_image_effect | default: 'zoom_in'
 
   assign image_scale = s.hover_image_scale | default: 106 | plus: 0
@@ -162,12 +82,7 @@
       tabindex="-1"
       aria-hidden="true"
     >
-      {%- comment -%}
-        One inner layer, whichever effect is on it — a `<div>` for none and the
-        two zooms, `<parallax-media>` for Drift. The class is the same either
-        way, so the sizing rules in `base.css` do not have to know which element
-        they got, and the modifier is the only thing that varies.
-      {%- endcomment -%}
+
       <{{ layer_tag }}
         class="article-image-block__layer article-image-block__layer--{{ image_effect | replace: '_', '-' }}"
         {% if image_effect == 'drift' %}data-speed="{{ drift_speed }}"{% endif %}

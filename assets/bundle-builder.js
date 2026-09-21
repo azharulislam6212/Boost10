@@ -1,31 +1,5 @@
 /**
- * bundle-builder.js — Boost10
- *
  * `<bundle-builder>`, `<bundle-card>` and `<bundle-discount>`.
- *
- * A mix-and-match bundle: a product list on one side, a tray of placement slots
- * on the other, and a tier discount that grows as the tray fills.
- *
- * Moved out of `product-form.js` into its own module because it grew past the
- * point where sharing a file with the buy button was doing anyone a favour, and
- * because it is only ever on one template — so it can be loaded there rather
- * than on every product page.
- *
- * ## The three things this gets right that bundle builders usually do not
- *
- * **The discount is display only, and says so.** The actual money comes off at
- * checkout via a Shopify automatic discount the merchant configures. A theme
- * cannot create a discount; one that pretends to produces a cart that disagrees
- * with checkout, and the customer finds out on the payment step.
- *
- * **Selections survive pagination.** Appending a page never touches existing
- * nodes — `morph()` is not involved on an append — so a product chosen on page
- * one is still chosen after page four loads. The tray is the source of truth, not
- * the DOM state of a card that may have been replaced.
- *
- * **One request, not a loop.** The whole bundle is added with a single
- * multi-line POST. A loop of single adds gives the customer four round trips and
- * can leave half a bundle in the cart when the third one fails.
  *
  * @module @theme/bundle-builder
  */
@@ -39,36 +13,11 @@ import { formatMoney, themeString, announce, announceUrgent, clamp, getRoute } f
    <bundle-builder>
    ========================================================================== */
 
-/**
- * Markup:
- *
- *   <bundle-builder data-size="5" data-tiers="3:30,4:40,5:50" data-bundle-id="…">
- *     <div data-ref="picker">…<bundle-card>…</bundle-card>…</div>
- *
- *     <div data-ref="tray">
- *       <ol data-ref="slots"></ol>
- *       <div data-ref="progressTrack"><span data-ref="progressFill"></span></div>
- *       <p data-ref="progress" role="status"></p>
- *       <dl>
- *         <dd data-ref="subtotal"></dd>
- *         <dd data-ref="discount"></dd>
- *         <dd data-ref="total"></dd>
- *       </dl>
- *       <button data-ref="submit" disabled>…</button>
- *       <p data-ref="error" role="alert" hidden></p>
- *     </div>
- *
- *     <template data-ref="slotTemplate">…</template>
- *   </bundle-builder>
- */
 export class BundleBuilder extends BaseComponent {
   static requiredRefs = ['slots', 'submit'];
 
   /**
    * Chosen items, keyed by variant id.
-   *
-   * A Map rather than an array because the same product can only be in the tray
-   * once per variant, and lookup by id is what every interaction needs.
    *
    * @type {Map<string, { id: number, productId: string, title: string,
    *   variantTitle: string, price: number, image: string, url: string }>}
@@ -83,8 +32,6 @@ export class BundleBuilder extends BaseComponent {
       this.addToCart();
     });
 
-    // Removing from a slot is delegated, because slots are rebuilt on every
-    // render and per-slot listeners would leak with them.
     this.on(this, 'click', (event) => {
       const remove = event.target instanceof Element ? event.target.closest('[data-slot-remove]') : null;
       if (!remove) return;
@@ -93,8 +40,6 @@ export class BundleBuilder extends BaseComponent {
       this.remove(remove.dataset.slotRemove, { focusPicker: true });
     });
 
-    // Cards report themselves rather than the builder reaching into them, so a
-    // card appended by pagination works with no re-binding.
     this.on(this, EVENTS.BUNDLE_ITEM_TOGGLE, (event) => {
       const { detail } = event;
       if (!detail?.variantId) return;
@@ -109,7 +54,7 @@ export class BundleBuilder extends BaseComponent {
     this.render();
   }
 
-  /* --------------------------------------------------------- public API -- */
+  /* --------------------------------------------------------- public API -- ---- */
 
   /**
    * @returns {number} How many slots the tray holds.
@@ -120,9 +65,6 @@ export class BundleBuilder extends BaseComponent {
 
   /**
    * Discount tiers, ascending.
-   *
-   * Parsed from `quantity:percent` pairs so a merchant can define as many as
-   * they like from the schema without the module knowing how many exist.
    *
    * @returns {Array<{ quantity: number, percent: number }>}
    */
@@ -217,8 +159,6 @@ export class BundleBuilder extends BaseComponent {
     if (this.#selection.has(key)) return true;
 
     if (this.isFull) {
-      // Refusing beats silently swapping the oldest item out, which is the
-      // behaviour that makes a customer think the tray is broken.
       announceUrgent(themeString('bundleFull', '', { count: this.size }));
       this.#error(themeString('bundleFull', '', { count: this.size }));
       return false;
@@ -258,9 +198,6 @@ export class BundleBuilder extends BaseComponent {
 
     announce(themeString('bundleRemoved', '', { product: item.title }));
 
-    // Focus would otherwise land on a remove button that no longer exists.
-    // Sending it back to the card the item came from is where the customer is
-    // most likely to act next.
     if (!focusPicker) return;
 
     const card = this.querySelector(`bundle-card[data-variant-id="${CSS.escape(key)}"] [data-bundle-toggle]`);
@@ -271,9 +208,7 @@ export class BundleBuilder extends BaseComponent {
     }
   }
 
-  /**
-   * Empty the tray.
-   */
+  /** Empty the tray. */
   clear() {
     this.#selection.clear();
     this.render();
@@ -301,9 +236,6 @@ export class BundleBuilder extends BaseComponent {
         id: item.id,
         quantity: 1,
         properties: {
-          // The leading underscore keeps these out of the customer's view of the
-          // cart and out of the order confirmation, while staying available to
-          // the merchant and to any fulfilment tooling.
           _bundle: bundleId,
           _bundle_size: String(this.size),
           _bundle_discount: String(this.percent),
@@ -318,9 +250,6 @@ export class BundleBuilder extends BaseComponent {
 
       return result;
     } catch (error) {
-      // A line that has sold out since the customer chose it is the common
-      // failure. Naming it beats a generic error, because the fix is to swap
-      // that one item rather than start again.
       const message = error?.message || themeString('cartError', '');
       this.#error(message);
       announceUrgent(message);
@@ -330,9 +259,7 @@ export class BundleBuilder extends BaseComponent {
     }
   }
 
-  /**
-   * Redraw the tray, the totals and every card's pressed state.
-   */
+  /** Redraw the tray, the totals and every card's pressed state. */
   render() {
     this.#renderSlots();
     this.#renderTotals();
@@ -354,13 +281,10 @@ export class BundleBuilder extends BaseComponent {
     });
   }
 
-  /* ---------------------------------------------------------- internals -- */
+  /* ---------------------------------------------------------- internals -- ---- */
 
   /**
    * Draw exactly `size` slots: filled ones first, placeholders after.
-   *
-   * Rebuilt rather than diffed because the list is at most a handful of nodes
-   * and a rebuild cannot leave a stale thumbnail behind.
    *
    * @private
    */
@@ -432,8 +356,6 @@ export class BundleBuilder extends BaseComponent {
 
     const variant = slot.querySelector('[data-slot-variant]');
     if (variant instanceof HTMLElement) {
-      // A default-variant product has nothing useful to say here, and "Default
-      // Title" under every item is the tell of a theme that did not check.
       const meaningful = item.variantTitle && item.variantTitle !== 'Default Title';
       variant.textContent = meaningful ? item.variantTitle : '';
       variant.toggleAttribute('hidden', !meaningful);
@@ -572,28 +494,7 @@ defineComponent('bundle-builder', BundleBuilder);
    <bundle-card>
    ========================================================================== */
 
-/**
- * One product in the picker, with its own variant selector.
- *
- * The card owns which variant of *itself* is chosen; the builder owns which
- * products are in the tray. That split is why a card appended by pagination
- * needs no wiring: it reports a toggle upward and the builder decides.
- *
- * A native `<select>` rather than a second swatch picker. Twenty cards each
- * rendering a full radio group would put twenty identically labelled option
- * groups on one page, which is unusable with a screen reader — and the picker's
- * job here is choosing a size, not showcasing a colour.
- *
- * Markup:
- *
- *   <bundle-card data-product-id="…" data-variant-id="…">
- *     <script type="application/json" data-variants>[…]</script>
- *     <select data-ref="variantSelect">…</select>
- *     <span data-ref="price">…</span>
- *     <p data-ref="stock"></p>
- *     <button data-ref="toggle" data-bundle-toggle aria-pressed="false">…</button>
- *   </bundle-card>
- */
+/** One product in the picker, with its own variant selector. */
 export class BundleCard extends BaseComponent {
   static requiredRefs = ['toggle'];
 
@@ -606,7 +507,6 @@ export class BundleCard extends BaseComponent {
     try {
       this.#variants = script ? JSON.parse(script.textContent) : [];
     } catch {
-      // A malformed payload must not take the whole picker down with it.
       console.warn('[Boost10] Bundle card variant data could not be parsed.');
       this.#variants = [];
     }
@@ -623,7 +523,7 @@ export class BundleCard extends BaseComponent {
     this.#render();
   }
 
-  /* --------------------------------------------------------- public API -- */
+  /* --------------------------------------------------------- public API -- ---- */
 
   /**
    * @returns {Object|null}
@@ -640,14 +540,10 @@ export class BundleCard extends BaseComponent {
     return Boolean(this.variant?.available);
   }
 
-  /**
-   * Ask the builder to add or remove this card's current variant.
-   */
+  /** Ask the builder to add or remove this card's current variant. */
   toggle() {
     const variant = this.variant;
 
-    // Stock is validated here, before the tray is touched, so a customer never
-    // gets a slot filled with something that will fail at add-to-cart.
     if (!variant?.available) {
       announceUrgent(themeString('soldOut', ''));
       return;
@@ -683,7 +579,7 @@ export class BundleCard extends BaseComponent {
     }
   }
 
-  /* ---------------------------------------------------------- internals -- */
+  /* ---------------------------------------------------------- internals -- ---- */
 
   /** @private */
   #onVariantChange() {
@@ -692,9 +588,6 @@ export class BundleCard extends BaseComponent {
 
     this.#render();
 
-    // Changing the variant of a card already in the tray would leave the tray
-    // holding a variant the customer is no longer looking at, so the old one is
-    // dropped and the new one is not added silently.
     if (this.hasAttribute('data-selected')) {
       this.closest('bundle-builder')?.remove?.(this.dataset.previousVariantId || '');
     }
@@ -729,32 +622,7 @@ defineComponent('bundle-card', BundleCard);
    <bundle-discount>
    ========================================================================== */
 
-/**
- * The optional manual promo code field.
- *
- * Two things happen, and only one of them is verifiable:
- *
- *   1. `GET /discount/{code}` is requested, which is how Shopify attaches a code
- *      to the current session. It answers with a page, not a result — there is
- *      no endpoint that says whether a code is valid — so a 200 means the
- *      request was served, not that the code exists.
- *   2. The code is stored on the cart and appended to the checkout URL by
- *      `cart.applyDiscount`, so it survives a session that did not take.
- *
- * Because neither step can validate, the message says the code will be applied
- * at checkout rather than claiming a saving. Showing "£12 off" for a code that
- * turns out to be expired is worse than showing nothing.
- *
- * Markup:
- *
- *   <bundle-discount>
- *     <form data-ref="form">
- *       <input data-ref="input" name="discount">
- *       <button type="submit" data-ref="submit">…</button>
- *     </form>
- *     <p data-ref="message" role="status"></p>
- *   </bundle-discount>
- */
+/** The optional manual promo code field. */
 export class BundleDiscount extends BaseComponent {
   static requiredRefs = ['form', 'input'];
 
@@ -776,14 +644,11 @@ export class BundleDiscount extends BaseComponent {
     this.refs.submit?.setAttribute('disabled', '');
 
     try {
-      // Attach to the session. The response is a page; there is nothing in it
-      // that tells us whether the code was accepted.
       await fetch(`${getRoute('rootUrl')}discount/${encodeURIComponent(code)}`, {
         method: 'GET',
         headers: { Accept: 'text/html' }
       }).catch(() => null);
 
-      // Store it too, so checkout still receives it if the session did not take.
       await cart.applyDiscount(code);
 
       this.#message(themeString('discountApplied', '', { code }), false);

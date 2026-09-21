@@ -1,27 +1,6 @@
 /**
- * cart-drawer.js — Boost10
- *
  * The cart. Every mutation in the theme goes through this module, and nothing
  * else is allowed to POST to a cart endpoint.
- *
- * Two pieces live here:
- *
- *   `cart`          A module singleton holding the network layer and the last
- *                   known cart object. It is the owner of cart state.
- *   <cart-drawer>   The drawer UI. Delegates every mutation to `cart` and
- *                   renders whatever comes back.
- *
- * Why the state owner is a module rather than the element: `settings.cart_type`
- * can be set to "page" or "notification", in which case no drawer is rendered
- * at all — but `<cart-items>` on the cart page, `<free-shipping-bar>` in the
- * footer and the header count all still need a cart. Hanging the state on an
- * element that may not exist makes every consumer defensive. The ownership rule
- * is unchanged: exactly one owner, everyone else calls its methods.
- *
- * Server rendering, not client rendering. Every mutation asks Shopify to render
- * the affected sections in the same request, and `morph()` applies them. Prices,
- * discounts, translations and money formatting are therefore computed by Liquid
- * exactly once, and the cart drawer cannot drift out of step with the cart page.
  *
  * @module @theme/cart-drawer
  */
@@ -40,21 +19,6 @@ import { applySections, clearSectionCache } from '@theme/section-renderer';
  * Turn the name a piece of markup uses for a section into the id Shopify
  * actually renders it under.
  *
- * A section placed directly by a template is addressed by its own name —
- * `cart-drawer`. A section placed by a *section group* is not: Shopify renders
- * it as `sections--<group>__cart-drawer`, and that is the only id both the
- * Section Rendering API and `#shopify-section-…` will answer to. Boost10 puts
- * the drawer in `sections/overlay-group.json` and the header in
- * `sections/header-group.json`, so every `data-sections="cart-drawer,header"` in
- * the theme was naming two sections that do not exist under those names. The
- * request came back with nothing to apply, and the drawer kept whatever markup
- * the page had loaded with — which is a cart that shows the previous state, or
- * an empty one, after a successful add.
- *
- * Resolved from the DOM rather than from a Liquid variable so the markup keeps
- * saying which section it means, not where the theme currently happens to put
- * it. A section that moves in or out of a group needs no change here.
- *
  * @param {string} name
  * @returns {string} The rendered id, or `name` unchanged when nothing matches.
  */
@@ -71,13 +35,6 @@ function resolveSectionId(name) {
 /**
  * Whether a section has somewhere to land on the page as it stands.
  *
- * The registry is per page but the elements that fill it are not always: a
- * `<cart-items>` on the cart page registers `main-cart`, and the free shipping
- * bar's own section is only in the drawer. Asking the server to render a section
- * with no wrapper to morph it into is a round trip whose result is thrown away,
- * and `refresh()` re-fetches whatever did not apply — so without this, one
- * absent section would mean one wasted request on every cart mutation, forever.
- *
  * @param {string} id
  * @returns {boolean}
  */
@@ -89,9 +46,6 @@ function isSectionOnPage(id) {
 
 /**
  * Split a code field into individual codes.
- *
- * Merchant-typed and customer-typed free text, so it is trimmed, de-duplicated
- * and emptied of blanks before it is ever put in a URL.
  *
  * @param {string} value
  * @returns {string[]}
@@ -110,17 +64,6 @@ function parseCodes(value) {
 /**
  * Shopify's discount route for a set of codes.
  *
- * Built from `routes.root` rather than written as `/discount/…`, because a
- * market prefixes every path with its locale and a literal would silently stop
- * working on every market but the primary one.
- *
- * `redirect` keeps the response small: the route answers with a redirect and the
- * browser follows it, so without a target it would be the whole homepage
- * downloaded to be thrown away. `/cart.js` is the cheapest destination on the
- * store, and if a Shopify version ignores the parameter the only cost is the
- * bytes — the discount is set either way, and it is the cart read afterwards
- * that this module actually believes.
- *
  * @param {string[]} codes
  * @returns {string}
  */
@@ -133,15 +76,6 @@ function discountUrl(codes) {
 
 /**
  * Whether a cart is actually being discounted by a given code.
- *
- * Shopify reports a discount in more than one shape and which one it uses
- * depends on what kind of discount it is: an order-level one lands in
- * `cart_level_discount_applications`, a product-level one only ever appears on
- * the lines it touched. Checking a single field is how a working discount gets
- * reported as a failure.
- *
- * Matched on title, which for a code-based discount is the code. Case-insensitive
- * because Shopify upper-cases them and customers do not.
  *
  * @param {Object} state A cart, as returned by Shopify.
  * @param {string} code
@@ -181,14 +115,6 @@ export const cart = {
    * number of elements currently asking for each. Registered by the elements
    * that own them, so a page that has no free shipping bar never asks the
    * server to render one.
-   *
-   * Counted rather than a plain set, because two elements legitimately want the
-   * same section: `<cart-drawer>` asks for `cart-drawer` because it *is* that
-   * section, and the `<cart-items>` inside it asks for the same id because it is
-   * what a quantity change has to re-render. With a set, the first of them to
-   * leave took the id away from the other — so a cart emptied to zero discarded
-   * its `<cart-items>`, that teardown deregistered `cart-drawer`, and from then
-   * on no mutation re-rendered the drawer at all.
    *
    * @type {Map<string, number>}
    */
@@ -231,7 +157,7 @@ export const cart = {
     return document.querySelector('cart-drawer') || document.body;
   },
 
-  /* ------------------------------------------------------------ mutations */
+  /* ------------------------------------------------------------ mutations ---- */
 
   /**
    * Add one or more items.
@@ -251,11 +177,6 @@ export const cart = {
       sections_url: window.location.pathname
     });
 
-    // Past this line the items are in Shopify's cart. Nothing that follows is
-    // allowed to make the caller believe otherwise: a drawer that could not be
-    // re-rendered is a display failure, and a bundle that threw away the
-    // customer's six choices because of one is a far worse outcome than a
-    // drawer showing a stale total for a moment.
     try {
       await this.refresh({ sections: data.sections });
     } catch (error) {
@@ -274,9 +195,6 @@ export const cart = {
 
   /**
    * Change a line's quantity.
-   *
-   * `line` is one-based and shifts whenever an item is removed, so `key` is
-   * preferred wherever the caller has one. Shopify accepts either.
    *
    * @param {Object} options
    * @param {string} [options.key] Line item key.
@@ -308,8 +226,6 @@ export const cart = {
 
     announce(themeString(removed ? 'itemRemoved' : 'cartUpdated', ''));
 
-    // A cart that just emptied has to re-render even if the server returned no
-    // sections, because the empty state lives in a different part of the markup.
     if (previousCount > 0 && data.item_count === 0) await this.refresh();
 
     return data;
@@ -317,11 +233,6 @@ export const cart = {
 
   /**
    * Swap a line for a different variant, keeping its quantity and properties.
-   *
-   * Shopify has no "change variant" endpoint: the old line is removed and a new
-   * one added. Doing it in that order avoids a moment where the customer has
-   * neither, which matters when the add fails because the new variant sold out
-   * between the page load and the click.
    *
    * @param {Object} options
    * @param {string} options.key Existing line key.
@@ -389,36 +300,6 @@ export const cart = {
   /**
    * Hand a discount code to Shopify, so Shopify prices the cart.
    *
-   * ## Why this is two requests and not one
-   *
-   * There is no cart endpoint that takes a discount code. `/discount/<code>` is
-   * the only place a storefront can give Shopify one: it is a redirect that puts
-   * the code on the session. Nothing is returned that is worth reading — the
-   * point of the call is the side effect.
-   *
-   * The second request is what makes the drawer true. `/cart/update.js` comes
-   * back with the cart *after* the discount, and with the cart sections rendered
-   * by Liquid from that same cart — so the line prices, the
-   * `cart_level_discount_applications` row and the total in the drawer are
-   * Shopify's own numbers, not the theme's. This module still never prices
-   * anything; it asks, and then it shows the answer.
-   *
-   * This replaces storing the code as a cart attribute and calling that
-   * "applied at checkout". That was honest about not knowing, and it was also
-   * the reason a bundle could show "You save $7.95" beside a cart drawer
-   * charging full price: nothing had ever been handed to Shopify to price. The
-   * attribute is still written, because `checkoutUrl` appends it and because a
-   * code Shopify holds for checkout but does not show on the cart is still worth
-   * carrying.
-   *
-   * ## Several codes
-   *
-   * Comma separated, in one request, because that is how the route takes them.
-   * Whether Shopify keeps all of them is Shopify's decision — discounts combine
-   * only when the merchant has marked them combinable, and an order-level code
-   * replaces another order-level code. The cart read afterwards is what says
-   * which survived, so `applied` is observed rather than assumed.
-   *
    * @param {string} code One code, or several separated by commas.
    * @returns {Promise<Object>} The cart, after Shopify has priced it.
    */
@@ -426,9 +307,6 @@ export const cart = {
     const codes = parseCodes(code);
     if (codes.length === 0) return this.state;
 
-    // Best effort, and deliberately not fatal. A failure here means the code was
-    // not put on the session; the update below still records it for checkout,
-    // which is exactly where this module stood before.
     try {
       await fetch(discountUrl(codes), { headers: { Accept: 'application/json' } });
     } catch (error) {
@@ -440,8 +318,6 @@ export const cart = {
 
     this._dispatch(EVENTS.CART_DISCOUNT, { code: codes.join(','), codes, applied, cart: data });
 
-    // Only when the cart actually shows it. Announcing an applied discount for a
-    // code Shopify ignored is the claim this whole method exists to stop making.
     if (applied.length > 0) announce(themeString('discountApplied', ''));
 
     return data;
@@ -449,13 +325,6 @@ export const cart = {
 
   /**
    * Clear the stored discount code.
-   *
-   * The attribute goes, so `checkoutUrl` stops carrying the code. A code already
-   * on the session does not: Shopify has no storefront route that takes one off,
-   * and inventing one that appears to work would be worse than the gap. The cart
-   * read below is therefore the honest answer — if Shopify is still applying the
-   * discount, the drawer keeps showing it, and `<promo-code>` renders it as an
-   * applied discount with no remove button rather than as a pending one.
    *
    * @returns {Promise<Object>}
    */
@@ -474,7 +343,7 @@ export const cart = {
     return code ? `${base}?discount=${encodeURIComponent(code)}` : base;
   },
 
-  /* --------------------------------------------------------------- reads */
+  /* --------------------------------------------------------------- reads ---- */
 
   /**
    * Re-fetch the cart and re-render the registered sections.
@@ -486,24 +355,10 @@ export const cart = {
   async refresh({ sections } = {}) {
     const wanted = this.sections;
 
-    // What the mutation already rendered for us, if anything. `_applySections`
-    // reports what it could actually place, which is not the same as what was
-    // asked for: a section the current template does not have is skipped, and so
-    // — silently, until now — is one whose id the server did not recognise.
     const applied = sections ? this._applySections(sections) : [];
 
-    // Anything still stale is fetched. This is what removes the race the drawer
-    // used to lose: whatever the add response did or did not contain, every
-    // section the cart owns is current by the time this resolves, and the drawer
-    // is not revealed until then.
     const missing = wanted.filter((id) => !applied.includes(id) && isSectionOnPage(id));
 
-    // Best effort, and it has to be. Re-rendering markup and re-reading the cart
-    // are two different jobs, and letting the first stop the second is how the
-    // drawer ends up showing the right lines beside a free shipping bar that
-    // still thinks the cart is empty: `cart.state` is what every indicator in
-    // the theme reads — the bar, the badges, the gift threshold — and it is not
-    // allowed to go stale because one section failed to render.
     if (missing.length > 0) {
       try {
         const { fetchSections } = await import('@theme/section-renderer');
@@ -530,7 +385,7 @@ export const cart = {
     return this.state?.item_count ?? 0;
   },
 
-  /* ----------------------------------------------------------- internals */
+  /* ----------------------------------------------------------- internals ---- */
 
   /**
    * @param {string} url
@@ -539,8 +394,6 @@ export const cart = {
    * @private
    */
   async _post(url, body) {
-    // A second request while one is in flight would race, and the loser would
-    // overwrite the winner's cart state with a stale object.
     this._request?.abort();
     this._request = new AbortController();
 
@@ -555,7 +408,6 @@ export const cart = {
 
       const data = await parseResponse(response, { ErrorClass: CartError });
 
-      // Cached section HTML is stale the moment the cart changes.
       clearSectionCache();
 
       return data;
@@ -622,16 +474,7 @@ export const cart = {
    <cart-drawer>
    ========================================================================== */
 
-/**
- * The cart drawer.
- *
- * Extends `<drawer-component>`, so focus trapping, scroll locking, Escape
- * handling and the `data-lenis-prevent` fix all come from one place rather than
- * being reimplemented for the cart.
- *
- * Attributes:
- *   data-sections  Comma separated section ids to re-render on every mutation
- */
+/** The cart drawer. */
 export class CartDrawer extends DrawerComponent {
   get overlayType() {
     return 'cart';
@@ -646,9 +489,6 @@ export class CartDrawer extends DrawerComponent {
 
     cart.state = window.Theme?.cart ?? cart.state;
 
-    // Quick add forms in product cards submit straight to the cart. Intercepting
-    // here rather than in the card keeps the network layer in one module, and
-    // the form still works as a plain POST if this script never loads.
     this.on(document, 'submit', this.#onQuickAdd);
 
     this.on(document, EVENTS.CART_ERROR, this.#onCartError);
@@ -661,7 +501,7 @@ export class CartDrawer extends DrawerComponent {
     super.teardown();
   }
 
-  /* --------------------------------------------------------- public API -- */
+  /* --------------------------------------------------------- public API -- ---- */
 
   /** @returns {Object|null} The current cart. Read-only by convention. */
   get state() {
@@ -715,7 +555,7 @@ export class CartDrawer extends DrawerComponent {
     return cart.refresh();
   }
 
-  /* ---------------------------------------------------------- internals -- */
+  /* ---------------------------------------------------------- internals -- ---- */
 
   /**
    * @param {SubmitEvent} event
@@ -737,9 +577,7 @@ export class CartDrawer extends DrawerComponent {
         id: Number(data.get('id')),
         quantity: Number(data.get('quantity') || 1)
       });
-    } catch {
-      // The error has already been announced and dispatched by `cart._post`.
-    } finally {
+    } catch {} finally {
       button?.removeAttribute('aria-busy');
       button?.removeAttribute('disabled');
     }
@@ -757,33 +595,11 @@ export class CartDrawer extends DrawerComponent {
 
 defineComponent('cart-drawer', CartDrawer);
 
-
 /* ==========================================================================
    <cart-upsell>
    ========================================================================== */
 
-/**
- * Cross-sells inside the cart drawer.
- *
- * Fetches Shopify's recommendations endpoint as JSON rather than as a rendered
- * section, for one reason: the drawer offers a variant selector, and the
- * section-rendered version would mean a second request to get the variant data.
- *
- * Two products, not six. A cart drawer is a checkout funnel, and the honest
- * measure of an upsell there is whether it adds an item without costing a
- * conversion. A grid of six turns the drawer into a browse.
- *
- * Nothing is fetched until the drawer opens. Recommendations for a cart nobody
- * has looked at are a request nobody asked for.
- *
- * Markup:
- *
- *   <cart-upsell data-product-id="123" data-limit="2" data-intent="complementary">
- *     <h3 data-ref="heading" hidden>…</h3>
- *     <div data-ref="list"></div>
- *     <template data-ref="template">…</template>
- *   </cart-upsell>
- */
+/** Cross-sells inside the cart drawer. */
 export class CartUpsell extends BaseComponent {
   static requiredRefs = ['list'];
 
@@ -796,13 +612,11 @@ export class CartUpsell extends BaseComponent {
   setup() {
     this.on(this, 'click', this.#onClick);
 
-    // The drawer announces itself rather than this element polling for it.
     this.on(document.body, EVENTS.OVERLAY_OPEN, (event) => {
       if (event.detail?.type !== 'cart') return;
       this.load();
     });
 
-    // Adding an item changes what should be recommended alongside it.
     this.on(document.body, EVENTS.CART_UPDATED, () => {
       this.#loadedFor = null;
     });
@@ -858,8 +672,6 @@ export class CartUpsell extends BaseComponent {
       const products = (data.products || []).filter((product) => product.available);
 
       if (products.length === 0) {
-        // Nothing to suggest is not an error. Remove rather than leave a heading
-        // over an empty row in a drawer already short on space.
         this.remove();
         return false;
       }
@@ -870,8 +682,6 @@ export class CartUpsell extends BaseComponent {
     } catch (error) {
       if (error?.name === 'AbortError') return false;
 
-      // An upsell is supplementary. A failure removes it rather than putting an
-      // error message inside a checkout funnel.
       console.warn('[Boost10] Cart recommendations could not be loaded.', error);
       this.remove();
       return false;
@@ -880,7 +690,7 @@ export class CartUpsell extends BaseComponent {
     }
   }
 
-  /* ---------------------------------------------------------- internals -- */
+  /* ---------------------------------------------------------- internals -- ---- */
 
   /**
    * @param {Object[]} products
@@ -916,8 +726,6 @@ export class CartUpsell extends BaseComponent {
       const price = node.querySelector('[data-upsell-price]');
       if (price instanceof HTMLElement) price.textContent = formatMoney(product.price);
 
-      // A variant selector, because adding the wrong size from a cart drawer is
-      // a return rather than a sale.
       const select = node.querySelector('[data-upsell-variant]');
       const available = product.variants.filter((variant) => variant.available);
 
@@ -991,31 +799,7 @@ defineComponent('cart-upsell', CartUpsell);
    <cart-free-gift>
    ========================================================================== */
 
-/**
- * The claim button for a gift the cart has earned.
- *
- * ## What this promises, and what it does not
- *
- * It adds a product to the cart. It does **not** make that product free — the
- * discount is a Shopify automatic discount the merchant configures, and a theme
- * cannot create one. The gift line shows its real price until checkout applies
- * the discount, and the schema tells the merchant to set that discount up.
- *
- * Claiming is a button, never automatic. A product appearing in a cart without
- * the customer asking reads as a bug or a trick, and it is the kind of thing
- * that produces chargebacks.
- *
- * The threshold is compared against `items_subtotal_price`, not `total_price`.
- * `total_price` already has discounts taken off, so a customer who applied a
- * code would watch the gift they had earned disappear.
- *
- * Markup:
- *
- *   <cart-free-gift data-threshold="5000" data-variant-id="123" data-claimed="false">
- *     <p data-ref="message"></p>
- *     <button data-ref="claim" hidden>…</button>
- *   </cart-free-gift>
- */
+/** The claim button for a gift the cart has earned. */
 export class CartFreeGift extends BaseComponent {
   setup() {
     if (this.refs.claim) {

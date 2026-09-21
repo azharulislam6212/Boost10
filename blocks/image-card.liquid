@@ -1,49 +1,6 @@
 {% doc %}
-  blocks/image-card.liquid
-
   A picture with blocks on it — the panel beside the FAQ in the *FAQ: Banner*
   preset, where a photograph carries a heading, a line of text and a button.
-
-  ## It is a group, and that is the whole implementation
-
-  A card like this is a flex container with a background, a border, a radius, a
-  link and a set of child blocks. `snippets/group.liquid` is that, down to the
-  alignment swap that makes **Alignment** mean horizontal whether the content
-  stacks or sits in a row, and the width pair where Fill means *take what is
-  left* rather than `100%`.
-
-  So this file renders through it, with `extra_classes`, `tag` and `attributes`
-  — three parameters that exist for exactly this — and adds four things the
-  group has no opinion about:
-
-      the shape        an aspect ratio, so the card is a portrait beside a
-                       column of questions rather than as tall as its content
-      the label        a word pinned to the picture, or set into the content
-      the animation    the image family's, through `snippets/motion-attrs.liquid`
-      the preload      one hint, for a card that is genuinely above the fold
-
-  Every layout, colour, border and spacing control is the group's own setting id.
-  A merchant who has laid out a Group already knows this block, and a change to
-  how Fill works reaches both.
-
-  ## Over the picture, or under it
-
-  **Content** is the group's `background_media` setting wearing a clearer label.
-  *Over the image* makes the picture the group's background — the content layer
-  sits above it and the card takes the ratio. *Below the image* turns the
-  background off and renders the picture as the first child instead, so the
-  content flows underneath it in normal document order.
-
-  One setting rather than a toggle plus a hidden media type: the group already
-  branches on this value, and a second control that has to be kept in step with
-  it is a second control that can disagree with it.
-
-  ## The label is not a heading
-
-  It is a word or two over a photograph — "New", a category, a price. Blocks are
-  what headings are for, and the card takes any of them. **Show in content**
-  moves the label out of its corner and into the flow, for a card whose picture
-  is at the top and whose label reads as a kicker over the heading.
 {% enddoc %}
 
 {%- liquid
@@ -54,12 +11,6 @@
     assign content_over = true
   endif
 
-  comment
-    The ratio shapes the card only when the picture is behind the content. With
-    the picture as a child it has a ratio of its own, applied by
-    `snippets/image.liquid`, and a second one on the wrapper would crop the
-    content underneath it as well.
-  endcomment
   assign ratio = s.ratio | default: 'aspect-ratio'
 
   capture ratio_value
@@ -74,12 +25,6 @@
   endif
 -%}
 
-{%- comment -%}
-  No ratio when the card is told to fill the height beside it: a box cannot
-  both match its tallest sibling and keep its own proportions, and the height
-  is the setting the merchant just changed. Decided here rather than with a
-  CSS rule that has to out-specify itself.
-{%- endcomment -%}
 {%- capture card_style -%}
   {%- if content_over and s.height != 'fill' -%}
     --image-card-ratio: {{ ratio_value | strip }};
@@ -95,11 +40,6 @@
 
 {%- capture children -%}
 
-  {%- comment -%}
-    No guard on the image here: the snippet renders its own placeholder when
-    there is nothing to render, which is the same picture the card shows in the
-    other arrangement and one fewer branch than testing for it twice.
-  {%- endcomment -%}
   {%- if content_over == false -%}
     {% render 'image',
        image: s.image,
@@ -113,10 +53,6 @@
        wrapper_class: 'image-card__media' %}
   {%- endif -%}
 
-  {%- comment -%}
-    Pinned to the picture unless the merchant asked for it in the flow, in which
-    case it is an ordinary child and the gap between blocks applies to it.
-  {%- endcomment -%}
   {%- if s.label_text != blank -%}
     <span class="image-card__label{% unless s.label_in_content %} image-card__label--pinned{% endunless %}">
       {{- s.label_text | escape -}}
@@ -126,18 +62,6 @@
   {% content_for 'blocks' %}
 {%- endcapture -%}
 
-{%- comment -%}
-  `styles` rather than a `style` attribute of this block's own: the group snippet
-  already writes one, and a tag carrying two of them keeps the first and loses
-  the rest — which is the bug `snippets/spacing.liquid` documents at length.
-{%- endcomment -%}
-{%- comment -%}
-  The placeholder goes to the background layer rather than in with the blocks.
-  It was a child, and a child sits inside the padding — so an unfilled card drew
-  its picture 24px in on every side and then jumped flush to the edges the
-  moment a real image was chosen. The background layer is where the photograph
-  will be, so it is where its stand-in belongs.
-{%- endcomment -%}
 {% render 'group',
    children: children,
    settings: s,
@@ -149,11 +73,6 @@
    placeholder: 'hero-apparel-1',
    shopify_attributes: block.shopify_attributes %}
 
-{%- comment -%}
-  Every setting below is a control a merchant reaches in the editor, and the
-  schema is one element's styling surface: splitting it to get under Theme
-  Check's count of 40 would split the thing the settings style.
-{%- endcomment -%}
 {% # theme-check-disable ExcessiveSettingsCount %}
 {% schema %}
 {

@@ -1,81 +1,12 @@
 {% doc %}
-  blocks/_highlight-stage.liquid
-
   The photograph in the middle and the points pinned around it.
-
-  ## The product owns a column, and that is the whole promise
-
-  Above 990px the stage is three columns — points, product, points. A point is
-  placed in column 1 or column 3 and the photograph is in column 2, so a label
-  cannot end up over the product at any picture size. There is no arithmetic
-  involved and therefore none to get wrong.
-
-  It was coordinates once: every point carried an Across and a Down measured
-  against the stage, with the photograph on a layer of its own inside it.
-  Nothing tied the two together, so a taller bottle or a wider setting put
-  labels across the product and the only fix was for somebody to notice. A
-  section cannot promise a clear product that way.
-
-  **Gap from the product** on each point is a margin on the side facing the
-  middle, so it only ever moves a point further out — which is what gives each
-  row of the drawing its outward stagger, with one number rather than a left
-  value and a right value that have to be kept equal.
-
-  ## Two layouts, not one layout scaled
-
-  Below 990px there is no room either side of a photograph for a column to
-  mean anything. So the placement is not scaled down, it is dropped:
-  `assets/base.css` gives the picture a row of its own and the points follow it
-  in source order, two across on a tablet and one on a phone.
-
-  That is a different layout on purpose. Squeezing three columns into 390px
-  gives five labels fighting a photograph and a merchant who cannot fix it,
-  because the thing that is wrong is the idea, not the numbers.
-
-  ## The light is an attribute, and Liquid writes the first one
-
-  `<highlight-points>` in `assets/highlight-points.js` advances
-  `data-highlight-active` along the points as the stage crosses the viewport.
-  It is the shared scroll ticker from `assets/motion-engine.js` — the same one
-  the parallax backgrounds use — rather than a listener of this section's own.
-
-  The element is asked for by `data-activate="scroll"`. Switch **Light the
-  points as the section scrolls** off and it stands down entirely, leaving the
-  point the merchant marked lit. Without the module at all the same thing
-  happens, which is why the state is an attribute in the markup rather than
-  something the script creates.
-
-  ## What the active point becomes lives here, not on each point
-
-  Fill, glyph colour and ring colour for the lit state are the stage's
-  settings, because "the lit one is filled green" is a property of the set. Set
-  on each point they are five places for one decision to drift, which is the
-  same reasoning `blocks/_featured-pills-tabs.liquid` gives for its own marks.
-
-  **When a point lights up** is here for the same reason. Those colours are the
-  state the light leaves behind; this is the movement it arrives with — a halo
-  opening out of the mark once, or the mark breathing while it holds — and one
-  run cannot arrive two different ways.
 {% enddoc %}
 
 {%- liquid
   assign s = block.settings
 
-  comment
-    ---- the picture ----
-
-    `snippets/image.liquid` renders it, so it is responsive, lazily loaded and
-    never a layout shift — and it draws its own placeholder, which is what an
-    unfilled stage in the editor should show: a picture-shaped box the merchant
-    can place points against, rather than empty space they cannot aim at.
-  endcomment
   assign ratio = s.image_ratio | default: 'aspect-ratio'
 
-  comment
-    The middle column's width. Widening it narrows the two the points are in
-    rather than growing the picture over them, which is the difference between
-    this and the layered version it replaced.
-  endcomment
   assign media_width = s.media_width | default: 28 | plus: 0
   assign media_width_tablet = s.media_width_tablet | default: 46 | plus: 0
   assign media_width_mobile = s.media_width_mobile | default: 62 | plus: 0
@@ -83,21 +14,6 @@
   assign min_height = s.min_height | default: 560 | plus: 0
   assign min_height_mobile = s.min_height_mobile | default: 0 | plus: 0
 
-  comment
-    Which grid row the product starts on, and therefore which rows are the
-    ones above it. Column 2 is the product's from here to the bottom of the
-    stage, so a centre point belongs on a row before this number — that is
-    the whole of the rule that keeps a label off the picture.
-  endcomment
-  comment
-    How many rows the stage has.
-
-    It has to be stated rather than left to the browser: the product is
-    placed with `grid-row: <start> / -1`, and -1 is the last line of the
-    *explicit* grid. Without a track list there is no explicit grid, -1
-    resolves to line 1, and the product lands on the row above instead of
-    the rows below — on top of the very point it is supposed to sit under.
-  endcomment
   assign rows = s.rows | default: 3 | plus: 0
 
   assign media_row = s.media_row | default: 2 | plus: 0
@@ -105,11 +21,6 @@
   assign columns_tablet = s.columns_tablet | default: 2 | plus: 0
   assign columns_mobile = s.columns_mobile | default: 1 | plus: 0
 
-  comment
-    Presence, not a value. `data-activate` is what the component tests, so the
-    off state has to emit a different string rather than a falsy one — an
-    attribute that says `false` is still an attribute.
-  endcomment
   assign activate = 'none'
   if s.activate_on_scroll
     assign activate = 'scroll'
@@ -117,20 +28,6 @@
 
   assign scroll_window = s.scroll_window | default: 60 | plus: 0
 
-  comment
-    ---- what the light does when it lands ----
-
-    The fill, the glyph colour and the size are a *state*: they cross once and
-    stay, and they are already set here for the whole set. This is the movement
-    laid over that, and it belongs here for the same reason — "the light arrives
-    like this" is a property of the run, not of any one point, and five copies
-    of it are five places for one decision to drift.
-
-    An attribute rather than a custom property, because `assets/base.css` has to
-    *select* on it: each style is a different keyframe on a different element,
-    which is a rule to match and not a value to substitute. Same shape as
-    `data-activate` above.
-  endcomment
   assign active_motion = s.active_motion | default: 'halo'
   assign active_motion_duration = s.active_motion_duration | default: 900 | plus: 0
 -%}
@@ -148,14 +45,7 @@
   --hps-columns-mobile: {{ columns_mobile }};
   --hps-gap: {{ s.gap | default: 24 | plus: 0 }}px;
   --hps-gap-mobile: {{ s.gap_mobile | default: 16 | plus: 0 }}px;
-  {%- comment -%}
-    What the lit point becomes. Each is emitted only when the merchant chose
-    one, so a stage that has set none of them leaves every point drawing
-    exactly what `snippets/icon-mark.liquid` gave it — the lit one included.
-    `assets/base.css` reads these as overrides on the painted result rather
-    than on the `--icon-mark-*` properties themselves, because those are inline
-    on each mark and an inline custom property beats every stylesheet.
-  {%- endcomment -%}
+
   {%- if s.active_fill != blank -%}
     --hps-active-fill: {{ s.active_fill }};
   {%- endif -%}
@@ -167,12 +57,7 @@
   {%- endif -%}
   --hps-active-ring-opacity: {%- if s.active_keep_ring %}1{% else %}0{% endif -%};
   --hps-active-motion-duration: {{ active_motion_duration }}ms;
-  {%- comment -%}
-    The halo's own colour, and only when the merchant picked one. Left alone it
-    falls to the lit ring colour and then to `currentColor` in the stylesheet,
-    so a stage that recoloured the lit mark has recoloured the halo with it and
-    there is never a second colour to keep in step.
-  {%- endcomment -%}
+
   {%- if s.active_halo_color != blank -%}
     --hps-halo-color: {{ s.active_halo_color }};
   {%- endif -%}
@@ -182,25 +67,6 @@
   --hps-idle-opacity: {{ s.idle_opacity | default: 100 | plus: 0 | divided_by: 100.0 }};
 {%- endcapture -%}
 
-{%- comment -%}
-  The animation wraps the stage; the stage holds the picture and the points as
-  siblings.
-
-  Nothing may come between `<highlight-points>` and a point, because the points
-  are grid items of the stage — the column that keeps them off the product is
-  the stage's own, and a wrapper in the middle would be one grid item holding
-  all five with no columns at all. So `{% content_for 'blocks' %}` is a direct
-  child here, and the entrance animation is a `<motion-effect>` on the outside
-  aiming at `.highlight-point` rather than a layer on the inside.
-
-  `target` and not `children: true`: the wrapper's only child is the stage, so
-  staggering its children would stagger one element. The points are what arrive
-  one after another, so the points are what the stagger is pointed at.
-
-  The outer wrapper does not disturb the scroll run either. `<highlight-points>`
-  measures its own box against the viewport, and a wrapper that adds no padding
-  of its own is the same box.
-{%- endcomment -%}
 <motion-effect
   class="highlight-stage-motion"
   {% render 'motion-attrs', kind: 'text', block: s, target: '.highlight-point' %}
@@ -214,14 +80,7 @@
     style="{{ stage_style | strip_newlines | strip }}"
     {{ block.shopify_attributes }}
   >
-    {%- comment -%}
-      `kind: 'image'` and not `'text'`: the subject is a photograph, and the
-      text family's presets split their target into words and letters.
 
-      This one *is* a grid item — column 2, from its own row to the bottom of
-      the stage — so the wrapper is the picture's box and nothing is nested
-      inside the cell that does not need to be.
-    {%- endcomment -%}
     <motion-effect
       class="highlight-stage__media"
       {% render 'motion-attrs', kind: 'image', block: s %}
@@ -242,11 +101,6 @@
   </highlight-points>
 </motion-effect>
 
-{%- comment -%}
-  Every setting below is a control a merchant reaches in the editor, and the
-  schema is one element's styling surface: splitting it to get under Theme
-  Check's count of 40 would split the thing the settings style.
-{%- endcomment -%}
 {% # theme-check-disable ExcessiveSettingsCount %}
 {% schema %}
 {

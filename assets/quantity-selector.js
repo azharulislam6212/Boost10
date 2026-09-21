@@ -1,43 +1,8 @@
 /**
- * quantity-selector.js — Boost10
- *
  * `<quantity-selector>` is the stepper used on the product page, in the cart,
  * in the cart drawer and inside the quick option drawer. One component for all
  * four, because a quantity rule that is enforced in one place and not another
  * is a bug report waiting to happen.
- *
- * Markup:
- *
- * <button type="button" data-ref="decrease" aria-label="…">−</button>
- *
- * <input
- *   data-ref="input"
- *   type="number"
- *   name="quantity"
- *   value="1"
- *   min="1"
- *   inputmode="numeric">
- *
- * <button type="button" data-ref="increase" aria-label="…">+</button>
- *
- * <p data-ref="message" role="status"></p>
- *
- * Design decisions worth keeping:
- *
- * - The `<input>` is a real form control with `name`, `min`, `max` and `step`.
- *   Add to cart therefore works with JavaScript disabled, and Shopify's own
- *   validation still applies as a second line of defence.
- *
- * - Typing is not corrected on every keystroke. Clamping "1" to the minimum
- *   while someone is halfway through typing "10" is the single most common
- *   quantity-field bug. Correction happens on blur and on submit.
- *
- * - Shopify's quantity rules, minimum, increment, and maximum implied by
- *   available stock, are read from data attributes rendered by Liquid, not
- *   recalculated in JavaScript from a variant object that may be stale.
- *
- * - Changes are debounced before they reach the cart, so holding the plus
- *   button sends one request rather than fifteen.
  *
  * @module @theme/quantity-selector
  */
@@ -57,7 +22,7 @@ export class QuantitySelector extends BaseComponent {
   /** Last value broadcast, so a no-op blur does not fire a cart request. */
   #lastNotified = null;
 
-  /* ------------------------------------------------------------ lifecycle */
+  /* ------------------------------------------------------------ lifecycle ---- */
 
   setup() {
     const input = this.refs?.input;
@@ -92,18 +57,13 @@ export class QuantitySelector extends BaseComponent {
   }
 
   attributeChanged() {
-    /*
-     * attributeChangedCallback() can run before setup() has initialized refs.
-     * Do not touch the input until the component has been initialized.
-     */
     if (!(this.refs?.input instanceof HTMLInputElement)) return;
 
-    // Stock and quantity rules change when the variant changes.
     this.#clampToRules();
     this.#syncButtons();
   }
 
-  /* --------------------------------------------------------- public API */
+  /* --------------------------------------------------------- public API ---- */
 
   /**
    * @returns {number} The current quantity.
@@ -111,10 +71,6 @@ export class QuantitySelector extends BaseComponent {
   get value() {
     const input = this.refs?.input;
 
-    /*
-     * Attribute callbacks can fire before setup() has initialized refs.
-     * Returning the minimum keeps the getter safe during that phase.
-     */
     if (!(input instanceof HTMLInputElement)) {
       return this.min;
     }
@@ -196,16 +152,12 @@ export class QuantitySelector extends BaseComponent {
   /**
    * Move by one increment.
    *
-   * Named `stepBy` rather than `step` on purpose: `step` is already the getter
-   * for the increment size, and a class cannot hold both.
-   *
    * @param {number} direction 1 or -1.
    */
   stepBy(direction) {
     const before = this.value;
     const applied = this.setValue(before + this.step * direction);
 
-    // Explain why nothing happened rather than leaving the button feeling dead.
     if (
       applied === before &&
       direction > 0 &&
@@ -230,7 +182,7 @@ export class QuantitySelector extends BaseComponent {
     this.#message(text, announceIt);
   }
 
-  /* ---------------------------------------------------------- internals */
+  /* ---------------------------------------------------------- internals ---- */
 
   /**
    * @param {number} value
@@ -246,10 +198,6 @@ export class QuantitySelector extends BaseComponent {
       return min;
     }
 
-    /*
-     * Snap to the nearest valid increment above the minimum, so a store
-     * selling in packs of six cannot end up with seven in the cart.
-     */
     const stepped =
       step > 1
         ? min + Math.round((value - min) / step) * step
@@ -348,10 +296,6 @@ export class QuantitySelector extends BaseComponent {
         break;
 
       case 'Enter':
-        /*
-         * Commit immediately: inside a cart form, Enter would otherwise
-         * submit with the value still un-clamped.
-         */
         this.#onCommit();
         break;
 

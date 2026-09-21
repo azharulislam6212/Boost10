@@ -1,23 +1,5 @@
 {% comment %}
-  sections/main-collection-category.liquid
-
   A parent collection: sub-category pills, a curated feature row, then the grid.
-
-  Assigned as an alternate template, so a merchant picks it per collection. That
-  matters because "parent collection" is not something Shopify models — there is
-  no field that says one collection contains others. The merchant expresses the
-  relationship in a menu, which is a thing they already know how to edit, and
-  this section reads that menu.
-
-  Everything below the pills is the ordinary collection experience: the same
-  filters block, the same _product-card, the same three pagination modes. A
-  category page that behaved differently from a collection page would be a second
-  set of bugs.
-
-  The feature row is a separate collection the merchant chooses. It sits above
-  the grid and outside the paginated region, so appending a page never re-renders
-  it and a customer scrolling through four hundred products does not drag the
-  feature row's images along with them.
 {% endcomment %}
 
 {%- liquid
@@ -43,7 +25,7 @@
   </a>
 
   <div class="{% render 'container', width: section.settings.container_width %}">
-    {%- comment -%} ---------- category header ---------- {%- endcomment -%}
+
     <header class="collection-category__header collection-category__header--{{ section_settings.alignment }}">
       {%- if section_settings.show_breadcrumbs -%}
         {% render 'breadcrumbs' %}
@@ -60,16 +42,10 @@
       {%- endif -%}
     </header>
 
-    {%- comment -%}
-      Sub-category pills. Built from a menu, because Shopify has no parent-child
-      relationship between collections and a merchant already knows how to edit a
-      menu.
-    {%- endcomment -%}
     {%- if section_settings.menu != blank -%}
       {% render 'sub-collections', menu: linklists[section_settings.menu], current: collection %}
     {%- endif -%}
 
-    {%- comment -%} ---------- curated feature row ---------- {%- endcomment -%}
     {%- if section_settings.featured_collection != blank and section_settings.featured_collection.products.size > 0 -%}
       <section class="collection-category__featured" aria-label="{{ section_settings.featured_heading | default: 'collections.category.featured' | t | escape }}">
         <h2 class="collection-category__featured-title">
@@ -92,7 +68,6 @@
       </section>
     {%- endif -%}
 
-    {%- comment -%} ---------- filters and grid ---------- {%- endcomment -%}
     {% paginate collection.products by per_page %}
       {% content_for 'block',
         type: '_filters',
@@ -102,20 +77,6 @@
         paginate: paginate
       %}
 
-      {%- comment -%}
-        The grid markup, inline rather than through `snippets/product-grid.liquid`.
-
-        The loop below renders each card with `{% content_for 'block' %}`, and the
-        output of `content_for` cannot be captured - theme-check reports it as an
-        error, because Shopify renders blocks with their theme-editor bindings
-        attached and buffering that output into a variable is not something the
-        platform supports. Passing the cards to a wrapper snippet meant capturing
-        them first, so the wrapper had to come here instead.
-
-        This is the same markup `product-grid.liquid` emits, with the same classes,
-        the same refs and the same order. Nothing about how the grid looks or how
-        `<results-list>` finds it has changed.
-      {%- endcomment -%}
       {%- liquid
         assign grid_mode = section.settings.pagination_type | default: settings.pagination_type | default: 'paginate'
         assign grid_total = collection.products_count
@@ -164,7 +125,7 @@
             %}
           </li>
         {%- endfor -%}
-      
+
         </ul>
 
         <div class="product-grid__empty" data-ref="empty" {% if grid_total > 0 %}hidden{% endif %}>

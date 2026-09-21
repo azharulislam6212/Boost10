@@ -1,49 +1,5 @@
-{%- comment -%}
-  Kept deliberately, and not yet called from anywhere.
-
-  Called by the variant picker once the advanced swatch layout is switched on.
-
-  Theme Check reports this as `OrphanedSnippet`, and that report is correct:
-  nothing calls it yet. It is a warning, not an error, and it stands until the
-  file is wired up - which is the fix, rather than silencing the check.
-{%- endcomment -%}
-
 {% doc %}
   Renders a full row of swatches for one product option.
-
-  `swatch.liquid` draws a single value; this draws the option — the inputs, the
-  labels, the overflow control and the availability marking — so a section never
-  has to assemble that itself.
-
-  ## Where a swatch comes from
-
-  Four sources, narrowest first. Each one exists because the one after it is not
-  good enough for someone:
-
-  1. **Shopify's native swatch** on the option value. Per-product, survives a
-     theme change, and is what Shopify itself uses in filters and search.
-  2. **A variant metafield** (`variant.metafields.custom.swatch_image`). This is
-     the escape hatch for a pattern that is genuinely an image — marble, wood
-     grain, a printed fabric — where a hex code is a lie.
-  3. **The theme's swatch map**, `settings.swatch_config`. The practical option
-     when option values are shared across a whole catalogue.
-  4. **The fallback**, chosen in settings.
-
-  Dual-tone values are supported by writing two hex codes separated by a slash in
-  the map — `Navy/White=#292B6C/#ffffff` — because a two-colour product rendered
-  as one colour is wrong in a way customers notice immediately.
-
-  ## Why unavailable values are marked and not removed
-
-  Hiding a sold-out size tells the customer nothing. A disabled radio cannot be
-  focused, so a keyboard user can no longer discover it exists. Both are worse
-  than a struck-through swatch with a title saying why.
-
-  The control markup lives in `swatch-input.liquid` and the visual in
-  `swatch.liquid`. This snippet owns only the row: the loop, the availability
-  test, and the overflow control. Three files rather than one, because the same
-  visual has to appear in a filter checkbox and on a product card where neither
-  a radio nor a row is wanted.
 
   @param {product} product
   @param {object} option - From `product.options_with_values`
@@ -76,17 +32,6 @@
         # from `section_id`, `option.position` and `index`, all of which it is
         # given below, so this one was computed once per value and discarded.
 
-        comment
-          Availability is evaluated against this value alone, which is enough for
-          the row. `<variant-picker>` re-evaluates it against the other selected
-          options as soon as it connects.
-
-          The same pass picks up a variant carrying this value, because the
-          swatch may need its image. `where: 'title'` cannot do this: on a
-          multi-option product `variant.title` is "Red / Small", so matching it
-          against "Red" returns nothing and every image-backed swatch silently
-          falls through to its initials.
-        endcomment
         assign matching = false
         assign variant_for_value = nil
         for variant in product.variants
@@ -107,33 +52,5 @@
     {%- endfor -%}
   </div>
 
-  {%- comment -%}
-    Rendered always and revealed by the element, because whether the row overflows
-    depends on the limit and on how many values exist — neither of which Liquid
-    should duplicate the arithmetic for.
-  {%- endcomment -%}
   <button type="button" class="advanced-swatches__more button button--link" data-ref="more" hidden></button>
 </variant-swatches>
-{% comment %}
-
-This file has been rewritten to preserve the original behavior.
-
----
-Changes:
-- from: |-
-    {% render 'swatch-input',
-             value: value,
-             option: option,
-             section_id: section.id,
-             form_id: form_id,
-             index: forloop.index,
-             checked: option.selected_value == value,
-             available: matching,
-             variant: variant_for_value,
-             shape: shape,
-             size: size %}
-  to: "{% render 'swatch-input', value: value, option: option, section_id: section.id,
-    form_id: form_id, index: forloop.index, checked: option.selected_value, available:
-    matching, variant: variant_for_value, shape: shape, size: size %}"
-  position: 3932..4160
-{% endcomment %}

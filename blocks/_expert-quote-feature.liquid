@@ -1,44 +1,6 @@
-{% comment %}
-  blocks/_expert-quote-feature.liquid
-
+{% doc %}
   The picture directly under the expert, with the offset outline behind it.
-
-  ## Why it is its own block and not part of the lead
-
-  It is a different kind of thing. The lead is a claim — words and the person
-  who made them — and this is a product. A merchant swapping which product the
-  endorsement points at should not be opening the block that holds the quote,
-  and a merchant rewriting the quote should not be scrolling past image
-  settings to reach it.
-
-  `sections/expert-quote.liquid` renders it with `content_for 'block'`, so it is
-  editable but cannot be dragged out of the centre column or deleted by
-  accident — the same treatment the lead gets, and the same mechanism
-  `sections/testimonials.liquid` uses for its intro panel.
-
-  ## The frame behind it
-
-  A second outline, the picture's own size, nudged off it — the detail that
-  stops the centre column reading as a plain stack. It is a pseudo-element on
-  the same box translated by two offsets, so it is always exactly the picture's
-  size and follows the corner radius without either being restated. At an offset
-  of 0/0 it becomes a plain outline around the picture, which is a reasonable
-  thing for a merchant to want.
-
-  ## It is never an empty box
-
-  With no upload, `snippets/image.liquid` draws a placeholder. A merchant
-  arranging this section should be looking at the shape of the picture while
-  they decide which one it is, not at a gap they have to imagine around.
-
-  ## The loop is the same vocabulary the scattered pictures use
-
-  Four styles, one set of keyframes in `assets/base.css`, shared by this block
-  and `blocks/_expert-quote-image.liquid`. The distance and the speed come from
-  the section so all the pictures move to one rhythm; the style and the offset
-  into the cycle are per-picture, because pictures rising and falling in unison
-  is a lift rather than a drift.
-{% endcomment %}
+{% enddoc %}
 
 {%- liquid
   assign b = block.settings
@@ -48,20 +10,6 @@
   assign radius = b.radius | default: 0 | plus: 0
   assign radius_mobile = b.radius_mobile | default: radius | plus: 0
 
-  comment
-    ---- the outline ----
-
-    Its own style, colour and offsets rather than the section's frame settings,
-    because the two are different marks: the frame is around the whole section
-    and this is a deliberate off-register echo of one photograph. A merchant
-    turning the section's frame off should not lose this.
-
-    Drawn only when it has both a style and a width — an outline 0px wide with a
-    colour on it is three declarations that paint nothing. Opacity goes into the
-    colour rather than onto the element, so the picture is not faded along with
-    its outline; `currentColor` cannot take an alpha channel from the colour
-    filters, so `color-mix` does the same fade in the browser instead.
-  endcomment
   assign outline_style = b.outline_style | default: 'none'
   assign outline_width = b.outline_width | default: 0 | plus: 0
 
@@ -80,34 +28,12 @@
     endif
   endif
 
-  comment
-    ---- the loop ----
-
-    The style is a class so one keyframe set in the stylesheet serves every
-    picture in the section; the offset is a custom property, written negative so
-    the picture starts that far into the cycle rather than standing still for
-    that long first.
-  endcomment
   assign motion = b.motion_style | default: 'none'
 
-  comment
-    The ratio the frame was given, resolved through
-    `snippets/aspect-ratio.liquid` and published so the stylesheet can derive
-    the picture's height from its width the same way it does for the scattered
-    ones. This picture is never tilted, so nothing is reserved for a turn — it
-    is published so one rule in `assets/base.css` serves both blocks rather
-    than a second rule that differs only in resting angle.
-  endcomment
   capture aspect
     render 'aspect-ratio', ratio: b.ratio, image: b.image
   endcapture
 
-  comment
-    The picture is never wider than the column it sits in, so the `sizes` hint
-    is the slider rather than a viewport fraction. The browser is told the one
-    number that is actually true about the box, and stops fetching a 1600px
-    variant for a 232px frame.
-  endcomment
   assign sizes = width_mobile | append: 'px'
   assign sizes = '(min-width: 750px) ' | append: width | append: 'px, ' | append: sizes
 
@@ -127,13 +53,7 @@
   --eqp-radius: {{ radius }}px;
   --eqp-radius-mobile: {{ radius_mobile }}px;
   --eqp-space: {{ b.space | default: 0 | plus: 0 }}px;
-  {%- comment -%}
-    The featured picture is not tilted, but the keyframes are shared with the
-    scattered ones that are — and the sway style rotates *around* whatever tilt
-    a picture already carries. Publishing 0 here rather than leaving it unset
-    means one set of keyframes works for both without a second copy that
-    differs only in its resting angle.
-  {%- endcomment -%}
+
   --eqp-rotate: 0deg;
   --eqp-tilt: 0deg;
   --eqp-aspect: {{ aspect | strip }};

@@ -1,79 +1,10 @@
 {% comment %}
-  sections/quick-add.liquid
-
   The section the quick add modal renders.
-
-  `assets/dialog.js` requests `{{ product.url }}?section_id=quick-add` and morphs
-  the `[data-quick-add-content]` element out of the response into the modal
-  body. This file did not exist — so every quick add in the theme fetched a
-  section id Shopify could not resolve, every request came back 404, and the
-  modal opened onto its own loading paragraph and stayed there.
-
-  Exactly the failure `sections/predictive-search.liquid` was written to fix, in
-  exactly the same shape, and the fix is the same: the section the JavaScript
-  already asks for, written in Liquid, so money formatting, translations,
-  metafields and the swatch settings are the theme's single copies rather than a
-  second set reconstructed in JavaScript.
-
-  ## It is not rendered by any template, and that is correct
-
-  A section requested through `?section_id=` does not have to appear on the page.
-  Shopify renders it against the requested URL with no layout, which is what
-  makes a product URL the right thing to ask. It therefore has no preset and no
-  editable settings of its own — a merchant can never select it in the editor, so
-  settings here would be a panel nobody can open. Everything configurable lives
-  in **Theme settings › Product cards › Quick add modal** instead.
-
-  ## What is in the modal
-
-    Title and description   the product's own
-    Options                 `snippets/variant-picker.liquid`, the same one the
-                            product page uses, so buttons, dropdowns and swatches
-                            all follow the theme's swatch settings
-    Purchase options        `<selling-plan-selector>`, one-time against
-                            subscribe, when the product has selling plans
-    Quantity and add        a real `<form action="/cart/add" method="post">`
-
-  ## `data-product-root` is what makes two of these safe
-
-  `<variant-picker>`, `<product-form>`, `<selling-plan-selector>` and
-  `<inventory-status>` all resolve their peers through
-  `this.closest('[data-product-root]') || document`. Without that attribute here,
-  a modal opened on top of a product page would find the *page's* picker and
-  form, and choosing a flavour in the modal would change the variant behind it.
-
-  ## The add button's label is written by JavaScript
-
-  `product-form.js` rewrites it on every variant change — "Add to cart",
-  "Pre-order", "Sold out" — and `<quick-add-summary>` then appends the price and
-  the chosen option to whatever the form wrote. See `assets/quick-add.js`.
-
-  Both used to set `button.textContent`, which replaces every child the button
-  has. So the button could hold text and nothing else, and the arrow badge the
-  drawing puts on its end is drawn by `::after` in `assets/base.css` because a
-  pseudo-element is not a child and `textContent` cannot reach it.
-
-  That stopped being enough the moment the button needed a spinner: an arrow is
-  decoration and can live in a pseudo-element, but a loader that replaces the
-  label has to be a sibling of it. So the words are in a `[data-button-label]`
-  span and both writers aim at that instead — `labelTarget()` in
-  `assets/utilities.js` is the one line of it, and it falls back to the button
-  for every other add button in the theme.
 {% endcomment %}
 
 {%- liquid
-  comment
-    `product` is the global for the URL this section was requested against, which
-    is what makes `{{ product.url }}?section_id=quick-add` the whole of the
-    request. Nothing is passed in and nothing needs to be.
-  endcomment
   assign current = product.selected_or_first_available_variant
 
-  comment
-    The modal is one product wide, so the form id only has to be unique against
-    the page underneath it — which is a product page often enough to matter. The
-    product id is what distinguishes them.
-  endcomment
   assign form_id = 'quick-add-' | append: product.id | append: '-form'
   assign qty_id = 'QuickAddQty-' | append: product.id
 
@@ -84,12 +15,6 @@
     assign has_plans = true
   endif
 
-  comment
-    The benefit list under Subscribe & save is one line of the textarea per
-    benefit. `newline_to_br` then `split` rather than `split: '\n'`, because a
-    Liquid string literal has no escape sequences and "\n" there is a backslash
-    followed by an n.
-  endcomment
   assign benefits = settings.quick_add_benefits | newline_to_br | split: '<br />'
 
   assign first_allocation = current.selling_plan_allocations.first
@@ -102,12 +27,7 @@
   data-section-id="quick-add"
   data-product-id="{{ product.id }}"
 >
-  {%- comment -%}
-    The whole product, as JSON, for anything in the modal that needs a price or
-    a title without another request. `<quick-add-summary>` reads it to build the
-    add button's label; `<product-bundle>` reads it to fill a bundle slot from a
-    variant the customer chose here.
-  {%- endcomment -%}
+
   <script type="application/json" data-quick-add-product>
     {
       "id": {{ product.id }},
@@ -126,35 +46,18 @@
     </h2>
 
     {%- if show_description and product.description != blank -%}
-      {%- comment -%}
-        One line, not the whole description. The modal exists so a customer does
-        not have to leave the grid; a full product description in it is the
-        product page, badly.
-      {%- endcomment -%}
+
       <p class="quick-add__summary">
         {{- product.description | strip_html | truncatewords: 26 -}}
       </p>
     {%- endif -%}
   </header>
 
-  {%- comment -%}
-    The dashed rule under the heading. A `<hr>` rather than a border, because it
-    separates the identity of the product from the choices being made about it,
-    and that is a thematic break.
-  {%- endcomment -%}
   <hr class="quick-add__rule">
 
   <div class="quick-add__options">
     {%- unless product.has_only_default_variant -%}
-      {%- comment -%}
-        `no_script: false` — this section is only ever reached by a fetch, so a
-        no-JS fallback inside it can never be the thing that saves a sale, and it
-        is actively harmful here: the modal's markup arrives through `DOMParser`,
-        which materialises `<noscript>` contents as real elements. That put a
-        second `name="id"` control in front of the live one in tree order, and
-        `new FormData(form).get('id')` answered with it — the variant the modal
-        opened on, whatever the customer chose afterwards.
-      {%- endcomment -%}
+
       {% render 'variant-picker',
          product: product,
          section: section,
@@ -165,16 +68,7 @@
   </div>
 
   {%- if has_plans -%}
-    {%- comment -%}
-      The purchase options, as two cards rather than the plain radio pair
-      `snippets/selling-plans.liquid` renders.
 
-      Every ref `assets/product-selling-plans.js` requires is still here and
-      still spelled the same — `oneTime`, `subscribe`, `interval`, `summary`,
-      `unavailable`, and `[data-allocations]`. The component is untouched; only
-      what sits around its inputs is different, which is why this can be richer
-      without a second component to keep in step.
-    {%- endcomment -%}
     <selling-plan-selector
       class="quick-add__plans selling-plans selling-plans--cards"
       data-layout="cards"
@@ -234,11 +128,6 @@
               {%- endif -%}
             </span>
 
-            {%- comment -%}
-              The frequency select sits inside the card it belongs to. The
-              component hides and disables it while One-time is chosen, so it is
-              never a control a customer can set and have ignored.
-            {%- endcomment -%}
             <label class="visually-hidden" for="QuickAddPlan-{{ product.id }}">
               {{ 'products.selling_plans.select_plan' | t }}
             </label>
@@ -269,13 +158,7 @@
 
           <span class="selling-plans__card-price" data-plan-price>
             {%- if first_allocation -%}
-              {%- comment -%}
-                Written out rather than rendered through `snippets/price.liquid`,
-                because a selling plan allocation is not a variant and the
-                snippet prices variants. The class names and the
-                `data-price-*` hooks are the snippet's, so it styles the same
-                and `<quick-add-summary>` finds it the same way.
-              {%- endcomment -%}
+
               {%- liquid
                 assign plan_saved = first_allocation.compare_at_price | minus: first_allocation.price
                 assign plan_percent = 0
@@ -293,18 +176,6 @@
                   {{- first_allocation.compare_at_price | money -}}
                 </s>
 
-                {%- comment -%}
-                  The saving, said the same way the one-time card says it.
-
-                  This card had no badge at all, so the drawing's pair — "Save
-                  10%" under the one-time price and "Save 20%" under the
-                  subscription — only ever showed one of them, and the discount
-                  that is the whole reason to subscribe was the one missing.
-
-                  `data-price-saving` and the same string as `price.liquid`, so
-                  `assets/quick-add.js` keeps both in step on a variant change
-                  and the two cards cannot word the same thing differently.
-                {%- endcomment -%}
                 <span
                   class="price__saving"
                   data-price-saving
@@ -322,17 +193,7 @@
       <p class="selling-plans__unavailable" data-ref="unavailable" hidden></p>
     </selling-plan-selector>
   {%- else -%}
-    {%- comment -%}
-      No subscriptions on this product, so the price is its own row rather than
-      a column of a card that is not there.
 
-      `data-one-time-price` is the hook `<quick-add-summary>` rewrites on every
-      variant change. Without it this row was Liquid's one-time answer for the
-      variant the modal opened on and nothing ever revisited it, so a customer
-      who switched size read the first size's price — on the line they are
-      deciding from. It is the same hook the subscription layout's one-time card
-      carries, which is why one writer keeps both in step.
-    {%- endcomment -%}
     <div class="quick-add__price" data-one-time-price>
       {% render 'price', variant: current, context: 'product', show_badges: true %}
     </div>
@@ -355,10 +216,6 @@
          step: 1,
          product_title: product.title %}
 
-      {%- comment -%}
-        The words go in a span, and the spinner is its sibling — see the note at
-        the top on why they could not both simply be children of the button.
-      {%- endcomment -%}
       <button
         type="submit"
         class="button button--primary quick-add__submit"
@@ -373,15 +230,6 @@
           {%- endif -%}
         </span>
 
-        {%- comment -%}
-          Shown while `<product-form>` has the request in flight, in place of the
-          label. Adding from the modal is a network round trip and the modal
-          closes on success, so until this the only sign a press had landed was
-          the modal eventually going away.
-
-          It is the same spinner the tray's button and every bundle row use, so
-          "working" looks like one thing across the section.
-        {%- endcomment -%}
         <span class="quick-add__submit-loader">{% render 'icon', icon: 'loader', size: 18 %}</span>
       </button>
 
@@ -389,12 +237,6 @@
     </form>
   </product-form>
 
-  {%- comment -%}
-    Decorates the button's label with the price and the chosen option, after
-    `product-form.js` has written it, and reports which option is selected up
-    beside the picker's heading. Renders nothing on its own — it only ever
-    rewrites text that is already there.
-  {%- endcomment -%}
   <quick-add-summary
     class="visually-hidden"
     data-product-id="{{ product.id }}"

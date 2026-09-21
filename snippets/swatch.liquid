@@ -1,41 +1,6 @@
 {% doc %}
   The low-level swatch renderer: one option value, one visual.
 
-  ## Resolution order
-
-  Seven sources, tried narrowest first. Each exists because the one after it is
-  not good enough for someone, and the order matters more than the list:
-
-  1. **Metaobject** — `option_value.swatch` pointing at a metaobject entry with
-     its own colour, image and label. The richest source, and the one a merchant
-     maintains once for a whole catalogue.
-  2. **Shopify's native swatch** — a colour or image set on the option value in
-     the admin. Per-product, survives a theme change, and is what Shopify itself
-     uses in filters and search.
-  3. **A variant metafield image** — the escape hatch for a pattern that is
-     genuinely a photograph: marble, wood grain, printed fabric. A hex code for
-     any of those is a lie.
-  4. **The theme's swatch map** — `settings.swatch_config`. The practical option
-     when option values are shared across a whole catalogue.
-  5. **Gradients and dual tones**, from the same map. `Sunset=linear-gradient(...)`
-     renders as written; `Navy/White=#292B6C/#ffffff` splits the circle. A
-     two-colour product drawn as one colour is wrong in a way customers notice
-     before they notice anything else.
-  6. **CSS colour names** — `Dark red=darkred` works, because a merchant who
-     writes a colour name means a colour.
-  7. **The fallback** — the variant's own image, initials, or a text pill.
-
-  ## Why the fallback is never nothing
-
-  A value with no entry renders as a readable pill, never as an empty circle. An
-  empty circle is indistinguishable from a white product, and a customer who
-  cannot tell those apart clicks the wrong one.
-
-  This snippet renders the *visual only* — `aria-hidden`, no name, no input.
-  `swatch-input.liquid` wraps it in the accessible control. Keeping them apart is
-  what lets the same visual appear in a filter checkbox, a card, and a radio
-  group without three copies of the resolution logic.
-
   @param {string} value - The option value, e.g. "Mango"
   @param {string} [option_name] - The option's name, e.g. "Flavour"
   @param {object} [option_value] - Shopify's option value drop, for native swatches
@@ -100,10 +65,6 @@
         continue
       endif
 
-      comment
-        Split on the first '=' only, so a gradient containing '=' in a colour
-        stop is not torn in half.
-      endcomment
       assign pair = raw | split: '='
       if pair.size < 2
         continue
@@ -127,17 +88,8 @@
           assign swatch_color = entry_value
         endif
       elsif entry_value contains '.'
-        comment
-          Anything with a dot is a filename in Content > Files. `file_url`
-          returns an empty string for a missing file, which the fallback catches.
-        endcomment
         assign swatch_image = entry_value | file_url
       else
-        comment
-          A bare word is a CSS colour name. A merchant who writes "darkred"
-          means a colour, and refusing it would send them to look up a hex code
-          for no reason.
-        endcomment
         assign swatch_color = entry_value
       endif
 
@@ -169,12 +121,6 @@
   assign resolved_shape = shape | default: settings.swatch_shape | default: 'circle'
   assign resolved_size = size | default: 'medium'
 
-  comment
-    `size_px` is an explicit pixel size, used by product cards where the theme
-    setting is a range rather than one of the three named sizes. It is emitted
-    as `--swatch-size` directly, which is the same property the named sizes
-    resolve to, so one rule in the stylesheet serves both.
-  endcomment
 -%}
 
 <span

@@ -1,33 +1,7 @@
-{% comment %}
-  blocks/icon-with-text.liquid
-
+{% doc %}
   An icon beside a short line of text. Trust points, shipping promises, feature
   rows.
-
-  The icon is decorative and `aria-hidden`: the text beside it is the content,
-  and announcing "truck, free delivery over fifty pounds" helps nobody.
-
-  ## The mark is the theme's shared one
-
-  `snippets/icon-mark.liquid` resolves the Shape and the Ring — the same three
-  groups the Feature icon, the Highlight tile, the Accordion row and the
-  footer's Utility item all offer. It emits nothing until a merchant chooses
-  something, so this block still draws what it always drew: a bare glyph beside
-  the words, with no box behind it.
-
-  The wrapper around the glyph is new and paints nothing. It exists because a
-  ring has to be positioned against *something*, and an `<svg>` that is itself
-  the flex item has nowhere to hang one. `inline-flex` with `flex: 0 0 auto` is
-  what the glyph had from `.icon`, so the row and the column arrangements
-  measure exactly as they did.
-
-  ## The source is stated, not inferred
-
-  `custom_icon` used to win simply by holding an upload, so a merchant who had
-  tried one and moved on could not get back to the theme glyph without clearing
-  the field. **Icon** now says which, and the upload keeps its own id so nothing
-  saved is lost — an item with no source stored falls back to the old rule.
-{% endcomment %}
+{% enddoc %}
 
 {%- liquid
   assign s = block.settings
@@ -37,26 +11,8 @@
   endcapture
   assign icon_size = icon_px | plus: 0
 
-  comment
-    ---- the upload has two homes ----
-
-    The shared panel calls its image `icon_image`, which every other block that
-    offers the mark uses. This block called it `custom_icon`, and renaming a
-    setting in Shopify does not carry the value across — the upload would simply
-    be gone from every block already using one.
-
-    So the new id is read first and the old one is the fallback, exactly the way
-    the Highlight tile still reads its retired `icon_frame_*` keys. The old
-    field stays in the schema, hidden behind the same source, so a merchant can
-    see and clear what they uploaded rather than being left with a picture they
-    cannot reach.
-  endcomment
   assign icon_upload = s.icon_image | default: s.custom_icon
 
-  comment
-    The old order, reproduced for anything saved before the select existed: an
-    upload won if there was one, otherwise the theme glyph.
-  endcomment
   assign icon_source = s.icon_source
   if icon_source == blank
     if icon_upload != blank
@@ -73,16 +29,6 @@
     assign has_icon = true
   endif
 
-  comment
-    The space between the icon and the words. It was a fixed `--space-3` in the
-    stylesheet, which is right for a stacked card and too wide for a row of
-    short labels where the icon should sit close enough to read as belonging to
-    the text beside it.
-
-    `plus: 0` and not a blank test: an unset range is nil in Shopify and
-    Undefined elsewhere, and only one of those is blank — the difference that
-    emits `--icon-text-gap:px` and takes the whole style attribute down with it.
-  endcomment
   assign gap = block.settings.gap | default: 12 | plus: 0
 -%}
 
@@ -91,12 +37,6 @@
   --icon-text-gap: {{ gap }}px;
 {%- endcapture -%}
 
-{%- comment -%}
-  On the wrapper and not on the block, because `.icon-mark` is matched on the
-  presence of each property name in the element's *own* `style` attribute — a
-  value inherited from an ancestor is invisible to that test, which is exactly
-  what keeps a mark that set nothing from being restyled.
-{%- endcomment -%}
 {%- capture icon_mark_style -%}
   {%- render 'icon-mark', block: s, declarations: true -%}
 {%- endcapture -%}

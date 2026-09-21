@@ -1,48 +1,5 @@
 {% doc %}
-  blocks/tabs.liquid
-
   A strip of tab buttons and the panel one of them shows.
-
-  ## The strip is empty in the markup
-
-  Each nested **Tab** renders a `role="tabpanel"` carrying `data-tab-label`, and
-  `<tab-group>` in `assets/tabs.js` builds the buttons from those labels.
-
-  This is not a shortcut, it is the only shape that works.
-  `{% content_for 'blocks' %}` produces one stream of output, and the buttons
-  and the panels have to end up in two different containers — the rail on one
-  side, the panels on the other. No Liquid emits nested blocks twice. Either the
-  buttons are generated from the panels, or the merchant types every tab name a
-  second time into this block's settings and keeps two lists in sync by hand.
-
-  With JavaScript off every panel stays visible and stacks. All of the content
-  is reachable; only the switching is missing.
-
-  ## Nothing here is FAQ-specific, and none of the shell is this file's
-
-  The same block holds a size guide, a spec table or a set of care instructions.
-  The markup is `snippets/tab-group.liquid` — the rail, the marker, the panel
-  area and the ARIA wiring — which was written generic and, until now, called
-  from nowhere. This is its first caller, so the strip in a section and the
-  strip in the mega menu are one implementation with one set of bugs.
-
-  ## A note on the range settings below
-
-  Shopify validates every `range` for `(max - min) / step <= 101`, and a range
-  that fails it does not fail alone: the schema is rejected whole and *every*
-  setting in this block reads as undefined, so the first thing that breaks is a
-  section preset elsewhere reporting an unrelated setting as missing. **Track
-  corners** was `0..999 step 1` and produced exactly that — a preset complaining
-  that `strip_style` did not exist. Both radius sliders now stop at 50, which is
-  a pill at any strip height this component produces.
-
-  ## Vertical and horizontal are a grid, not two layouts
-
-  `assets/header.css` reads `.tabs--vertical` and `.tabs--horizontal` and puts
-  the rail beside the panels or above them. Below 990px the vertical rail
-  becomes a horizontal scroller on its own, because a column of tab names on a
-  phone spends the whole screen width on labels and leaves the panel below the
-  fold.
 {% enddoc %}
 
 {%- liquid
@@ -53,16 +10,6 @@
   assign gap = s.gap | default: 24 | plus: 0
   assign marker_radius = s.marker_radius | default: 50 | plus: 0
 
-  comment
-    Two properties, not one, and for the reason `snippets/group.liquid` sets
-    out at length: `flex` only means anything to a flex *item*, and this block
-    is one only when the section it sits in lays its children out in a flex
-    container — which the FAQ section does and a plain container does not. Each
-    option writes both, they agree, and neither context is a special case.
-
-    Fill is the default because a tab strip that hugs its longest tab name is a
-    panel that changes width as the customer moves between tabs.
-  endcomment
   if s.width == 'fit'
     assign width_flex = '0 0 auto'
     assign width_size = 'fit-content'
@@ -71,11 +18,6 @@
     assign width_size = '100%'
   endif
 
-  comment
-    The line around each tab button. `none` is a zero width rather than
-    `border-style: none`, so the buttons keep the same box either way and
-    choosing None does not resize the strip.
-  endcomment
   assign tab_border_style = s.tab_border_style | default: 'solid'
   assign tab_border_width = 0
   if tab_border_style != 'none'
@@ -84,34 +26,11 @@
 
   assign tabs_id = 'Tabs-' | append: block.id
 
-  comment
-    ## Plain and Segmented are one strip with a track drawn round it
-
-    Segmented is the pill chooser — a filled track, the tabs sharing its width,
-    the marker sliding inside it. It is a modifier and not a second component
-    because everything that makes a tab strip work is already here: the measured
-    marker, the keyboard walk, the overflow scroller, the ARIA. What changes is
-    a background, a padding and how the tabs divide the space.
-
-    It is the arrangement a delivery-frequency chooser wants, and equally a
-    Monthly/Yearly price switch or a two-state filter — so it is a look this
-    block offers rather than something a section grows its own copy of.
-
-    Segmented is horizontal by definition: a filled track running down the side
-    of a page with the options stacked in it is a menu, not a switch. The
-    orientation is forced rather than hidden behind a `visible_if`, so a
-    merchant who chooses Segmented on a strip that was vertical gets the strip
-    they picked instead of a broken one.
-  endcomment
   assign strip_style = s.strip_style | default: 'plain'
   if strip_style == 'segmented'
     assign orientation = 'horizontal'
   endif
 
-  comment
-    `tabs` and `tabs--<orientation>` are the snippet's. This is the modifier
-    list on top of them, which is why it does not repeat either.
-  endcomment
   assign classes = 'tabs--block'
   if strip_style == 'segmented'
     assign classes = classes | append: ' tabs--segmented'
@@ -145,31 +64,7 @@
       --tabs-tab-border-color: {{ s.tab_border_color }};
     {%- endif -%}
   {%- endif -%}
-  {%- comment -%}
-    ---- the two tab colours ----
 
-    Until these existed the strip said "selected" with opacity alone: every name
-    took the surrounding text colour and the unselected ones were dimmed to 0.6.
-    That reads on a tinted panel and nowhere else — over a photograph, or on the
-    dark track the segmented switch draws, the selected name and the three
-    behind it are the same colour at two strengths, and which option is chosen
-    stops being obvious at a glance.
-
-    Two fields, because they are two decisions: the colour a name is, and the
-    colour the chosen one becomes.
-
-    **Tab color** has no default: left alone it emits nothing, the name inherits
-    the surrounding text colour, and an untouched strip renders exactly as it
-    did. **Selected tab text color** ships white, because the selected name is
-    always read against a filled marker — the primary button's colour in a
-    section, the merchant's own in the segmented switch — and white is the
-    answer that holds on both. On a light marker it is the one to change.
-
-    The dimming is switched off by the first of them. A merchant who has said
-    what colour an unselected name is has already answered the question the
-    opacity was guessing at, and leaving it on would serve them a paler version
-    of the colour they picked.
-  {%- endcomment -%}
   {%- if s.tab_color != blank -%}
     --tabs-tab-color: {{ s.tab_color }};
     --tabs-tab-idle-opacity: 1;
@@ -179,11 +74,6 @@
   {%- endif -%}
 {%- endcapture -%}
 
-{%- comment -%}
-  Captured, because the shell has to wrap it. `blocks/section-header.liquid`
-  hands its children to `snippets/group.liquid` the same way: a block stream is
-  a string once it is captured, and a snippet can put a string anywhere.
-{%- endcomment -%}
 {%- capture panels -%}
   {% content_for 'blocks' %}
 {%- endcapture -%}
@@ -192,16 +82,6 @@
   data-block-spacing {{ block.shopify_attributes }}
 {%- endcapture -%}
 
-{%- comment -%}
-  The animation wraps the strip rather than replacing it: `<tab-group>` has to
-  be the custom element `assets/tabs.js` defines, so the one that animates goes
-  around it and takes the width with it — a wrapper that did not would leave the
-  strip sized to its content inside a full-width box.
-
-  Its two targets are the rail and the panels, so **Stagger between items** means
-  the tab names arrive and then what they open. Staggering the wrapper against
-  itself would be one element with a delay on it.
-{%- endcomment -%}
 <motion-effect
   class="tabs-motion"
   style="--tabs-flex: {{ width_flex }}; --tabs-width: {{ width_size }};"

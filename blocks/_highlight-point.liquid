@@ -1,47 +1,6 @@
 {% doc %}
-  blocks/_highlight-point.liquid
-
   One thing worth saying about the product: a mark with a number on it, a name,
   and a line under the name.
-
-  ## Why it is not `blocks/badge-highlight.liquid`
-
-  The Highlight tile is a mark, a heading and a line of text in a box, and it
-  is the right block for three benefits in a row. Two things make this one
-  different, and neither could be a setting on that block.
-
-  It has a **place in the stage**: a column and a row, which only mean anything
-  inside `blocks/_highlight-stage.liquid`'s grid. A tile that says "left column,
-  row 2" somewhere else is a tile that has escaped its container.
-
-  That grid is also the section's one promise: the product owns the middle
-  column, points go either side of it, and no picture at any size can end up
-  underneath a label. See the note on **Where it sits** below for what this
-  replaced and why.
-
-  And it has a **lit state** that something else drives. The mark fills in when
-  `<highlight-points>` puts `data-highlight-active` on it, and what it fills in
-  *to* is set once on the stage rather than five times here — see the note
-  there.
-
-  ## The number is content
-
-  It is a field rather than something typed into the name, so the order stays
-  the order of the blocks, a merchant reordering them does not have to retype
-  five numbers, and the sequence is announced to anyone not looking at it. It
-  rides on the mark, positioned against it, so switching it on never changes
-  the height of the point or moves its neighbours.
-
-  ## The mark is the theme's
-
-  Shape, Ring and the icon colours are `snippets/icon-mark.liquid`: the same
-  three groups with the same ids as the Feature icon, the Highlight tile and
-  the pills in the other section. A merchant who has drawn one mark in this
-  theme has drawn this one.
-
-  Private — the leading underscore — because a point with nothing to be a point
-  on is not a block. It is addable inside a **Highlight stage** and nowhere
-  else.
 {% enddoc %}
 
 {%- liquid
@@ -57,56 +16,10 @@
   endcapture
   assign icon_size = icon_px | plus: 0
 
-  comment
-    ---- where it sits ----
-
-    A column and a row, not a pair of coordinates.
-
-    This block used to carry an Across and a Down measured against the stage,
-    with the photograph on a layer of its own inside it. Nothing connected the
-    two, so a taller bottle or a wider picture put labels across the product
-    and the only fix was for somebody to notice and re-drag two sliders.
-
-    Now the stage is a three-column grid and the product owns the middle one.
-    A point is in the left column or the right column, so it cannot be over the
-    picture at any size — the guarantee is the layout rather than the numbers.
-    A **centre** point is for the one above the product, which is row 1 in the
-    drawing.
-
-    **Gap from the product** is a margin on the side facing the middle, so it
-    only ever moves a point further out. Which side that is comes from the
-    column, so one number gives the drawing's symmetric stagger instead of a
-    left value and a right value that have to be kept equal by hand.
-
-    Emitted on every breakpoint and read on one: `assets/base.css` drops the
-    placement below 990px, where the points are a plain grid under the picture.
-    Writing it anyway is what lets a merchant lay out the desktop while the
-    editor is previewing a phone.
-  endcomment
   assign column = s.column | default: 'left'
   assign row = s.row | default: 2 | plus: 0
   assign offset = s.offset | default: 40 | plus: 0
 
-  comment
-    **Nudge up or down**, and why it is not a second row setting.
-
-    A row is as tall as the tallest point in it — a mark, a name and a line —
-    and the drawing does not stack its rows that way: the upper pair sits level
-    with the top of the picture, beside the first point's caption rather than
-    below it. No number of rows produces that, because a row short enough to
-    give it would cut the point above off.
-
-    So the row keeps the point's full height and this moves the drawn result
-    out of it, as a `translate` in `assets/base.css`. A margin would be read
-    when the row is measured and would drag every row after it along; this
-    changes nothing the stage measures, which is what keeps the scroll run
-    reading the same box.
-
-    Written for every point and honoured for two: a centre point is in the
-    product's column and a centre point nudged downward is the one way left to
-    put a label on the picture. The stylesheet applies it to left and right
-    only, and the schema says so.
-  endcomment
   assign nudge = s.nudge | default: 0 | plus: 0
 
   case s.row_align
@@ -136,16 +49,6 @@
     assign title_classes = title_classes | append: ' block-text--gradient'
   endif
 
-  comment
-    Presence, not a value: `assets/highlight-points.js` reads the attribute with
-    `hasAttribute`, and an unchecked box has to emit nothing at all rather than
-    `data-highlight-active="false"`.
-
-    With the scroll run switched on this is only the starting state — the
-    component takes it over on the first frame. With the run off it is the
-    whole answer, and it is also what a customer sees if the module never
-    arrives.
-  endcomment
   assign is_active = s.active | default: false
 -%}
 
@@ -181,24 +84,6 @@
   {%- endif -%}
 {%- endcapture -%}
 
-{%- comment -%}
-  `data-highlight-point` is what the component collects on, and it is a data
-  attribute rather than the class so a restyle cannot silently take the
-  behaviour with it. `data-column` is the same idea for the layout: the grid
-  placement in `assets/base.css` is keyed on it, so the column a point is in is
-  one value read by both the stylesheet and anyone reading the markup.
-
-  A `<div>` and not an `<li>`. The points have to be direct children of the
-  stage for the grid to place them — a `<ul>` between the two would be one grid
-  item holding all five, and the column that keeps them off the product would
-  not exist. `display: contents` on the list would flatten it, but an element
-  with no box is one an IntersectionObserver never sees, and the entrance
-  animation depends on that.
-
-  What is lost is the "list of 5" a screen reader would announce. What is kept
-  is every point's number, name and line, each read in order — which is the
-  content. The layout guarantee was worth more than the count.
-{%- endcomment -%}
 <div
   class="highlight-point icon-mark-host"
   data-highlight-point
@@ -213,23 +98,12 @@
       {% render 'icon-mark', block: s %}
       {% render 'icon', icon: s.icon, size: icon_size %}
 
-      {%- comment -%}
-        Positioned against the mark, which `.icon-mark` already makes a
-        containing block, and out of flow — so a point with a number and one
-        without are the same height and sit on the same line in the grid.
-
-        `aria-hidden="false"` back on, because the mark around it is hidden and
-        the number is not decoration: it is this point's place in the run.
-      {%- endcomment -%}
       {%- if s.number != blank -%}
         <span class="highlight-point__number" aria-hidden="false">{{ s.number | escape }}</span>
       {%- endif -%}
     </span>
   {%- elsif s.number != blank -%}
-    {%- comment -%}
-      No glyph, so the number is the mark. Same element, same settings, drawn
-      on its own and back in the flow.
-    {%- endcomment -%}
+
     <span class="highlight-point__number highlight-point__number--alone">{{ s.number | escape }}</span>
   {%- endif -%}
 
@@ -246,11 +120,6 @@
   </span>
 </div>
 
-{%- comment -%}
-  Every setting below is a control a merchant reaches in the editor, and the
-  schema is one element's styling surface: splitting it to get under Theme
-  Check's count of 40 would split the thing the settings style.
-{%- endcomment -%}
 {% # theme-check-disable ExcessiveSettingsCount %}
 {% schema %}
 {

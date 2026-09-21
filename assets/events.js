@@ -1,18 +1,6 @@
 /**
- * events.js — Boost10
- *
  * The single source of truth for every custom event name the theme dispatches,
  * plus small constructors that build the `detail` payload for each one.
- *
- * This file is NOT an event bus. It holds no listeners, no subscriber list and
- * no routing logic. It exists so that no module ever types an event name as a
- * string literal, which is how event-name drift starts. Dispatching is done by
- * the owning element through `BaseComponent#dispatch()`, which calls native
- * `dispatchEvent()` directly.
- *
- * Ownership rule: only the element that owns a piece of state dispatches events
- * about that state. `<cart-drawer>` dispatches `cart:*`. `<variant-picker>`
- * dispatches `variant:*`. Nothing else may.
  *
  * @module @theme/events
  */
@@ -20,17 +8,10 @@
 /**
  * Canonical event names, grouped by domain.
  *
- * Naming: `domain:verb`, lowercase, colon-separated. Past tense reports a fact
- * that already happened; present tense reports an intent that a listener may
- * still cancel.
- *
- * Deliberately a plain, mutable object — never frozen — so that a section can
- * register a namespaced event of its own without patching this file.
- *
  * @type {Record<string, string>}
  */
 export const EVENTS = {
-  /* ------------------------------------------------------------------ cart */
+  /* ------------------------------------------------------------------ cart ---- */
   CART_UPDATED: 'cart:updated',
   CART_ERROR: 'cart:error',
   CART_ITEM_ADDED: 'cart:item-added',
@@ -40,58 +21,37 @@ export const EVENTS = {
   CART_NOTE_UPDATED: 'cart:note-updated',
   CART_LOADING: 'cart:loading',
 
-  /* --------------------------------------------------------------- product */
+  /* --------------------------------------------------------------- product ---- */
   VARIANT_CHANGE: 'variant:change',
   VARIANT_UNAVAILABLE: 'variant:unavailable',
 
-  /**
-   * What `<variant-picker>` already had selected when it connected.
-   *
-   * `variant:change` says "the customer picked something". This says "this is
-   * what is picked", and it is dispatched once, at the end of the picker's
-   * `setup()`.
-   *
-   * It exists because every other component on a product reads the picker's
-   * state directly in its own `setup()` — and which of them runs first depends
-   * on which module finished downloading, not on the order of the markup. A
-   * `<product-form>` that upgrades before the picker reads `currentVariant` off
-   * an element that is still a plain `HTMLElement`, gets `undefined`, and
-   * disables its own button with "Unavailable" on a product that is in stock.
-   * Nothing corrected it afterwards, because the picker only speaks when the
-   * customer does.
-   *
-   * With this, the order stops mattering: whoever upgraded first hears it, and
-   * whoever upgraded later read `currentVariant` and was already right.
-   *
-   * Deliberately not `variant:change`, which means a choice was *made* and so
-   * pushes a history entry, moves the gallery and announces to a screen reader.
-   */
+  /** What `<variant-picker>` already had selected when it connected. */
   VARIANT_READY: 'variant:ready',
   SELLING_PLAN_CHANGE: 'selling-plan:change',
   QUANTITY_CHANGE: 'quantity:change',
   PRODUCT_FORM_SUBMIT: 'product-form:submit',
   PRODUCT_FORM_ERROR: 'product-form:error',
 
-  /* ----------------------------------------------------------------- media */
+  /* ----------------------------------------------------------------- media ---- */
   CAROUSEL_CHANGE: 'carousel:change',
   MEDIA_SELECT: 'media:select',
   MEDIA_LOADED: 'media:loaded',
   ZOOM_OPEN: 'zoom:open',
   ZOOM_CLOSE: 'zoom:close',
 
-  /* ------------------------------------------------- collection and search */
+  /* ------------------------------------------------- collection and search ---- */
   FILTER_UPDATE: 'filter:update',
   FILTER_LOADED: 'filter:loaded',
   SEARCH_RESULTS: 'search:results',
 
-  /* -------------------------------------------------------------- overlays */
+  /* -------------------------------------------------------------- overlays ---- */
   OVERLAY_OPEN: 'overlay:open',
   OVERLAY_CLOSE: 'overlay:close',
 
-  /* --------------------------------------------------------------- staging */
+  /* --------------------------------------------------------------- staging ---- */
   SECTION_RENDERED: 'section:rendered',
 
-  /* -------------------------------------------------------- client memory */
+  /* -------------------------------------------------------- client memory ---- */
   BUNDLE_ITEM_TOGGLE: 'bundle:item-toggle',
   BUNDLE_CHANGE: 'bundle:change',
   COMPARE_CHANGE: 'compare:change',
@@ -116,9 +76,6 @@ export const EDITOR_EVENTS = {
 
 /* -------------------------------------------------------------------------- */
 /*  Detail constructors                                                       */
-/*                                                                            */
-/*  Each returns a plain, serialisable object. No DOM nodes, no class          */
-/*  instances, no functions — a `detail` that cannot be cloned is a `detail`   */
 /*  that cannot be logged, replayed or tested.                                */
 /* -------------------------------------------------------------------------- */
 

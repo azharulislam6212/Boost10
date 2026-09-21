@@ -1,25 +1,5 @@
 /**
- * section-renderer.js — Boost10
- *
  * The theme's only interface to the Shopify Section Rendering API.
- *
- * Every AJAX update in Boost10 works the same way: Liquid renders the new
- * markup on the server, this module fetches it, and `morph()` applies it to the
- * live DOM. Nothing builds product cards, price blocks or facet lists in
- * JavaScript, which is why the storefront still works with JavaScript disabled
- * and why translated strings never need to be duplicated into JS.
- *
- * Two endpoints are used:
- *   `?section_id=<id>`   returns one section as raw HTML
- *   `?sections=<a,b,c>`  returns a JSON map of section id to HTML
- *
- * Responsibilities beyond fetching:
- *   - de-duplicate identical requests that are already in flight
- *   - cache GET responses for the current navigation, with a TTL and a cap
- *   - dispatch a native `section:rendered` event after each successful render
- *   - fail loudly in the console and quietly on screen
- *
- * This module holds no listeners and routes nothing. It is not a bus.
  *
  * @module @theme/section-renderer
  */
@@ -46,9 +26,6 @@ const inFlight = new Map();
 
 /**
  * Remove cached sections.
- *
- * Call this whenever server-rendered output could have changed underneath the
- * cache — after a cart mutation, or after applying a discount.
  *
  * @param {string} [prefix] Clear only entries whose cache key starts with this.
  */
@@ -84,7 +61,6 @@ function readCache(key) {
     return null;
   }
 
-  // Refresh recency so the eviction below behaves as a simple LRU.
   cache.delete(key);
   cache.set(key, entry);
 
@@ -124,7 +100,6 @@ function writeCache(key, html) {
 export function buildSectionUrl({ url, sectionId, sections, params } = {}) {
   const base = new URL(url || window.location.pathname + window.location.search, window.location.origin);
 
-  // A stale rendering parameter from a previous request would win otherwise.
   base.searchParams.delete('section_id');
   base.searchParams.delete('sections');
 
@@ -197,10 +172,6 @@ export async function fetchSection(sectionId, { url, params, signal, cache: useC
 
 /**
  * Fetch several sections in one round trip.
- *
- * Always prefer this over multiple `fetchSection` calls: adding a product to the
- * cart updates the drawer, the header count and the free shipping bar, and one
- * request is both faster and guaranteed to be internally consistent.
  *
  * @param {string[]} sectionIds
  * @param {Object} [options] Same shape as {@link fetchSection}.
@@ -285,10 +256,6 @@ export async function renderSection(
 /**
  * Apply an HTML response to a live element.
  *
- * Exposed separately because the Cart AJAX API can return rendered sections
- * inside its own JSON response. In that case there is nothing left to fetch:
- * the markup is already in hand and only needs applying.
- *
  * @param {string} html Document HTML containing the replacement.
  * @param {Element} into The live element to update.
  * @param {Object} [options]
@@ -317,11 +284,6 @@ export function applyHTML(html, into, { selector, sectionId = null, morphOptions
  * Apply a map of section id to HTML, as returned by `?sections=` or by the Cart
  * AJAX API's `sections` field.
  *
- * Each section is matched to its live wrapper by `#shopify-section-<id>` first,
- * then by `[data-section-id="<id>"]`. Sections with no wrapper on the current
- * page are skipped silently: the cart drawer legitimately asks for sections that
- * only exist on some templates.
- *
  * @param {Record<string, string>} sections
  * @param {Object} [options]
  * @param {Document|Element} [options.root=document]
@@ -342,17 +304,6 @@ export function applySections(sections, { root = document, morphOptions } = {}) 
 
     const parsed = new DOMParser().parseFromString(html, 'text/html');
 
-    // The last resort is a single unwrapped root, and only when it is the same
-    // kind of element as the one it would replace.
-    //
-    // It used to be `parsed.body.firstElementChild`, unconditionally, which is
-    // fine for the response it was written for and dangerous for any other. When
-    // an id does not resolve — a section that has moved into a section group, a
-    // server that answered with something else entirely — `live` could still be
-    // matched by the `[data-section-id]` fallback, and this then handed `morph()`
-    // the first element of an unrelated document to apply to it. That is how a
-    // cart drawer ends up with a correct header, a correct footer and an item
-    // list with nothing in it.
     const body = parsed.body;
     const onlyRoot = body.children.length === 1 ? body.firstElementChild : null;
 
@@ -377,9 +328,6 @@ export function applySections(sections, { root = document, morphOptions } = {}) 
 /**
  * Extract a single element from a section response without applying it.
  *
- * Useful when only a fragment of a section is needed, for example pulling the
- * updated pagination block out of a collection response.
- *
  * @param {string} html
  * @param {string} selector
  * @returns {Element|null}
@@ -394,10 +342,6 @@ export function extractFromHTML(html, selector) {
 
 /**
  * Announce that a section finished rendering.
- *
- * Dispatched natively on the updated element so it bubbles to whichever
- * ancestor cares. There is no subscriber registry here: listeners attach
- * themselves through `BaseComponent#on()` and die with their component.
  *
  * @param {string|null} sectionId
  * @param {Element} element

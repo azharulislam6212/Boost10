@@ -1,48 +1,5 @@
 /**
- * product-selling-plans.js — Boost10
- *
  * `<selling-plan-selector>` — the subscribe-and-save control on the product page.
- *
- * Selling plans come from a subscription app; the theme only presents them. The
- * groups, intervals and prices are rendered by Liquid from
- * `product.selling_plan_groups`, so this module never needs to know which app is
- * installed or how it prices a plan.
- *
- * The detail that is easy to miss: **selling plan allocations are per variant.**
- * A 1kg tub and a 500g pouch can have different subscription prices, and a plan
- * that exists on one variant may not exist on another at all. A selector that
- * reads its prices once on page load shows the wrong price the moment the
- * customer switches flavour, and can leave a plan selected that the chosen
- * variant does not offer — which fails at add-to-cart with an unhelpful error.
- *
- * So this element listens for `variant:change` and re-reads the allocation map
- * that Liquid rendered, per variant, into `data-allocations`.
- *
- * It reports the chosen plan to `<product-form>` by direct method call. The form
- * owns what gets submitted; this owns which plan is chosen.
- *
- * The one-time option is a real radio, not the absence of a selection. A
- * customer switching from subscription back to one-time is making a choice, and
- * it has to be expressible.
- *
- * Markup:
- *
- *   <selling-plan-selector data-layout="radio">
- *     <script type="application/json" data-allocations>
- *       { "41234": [ { "id": 998, "name": "Every 30 days", "price": 2250,
- *                      "compare_at_price": 2500, "per_delivery_price": 2250 } ] }
- *     </script>
- *
- *     <input type="radio" name="purchase-option" value="" checked data-ref="oneTime">
- *     <input type="radio" name="purchase-option" value="subscription" data-ref="subscribe">
- *
- *     <select data-ref="interval" name="selling_plan">
- *       <option value="998" data-price="2250">Every 30 days</option>
- *     </select>
- *
- *     <p data-ref="summary" role="status"></p>
- *     <p data-ref="unavailable" hidden></p>
- *   </selling-plan-selector>
  *
  * @module @theme/product-selling-plans
  */
@@ -54,6 +11,7 @@ import { parseJSONScript, themeString, announce, formatMoney } from '@theme/util
 export class SellingPlanSelector extends BaseComponent {
   /**
    * Variant id to available plans, rendered by Liquid.
+   *
    * @type {Record<string, Array<Object>>}
    */
   #allocations = {};
@@ -66,25 +24,16 @@ export class SellingPlanSelector extends BaseComponent {
 
     this.on(this, 'change', this.#onChange);
 
-    // Broadcast path: the customer switches variant after load.
     this.on(this.root, EVENTS.VARIANT_CHANGE, (event) => {
       this.applyVariant(event.detail?.variant);
     });
 
     this.on(this.root, EVENTS.VARIANT_UNAVAILABLE, () => this.applyVariant(null));
 
-    // Opening position, for the case where this component upgraded before the
-    // picker did and the direct read below found an element that was still a
-    // plain `HTMLElement`. Then the plan list belonged to no variant at all —
-    // in the quick add modal, the subscription card priced whatever Liquid had
-    // rendered rather than the flavour actually selected. See `VARIANT_READY`
-    // in `@theme/events`.
     this.on(this.root, EVENTS.VARIANT_READY, (event) => {
       this.applyVariant(event.detail?.variant ?? null, { silent: true });
     });
 
-    // Direct path: the variant that was already selected when this connected,
-    // including a page loaded on a `?variant=` URL.
     const picker = this.root.querySelector?.('variant-picker');
     if (picker?.currentVariant) {
       this.applyVariant(picker.currentVariant, { silent: true });
@@ -93,7 +42,7 @@ export class SellingPlanSelector extends BaseComponent {
     }
   }
 
-  /* --------------------------------------------------------- public API -- */
+  /* --------------------------------------------------------- public API -- ---- */
 
   /**
    * @returns {HTMLElement|Document}
@@ -109,8 +58,6 @@ export class SellingPlanSelector extends BaseComponent {
     const checked = this.querySelector('input[name="purchase-option"]:checked');
 
     if (checked instanceof HTMLInputElement) {
-      // With an interval dropdown, the radio picks one-time versus subscription
-      // and the select picks the plan within it.
       if (checked.value === 'subscription') {
         return this.refs.interval instanceof HTMLSelectElement ? this.refs.interval.value : '';
       }
@@ -179,8 +126,6 @@ export class SellingPlanSelector extends BaseComponent {
 
     this.#renderIntervals(plans);
 
-    // Nothing to subscribe to for this variant: fall back to one-time rather
-    // than leaving a plan selected that add-to-cart would reject.
     if (plans.length === 0) {
       this.#setSubscriptionAvailable(false);
       this.select('');
@@ -189,8 +134,6 @@ export class SellingPlanSelector extends BaseComponent {
 
     this.#setSubscriptionAvailable(true);
 
-    // Keep the customer's choice when the same plan exists on the new variant.
-    // Switching from 1kg to 500g should not silently reset "every 30 days".
     const stillValid = plans.some((plan) => String(plan.id) === previous);
     const next = stillValid ? previous : '';
 
@@ -201,7 +144,7 @@ export class SellingPlanSelector extends BaseComponent {
     this.#commit(next === '' && this.refs.subscribe?.checked ? String(plans[0].id) : next, { silent });
   }
 
-  /* ---------------------------------------------------------- internals -- */
+  /* ---------------------------------------------------------- internals -- ---- */
 
   /** @private */
   #onChange = () => {
@@ -216,8 +159,6 @@ export class SellingPlanSelector extends BaseComponent {
   #commit(value, { silent = false } = {}) {
     const subscribing = value !== '';
 
-    // The interval dropdown is meaningless for a one-time purchase, and leaving
-    // it focusable invites a customer to set a frequency that will be ignored.
     if (this.refs.interval instanceof HTMLSelectElement) {
       this.refs.interval.hidden = !subscribing;
       this.refs.interval.disabled = !subscribing;
@@ -225,7 +166,6 @@ export class SellingPlanSelector extends BaseComponent {
 
     this.toggleAttribute('data-subscription', subscribing);
 
-    // Direct call: the form owns what is submitted, this owns what is chosen.
     this.root.querySelector?.('product-form')?.setSellingPlan?.(value || null);
 
     this.#renderSummary(value);
@@ -244,9 +184,6 @@ export class SellingPlanSelector extends BaseComponent {
 
   /**
    * Rebuild the interval options for the current variant.
-   *
-   * Options are replaced rather than hidden, because a hidden `<option>` is
-   * still selectable with a keyboard in several browsers.
    *
    * @param {Array<Object>} plans
    * @private

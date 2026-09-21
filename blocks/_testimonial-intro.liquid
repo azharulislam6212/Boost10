@@ -1,42 +1,5 @@
 {% doc %}
   blocks/_testimonial-intro.liquid — private to `sections/testimonials.liquid`.
-
-  The filled panel at the head of the row: a line about the reviews, and the
-  numbers that back it up.
-
-  ## It is a static block, so it cannot be dragged into the carousel
-
-  `sections/testimonials.liquid` renders it through
-  `{% content_for 'block', type: '_testimonial-intro', id: 'testimonials-intro' %}`,
-  the same mechanism `sections/feature-cards.liquid` uses for its heading
-  cluster and for the same reason: it is part of the section's layout rather
-  than one of its slides. A merchant editing it on the canvas cannot reorder it
-  among the reviews, cannot delete it by accident, and cannot end up with two.
-
-  It is also outside the `<carousel-slider>` entirely. Inside the track it would
-  be a slide — it would scroll away with the first arrow press, and it would be
-  count it when deciding whether the merchant's Loop setting is achievable.
-
-  ## The stats are blocks, and the heading is a setting
-
-  The heading is one line that every panel has. The stats are a list whose
-  length is content — two numbers here, one or three somewhere else — so they
-  are `_testimonial-stat` blocks the merchant adds, reorders and removes.
-
-  `@theme` is accepted alongside them, so a panel that wants a button under its
-  numbers, or a logo above them, does not need this file changed.
-
-  ## The panel paints itself rather than taking a colour scheme
-
-  A colour scheme would be the theme's usual answer and it is the wrong one
-  here: this panel is the *inverse* of the section it sits in — dark on light —
-  and reaching for a second scheme to express that means a merchant who
-  recolours the section has to remember to recolour a scheme they did not know
-  was involved. A background and a text colour on the block say what they do.
-
-  The section's own `--tc-accent` still reaches the stats, so the numbers stay
-  in step with the heading's highlight above without either knowing about the
-  other.
 {% enddoc %}
 
 {%- liquid
@@ -47,13 +10,6 @@
   assign min_height = s.min_height | default: 366 | plus: 0
   assign width = s.width | default: 312 | plus: 0
 
-  comment
-    Same three-part border resolution as everything else in the theme —
-    `sections/feature-cards.liquid`'s panel, `blocks/_feature-card.liquid`,
-    `blocks/_testimonial-card.liquid`. One width rather than four: this panel is
-    a filled box, and the frame a merchant wants around a filled box is the
-    whole outline or nothing.
-  endcomment
   assign border_line = s.border_style | default: 'none'
   assign border_width = 0
   assign border_paint = ''
@@ -73,12 +29,6 @@
   assign radius = s.border_radius | default: 20 | plus: 0
   assign radius_mobile = s.border_radius_mobile | default: radius | plus: 0
 
-  comment
-    The colour is only painted when there is no picture over it. A tint under a
-    photograph that covers the panel is a colour nobody sees, and one under a
-    *fitted* photograph is a second background fighting the overlay — which is
-    the control that exists for exactly that job.
-  endcomment
   assign background_media = s.background_media | default: 'none'
   assign has_background_media = false
   if background_media != 'none'
@@ -124,46 +74,21 @@
   style="{{ intro_style | strip_newlines | strip }}"
   {{ block.shopify_attributes }}
 >
-  {%- comment -%}
-    The same `snippets/background-media.liquid` every other surface in the theme
-    uses, handed the block's own settings — so a picture, a video, the parallax
-    and the overlay all arrive by adding settings rather than by adding markup
-    here.
 
-    `base.css` clips it to the panel's radius and lifts the heading and the stats
-    above it. The snippet renders nothing at all when nothing is chosen, so the
-    panel is not given a stacking context it has no use for.
-  {%- endcomment -%}
   {%- if has_background_media -%}
     {% render 'background-media', settings: s %}
   {%- endif -%}
 
   {%- if s.heading != blank -%}
-    {%- comment -%}
-      An `<h3>`, not an `<h2>`. The section's own heading cluster above is the
-      `<h2>`, and this panel is a part of the row under it — promoting it would
-      give the page two headings at the same level saying different things.
-    {%- endcomment -%}
+
     <h3 class="testimonial-intro__heading">{{ s.heading }}</h3>
   {%- endif -%}
 
-  {%- comment -%}
-    The stats are pushed to the bottom of the panel by `margin-block-start: auto`
-    in `base.css` rather than by a spacer here, so a panel taller than its
-    content keeps the heading at the top and the numbers at the foot — which is
-    what the design draws and what a fixed gap cannot hold at two viewport
-    widths.
-  {%- endcomment -%}
   <div class="testimonial-intro__stats">
     {% content_for 'blocks' %}
   </div>
 </div>
 
-{%- comment -%}
-  Every setting below is a control a merchant reaches in the editor, and the
-  schema is one element's styling surface: splitting it to get under Theme
-  Check's count of 40 would split the thing the settings style.
-{%- endcomment -%}
 {% # theme-check-disable ExcessiveSettingsCount %}
 {% schema %}
 {

@@ -1,46 +1,11 @@
 {% doc %}
   JSON-LD for the current page.
 
-  One script per page, emitted in the head. Google reads the first valid block
-  for each type and a theme that scatters three of them across a document gives
-  itself three chances to disagree with itself.
-
-  ## What is here, and what deliberately is not
-
-  **Product** — name, image, description, SKU, brand, and an Offer with the price
-  Shopify actually has. `priceValidUntil` is omitted rather than guessed: a made
-  up date is a rich result that expires on a day nobody chose.
-
-  **No aggregateRating unless a rating metafield exists.** Emitting review markup
-  a store has not earned is the fastest route to a manual action, and it is the
-  single most common reason themes get rejected for structured data.
-
-  **Organization** — on the home page only. Repeating it on every page adds bytes
-  and tells Google nothing new.
-
-  **BreadcrumbList** — mirrors the visible breadcrumb exactly. Structured data
-  that describes navigation the customer cannot see is the definition of
-  mismatched markup.
-
-  **Article** — for blog posts, with the author as a Person and the real
-  published and modified dates.
-
-  Everything is escaped through `| json`, which handles quotes, newlines and
-  unicode in one pass. Hand-escaping product descriptions into JSON is how themes
-  ship invalid structured data that only breaks for the merchant whose product
-  name contains an apostrophe.
-
   @example
     {% render 'structured-data' %}
 {% enddoc %}
 
-
 {%- liquid
-  comment
-    The logo lives on the header section, which structured data cannot reach, so
-    the theme-level share image is the source here. A merchant who wants a logo
-    in rich results sets it in Theme settings rather than only on the header.
-  endcomment
   assign shop_image = settings.share_image
 -%}
 
@@ -131,10 +96,6 @@
           ,"gtin": {{ variant.barcode | json }}
         {%- endif -%}
 
-        {%- comment -%}
-          Ratings only when the store genuinely has them. Inventing review markup
-          is the fastest route to a manual action.
-        {%- endcomment -%}
         {%- if product.metafields.reviews.rating_count > 0 and product.metafields.reviews.rating.value != blank -%}
           ,"aggregateRating": {
             "@type": "AggregateRating",
@@ -203,10 +164,6 @@
     </script>
 {%- endcase -%}
 
-{%- comment -%}
-  Breadcrumbs, on every page that has a trail. Mirrors what breadcrumbs.liquid
-  renders, so the markup and the page never describe different journeys.
-{%- endcomment -%}
 {%- if request.page_type == 'product' or request.page_type == 'collection' or request.page_type == 'article' or request.page_type == 'blog' or request.page_type == 'page' -%}
   <script type="application/ld+json">
     {

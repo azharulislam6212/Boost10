@@ -1,19 +1,5 @@
 /**
- * cart-items.js — Boost10
- *
  * The editable cart line list, plus the two things that sit alongside it:
- *
- *   <cart-items>       Quantity changes, removal, per-line loading and errors
- *   <cart-note>        The order note
- *   <gift-wrap-toggle> Adds or removes a gift wrap product
- *
- * Used by both the cart page and the cart drawer, from the same snippet, so the
- * two can never drift apart.
- *
- * Nothing here builds markup. A quantity change asks Shopify to re-render the
- * cart sections and `morph()` applies the result, which is why line prices,
- * discounts and totals are always internally consistent — they were all
- * computed by Liquid in the same request.
  *
  * @module @theme/cart-items
  */
@@ -27,23 +13,10 @@ import { debounce, themeString, announce, announceUrgent } from '@theme/utilitie
    <cart-items>
    ========================================================================== */
 
-/**
- * Markup contract:
- *
- *   <cart-items data-section-id="cart-drawer">
- *     <div data-line-item data-key="{{ item.key }}" data-line="{{ forloop.index }}">
- *       <quantity-selector data-key="{{ item.key }}" data-line="{{ forloop.index }}">…</quantity-selector>
- *       <button data-remove-item>…</button>
- *       <p data-line-error role="alert"></p>
- *     </div>
- *   </cart-items>
- */
 export class CartItems extends BaseComponent {
   setup() {
     if (this.dataset.sectionId) cart.registerSection(this.dataset.sectionId);
 
-    // <quantity-selector> owns its own validation and debouncing, and reports
-    // the settled value. This element only decides what a settled value means.
     this.on(this, EVENTS.QUANTITY_CHANGE, this.#onQuantityChange);
     this.on(this, 'click', this.#onClick);
   }
@@ -52,7 +25,7 @@ export class CartItems extends BaseComponent {
     if (this.dataset.sectionId) cart.unregisterSection(this.dataset.sectionId);
   }
 
-  /* --------------------------------------------------------- public API -- */
+  /* --------------------------------------------------------- public API -- ---- */
 
   /**
    * Change a line's quantity.
@@ -69,8 +42,6 @@ export class CartItems extends BaseComponent {
     try {
       await cart.changeItem({ key, quantity });
     } catch (error) {
-      // Shopify reports the quantity it could actually honour, so the message
-      // says "only 3 available" rather than a generic failure.
       const available = error?.body?.quantity;
       const message = Number.isFinite(available)
         ? themeString('cartQuantityError', '', { quantity: available })
@@ -104,7 +75,7 @@ export class CartItems extends BaseComponent {
     }
   }
 
-  /* ---------------------------------------------------------- internals -- */
+  /* ---------------------------------------------------------- internals -- ---- */
 
   /**
    * @param {CustomEvent} event
@@ -172,21 +143,7 @@ defineComponent('cart-items', CartItems);
    <cart-note>
    ========================================================================== */
 
-/**
- * The order note.
- *
- * Saved on a debounce as the customer types, and again on blur, because a note
- * typed and then abandoned by closing the drawer should still be there when the
- * drawer reopens. The save is silent — a toast for every pause in typing would
- * be noise — but the saved state is announced once, politely.
- *
- * Markup:
- *
- *   <cart-note>
- *     <textarea data-ref="input" name="note"></textarea>
- *     <p data-ref="status" role="status"></p>
- *   </cart-note>
- */
+/** The order note. */
 export class CartNote extends BaseComponent {
   static requiredRefs = ['input'];
 
@@ -235,23 +192,7 @@ defineComponent('cart-note', CartNote);
    <gift-wrap-toggle>
    ========================================================================== */
 
-/**
- * Adds or removes a gift wrap product.
- *
- * The merchant creates a real product for the wrapping fee and selects it in
- * theme settings, so the charge flows through Shopify's own pricing, tax and
- * reporting rather than being faked with a cart attribute.
- *
- * The checkbox is a real checkbox and reflects the cart, not the click: if the
- * add fails, it goes back to where it was rather than showing a state the cart
- * does not have.
- *
- * Markup:
- *
- *   <gift-wrap-toggle data-variant-id="123" data-key="{{ wrap_line.key }}">
- *     <input type="checkbox" data-ref="checkbox">
- *   </gift-wrap-toggle>
- */
+/** Adds or removes a gift wrap product. */
 export class GiftWrapToggle extends BaseComponent {
   static requiredRefs = ['checkbox'];
 

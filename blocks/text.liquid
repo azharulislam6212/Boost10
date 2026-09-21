@@ -1,64 +1,5 @@
 {% doc %}
-  blocks/text.liquid
-
   Every run of text in the theme, headings included.
-
-  ## Why there is no separate heading block
-
-  There used to be one, and the two files were near-identical: the same
-  typography controls, the same colour controls, the same spacing controls, kept
-  in step by hand. A merchant who learned one still had to guess which of the two
-  a given piece of text was, and the answer was usually "whichever the section
-  preset happened to add".
-
-  So the heading block is gone and this block does both jobs. **Heading** and
-  **Text** are two `presets` on this one file, which is why both still appear as
-  separate entries when adding a block — the merchant's mental model is
-  unchanged, there is simply one implementation underneath instead of two.
-
-  ## Preset chooses the tag as well as the look
-
-  `Default` means "leave my markup alone". An `<h2>` typed into the field stays
-  an `<h2>` and takes its size from Theme settings › Typography, exactly as it
-  would anywhere else on the page — so a merchant can write a small heading and
-  a paragraph in one block and have both look right without touching a setting.
-
-  Every other preset is the merchant overriding that. `Heading 1`–`Heading 6`
-  restyle *everything* in the field to that level and normalise the tags to
-  match, so an `<h1>` inside a block set to Heading 2 comes out at H2 size and
-  as an `<h2>` element. Size and outline saying different things is the failure
-  mode worth avoiding here: the outline is the half nobody can see, and it is
-  the half screen readers and search engines navigate by.
-
-  `Paragraph` and `Subheading` point at the theme's body and small text tokens.
-  `Custom` is the escape hatch and opens the full override set.
-
-  ## Presets are classes, overrides are inline properties
-
-  Only the Custom preset and the colour reach Liquid — see
-  `snippets/block-typography.liquid` for why the named presets resolve in CSS
-  instead. The short version: the theme's type tokens already exist as custom
-  properties, and pointing a class at them means Theme settings › Typography
-  stays the one place the scale is defined.
-
-  ## Highlight
-
-  Highlight styles paint part of the text, and **Apply to** says which part —
-  the italic runs by default, or the bold runs, or the whole block. Marking the
-  words with the editor's own buttons keeps them attached to the copy, so a
-  rewrite cannot leave a separate "words to highlight" field pointing at words
-  that are no longer there.
-
-  Italic being the default is also what made this look broken: with no italics
-  in the field there is nothing to paint. `Entire text` needs no markup at all,
-  so the style can always be seen working first and narrowed down after.
-
-  ## One style attribute
-
-  Spacing is pulled in as declarations rather than as its own attribute. Two
-  `style` attributes on one element is invalid HTML, the browser keeps the first
-  and discards the rest, and that is how the padding sliders here used to move a
-  value that never reached the page.
 {% enddoc %}
 
 {%- liquid
@@ -140,12 +81,6 @@
   if color_mode == 'gradient'
     assign classes = classes | append: ' block-text--gradient'
   elsif color_mode != 'inherit' and color_mode != blank
-    comment
-      Only once the merchant actually picked a colour. The rule this turns on
-      hands the colour down to the headings and paragraphs inside the rich text,
-      and doing that unconditionally would repaint a heading that was meant to
-      keep `--color-heading` from the colour scheme.
-    endcomment
     assign classes = classes | append: ' block-text--colored'
   endif
 

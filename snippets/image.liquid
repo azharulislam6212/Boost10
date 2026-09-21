@@ -1,55 +1,6 @@
 {% doc %}
   Renders a responsive image, optionally with a different image on mobile.
 
-  Every image in the theme goes through this snippet, so the rules that keep
-  Lighthouse happy are enforced in one place rather than remembered in forty:
-
-    - `width` and `height` are always present, so the browser reserves space and
-      cumulative layout shift stays at zero.
-    - `srcset` is capped at the source image's real width. Asking Shopify for a
-      2000px variant of a 600px upload wastes bytes and returns nothing sharper.
-    - `loading="lazy"` and `decoding="async"` are the default. The one image that
-      should not be lazy — the hero — passes `priority: true`, which is also the
-      only way `fetchpriority="high"` is ever set.
-    - The wrapper is `<responsive-image>`, an autonomous custom element, not
-      `is="responsive-image"`. Safari has never supported customized built-ins.
-
-  ## Mobile art direction
-
-  Pass `mobile_image` and the snippet renders a `<picture>` with a `<source>` for
-  small screens. This is art direction, not resizing: a wide banner cropped to a
-  tall one, or a lifestyle shot swapped for a product cut-out.
-
-  `<picture>` is used rather than two `<img>` elements toggled with CSS, because
-  CSS cannot stop the browser downloading both. `display: none` on an `<img>`
-  still fetches it, so the "hide one, show the other" approach ships two images
-  to every visitor and is slower than shipping one.
-
-  The ratio can differ per breakpoint too: `mobile_ratio` sets its own aspect on
-  the wrapper, so a 16:9 desktop banner can be 9:16 on a phone without the box
-  jumping when the source swaps.
-
-  ## Ratios
-
-  The names, and the numbers behind them, belong to
-  `snippets/aspect-ratio.liquid` — this snippet only passes them through.
-
-    9-16           9:16
-    2-3            2:3
-    3-4            3:4
-    portrait       4:5
-    1-1            1:1
-    5-4            5:4
-    4-3            4:3
-    3-2            3:2
-    16-9           16:9
-    aspect-ratio   the image's own ratio
-    <number>       any custom value, e.g. 1.5 or "5 / 4"
-
-  `square`, `portrait`, `landscape`, `wide`, `tall`, `long` and `adapt` were the
-  previous names and still resolve. `portrait` is the one that changed meaning:
-  it was 3:4 and is now 4:5, so `3-4` is what keeps the old shape.
-
   @param {image} image - Shopify image or media preview
   @param {image} [mobile_image] - Shown at 767px and below
   @param {string} [alt] - Overrides the image's own alt text
@@ -58,7 +9,7 @@
   @param {string} [sizes] - Defaults to a full-width hint
   @param {string} [mobile_sizes] - Defaults to 100vw
   @param {string} [widths] - Comma separated. Defaults to a standard ladder
-  @param {string} [ratio] - See above. Default: aspect-ratio
+  @param {string} [ratio] - Ratio keyword, resolved by `snippets/aspect-ratio.liquid`. Default: aspect-ratio
   @param {string} [mobile_ratio] - Defaults to `ratio`
   @param {boolean} [priority] - Eager load, high fetch priority. Hero images only
   @param {boolean} [preload] - Emits a preload hint. Requires `priority`
@@ -91,10 +42,6 @@
     endif
   endfor
 
-  comment
-    An upload smaller than the first rung would produce an empty srcset, so fall
-    back to the image's own width.
-  endcomment
   if usable == blank
     assign usable = source_width | append: ','
   endif
@@ -154,49 +101,17 @@
 -%}
 
 {%- if image == blank -%}
-  {%- comment -%}
-    A placeholder still reserves its box, or the layout jumps when the merchant
-    adds the real image.
-  {%- endcomment -%}
+
   <responsive-image
     class="responsive-image responsive-image--placeholder {{ wrapper_class }}"
     style="--aspect-ratio: {{ aspect }}; --aspect-ratio-mobile: {{ mobile_aspect }};"
     data-loaded
   >
-    {%- comment -%}
-      Shopify's placeholder set has grown well past the flat grey `image` mark
-      this used to render, and the newer names draw an actual scene — apparel on
-      a rail, a lifestyle shot, a product on a surface. That matters in the theme
-      editor, where a merchant judges a section's layout before they have
-      uploaded anything: a grey rectangle tells them nothing about how the
-      section will look, and an apparel mark fills the same box with something
-      shaped like a real photograph.
 
-      The set this theme uses is the apparel family — `hero-apparel-*`,
-      `product-apparel-*`, `collection-apparel-*`, `blog-apparel-*` and
-      `detailed-apparel-1` — so every empty slot in the editor reads as the same
-      store rather than as a pile of unrelated stock drawings.
-
-      `placeholder` is a parameter so a section can ask for the mark that suits
-      it — `product-1` in a product grid, `collection-1` in a collection card —
-      rather than every empty slot on the page showing the same drawing.
-    {%- endcomment -%}
     {{- placeholder | default: 'hero-apparel-1' | placeholder_svg_tag: 'responsive-image__placeholder' -}}
   </responsive-image>
 {%- else -%}
-  {%- comment -%}
-    `preload_tag` and the `preload` argument of `image_tag` cannot express these.
 
-    Both emit a plain `rel="preload"` for a single URL. What is needed here is a
-    responsive preload: `imagesrcset` with every width, `imagesizes` matching the
-    `sizes` the img will use, and a `media` query when there is a separate mobile
-    crop. Without those the browser preloads one fixed width and then downloads a
-    second file for the size it actually wants - two requests for the LCP image,
-    which is worse than not preloading at all.
-
-    So these two are written by hand, and the check is switched off for exactly
-    them, with the reason recorded rather than left as a standing warning.
-  {%- endcomment -%}
   {% # theme-check-disable AssetPreload %}
 
   {%- if preload and priority -%}
@@ -236,10 +151,7 @@
   >
     <picture class="responsive-image__picture">
       {%- if mobile_image != blank -%}
-        {%- comment -%}
-          The mobile source comes first: a browser takes the first matching
-          `<source>`, so ordering it after the default would never match.
-        {%- endcomment -%}
+
         <source
           media="(max-width: 767px)"
           srcset="

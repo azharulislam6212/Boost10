@@ -1,20 +1,5 @@
 /**
- * product-form.js — Boost10
- *
  * `<product-form>` — the buy form.
- *
- * `<sticky-add-to-cart>` moved to its own module: it is optional, and a product
- * page is the most performance-sensitive template in the theme, so a merchant
- * who turns the bar off should not pay for the code.
- *
- * `<bundle-builder>` used to live here too. It moved to its own module once it
- * outgrew sharing a file with the buy button, and because it is only ever on one
- * template, so it can be loaded there rather than on every product page.
- *
- * The form is a real `<form action="/cart/add" method="post">`. Submission is
- * intercepted so the drawer can open instead of the page reloading, but if this
- * module never loads the form still works. That is not a nicety: it is the
- * difference between a bad deploy costing conversion and costing every sale.
  *
  * @module @theme/product-form
  */
@@ -29,48 +14,24 @@ import { themeString, announceUrgent, getRoute, labelTarget } from '@theme/utili
    <product-form>
    ========================================================================== */
 
-/**
- * Markup:
- *
- *   <product-form data-product-id="123">
- *     <form action="{{ routes.cart_add_url }}" method="post" data-ref="form">
- *       <input type="hidden" name="id" value="…" data-ref="idInput">
- *       <quantity-selector>…</quantity-selector>
- *       <button type="submit" data-ref="submit">…</button>
- *       <p data-ref="error" role="alert" hidden></p>
- *     </form>
- *   </product-form>
- */
 export class ProductForm extends BaseComponent {
   static requiredRefs = ['form', 'submit'];
 
   setup() {
     this.on(this.refs.form, 'submit', this.#onSubmit);
 
-    // The picker owns the variant; this form reflects it.
     this.on(this.root, EVENTS.VARIANT_CHANGE, (event) => this.setVariant(event.detail?.variant));
     this.on(this.root, EVENTS.VARIANT_UNAVAILABLE, () => this.setVariant(null));
 
-    // The picker's opening position, for the case where this form upgraded
-    // first and the read below could not work. See `VARIANT_READY` in
-    // `@theme/events`.
     this.on(this.root, EVENTS.VARIANT_READY, (event) => this.setVariant(event.detail?.variant ?? null));
 
     const picker = this.root.querySelector?.('variant-picker');
     if (!picker) return;
 
-    // `currentVariant` is `undefined` on an element the browser has not upgraded
-    // yet, and `null` on an upgraded picker whose combination does not exist.
-    // Only the second is an answer.
-    //
-    // Reading `undefined` as one is the whole of the "Unavailable on a product
-    // that is in stock" bug: `setVariant(undefined)` takes the no-variant branch
-    // and disables the button, and nothing ever revisited it. The listener above
-    // covers this case instead, so the read is skipped rather than guessed at.
     if (picker.currentVariant !== undefined) this.setVariant(picker.currentVariant);
   }
 
-  /* --------------------------------------------------------- public API -- */
+  /* --------------------------------------------------------- public API -- ---- */
 
   /**
    * @returns {HTMLElement|Document}
@@ -110,10 +71,6 @@ export class ProductForm extends BaseComponent {
     const button = this.refs.submit;
     if (!(button instanceof HTMLButtonElement)) return;
 
-    // `labelTarget` rather than the button, so a button that carries a spinner
-    // or an icon beside its words keeps them. It returns the button itself when
-    // there is no `[data-button-label]`, which is every other add button in the
-    // theme — see the note on the helper in `assets/utilities.js`.
     const label = labelTarget(button);
 
     if (!variant) {
@@ -172,9 +129,6 @@ export class ProductForm extends BaseComponent {
       return null;
     }
 
-    // A gift card with an incomplete recipient is bought and never delivered,
-    // and Shopify accepts it silently. The form asks the field owner rather than
-    // reaching into it.
     const giftCard = this.querySelector('gift-card-recipient-form');
     if (giftCard?.validate && giftCard.validate() === false) return null;
 
@@ -185,9 +139,6 @@ export class ProductForm extends BaseComponent {
       const data = new FormData(this.refs.form);
       const properties = {};
 
-      // Line item properties are any `properties[…]` field the section rendered:
-      // engraving text, a gift message, a recipient email. Collected generically
-      // so a new one never needs a change here.
       for (const [key, value] of data.entries()) {
         const match = key.match(/^properties\[(.+)\]$/);
         if (match && String(value).trim() !== '') properties[match[1]] = value;
@@ -201,13 +152,8 @@ export class ProductForm extends BaseComponent {
 
       const result = await cart.addItem(line);
 
-      // Clear the recipient so the next gift card does not inherit it.
       giftCard?.reset?.();
 
-      // A toast as well as the live-region announcement `cart` already makes.
-      // A sighted customer who added from a card halfway down a grid otherwise
-      // gets no visible feedback at all. The cart link is a shortcut, never the
-      // only route — the header icon is always there.
       if (!this.hasAttribute('data-silent')) {
         toast(themeString('addedToCart', ''), {
           type: 'success',
@@ -227,7 +173,7 @@ export class ProductForm extends BaseComponent {
     }
   }
 
-  /* ---------------------------------------------------------- internals -- */
+  /* ---------------------------------------------------------- internals -- ---- */
 
   /**
    * @param {SubmitEvent} event

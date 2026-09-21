@@ -1,89 +1,10 @@
 {% doc %}
-  blocks/_comparison-table.liquid — private.
-
-  The table itself: one CSS grid, and every column inside it a `subgrid`.
-
-  ## Why the rows are the grid's and not each column's
-
-  A comparison is only a comparison while *Third-party lab tested* is on the
-  same line in all four columns. Four independent columns cannot promise that —
-  each is as tall as its own content, so the first claim that wraps to two lines
-  in one column and not another slides every row under it out of step, and the
-  table goes on looking plausible while saying the wrong thing about three
-  products.
-
-  So the rows belong to this block. It declares them once —
-
-      grid-template-rows: var(--ct-head)
-                          repeat(var(--ct-rows), minmax(var(--ct-row-min), auto))
-                          var(--ct-foot);
-
-  — and each **Comparison column** is a grid item spanning all of them with
-  `grid-template-rows: subgrid`, so its cells sit in *these* tracks rather than
-  in tracks of their own. A claim that wraps grows its row in every column at
-  once, at the moment it wraps, with nothing measured in JavaScript and no fixed
-  heights anywhere.
-
-  `@supports not (grid-template-rows: subgrid)` falls back to fixed row heights,
-  which is the drawn design exactly — 70px rows — and only loses the ability to
-  grow.
-
-  ## Feature rows is a number because Liquid cannot count blocks
-
-  `block.blocks` does not exist: a block cannot read its children, and
-  `forloop` does not reach inside `{% content_for 'blocks' %}`. The row track
-  list needs a count before any child renders, so the count is a setting.
-
-  `assets/comparison-table.js` corrects it on connect from the number of cells
-  actually in the first column, so a merchant who adds a seventh row and forgets
-  the slider sees the right table anyway. The setting is what makes the page
-  correct *before* and *without* that script, which is why it is not simply left
-  to JavaScript.
-
-  ## Why the chooser lives here and not on each column
-
-  Every alternative column in the drawing offers the same list — because the
-  list *is* the set of alternative columns. Each column drawing its own copy
-  would mean the merchant typing every name once per column and keeping four
-  lists in step by hand, which is the trap `blocks/_featured-pills-tabs.liquid`
-  documents at length.
-
-  So each column publishes its own name on `data-comparison-name`, and
-  `assets/comparison-table.js` builds every chooser's list from all of them —
-  the same shape as `<tab-group>` building its buttons from its panels. How the
-  chooser *looks* is set here too, once, so all of them agree.
-
-  With the script absent every alternative column renders side by side, named,
-  complete and readable. What is lost is the switching, not the content.
-
-  ## Alternatives shown, per device
-
-  The drawing has two alternatives beside the brand on a wide screen. A 390px
-  phone cannot hold four columns of text, so the count is a setting per device
-  and the columns past it are hidden rather than squeezed — the chooser is how
-  the customer reaches the rest, which is the same job it does on a desktop.
-
-  Private — the leading underscore — because a table of comparison columns is
-  not something to drop into a footer. It is addable inside
-  `sections/comparison-table.liquid` and nowhere else.
+  The comparison grid. Private — addable inside Comparison table only.
 {% enddoc %}
 
 {%- liquid
   assign s = block.settings
 
-  comment
-    ---- the columns ----
-
-    The label column is wider than the product columns — 312 against 253 in the
-    drawing — so it is expressed as a ratio of one product column rather than as
-    a width. A ratio survives every container width and every column count; a
-    width does not.
-
-    It reaches CSS as a bare `fr`, computed here, because `calc(1.23 * 1fr)` is
-    not something to rely on across browsers and `repeat()` will not take a
-    `calc()` as its count either. Liquid does the arithmetic; CSS receives
-    literals.
-  endcomment
   assign label_ratio = s.label_ratio | default: 123 | plus: 0
   assign label_col = label_ratio | divided_by: 100.0
 
@@ -93,14 +14,6 @@
   assign label_ratio_mobile = s.label_ratio_mobile | default: label_ratio_tablet | plus: 0
   assign label_col_mobile = label_ratio_mobile | divided_by: 100.0
 
-  comment
-    One brand column plus however many alternatives that device shows. Summed
-    here rather than in a `calc()` inside `repeat()`, for the reason above.
-
-    A merchant who has added fewer alternative columns than the count asks for
-    would leave an empty track; `assets/comparison-table.js` writes the real
-    number over these three the moment it connects.
-  endcomment
   assign slots = s.slots | default: 2 | plus: 0
   assign slots_tablet = s.slots_tablet | default: 1 | plus: 0
   assign slots_mobile = s.slots_mobile | default: 1 | plus: 0
@@ -111,13 +24,6 @@
 
   assign rows = s.rows | default: 6 | plus: 0
 
-  comment
-    ---- the chooser ----
-
-    Resolved the way every border in this theme is: `none` emits nothing at all,
-    and with no colour picked the line is `currentColor` faded by `color-mix`,
-    because the colour filters cannot take an alpha channel from a keyword.
-  endcomment
   assign trigger_line = s.trigger_border_style | default: 'none'
   assign trigger_width = 0
   if trigger_line != 'none'
@@ -190,9 +96,6 @@
     --ct-background: {{ s.background }};
   {%- endif -%}
 
-  {%- comment -%}
-    ---- the chooser, set once for every column ----
-  {%- endcomment -%}
   --ct-trigger-radius: {{ s.trigger_radius | default: 24 | plus: 0 }}px;
   --ct-trigger-pad-block: {{ s.trigger_padding_block | default: 13 | plus: 0 }}px;
   --ct-trigger-pad-inline: {{ s.trigger_padding_inline | default: 14 | plus: 0 }}px;
@@ -225,16 +128,6 @@
   {%- if s.panel_background != blank -%}
     --ct-panel-background: {{ s.panel_background }};
   {%- endif -%}
-  {%- comment -%}
-    One checkbox, not four sliders.
-
-    Distance, blur and colour were three more controls and three more
-    translation keys for a value no merchant tunes, on a file that is at its
-    key ceiling. The shadow is `currentColor` faded rather than a fixed dark,
-    so it follows the colour scheme the table is sitting in instead of holding
-    one colour across all of them — the same reasoning every border in this
-    theme uses when no colour is picked.
-  {%- endcomment -%}
   {%- if s.panel_shadow -%}
     --ct-panel-shadow: 0 12px 32px color-mix(in srgb, currentColor 12%, transparent);
   {%- else -%}
@@ -257,19 +150,6 @@
   {%- endif -%}
   --ct-option-active-weight: {{ s.option_active_weight | default: '700' }};
 
-  {%- comment -%}
-    ---- the two marks ----
-
-    A tick and a cross are the same element with two palettes, and both are set
-    here rather than on each cell for the reason the chooser is: a table whose
-    third tick is a different green from its second is a table that will be.
-    Each cell picks a palette by name — `var(--ct-mark-yes-fill)` or
-    `var(--ct-mark-no-fill)` — so a cell that overrides nothing emits nothing.
-
-    A fill of `none` rather than a colour is what makes the cross an outline:
-    both palettes carry the same six properties, and the difference between a
-    disc and a ring is which of them the merchant filled in.
-  {%- endcomment -%}
   --ct-mark-yes-size: {{ s.mark_yes_size | default: 24 | plus: 0 }}px;
   --ct-mark-yes-size-mobile: {{ s.mark_yes_size_mobile | default: 20 | plus: 0 }}px;
   --ct-mark-yes-icon-size: {{ s.mark_yes_icon_size | default: 12 | plus: 0 }}px;
@@ -287,19 +167,6 @@
   --ct-mark-no-color: {{ s.mark_no_color | default: '#161514' }};
 {%- endcapture -%}
 
-{%- comment -%}
-  `<comparison-table>` is the grid. Making the custom element the grid rather
-  than a wrapper around one keeps the columns as its direct children, which is
-  what `subgrid` needs — an element in between would be a grid item with tracks
-  of its own and the alignment this block exists for would be gone.
-
-  It is not `role="table"`. The DOM here is column-major and the visual rows are
-  grid tracks, so a `table` role would be a promise about row order that the
-  markup cannot keep. It is a labelled group instead, each column is a labelled
-  group inside it, and `assets/comparison-table.js` names every mark with the
-  claim it answers — which it can do, because it knows each cell's position and
-  Liquid does not.
-{%- endcomment -%}
 <comparison-table
   class="comparison-grid"
   data-block-spacing
@@ -315,11 +182,6 @@
   {% content_for 'blocks' %}
 </comparison-table>
 
-{%- comment -%}
-  Every setting below is a control a merchant reaches in the editor, and the
-  schema is one element's styling surface: splitting it to get under Theme
-  Check's count of 40 would split the thing the settings style.
-{%- endcomment -%}
 {% # theme-check-disable ExcessiveSettingsCount %}
 {% schema %}
 {

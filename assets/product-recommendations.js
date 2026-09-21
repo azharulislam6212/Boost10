@@ -1,35 +1,5 @@
 /**
- * product-recommendations.js — Boost10
- *
  * `<product-recommendations>` and `<complementary-products>`.
- *
- * Both fetch server-rendered markup from Shopify's recommendations endpoint,
- * which returns product cards built by the same snippet the collection grid
- * uses. Nothing about a product is reconstructed here, so prices, badges,
- * swatches and translations are correct by construction.
- *
- * Three decisions worth keeping:
- *
- *   **Nothing is fetched until the section is near the viewport.**
- *   Recommendations sit below the fold on every product page, and a request
- *   fired at page load competes with the images the customer is actually
- *   looking at.
- *
- *   **An empty response removes the section.** Shopify returns no
- *   recommendations until it has enough order data, which is the state every new
- *   store is in. "You may also like" above an empty row looks broken.
- *
- *   **A failure removes it too, silently.** A missing recommendations row is not
- *   worth an error message; the customer came for the product above it.
- *
- * Markup:
- *
- *   <product-recommendations
- *     data-product-id="123"
- *     data-section-id="product-recommendations"
- *     data-limit="4">
- *     <div data-ref="content" data-recommendations-content></div>
- *   </product-recommendations>
  *
  * @module @theme/product-recommendations
  */
@@ -38,9 +8,7 @@ import { BaseComponent, defineComponent } from '@theme/component';
 import { getRoute, whenIdle, themeString } from '@theme/utilities';
 import { morph } from '@theme/morph';
 
-/**
- * Shared behaviour. Not registered: it has no tag of its own.
- */
+/** Shared behaviour. Not registered: it has no tag of its own. */
 class RecommendationsBase extends BaseComponent {
   /** @type {AbortController|null} */
   #request = null;
@@ -84,7 +52,7 @@ class RecommendationsBase extends BaseComponent {
     this.#observer = null;
   }
 
-  /* --------------------------------------------------------- public API -- */
+  /* --------------------------------------------------------- public API -- ---- */
 
   /**
    * @returns {'related'|'complementary'}
@@ -98,15 +66,11 @@ class RecommendationsBase extends BaseComponent {
    */
   get limit() {
     const value = Number(this.dataset.limit);
-    // Shopify caps the endpoint at ten, and asking for more returns an error
-    // rather than a truncated list.
     return Number.isFinite(value) && value > 0 ? Math.min(value, 10) : 4;
   }
 
   /**
    * Load recommendations for a different product.
-   *
-   * Used by the quick add modal, which reuses one instance across products.
    *
    * @param {string|number} productId
    * @returns {Promise<boolean>}
@@ -136,8 +100,6 @@ class RecommendationsBase extends BaseComponent {
       intent: this.intent
     });
 
-    // An empty `section_id` makes Shopify return the whole page rather than the
-    // section, which then morphs a full document into the row.
     if (this.dataset.sectionId) params.set('section_id', this.dataset.sectionId);
 
     this.setLoading(true);
@@ -156,8 +118,6 @@ class RecommendationsBase extends BaseComponent {
         parsed.querySelector('[data-recommendations-content]') ||
         parsed.querySelector(`${this.tagName.toLowerCase()} [data-ref="content"]`);
 
-      // No products, or a section that rendered nothing: remove rather than
-      // leave a heading above an empty row.
       if (!next || next.querySelectorAll('[data-product-id]').length === 0) {
         this.remove();
         return false;
@@ -170,8 +130,6 @@ class RecommendationsBase extends BaseComponent {
       this.setAttribute('data-loaded', '');
       this.removeAttribute('hidden');
 
-      // The heading is rendered by Liquid and hidden until there is something
-      // to head, so it never flashes above an empty row.
       this.querySelector('[data-recommendations-heading]')?.removeAttribute('hidden');
 
       return true;
@@ -188,21 +146,12 @@ class RecommendationsBase extends BaseComponent {
   }
 }
 
-/**
- * Products related to the one being viewed.
- */
+/** Products related to the one being viewed. */
 export class ProductRecommendations extends RecommendationsBase {}
 
 defineComponent('product-recommendations', ProductRecommendations);
 
-/**
- * Complementary products, curated in Shopify's Search & Discovery app.
- *
- * Identical mechanics, separate element only because the intent differs — which
- * changes what Shopify returns and what the heading should say. Merchants curate
- * these by hand, so an empty result here is a deliberate "nothing pairs with
- * this" rather than missing data, and removing the section is still right.
- */
+/** Complementary products, curated in Shopify's Search & Discovery app. */
 export class ComplementaryProducts extends RecommendationsBase {
   get intent() {
     return 'complementary';

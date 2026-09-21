@@ -1,18 +1,6 @@
 /**
- * component.js — Boost10
- *
  * `BaseComponent` is the class every interactive element in the theme extends.
  * It provides four things and nothing else:
- *
- *   1. Automatic listener cleanup through a per-connection `AbortController`.
- *   2. `data-ref` resolution, so markup and behaviour stay decoupled.
- *   3. A thin `dispatch()` wrapper over native `dispatchEvent()`.
- *   4. Theme Editor lifecycle hooks that only bind when a subclass uses them.
- *
- * What it deliberately does NOT provide: a message bus, a subscriber registry,
- * `emit()`, a global state container, or any cross-component routing. Commands
- * travel by direct method call on a element reference; broadcasts travel by
- * native events dispatched by whichever element owns the state.
  *
  * @module @theme/component
  */
@@ -21,10 +9,6 @@ import { EDITOR_EVENTS } from '@theme/events';
 
 /**
  * Registers a custom element exactly once.
- *
- * The Theme Editor re-executes section scripts on `shopify:section:load`, and a
- * second `customElements.define()` for the same tag throws `NotSupportedError`,
- * which kills the rest of the module. Always register through this function.
  *
  * @param {string} tagName Must contain a hyphen and carry no vendor prefix.
  * @param {CustomElementConstructor} ElementClass
@@ -45,18 +29,12 @@ export function defineComponent(tagName, ElementClass) {
 /**
  * Base class for every autonomous custom element in Boost10.
  *
- * Subclass contract:
- *   - Put initialisation in `setup()`, not in `connectedCallback()`.
- *   - Put cleanup that is not a listener in `teardown()`.
- *   - Bind every listener with `this.on()` so it dies with the element.
- *   - `setup()` must be idempotent: moving an element in the DOM disconnects
- *     and reconnects it, and morphing does exactly that.
- *
  * @extends HTMLElement
  */
 export class BaseComponent extends HTMLElement {
   /**
    * Attributes that trigger `attributeChanged()`.
+   *
    * @type {string[]}
    */
   static observedAttributes = [];
@@ -64,6 +42,7 @@ export class BaseComponent extends HTMLElement {
   /**
    * `data-ref` names that must be present. If any is missing the component
    * logs once and disables itself rather than throwing on every interaction.
+   *
    * @type {string[]}
    */
   static requiredRefs = [];
@@ -73,15 +52,6 @@ export class BaseComponent extends HTMLElement {
    * component further up. True for anything that reads `this.refs`, which is
    * almost everything — a `<product-form>` must not claim the refs of a
    * `<quantity-selector>` nested in it.
-   *
-   * It is false for the handful of elements that wrap arbitrary content without
-   * ever reading a ref: `<motion-effect>` is the one that matters, because
-   * `snippets/group.liquid` renders a **Group** as one whenever the merchant
-   * has left its animation on — which is the default. Any component whose
-   * markup is Group-shaped therefore had every ref inside it silently dropped
-   * and disabled itself, and only *sometimes*: the check asks
-   * `customElements.get()`, so whether the wrapper counted at all depended on
-   * whether its module had finished loading first.
    *
    * @type {boolean}
    */
@@ -96,18 +66,13 @@ export class BaseComponent extends HTMLElement {
   /**
    * Resolved `[data-ref]` descendants.
    *
-   * A single match is the element itself; repeated names collect into an array,
-   * which is what makes lists (`data-ref="item"` on every row) work without
-   * extra markup.
-   *
    * @type {Record<string, HTMLElement|HTMLElement[]>}
    */
   refs = {};
 
-  /* ---------------------------------------------------------- lifecycle -- */
+  /* ---------------------------------------------------------- lifecycle -- ---- */
 
   connectedCallback() {
-    // Guard against a double connect during morphing.
     if (this.#connected) return;
     this.#connected = true;
 
@@ -128,8 +93,6 @@ export class BaseComponent extends HTMLElement {
   disconnectedCallback() {
     this.#connected = false;
 
-    // Aborting removes every listener bound through `on()` in one step. There
-    // is no manual removeEventListener anywhere in this theme.
     this.#controller?.abort();
     this.#controller = null;
 
@@ -150,7 +113,7 @@ export class BaseComponent extends HTMLElement {
     this.attributeChanged?.(name, oldValue, newValue);
   }
 
-  /* --------------------------------------------------------- listeners -- */
+  /* --------------------------------------------------------- listeners -- ---- */
 
   /**
    * The `AbortSignal` for this connection. Pass it to `fetch()` so in-flight
@@ -195,17 +158,10 @@ export class BaseComponent extends HTMLElement {
     );
   }
 
-  /* ------------------------------------------------------------ events -- */
+  /* ------------------------------------------------------------ events -- ---- */
 
   /**
    * Dispatches a native `CustomEvent` from this element.
-   *
-   * This is a one-line wrapper over `dispatchEvent()`, not a bus: there is no
-   * subscriber list, no central registry and no delivery to anything the event
-   * does not naturally reach by bubbling.
-   *
-   * `composed` defaults to `true` so events still cross a shadow boundary when
-   * the dispatcher is a `ShadowComponent`.
    *
    * @param {string} type Use a constant from `@theme/events`, never a literal.
    * @param {Object} [detail={}] Plain, serialisable payload.
@@ -221,16 +177,11 @@ export class BaseComponent extends HTMLElement {
     return event;
   }
 
-  /* --------------------------------------------------------------- DOM -- */
+  /* --------------------------------------------------------------- DOM -- ---- */
 
   /**
    * Replaces this element's contents from server-rendered HTML while keeping
    * focus, scroll position, open dialogs and in-progress input intact.
-   *
-   * `morph` is imported lazily. `global.js` loads it on every page anyway, so
-   * this resolves from the module cache with no extra request; the dynamic
-   * import exists so `component.js` has no hard dependency on the renderer and
-   * can be unit-tested on its own.
    *
    * @param {string} html Full document HTML, usually a Section Rendering API response.
    * @param {string} [selector] Defaults to this element's own tag name.
@@ -279,23 +230,13 @@ export class BaseComponent extends HTMLElement {
     return this.closest('[data-section-id]')?.getAttribute('data-section-id') ?? null;
   }
 
-  /* --------------------------------------------------------------- refs -- */
+  /* --------------------------------------------------------------- refs -- ---- */
 
   /**
    * A `[data-ref]` node belongs to this component only if no other ref-reading
    * custom element sits between it and us. Without this check, a
    * `<product-form>` would happily claim the refs of a nested
    * `<quantity-selector>`.
-   *
-   * "Ref-reading" and not "registered", which is what this used to ask. A
-   * wrapper that never looks at `this.refs` is not competing for anything, and
-   * treating it as a boundary loses refs rather than protecting them — see
-   * `refBoundary` above for the case that made this visible.
-   *
-   * An unregistered tag is still not a boundary, as before: a component whose
-   * module has not loaded cannot be reading refs either. What changes is that
-   * the answer no longer depends on load order for the wrappers, because they
-   * are not boundaries in either state.
    *
    * @param {Element} node
    * @returns {boolean}
@@ -331,11 +272,6 @@ export class BaseComponent extends HTMLElement {
       const attribute = node.getAttribute('data-ref');
       if (!attribute) continue;
 
-      // Space-separated, so one element can answer to two names. That is not
-      // decoration: a product recommendations list is both the thing the module
-      // morphs into (`content`) and the thing the carousel scrolls (`track`),
-      // and giving them separate wrappers would mean the morph replaced the
-      // element the carousel holds a reference to.
       for (const name of attribute.split(/\s+/).filter(Boolean)) {
         const existing = refs[name];
 
@@ -371,7 +307,7 @@ export class BaseComponent extends HTMLElement {
     return true;
   }
 
-  /* ------------------------------------------------------ theme editor -- */
+  /* ------------------------------------------------------ theme editor -- ---- */
 
   /**
    * Binds Shopify Editor listeners only for the hooks a subclass actually
@@ -397,16 +333,12 @@ export class BaseComponent extends HTMLElement {
       if (typeof method !== 'function' || method === /** @type {any} */ (proto)[methodName]) continue;
 
       this.on(document, eventName, (event) => {
-        // Only react to events for the section or block that contains us.
         const target = /** @type {CustomEvent} */ (event).target;
         if (target instanceof Node && !target.contains(this)) return;
         method.call(this, event);
       });
     }
   }
-
-  /* Hooks below are intentionally empty. Overriding one is what opts a        */
-  /* component into the corresponding Theme Editor listener.                   */
 
   /** @param {CustomEvent} _event */
   sectionLoaded(_event) {}

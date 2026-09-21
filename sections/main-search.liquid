@@ -1,33 +1,6 @@
 {% comment %}
-  sections/main-search.liquid
-
   The same shape as the collection page, because a customer filtering search
   results expects exactly what they get on a collection.
-
-  ## The type tabs are links, not JavaScript
-
-  Shopify already serves /search?type=product, ?type=article and ?type=page, so
-  each tab is a URL: crawlable, shareable, and correct with the Back button.
-  Pagination then belongs to one type at a time, which is the only way it can be
-  right — a combined result set paginated as one list puts articles on page three
-  of a product search.
-
-  Counts appear on the active tab only. There is no way to ask Shopify how many
-  articles match without running that search, and firing three searches to
-  decorate two tabs is three times the work for a number nobody asked for.
-
-  `q` and `type` are carried in hidden inputs inside the filter form. Without
-  them, applying a filter turns a search into a browse of the whole catalogue —
-  the most common search bug in Shopify themes.
-
-  `<results-list>` wraps the filters as well as the grid, not just the grid. When
-  a filter changes, the whole element is morphed in one pass — counts next to each
-  value, the active filter pills, the grid and the pagination all update together
-  and cannot disagree with each other.
-
-  The skip link inside it matters more than it looks: this region is replaced by
-  AJAX, and without a way back to the main content a keyboard user who has tabbed
-  into a long filter list has a long way out.
 {% endcomment %}
 
 {%- liquid
@@ -53,7 +26,7 @@
   </a>
 
   <div class="{% render 'container', width: section.settings.container_width %}">
-    {%- comment -%} ---------- result type tabs ---------- {%- endcomment -%}
+
     {%- if section_settings.show_type_tabs and search.performed -%}
       {%- assign query = search.terms | url_encode -%}
 
@@ -94,12 +67,7 @@
                 {% if is_current %}aria-current="page"{% endif %}
               >
                 {{ type_label }}
-                {%- comment -%}
-                  A count only on the active tab. There is no way to ask Shopify
-                  how many articles match without running that search, and firing
-                  three searches to decorate two tabs is three times the work for
-                  a number nobody asked for.
-                {%- endcomment -%}
+
                 {%- if is_current -%}
                   <span class="search-tabs__count">{{ search.results_count }}</span>
                 {%- endif -%}
@@ -120,20 +88,6 @@
         paginate: paginate
       %}
 
-      {%- comment -%}
-        The grid markup, inline rather than through `snippets/product-grid.liquid`.
-
-        The loop below renders each card with `{% content_for 'block' %}`, and the
-        output of `content_for` cannot be captured - theme-check reports it as an
-        error, because Shopify renders blocks with their theme-editor bindings
-        attached and buffering that output into a variable is not something the
-        platform supports. Passing the cards to a wrapper snippet meant capturing
-        them first, so the wrapper had to come here instead.
-
-        This is the same markup `product-grid.liquid` emits, with the same classes,
-        the same refs and the same order. Nothing about how the grid looks or how
-        `<results-list>` finds it has changed.
-      {%- endcomment -%}
       {%- liquid
         assign grid_mode = section.settings.pagination_type | default: settings.pagination_type | default: 'paginate'
         assign grid_total = search.results_count
@@ -173,11 +127,7 @@
             data-product-id="{{ product.id }}"
             data-result-type="{{ product.object_type }}"
           >
-            {%- comment -%}
-              A search result set can hold three object types. Rendering an
-              article through the product card is how themes end up printing
-              "Sold out" under a blog post.
-            {%- endcomment -%}
+
             {%- case product.object_type -%}
               {%- when 'article' -%}
                 {% render 'article-card', article: product, index: forloop.index0 %}
@@ -206,24 +156,14 @@
             {%- endcase -%}
           </li>
         {%- endfor -%}
-      
+
         </ul>
 
-        {%- comment -%}
-          Clearing filters must keep the query. A reset that drops `q` turns a
-          search into a browse of the whole catalogue — the same bug the hidden
-          inputs in the filter form exist to prevent.
-        {%- endcomment -%}
         {%- capture search_reset_url -%}
           {{ routes.search_url }}?q={{ search.terms | url_encode }}&options%5Bprefix%5D=last
         {%- endcapture -%}
         {%- assign search_reset_url = search_reset_url | strip -%}
 
-        {%- comment -%}
-          `search.filters` lists every filter the storefront offers, not the ones
-          in play, so its size says nothing. Only an active value — or either end
-          of a price range — means the customer narrowed something.
-        {%- endcomment -%}
         {%- liquid
           assign has_active_filters = false
           for filter in search.filters
@@ -238,11 +178,6 @@
           endfor
         -%}
 
-        {%- comment -%}
-          Two different dead ends, two different messages. A search that matched
-          nothing needs different copy from a filter combination that matched
-          nothing, and the customer can tell which one they are in.
-        {%- endcomment -%}
         <div class="product-grid__empty" data-ref="empty" {% if grid_total > 0 %}hidden{% endif %}>
           {%- if has_active_filters -%}
             {% render 'search-empty', context: 'filters', url: search_reset_url %}
@@ -261,10 +196,6 @@
     {% endpaginate %}
     {%- endif -%}
 
-    {%- comment -%}
-      Merchant blocks sit below the grid, outside the paginated region, so
-      appending a page never re-renders them.
-    {%- endcomment -%}
     <div class="collection-results__blocks">
       {% content_for 'blocks' %}
     </div>

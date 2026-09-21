@@ -1,46 +1,6 @@
 {% doc %}
   blocks/_article-card.liquid — private.
 
-  One article, built from blocks rather than from a snippet's settings.
-
-  ## Why it is a block and not `snippets/article-card.liquid`
-
-  The snippet still exists and still serves the blog index, where every card is
-  the same and a merchant has nothing to arrange. This is the other case: a
-  featured row where the picture, the meta pills, the title, the excerpt and the
-  call to action are each something a store wants to move, restyle or remove.
-  Every one of those is a nested block here, so the merchant arranges the card
-  once and the section repeats the arrangement across every article.
-
-  ## Private, and rendered once per article
-
-  A merchant does not add cards to a row — the row decides how many there are
-  from **Articles to show**. So the section renders this block itself, with the
-  same `id` on every pass:
-
-      {% content_for 'block', type: '_article-card', id: 'article-card',
-         closest.article: article, index: forloop.index0 %}
-
-  One id means one set of settings shared by every card, which is the point: a
-  grid whose third card could be styled differently from the first is a grid
-  that will be.
-
-  ## `closest.article` is how the children see the article
-
-  `{% content_for 'blocks' %}` passes no parameters, so a nested **Article
-  title** cannot be handed the article the way this block is. `closest.article`
-  is the mechanism that does reach them: the section sets it on this block, and
-  every block inside inherits it. `sections/main-product.liquid` passes
-  `closest.product` into `_product-details` for exactly the same reason.
-
-  ## The card is not a link
-
-  The title is, stretched over the card in `base.css`. Wrapping the whole card
-  in an `<a>` would put the read-more button and the tag pills inside it — an
-  anchor inside an anchor, which is invalid and which browsers recover from
-  unpredictably — and would make the link's accessible name the entire card
-  rather than the article's title.
-
   @param {number} [index] - Position in the row, for the stagger delay.
 {% enddoc %}
 
@@ -48,11 +8,6 @@
   assign article = closest.article
   assign s = block.settings
 
-  comment
-    The stagger is the card's position in the row, not its position in the blog.
-    `modulo` keeps the delay inside one row's worth so the fourth card does not
-    wait three times as long as the first for no reason a customer can see.
-  endcomment
   assign card_delay = 0
   if index != blank
     assign columns = s.stagger_span | default: 3 | plus: 0
@@ -61,17 +16,6 @@
 
   assign gap = s.gap | default: 12 | plus: 0
 
-  comment
-    `column` and `row` are the flexbox keywords the rest of the theme already
-    uses for this setting — `blocks/group.liquid` and `blocks/image-card.liquid`
-    both spell Vertical and Horizontal that way — so the modifier class is the
-    value and the stylesheet needs no lookup table.
-
-    A row card stacks again below 750px whatever this holds. A picture and a
-    panel side by side on a phone is two columns of about 160px each, and the
-    title wraps to one word a line; that is not a layout a merchant would pick
-    on purpose, so it is not one the setting can reach.
-  endcomment
   assign direction = s.direction | default: 'column'
 -%}
 

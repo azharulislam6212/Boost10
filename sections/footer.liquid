@@ -1,103 +1,10 @@
 {% comment %}
-  sections/footer.liquid
-
   The footer, composed rather than configured.
-
-  ## The hierarchy
-
-      Column  ›  Group  ›  Elements
-
-  The section holds Columns and Utility rows; a Column holds Groups and elements;
-  a Group bundles what belongs together. Every level is a real theme block, so a
-  merchant rearranges the whole footer by dragging, and nothing here needs to
-  know what a "newsletter column" is.
-
-  What the section owns is now only what is true of the footer as a whole: its
-  surface, its corners, its border, the panel the columns sit in, and the policy
-  row. The contact details, the pickers, the payment marks and the copyright are
-  blocks — they were section settings, which meant the section decided both what
-  they said and where they went.
-
-  ## Why this list has no `@theme` in it
-
-  `@theme` means "every public theme block", and a `blocks` array that contains
-  it stops honouring the individual types listed beside it — which is every
-  private block this footer is built from. That is why the theme editor offered
-  no Column, no Brand and address, no Utilities row: they were listed, and the
-  `@theme` sitting in the same array meant only public blocks were ever shown.
-
-  `blocks/mega-menu.liquid` is the pattern that has always worked here: it names
-  every child type it accepts and never reaches for `@theme`.
-
-  So the public blocks that belong in a footer are named one by one instead. It
-  is a longer list and a shorter answer: a merchant sees exactly what is useful
-  here, private pieces included.
-
-  ## Two layouts, and what the card actually wraps
-
-  Every block a merchant adds arrives through one `content_for 'blocks'`, so
-  they are all siblings in one container and nothing here can wrap a subset of
-  them in a `<div>`. That matters, because the card belongs around the columns
-  and the policy links — not around the contact bar or the bottom bar, which the
-  design draws as their own surfaces below it.
-
-  Grid solves it without extra markup. The panel is the grid, every block is a
-  grid item, and the card is a `::before` pseudo-element — itself a grid item —
-  spanning from the first row down to the row before the first utility row. So
-  the card is a real painted box around exactly the right region, and anything
-  after it sits outside on the footer's own ground.
-
-      Card    a surface with a border and rounded corners, and the divisions
-              inside it drawn: a vertical rule between the menus and the aside,
-              and a line above the policy links.
-
-      Plain   no surface and no rules. Nothing moves — the columns keep their
-              widths, the policy links keep their place — the panel is simply
-              left open.
-
-  That used to be two settings: a panel *style* that drew the surface and a
-  panel *layout* that drew the rules. They were never usefully independent — a
-  bordered card with no divisions in it, or divisions floating with no card
-  around them, is not a thing anyone asked for — so it is one control now.
-
-  ## The background comes from the colour scheme
-
-  Both the colour and the gradient. `.color-scheme-container` paints
-  `--color-background` and `--gradient-background`, and the gradient half is a
-  real setting on every scheme — so a merchant who wants the footer's deep green
-  ramp sets it once in Theme settings › Colours and the footer follows. There is
-  no gradient defined in this theme's stylesheet for it to disagree with.
-
-  ## Collapsing
-
-  One `<footer-columns>` — an accordion that also measures its own grid —
-  wraps the blocks, always. It used to be behind a
-  "Collapse columns on mobile" checkbox with a breakpoint slider beside it — two
-  settings for a decision no merchant makes differently, and a footer that reads
-  as a wall of links on a phone when either one is wrong. The breakpoint is the
-  theme's own.
-
-  ## Motion
-
-  `<motion-effect>` is the theme's reveal engine and nothing here re-implements
-  it. The panel and the utility rows each get one with rising delays, so the
-  footer arrives as one short cascade rather than several unrelated animations.
 {% endcomment %}
 
 {%- liquid
   assign st = section.settings
 
-  comment
-    The background is the colour scheme's until the merchant says otherwise:
-    either a colour of their own, or a picture behind the whole footer.
-
-    `snippets/background-media.liquid` owns the picture — the absolute layer,
-    the mobile crop, cover-vs-fit and the stacking order — so this section adds
-    the settings and the `has-background-media` class and nothing else. The
-    colour is emitted as a real `background` declaration rather than a custom
-    property because `color-scheme-container` paints a background *and* a
-    gradient image, and only the shorthand clears both.
-  endcomment
   assign background_media = st.background_media | default: 'none'
   assign has_background_media = false
   if background_media != 'none'
@@ -109,25 +16,8 @@
     assign background_paint = st.background_color | default: ''
   endif
 
-  comment
-    Any style the merchant offers, not just solid. Style used to be tested for
-    the one value that existed, so the day Dashed was added to the select it
-    would have zeroed the width and drawn nothing — the setting would have
-    looked broken rather than new. `none` is the only value that means no
-    border, so that is what the test asks about.
-  endcomment
   assign border_line = st.border_style | default: 'none'
 
-  comment
-    One width per side rather than one for the box. The frame a merchant
-    actually wants here is usually a single rule — a hairline across the top
-    of the section, nothing down the sides — and a single slider could only
-    ever draw all four or none.
-
-    They are summed into `border_any` so the properties are emitted only when
-    at least one side is drawn. A zero-width border with a colour on it is
-    three declarations that paint nothing.
-  endcomment
   assign bw_top = 0
   assign bw_right = 0
   assign bw_bottom = 0
@@ -141,15 +31,6 @@
     assign bw_left = st.border_width_left | default: 0 | plus: 0
     assign border_any = bw_top | plus: bw_right | plus: bw_bottom | plus: bw_left
 
-    comment
-      Opacity goes into the colour, not onto the element: `opacity` on the
-      footer would fade every column along with the frame.
-
-      With no colour picked the border is `currentColor`, which the colour
-      filters cannot take an alpha channel from — there is no channel to read
-      until the scheme resolves it in the browser. `color-mix` does the same
-      fade at that point instead, so both paths honour the slider.
-    endcomment
     assign border_percent = st.border_opacity | default: 100 | plus: 0
     if st.border_color == blank
       assign border_paint = 'color-mix(in srgb, currentColor ' | append: border_percent | append: '%, transparent)'
@@ -159,47 +40,6 @@
     endif
   endif
 
-  comment
-    The panel's geometry is measured in the browser, not worked out here.
-
-    Every block a merchant adds arrives through one `content_for 'blocks'`, and
-    a section cannot iterate those blocks — `section.blocks` returns nothing for
-    them, exactly as sections/header.liquid already records. So the track list,
-    the rows the card covers and how far the policy links run cannot be derived
-    in Liquid however this file is written. An earlier version of this section
-    tried, found no columns, and fell back to a single track: every column in
-    the footer stacked on top of the next.
-
-    The footer-columns element in assets/modules.js reads the same three
-    numbers off the rendered children, where they can actually be seen. Each column publishes
-    its own width share, so nothing here has to know how many there are.
-
-    What this file still decides is what it genuinely owns: whether there is a
-    policy row at all, which is a section setting rather than a block.
-  endcomment
-  comment
-    ---- corners ----
-
-    Four corners, twice — one set per device, behind the same Desktop/Mobile
-    switch the padding and the gaps already use.
-
-    The top pair ships at 40 and the bottom pair at 0, because a section is a
-    band that lifts away from what is above it and sits flush on what is below:
-    a rounded bottom edge leaves two slivers of the page showing through under
-    it. They are four sliders rather than one number and a rule, so a merchant
-    who wants a fully rounded card can still have one.
-
-    They reach CSS as a single border-radius shorthand, in the order that
-    property takes — top-left, top-right, bottom-right, bottom-left. Nothing in
-    the stylesheet reads them as a bare number, which is what makes sending a
-    shorthand safe.
-
-    A phone gets its own four because the same number does not read the same at
-    both widths: 40px is a soft lift across 1400px and a heavy scoop out of a
-    390px screen. Each mobile corner falls back to its desktop value when the
-    setting is missing entirely, so a section saved before these existed keeps
-    one shape at every width.
-  endcomment
   assign r_tl = st.border_radius_top_left | default: 40 | plus: 0
   assign r_tr = st.border_radius_top_right | default: 40 | plus: 0
   assign r_bl = st.border_radius_bottom_left | default: 0 | plus: 0
@@ -217,14 +57,6 @@
     assign has_policy = true
   endif
 
-  comment
-    Spacing is asked for as declarations, not as its own attribute. This element
-    already has a style attribute of its own, and a tag with two of them keeps
-    the first and drops the second — which is how a padding slider ends up
-    moving a value that never reaches the page. The data-section-spacing hook is
-    written by hand below because that attribute, not the properties, is what
-    base.css selects on.
-  endcomment
   capture section_spacing
     render 'spacing', section: st, declarations: true
   endcapture
@@ -246,12 +78,6 @@
   {{- section_spacing | strip -}}
 {%- endcapture -%}
 
-{%- comment -%}
-  `color-scheme-container` is what paints the scheme's background *and* its
-  gradient. The class was missing, so the footer took only the text colours and
-  its background came from a gradient written into the stylesheet — which no
-  merchant could reach.
-{%- endcomment -%}
 <footer
   class="footer color-scheme-container color-{{ st.color_scheme }}{% if has_background_media %} has-background-media{% endif %}"
   role="contentinfo"
@@ -265,18 +91,7 @@
 
   <div class="{% render 'container', width: st.container_width %}">
     {%- if section.blocks.size > 0 -%}
-      {%- comment -%}
-        The accordion and the grid are the same element now.
 
-        They used to be nested — a panel wrapping an accordion wrapping the
-        blocks — which put the contact bar and the bottom bar inside the card
-        along with the columns. One container, with the card painted by a
-        pseudo-element over part of it, is what lets the same set of siblings be
-        partly inside the card and partly below it.
-
-        The accordion behaviour is unaffected: it only ever looked for the
-        `<details>` elements it owns, and those are the columns.
-      {%- endcomment -%}
       <motion-effect
         class="footer__panel footer__panel--{{ st.panel_style | default: 'card' }}"
         data-easing="outQuint"
@@ -290,22 +105,6 @@
         >
           {% content_for 'blocks' %}
 
-          {%- comment -%}
-            The policy row lives *inside* the columns, not under the bottom bar.
-
-            It was in the copyright row, which is where a theme puts it when the
-            footer is a stack of bars. This footer is a panel of columns, and the
-            design puts the policy links on their own line directly beneath the
-            menu columns, above the rule. Rendering it here — as the last item in
-            the same flex container — is what makes it share the columns' grid
-            and sit under the menus rather than under the whole panel.
-
-            It stays a section setting rather than a block: a merchant can
-            rearrange every other part of this footer by dragging, and the one
-            row a store selling anything is obliged to show is not something to
-            be able to drag out by accident. `--column-order: 2` puts it after
-            the columns (which run -3 … 1) and before the utility rows.
-          {%- endcomment -%}
           {%- if has_policy -%}
             <div class="footer__policies" style="--column-order: 2;">
               <ul class="footer__policies-list" role="list">
@@ -319,25 +118,6 @@
           {%- endif -%}
         </footer-columns>
 
-        {%- comment -%}
-          The desktop state of the columns, decided before the first paint.
-
-          Above the breakpoint a footer column is not a disclosure at all — it is
-          a headed list, always open. `<accordion-element>` is what opens them,
-          and it cannot run until its module has loaded, so the browser paints
-          four collapsed rows first and the page jumps when the script catches
-          up. That is the flash on reload.
-
-          It cannot be fixed with CSS alone: a closed `<details>` hides its
-          content in the user agent stylesheet, and no rule reliably reopens it
-          across browsers — the `open` attribute has to actually change. So it
-          changes here, in a parser-blocking script sitting immediately after the
-          markup it acts on, which means it lands in the same paint.
-
-          Below the breakpoint nothing is touched: the columns are authored
-          closed, which is already correct, and the component takes over from
-          there. With scripting off, `<details>` still opens on tap.
-        {%- endcomment -%}
         <script>
           (function () {
             var el = document.getElementById({{ columns_id | json }});

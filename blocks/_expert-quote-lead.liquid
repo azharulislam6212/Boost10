@@ -1,62 +1,11 @@
-{% comment %}
-  blocks/_expert-quote-lead.liquid
-
+{% doc %}
   The words and the person who said them: a quotation mark, the quote, a line
   drawn down from it, and a portrait with a name and a role under it.
-
-  ## One block, because it is one sentence
-
-  The quote and the attribution were separate settings on the section before
-  this, and separating them further into two blocks would have been worse than
-  either. The connector line belongs to neither on its own — it exists only to
-  carry the eye from the last word to the face — and a merchant who deletes
-  "the expert" and is left with a section quoting nobody has been handed a way
-  to break their own page. They are one claim, so they are one block.
-
-  `sections/expert-quote.liquid` renders it with `content_for 'block'` rather
-  than through `content_for 'blocks'`, so it is editable but cannot be dragged
-  into the row of scattered pictures or deleted by accident. Same mechanism,
-  same reason, as `sections/testimonials.liquid`'s intro panel.
-
-  ## The mark is the theme's icon system, not a drawing kept here
-
-  `snippets/icon.liquid` gained a `quote` glyph — the one from the design, at
-  the proportions it was drawn with — so this block picks an icon the way every
-  other block in the theme does: a source (none / icon / image), a name, a size
-  off the shared ladder. A merchant who wants a star, a chat bubble or their own
-  uploaded mark gets it without a code change, and a store that restyles its
-  icons moves this one with them.
-
-  ## The portrait is never an empty box
-
-  With no upload, `snippets/image.liquid` draws a placeholder rather than
-  leaving a hole where a face goes. The section is an endorsement; a merchant
-  arranging one should be looking at the shape of a portrait while they decide
-  whose it is.
-
-  ## Two loops, and why they are on two different elements
-
-  The ring turns and the portrait breathes. They are separate animations on
-  separate elements on purpose: `rotate` on the ring and `scale` on the
-  portrait would fight if they shared a box, and splitting them also means the
-  dotted ring can spin while the face stays upright, which is the only version
-  of this that does not look like a broken carousel.
-
-  Both are decorative, both are `aria-hidden`, and both stop dead under
-  `prefers-reduced-motion` — see the note in `assets/base.css` on why that is
-  `animation: none` and not a shorter duration.
-{% endcomment %}
+{% enddoc %}
 
 {%- liquid
   assign b = block.settings
 
-  comment
-    ---- the mark ----
-
-    The shared icon vocabulary: a source, a name off the theme's list, a size
-    off the shared ladder. `icon-size` resolves the keyword against the theme's
-    own icon settings, so Small here is the Small every other block means.
-  endcomment
   capture icon_px
     render 'icon-size', size: b.icon_size, custom: b.icon_size_custom
   endcapture
@@ -71,18 +20,6 @@
     assign has_mark = true
   endif
 
-  comment
-    ---- the person ----
-
-    The ring is drawn at whatever size the portrait is, so only the portrait has
-    a slider: the ring's own number is the gap between the two, which is the
-    part a merchant can actually see and judge.
-
-    `ring_span` is the outer diameter the layout has to reserve. It is computed
-    here rather than in CSS because the stroke sits on the circle's edge and
-    half of it falls outside — a ring drawn at exactly the reserved size would
-    be clipped in half all the way round.
-  endcomment
   assign avatar_size = b.avatar_size | default: 46 | plus: 0
   assign ring_style = b.ring_style | default: 'none'
   assign ring_width = b.ring_width | default: 0 | plus: 0
@@ -99,17 +36,6 @@
   endif
   assign ring_span = avatar_size | plus: ring_pad | plus: ring_pad
 
-  comment
-    The circle is drawn in a viewBox measured in the same pixels the ring is
-    rendered at, so one user unit is one CSS pixel and every number below is the
-    number a merchant set. That is what keeps the dash pattern the same at every
-    portrait size — in a normalised viewBox the dashes would stretch with the
-    circle and a large portrait would come out with long dashes nobody asked
-    for.
-
-    The radius is the stroke's centre line, not its outer edge: half the stroke
-    falls outside it, which is exactly the half the box has room for.
-  endcomment
   assign ring_center = ring_span | divided_by: 2
   assign ring_radius = avatar_size | divided_by: 2 | plus: ring_gap
 
@@ -122,14 +48,6 @@
       assign ring_dash = 'none'
   endcase
 
-  comment
-    ---- the two loops ----
-
-    The ring turns only when there is a ring to turn, and only when the merchant
-    asked. A spin setting on a block whose ring is switched off is a control
-    that does nothing, which is why this is an `and` and not two separate
-    checkboxes the merchant has to keep in agreement.
-  endcomment
   assign ring_spin = false
   if has_ring and b.ring_spin and b.ring_spin_duration > 0
     assign ring_spin = true
@@ -140,11 +58,6 @@
     assign avatar_zoom = true
   endif
 
-  comment
-    The zoom is a percentage in the editor because "grow by 6%" is a thing a
-    merchant can picture and "scale to 1.06" is not. It reaches CSS as the
-    multiplier `scale` actually takes.
-  endcomment
   assign zoom_percent = b.avatar_zoom_scale | default: 0 | plus: 0
   assign zoom_to = zoom_percent | plus: 100 | divided_by: 100.0
 
@@ -154,11 +67,6 @@
     assign has_connector = true
   endif
 
-  comment
-    The portrait is never wider than the box it sits in, so the `sizes` hint is
-    that number rather than a viewport fraction — the browser is told the one
-    thing that is actually true about the box.
-  endcomment
   assign avatar_sizes = avatar_size | append: 'px'
 
   assign has_person = false
@@ -212,11 +120,7 @@
   {{ block.shopify_attributes }}
 >
   {%- if has_mark -%}
-    {%- comment -%}
-      Decorative. The quote underneath is the content, and a screen reader
-      announcing "quotation mark" before reading a quotation is one wasting its
-      user's time.
-    {%- endcomment -%}
+
     <span class="expert-quote-lead__mark" aria-hidden="true">
       {%- if icon_source == 'image' -%}
         {% render 'image',
@@ -242,15 +146,7 @@
       {%- endif -%}
 
       {%- if b.show_avatar -%}
-        {%- comment -%}
-          The portrait is announced by the name under it, so its own alt text is
-          empty — "photo of Dr Adrian Sterling, Dr Adrian Sterling, Holistic
-          Health Expert" is what the alternative sounds like. Same reasoning as
-          `blocks/_team-member.liquid`.
 
-          `placeholder` so an unfilled block is a portrait-shaped box rather
-          than a gap the merchant has to imagine the layout around.
-        {%- endcomment -%}
         <span class="expert-quote-lead__portrait">
           {%- if has_ring -%}
             <span class="expert-quote-lead__ring" aria-hidden="true">
@@ -289,11 +185,6 @@
   {%- endif -%}
 </motion-effect>
 
-{%- comment -%}
-  Every setting below is a control a merchant reaches in the editor, and the
-  schema is one element's styling surface: splitting it to get under Theme
-  Check's count of 40 would split the thing the settings style.
-{%- endcomment -%}
 {% # theme-check-disable ExcessiveSettingsCount %}
 {% schema %}
 {

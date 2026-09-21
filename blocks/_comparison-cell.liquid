@@ -1,53 +1,5 @@
 {% doc %}
-  blocks/_comparison-cell.liquid — private.
-
-  One answer in one column: a claim, a tick, a cross, or the number that makes
-  the point better than either.
-
-  ## Why it is not `blocks/icon-with-text.liquid`
-
-  
-  Icon with text is a glyph beside a sentence and it has no idea of being one of
-  a set. This one is a cell — its height is a track of the table's grid, its top
-  edge carries the divider its column drew, and the thing it says is only
-  meaningful next to whatever the same row says in the column beside it.
-
-  ## Five kinds, one file
-
-    Claim   the label down the left of the drawing
-    Yes     the filled tick
-    No      the outlined cross
-    Value   a phrase in place of a mark — *114mg Sugar*, *Slow Release*
-    Empty   a row this column has nothing to say about
-
-  Yes and No are the same element with two palettes, and both palettes live on
-  **Comparison table** rather than here: a table whose third tick is a different
-  green from its second is a table that will be, and a merchant tuning the
-  marks should be doing it once. Everything on this block under **The mark** is
-  an override, blank by default, for the one cell that genuinely differs.
-
-  ## The divider is drawn here and configured there
-
-  `.comparison-cell + .comparison-cell` is the selector, so the line appears
-  between cells and never above the first one or below the last — in a column
-  with a header row the first cell is preceded by the header, which is not a
-  cell, so the rule is right in both shapes without a modifier.
-
-  It sits on the cell's border box rather than inside its padding, so changing
-  the space around a claim never moves the line, and the line's inset is the
-  column's left and right padding exactly as the drawing has it.
-
-  ## What it does not say out loud
-
-  A mark on its own announces as nothing. The static markup therefore ships
-  visually hidden text — *Yes* / *No*, translated — and
-  `assets/comparison-table.js` upgrades it to *Third-party lab tested: Yes* once
-  it connects, because it knows which row the cell is in and Liquid does not:
-  `block.blocks` does not exist and `forloop` does not reach inside
-  `{% content_for 'blocks' %}`.
-
-  Private — the leading underscore — because a cell outside a column is a tick
-  in a box. It is addable inside **Comparison column** and nowhere else.
+  One answer in one column. Private — addable inside Comparison column only.
 {% enddoc %}
 
 {%- liquid
@@ -60,27 +12,11 @@
     assign has_mark = true
   endif
 
-  comment
-    Which palette the mark reads. Both are published by
-    `blocks/_comparison-table.liquid` as two sets of custom properties with the
-    same suffixes, so the cell picks a set by name rather than by branching over
-    six properties twice.
-
-    A custom icon takes the Yes palette, because an icon a merchant chose is a
-    thing they are saying *about* their own column rather than a mark against
-    it.
-  endcomment
   assign palette = 'yes'
   if kind == 'cross'
     assign palette = 'no'
   endif
 
-  comment
-    Which glyph. The two marks have a fixed one — a tick is a tick — and only
-    the custom kind reads a setting. `snippets/icon.liquid` renders an empty
-    `svg` for a name it does not know, so the name is checked here rather than
-    passed straight through.
-  endcomment
   case kind
     when 'check'
       assign glyph = 'check'
@@ -92,13 +28,6 @@
       assign glyph = ''
   endcase
 
-  comment
-    ---- what it announces ----
-
-    A default that says something is better than a default that says nothing:
-    a tick with no text is announced as an empty group. The merchant can replace
-    it, and the module replaces it again with the claim the cell answers.
-  endcomment
   assign sr_text = s.sr_text | default: ''
   if sr_text == blank
     case kind
@@ -126,11 +55,6 @@
 {%- capture cell_style -%}
   {%- render 'spacing', block: s, declarations: true -%}
   {%- if has_mark -%}
-    {%- comment -%}
-      Each property falls back through the table's palette to a hard default in
-      `assets/base.css`, so a cell that overrides nothing emits nothing and the
-      table stays the single place the marks are tuned.
-    {%- endcomment -%}
     --ct-mark-size: var(--ct-mark-{{ palette }}-size);
     --ct-mark-size-mobile: var(--ct-mark-{{ palette }}-size-mobile);
     --ct-mark-fill: var(--ct-mark-{{ palette }}-fill);
@@ -157,19 +81,7 @@
   {{ block.shopify_attributes }}
 >
   {%- if has_mark -%}
-    {%- comment -%}
-      `data-comparison-mark` is what the module re-labels. The hidden span is
-      inside the mark rather than beside it so the two are announced as one
-      thing, and `aria-hidden` on the `svg` comes from `snippets/icon.liquid` —
-      an icon never carries the accessible name in this theme.
-    {%- endcomment -%}
     <span class="comparison-cell__mark" data-comparison-mark>
-      {%- comment -%}
-        No `size:` is passed. The snippet would write `--icon-size` inline, and
-        an inline property cannot be swapped at a breakpoint — the glyph is
-        sized by `--ct-mark-icon-size` in `assets/base.css` instead, which falls
-        through the table's palette and can still shrink on a phone.
-      {%- endcomment -%}
       {% render 'icon', icon: glyph, class: 'comparison-cell__glyph' %}
       {%- if sr_text != blank -%}
         <span class="visually-hidden" data-comparison-answer>{{ sr_text | escape }}</span>
@@ -180,11 +92,6 @@
   {%- endif -%}
 </div>
 
-{%- comment -%}
-  Every setting below is a control a merchant reaches in the editor, and the
-  schema is one element's styling surface: splitting it to get under Theme
-  Check's count of 40 would split the thing the settings style.
-{%- endcomment -%}
 {% # theme-check-disable ExcessiveSettingsCount %}
 {% schema %}
 {

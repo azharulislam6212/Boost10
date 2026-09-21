@@ -1,36 +1,7 @@
 /**
- * motion-engine.js — Boost10
- *
  * The theme's animation runtime, built entirely on the Web Animations API and
  * IntersectionObserver. No timeline library, no scroll library, no keyframe CSS
  * duplicated across section files.
- *
- * What it provides:
- *   - `PRESETS`       a named registry of text and image entrance animations
- *   - `reveal()`      plays a preset on load or on scroll, with stagger
- *   - `splitText()`   accessible per-word / per-character splitting
- *   - `observe()`     a pooled IntersectionObserver shared by every caller
- *   - `parallax()`    transform-only parallax driven by one rAF loop
- *   - `marquee()`     infinite ticker with a real pause control
- *
- * Four rules hold everywhere in this file:
- *
- *   1. Reduced motion wins. Every helper skips straight to the final visual
- *      state. Nothing animates, and nothing stays invisible waiting for an
- *      animation that will never run.
- *   2. JavaScript hides the content, not CSS. The starting state is written as
- *      inline style by `reveal()` at the moment it takes responsibility for the
- *      element. If this script never loads, nothing was ever hidden.
- *   3. On load and on scroll are the same code path. An element already in the
- *      viewport when the page loads animates immediately, with a small cascade
- *      so above-the-fold content arrives in sequence rather than all at once.
- *   4. Reads are batched before writes. Layout measurement happens once per
- *      frame in the shared ticker, never inside a scroll handler.
- *
- * Works with Lenis without any coupling: Lenis scrolls the real document, so
- * IntersectionObserver fires exactly as it would with native scrolling. Nothing
- * here reads `window.scrollY` at all: this file is a library of presets and
- * timings, and the elements that use them live in `motion-effect.js`.
  *
  * @module @theme/motion-engine
  */
@@ -45,9 +16,6 @@ import { clamp, prefersReducedMotion, isTouchDevice, isRTL } from '@theme/utilit
 export const EASING = {
   outExpo: 'cubic-bezier(0.16, 1, 0.3, 1)',
   outQuart: 'cubic-bezier(0.25, 1, 0.5, 1)',
-  // The gentlest of the settles: no acceleration at the start, a long tail. For
-  // anything large and slow, where an ease-in-out reads as a hesitation
-  // followed by a lunge.
   outQuint: 'cubic-bezier(0.22, 1, 0.36, 1)',
   outBack: 'cubic-bezier(0.34, 1.4, 0.64, 1)',
   inOutQuart: 'cubic-bezier(0.76, 0, 0.24, 1)',
@@ -85,14 +53,10 @@ const DEFAULTS = {
 /**
  * Every named animation in the theme.
  *
- * Naming convention for the reveal family: the name is the direction the
- * revealing edge travels. `reveal-right` starts clipped at the left and the
- * visible area grows rightwards.
- *
  * @type {Record<string, MotionPreset>}
  */
 export const PRESETS = {
-  /* ---------------------------------------------------------- universal -- */
+  /* ---------------------------------------------------------- universal -- ---- */
 
   fade: {
     group: 'both',
@@ -161,7 +125,7 @@ export const PRESETS = {
     ]
   },
 
-  /* -------------------------------------------------------------- image -- */
+  /* -------------------------------------------------------------- image -- ---- */
 
   'zoom-in': {
     group: 'image',
@@ -181,9 +145,6 @@ export const PRESETS = {
     ]
   },
 
-  // The reveal family animates clip-path rather than wrapping the element in an
-  // overflow-hidden mask. No extra DOM, no layout change, and the image itself
-  // can still be zoomed or parallaxed by a separate transform.
   'reveal-right': {
     group: 'image',
     duration: 900,
@@ -224,7 +185,7 @@ export const PRESETS = {
     ]
   },
 
-  /* --------------------------------------------------------------- text -- */
+  /* --------------------------------------------------------------- text -- ---- */
 
   'split-text': {
     group: 'text',
@@ -310,17 +271,6 @@ export const PRESETS = {
     keyframes: () => [{ opacity: 0 }, { opacity: 1 }]
   },
 
-  /* Letters appearing in sequence with no transform and no fade, so it reads as
-     typing rather than as an entrance animation.
-
-     The 1ms duration is the whole trick: the effect lives entirely in the
-     stagger, and any real duration turns each hard cut into a cross-fade, which
-     is `letters-fade-in` — a different effect that already exists.
-
-     No blinking caret. A caret has to stop when the last character lands, and
-     the engine marks an element revealed when its animation *starts*, so there
-     is no state a stylesheet could key off. Faking one with a fixed CSS
-     animation would desync the moment a merchant changed the stagger. */
   typewriter: {
     group: 'text',
     split: 'chars',
@@ -402,9 +352,6 @@ const observerPool = new Map();
 /**
  * Observe an element until it enters the viewport.
  *
- * The first callback fires as soon as observation begins if the element is
- * already on screen, which is what makes on-load and on-scroll the same path.
- *
  * @param {Element} element
  * @param {(entry: IntersectionObserverEntry) => void} callback
  * @param {Object} [options]
@@ -445,7 +392,6 @@ export function observe(element, callback, options = {}) {
     observerPool.set(key, entry);
   }
 
-  // One firing, whichever route gets there first, and one cleanup.
   let done = false;
   const fire = (item) => {
     if (done) return;
@@ -479,16 +425,6 @@ export function observe(element, callback, options = {}) {
    the page runs out of scroll before the element ever enters the shrunken root.
    Those elements stay in their resting state, which for a reveal preset means
    `opacity: 0`, for the life of the page.
-
-   It is easy to miss, because it only bites the very last thing on the page and
-   only when that thing is short: the footer's disclaimer, a closing line of
-   copy, a final badge row. Then it does not "animate late" — it never appears
-   at all.
-
-   So the bottom of the document is a floor. Once the page can scroll no
-   further, anything still waiting that is genuinely on screen is released. One
-   shared listener for the whole page, passive, on rAF, and it removes itself as
-   soon as nothing is waiting on it.
    ========================================================================== */
 
 /** @type {Set<{ element: Element, fire: () => void }>} */
@@ -504,7 +440,6 @@ function checkScrollFloor() {
 
   for (const item of [...waitingOnFloor]) {
     const rect = item.element.getBoundingClientRect();
-    // In the real viewport, not the inset one.
     const onScreen = rect.top < window.innerHeight && rect.bottom > 0 && rect.height > 0;
     if (!onScreen) continue;
 
@@ -535,7 +470,6 @@ function startFloorListener() {
     window.removeEventListener('resize', onScroll);
   };
 
-  // A short page can already be at its end with nothing left to scroll.
   onScroll();
 }
 
@@ -637,10 +571,6 @@ function camelToKebab(value) {
  * Play a preset when an element is on screen — immediately if it already is,
  * on scroll if it is not.
  *
- * The starting state is written inline the moment this function takes charge,
- * so content is only ever hidden by a script that is definitely running. If the
- * module fails to load, every element stays visible.
- *
  * @param {HTMLElement} element The element that triggers the reveal.
  * @param {Object} [options]
  * @param {string} [options.effect='fade-up'] A key of {@link PRESETS}, or an alias.
@@ -667,7 +597,6 @@ export function reveal(element, options = {}) {
     return () => {};
   }
 
-  // Text presets animate the split parts, unless the caller named its own.
   let targets = options.targets?.length ? options.targets : [];
 
   if (preset.split && targets.length === 0) {
@@ -688,7 +617,6 @@ export function reveal(element, options = {}) {
 
   const restingState = keyframes[0];
 
-  // Hide now, from JavaScript, never from CSS.
   for (const target of targets) applyState(target, restingState);
   element.setAttribute('data-motion-pending', '');
 
@@ -707,8 +635,6 @@ export function reveal(element, options = {}) {
         easing: options.easing ?? preset.easing ?? EASING.outExpo
       });
 
-      // Once the animation holds the final state, the inline resting styles are
-      // no longer needed and would otherwise fight later hover styles.
       animation?.finished
         .then(() => {
           animation.commitStyles?.();
@@ -722,22 +648,6 @@ export function reveal(element, options = {}) {
     options.onReveal?.();
   };
 
-  // The element that is watched is not always the element that is hidden.
-  //
-  // The `reveal-*` presets rest at `clip-path: inset(100% 0 0 0)` — the element
-  // clipped away to nothing. IntersectionObserver applies the target's own
-  // clip-path before it measures, so an element clipped to nothing reports a
-  // ratio of 0 and never intersects, whatever the scroll position.
-  //
-  // When that resting state lands on the same element the observer is watching,
-  // those two facts deadlock: the state that hides the element suppresses the
-  // one event that would reveal it, and the content stays invisible for the
-  // life of the page. It only worked at all where the caller passed a
-  // `data-target`, because then the clip goes on a child and the host stays
-  // measurable — `reveal-up` on an element with no target was simply gone.
-  //
-  // So when the observed element clips itself, its parent is watched instead:
-  // the same place on the page, the same moment on screen, nothing clipped.
   const clipsItself = targets.includes(element) && typeof restingState.clipPath === 'string';
   const observed = clipsItself ? element.parentElement ?? element : element;
 
@@ -760,9 +670,6 @@ export function reveal(element, options = {}) {
 
 /**
  * Cascade delay for elements already on screen when the page loads.
- *
- * Without it, everything above the fold animates on the same frame, which looks
- * like a flash rather than an entrance.
  *
  * @param {Object} options
  * @returns {number}
@@ -810,38 +717,6 @@ function shuffledIndices(length) {
 /**
  * Split an element's text into animatable spans without destroying its markup.
  *
- * ## Text nodes are replaced; elements are not
- *
- * This used to read `element.textContent`, build a flat list of spans and call
- * `element.replaceChildren()`. That threw away every tag inside — and the way
- * the theme uses this, the tag inside is the whole point:
- *
- *     <motion-effect data-effect="words-slide-up">
- *       <h1 class="product-title__text">{{ product.title }}</h1>
- *     </motion-effect>
- *
- * Nine sections and blocks wrap a heading exactly like that, with no
- * `data-target`, so the host is what got split — and the `<h1>` was gone from
- * the document the moment the animation ran. Every `h1` rule stopped matching,
- * so a product title rendered at body size; the page lost its heading outline;
- * and a link or an `<em>` inside a heading simply vanished.
- *
- * So the walk is over text nodes now. Each one is replaced by a span holding
- * the pieces, and every element around it — the heading, the emphasis, the link
- * — is left exactly where the section put it.
- *
- * ## What a screen reader hears
- *
- * The pieces are decoration and are marked `aria-hidden`; a real copy of the
- * text rides alongside them in a `visually-hidden` span. That replaces the old
- * `aria-label` on the container, which only ever worked by accident: an
- * `aria-label` on an element with no role — `<motion-effect>` has none — is
- * ignored, so a split heading whose pieces were all hidden had, to assistive
- * technology, no text at all. A visible-to-AT copy needs no role to work.
- *
- * Words are always wrapped, even when splitting by character, so lines still
- * break between words rather than mid-word.
- *
  * @param {HTMLElement} element
  * @param {Object} [options]
  * @param {'chars'|'words'} [options.by='chars']
@@ -852,8 +727,6 @@ export function splitText(element, { by = 'chars' } = {}) {
     return Array.from(element.querySelectorAll('[data-motion-part]'));
   }
 
-  // Only text nodes that actually carry text. The whitespace between two tags
-  // is a text node too, and turning it into a span would add a word.
   const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
   const textNodes = [];
   while (walker.nextNode()) {
@@ -872,26 +745,11 @@ export function splitText(element, { by = 'chars' } = {}) {
     const original = node.nodeValue ?? '';
     const collapsed = original.replace(/\s+/g, ' ');
 
-    // One wrapper per split site, carrying the original string. `unsplitText`
-    // puts that string back, so a replay or a Theme Editor morph restores the
-    // node it started from rather than a best guess reassembled from spans.
     const site = document.createElement('span');
     site.className = 'motion-split';
     site.setAttribute('data-motion-split-site', '');
     site.dataset.motionText = original;
 
-    // A per-character split is the only one that needs an accessible copy.
-    //
-    // Word spans read naturally: a screen reader joins adjacent inline text and
-    // announces "Clinically studied ingredients" whether or not there are spans
-    // between the words. Characters do not — several screen readers spell a
-    // run of one-letter elements out loud — so those are hidden and the real
-    // string rides alongside them.
-    //
-    // Splitting the two cases matters because the copy is duplicated text: it
-    // is in `innerText`, in a selection, and in what a crawler reads. Paying
-    // that on every heading in the theme to solve a problem only `chars` has
-    // would be the wrong trade.
     if (by !== 'words') {
       const label = document.createElement('span');
       label.className = 'visually-hidden';
@@ -899,9 +757,6 @@ export function splitText(element, { by = 'chars' } = {}) {
       site.append(label);
     }
 
-    // Leading and trailing spaces belong to the flow around this node — the gap
-    // between a heading's own text and an `<em>` that follows it. Dropping them
-    // runs the two together.
     if (/^\s/.test(collapsed)) site.append(document.createTextNode(' '));
 
     const words = collapsed.trim().split(' ');
@@ -953,15 +808,10 @@ export function unsplitText(element) {
 
   element.removeAttribute('data-motion-split');
 
-  // Each site restores its own text node. Reading `textContent` back off the
-  // site would return the accessible copy *and* the pieces — the string twice —
-  // which is why the original is stored on the wrapper when it is built.
   for (const site of element.querySelectorAll('[data-motion-split-site]')) {
     site.replaceWith(document.createTextNode(site.dataset.motionText ?? ''));
   }
 
-  // Adjacent text nodes left by the replacements are merged, so a second split
-  // sees the same single node the first one did.
   element.normalize();
 }
 
@@ -977,10 +827,6 @@ let tickerFrame = null;
 
 /**
  * Subscribe to a single shared rAF loop driven by scroll position.
- *
- * One loop for the whole page keeps parallax, sticky maths and progress bars on
- * the same frame, which is the difference between smooth and janky. It reads
- * `window.scrollY`, so it follows Lenis without knowing Lenis exists.
  *
  * @param {(scrollY: number) => void} callback
  * @returns {() => void} Unsubscribe.
@@ -1027,10 +873,6 @@ function stopTicker() {
 
 /**
  * Move an element at a different rate to the page as it scrolls.
- *
- * Transform only: no `top`, no `background-position`, nothing that triggers
- * layout. Disabled under reduced motion and on touch devices, where parallax
- * fights momentum scrolling and reliably feels broken.
  *
  * @param {HTMLElement} element
  * @param {Object} [options]
@@ -1100,12 +942,6 @@ export function parallax(element, { speed = 0.2, axis = 'y', max = 120 } = {}) {
 /**
  * Turn a track into an infinite horizontal ticker.
  *
- * The track's children are duplicated until they overflow the container twice,
- * then the whole track is translated by exactly half its width, so the loop is
- * seamless regardless of content length. Duplicated content is hidden from
- * assistive technology, and the animation exposes a real pause control rather
- * than relying on hover alone.
- *
  * @param {HTMLElement} track
  * @param {Object} [options]
  * @param {number} [options.speed=60] Pixels per second.
@@ -1150,8 +986,6 @@ export function marquee(track, { speed = 60, direction = 'left', pauseOnHover = 
     const baseWidth = track.scrollWidth;
     if (baseWidth === 0) return 0;
 
-    // At least one extra copy, plus however many are needed to cover twice the
-    // viewport so there is always content queued off the leading edge.
     const copies = Math.max(2, Math.ceil((viewport * 2) / baseWidth) + 1);
 
     for (let copy = 1; copy < copies; copy += 1) {
@@ -1159,7 +993,6 @@ export function marquee(track, { speed = 60, direction = 'left', pauseOnHover = 
         const clone = /** @type {Element} */ (node.cloneNode(true));
         clone.setAttribute('aria-hidden', 'true');
         clone.setAttribute('data-marquee-clone', '');
-        // A cloned link must not be a second tab stop for the same destination.
         for (const focusable of clone.querySelectorAll('a, button, input, select, textarea')) {
           focusable.setAttribute('tabindex', '-1');
         }
@@ -1186,8 +1019,6 @@ export function marquee(track, { speed = 60, direction = 'left', pauseOnHover = 
 
     const duration = (distance / Math.max(speed, 1)) * 1000;
 
-    // Right-scrolling starts one cycle back and travels to zero, so the strip
-    // enters from the left edge instead of leaving a gap while it catches up.
     const from = direction === 'right' ? -distance : 0;
     const to = direction === 'right' ? 0 : -distance;
 
@@ -1221,10 +1052,6 @@ export function marquee(track, { speed = 60, direction = 'left', pauseOnHover = 
     container.addEventListener('focusout', onLeave);
   }
 
-  // A marquee built inside a hidden container — the announcement bar before it
-  // is revealed, a closed drawer, an inactive tab — measures zero and would
-  // otherwise never move. Rebuilding when the box gains a real width is the
-  // same recovery `<carousel-slider>` makes.
   let lastWidth = container.offsetWidth;
   observer = new ResizeObserver(() => {
     const width = container.offsetWidth;

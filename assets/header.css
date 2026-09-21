@@ -3,31 +3,6 @@
    --------------------------------------------------------------------------
    The header, its navigation, the mega menu panels, the reusable tab group and
    the mobile drawer.
-
-   ## The one idea
-   
-
-   A pill that moves. It is the active marker under a navigation item, the
-   selection in a category rail, the promotional badge and the shape of the
-   header itself. Everything else is quiet: hairline rules, one weight of
-   shadow, no gradients that are not the merchant's own colour scheme.
-
-   Spending the boldness in one place is what stops a header with this many
-   controls from looking like a demo of all of them.
-
-   ## Everything colours itself from the scheme
-
-   No colour is written here that is not a scheme token. A merchant switching
-   the sticky scheme from mint to charcoal changes the whole pinned header,
-   including the icon buttons and the cart bubble, without touching CSS.
-
-   ## Load order
-
-   Loaded after `base.css`, into the same `@layer overrides`, so these rules
-   settle against its own override blocks on specificity and source order. The
-   older header's rules have been removed from `base.css`: the class-keyed ones
-   were unreachable, and the three keyed on `<sticky-header>` itself were not —
-   see section 47.2.
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
@@ -38,61 +13,8 @@
    Boot stability
    --------------------------------------------------------------------------
    The header is visible from the first paint. It is not waiting on anything.
-
-   It used to be. `.site-header__shell` was `visibility: hidden` until the
-   custom element upgraded and cleared `data-booting`, on the reasoning that the
-   server-rendered state might not match the measured one and the correction
-   would be visible. What that actually bought was a page whose header is a
-   blank strip for as long as the module takes to arrive — over a slow
-   connection, seconds — and then appears all at once. The screenshot of an
-   announcement bar sitting directly on top of a hero banner is that rule, not a
-   layout bug.
-
-   The premise was wrong twice over. Liquid already knows the header's height
-   (`--header-block-size`, published by the section from the merchant's own
-   settings) and its sticky mode, and `.header-section:has(…)` below pins it
-   with no script at all — so the pre-upgrade paint is not a guess, it is the
-   answer. And the thing worth suppressing was never the header, only the
-   *transition* between two correct states, which `:not(:defined)` and
-   `[data-priming]` handle further down without hiding anything.
-
-   Nothing replaces these rules. That is the fix.
    -------------------------------------------------------------------------- */
 
-/* The timing tokens are on `:root`, not on `.site-header`.
-
-   This is why the drawer never animated. `{% render 'header-drawer' %}` runs
-   *after* `</sticky-header>` — the drawer is a sibling of the header, not a
-   descendant — so it inherited none of these. Every
-   `transition: … var(--panel-speed) var(--header-ease)` in the drawer resolved
-   to nothing, and an invalid transition is simply no transition: the accordion
-   snapped open, the slide panels teleported, and there was nothing in the
-   stylesheet to suggest why.
-
-   Timing is a property of the theme rather than of one element, so `:root` is
-   also where it belonged. The header still overrides its own layout tokens
-   below. */
-
-/* In `@layer overrides`, the last layer in the order base.css declares, and the
-   layer base.css's own override blocks and product-card.css write into. Same
-   layer, loaded in that order: these rules settle against theirs on specificity
-   and source order, and all of them outrank every layer above.
-
-   It has to be the last layer, and the reason is worth stating so nobody moves
-   it again. This is a component stylesheet: most of what it does is speak over
-   the generic rules base.css states for the same elements — `.drawer__panel` is
-   `inline-size: min(42rem, 100vw)` in `@layer components` and the nav drawer
-   wants `min(420px, 92vw)`; `.drawer__body` sets the padding and the scroll
-   behaviour every drawer shares. A layer beats specificity, so from any layer
-   below `components` those rules would win no matter how the selectors here are
-   written, and the drawer would come out the wrong width with the wrong padding.
-   Deleting them from base.css is not an option either — the cart, search, facet
-   and compare drawers all rely on them.
-
-   base.css no longer carries the *previous* header's rules, though: the
-   class-keyed ones could never match (`site-header*` now), and the three keyed
-   on the `<sticky-header>` element name itself were actively wrong. See section
-   47.2. */
 @layer overrides {
   :root {
     --header-ease: cubic-bezier(0.22, 1, 0.36, 1);
@@ -105,14 +27,6 @@
   .site-header {
     --header-row-height: 72px;
 
-    /* A second variable, and not for tidiness.
-     *
-     * The section writes `--header-row-height` as an *inline style*, because it
-     * comes from the Height setting — and an inline custom property beats every
-     * stylesheet rule for that property, including one inside a media query. So
-     * every previous attempt to set a different height for phones was overridden
-     * before it was read. This one is never written inline, so a media query can
-     * own it. Change this number and the whole small-screen header follows. */
     --header-row-height-mobile: 54px;
     --header-border-width: 0px;
     --header-radius: 999px;
@@ -144,46 +58,18 @@
      only creates something for a later rule to fight with.
      -------------------------------------------------------------------------- */
 
-  /* The positioning lives on `.shopify-section`, not on `<sticky-header>`.
-
-     A sticky element can only travel inside its own parent, and the section
-     wrapper Shopify emits is exactly as tall as the header — so sticky applied to
-     the inner element has nowhere to go and does nothing at all. Moving it one
-     level up puts the parent at `<body>` height, which is the whole page.
-
-     The mode still lives on the inner element, because that is where the merchant
-     setting and the component both read it. `:has()` bridges the two, so this
-     works with no JavaScript at all. */
   .header-section {
     position: relative;
     z-index: 100;
   }
 
-  /* `scroll-down` is deliberately absent. It is the one mode where the header is
-     *not* pinned for the whole page: it starts in flow, scrolls away with the
-     banner, and comes back pinned once the page has left it behind. Section 2b
-     below is where that happens. */
   .header-section:has(> [data-sticky-mode='always']),
   .header-section:has(> [data-sticky-mode='scroll-up']) {
     position: sticky;
-    /* Not a hard `0`. Anything above the header that is itself pinned — a sticky
-       announcement bar — owns that space, and a header pinned to 0 lands on top of
-       it. `<sticky-header>` measures whatever is above and publishes the offset. */
     inset-block-start: var(--header-sticky-offset, 0px);
-    /* Above the announcement bar in every case. Both sections are in the same
-       group and the header is the one that stays. */
     z-index: 110;
   }
 
-  /* Guarded on the mode, not on `[data-hidden]` alone, so an attribute left
-     behind by a mode change cannot hide a header that is supposed to be pinned.
-
-     `scroll-down` is no longer here. It used to hide the header with this same
-     transform while the page was at the top — which is why the header could not
-     be seen in that mode at all, and why what little of it showed was sitting on
-     the announcement bar: the travel is the header's own height, and from a
-     starting point below the announcement bar that is not far enough to leave the
-     screen. The mode does not hide anything now. See 2b. */
   sticky-header[data-sticky-mode='scroll-up'][data-hidden] {
     transform: translateY(calc(-100% - 8px));
   }
@@ -195,56 +81,17 @@
      bar — an ordinary header. It scrolls away with the page like any other
      content. Once the page has scrolled past it completely, it returns, pinned to
      the top of the viewport, dropping in from above.
-
-     Two things make that work without the page moving underneath it.
-
-     The pin is `fixed` rather than `sticky`. Sticky pins as soon as its own top
-     edge reaches the offset, so the header would never leave the screen and there
-     would be nothing to come back from.
-
-     And it is the *inner* element that goes fixed, not the section. The section
-     stays in flow and keeps its height, so the space the header occupied at the
-     top of the page is still reserved and nothing below it shifts up at the moment
-     the header lifts out. Pinning the section instead would pull the whole page up
-     by the header's height in a single frame.
      -------------------------------------------------------------------------- */
 
   sticky-header[data-sticky-mode='scroll-down'][data-pinned] {
     position: fixed;
     inset-block-start: 0;
-    /* Both edges rather than a width: on a fixed element these resolve against the
-       viewport, which is what the header should span — not the section it came
-       from. */
     inset-inline: 0;
     z-index: 110;
 
-    /* An animation, not a transition. There is no previous position to move from:
-       the element becomes fixed and is simply *there*, so a transition has nothing
-       to interpolate and the header would appear all at once. The keyframes give
-       it somewhere to come from. */
     animation: site-header-drop-in var(--header-speed) var(--header-ease) backwards;
   }
 
-  /* Except when the page was *restored* into the pinned state rather than
-     scrolled into it.
-
-     Reloading half-way down a page is the case. The browser restores the offset,
-     `<sticky-header>` sees that the header's place in the flow is already above
-     the fold and pins it — correctly — and the keyframes then slide the bar down
-     from `translateY(-100%)` as if the customer had just scrolled it back into
-     view. They did not. They reloaded, and what they see is the header dropping
-     in from the top of the screen a beat after the page arrives, on every single
-     refresh.
-
-     `data-instant` is written alongside `data-pinned` only when the state was
-     adopted during priming, and cleared the moment the header unpins — so the
-     next genuine pin animates exactly as before.
-
-     Suppressing this through `[data-priming]` instead does not work, and is worth
-     recording: a CSS animation starts when its `animation-name` becomes
-     non-`none`. Setting `animation: none` for the priming frames and then
-     releasing it two frames later does not skip the drop-in, it *schedules* it —
-     the same jump, two frames later. The animation has to never apply at all. */
   sticky-header[data-sticky-mode='scroll-down'][data-pinned][data-instant] {
     animation: none;
   }
@@ -259,12 +106,6 @@
     }
   }
 
-  /* Leaving is not animated, and does not need to be. `<sticky-header>` unpins at
-     exactly the scroll position where the header's place in the flow sits just
-     above the fold, so the fixed bar is replaced by an in-flow bar in the same
-     spot — off the top of the screen either way. Scrolling further up brings it
-     back into view with the page, as part of the document. */
-
   @media (prefers-reduced-motion: reduce) {
     sticky-header[data-sticky-mode='scroll-down'][data-pinned] {
       animation: none;
@@ -275,26 +116,10 @@
      3. Shell
      -------------------------------------------------------------------------- */
 
-  /* Deliberately static now.
-   *
-   * `.site-header__shell` is the containing block for panels — see below. Leaving
-   * `position: relative` here as well would put a second candidate between a panel
-   * and the bar, and whichever is nearer wins: the panel would silently go back to
-   * the container's padding box the moment the shell's positioning changed. */
   .site-header__inner {
     position: static;
   }
 
-  /* The scheme's real background, captured on the header itself.
-
-     Section 27 overrides `--color-background` on the *shell*, one level down, so
-     this copy is still the untouched scheme value and the hover surface can be
-     mixed from it. Capturing it on the same element that overrides it would be a
-     self-reference and resolve to nothing.
-
-     It follows the sticky scheme too: `<sticky-header>` swaps the scheme class on
-     this element, so `--header-surface` becomes the sticky background the moment
-     the page scrolls, with no second variable to keep in sync. */
   .site-header {
     --header-surface: var(--color-background);
     --header-surface-rgb: var(--color-background-rgb);
@@ -304,15 +129,6 @@
   }
 
   .site-header__shell {
-    /* The containing block for every panel.
-     *
-     * They used to resolve against `.site-header__inner`, which is the container —
-     * so `inset-inline: 0` gave them the container's *padding box*, a gutter wider
-     * than the bar on each side. In the pill shape that gap is obvious, and once
-     * the header is solid the panel visibly overhangs it.
-     *
-     * Anchored here, a page-width panel is exactly as wide as the bar above it, in
-     * every state and at every viewport, with no arithmetic. */
     position: relative;
 
     display: flex;
@@ -331,33 +147,12 @@
     padding-inline: var(--header-pad-inline);
   }
 
-  /* The bar shape has to reach past the container's gutter or it is a bar with a
-     margin, which is neither shape. */
   .site-header--shape-bar .site-header__shell {
     border-radius: 0;
     margin-inline: calc(var(--container-gutter, var(--space-4)) * -1);
     padding-inline: var(--container-gutter, var(--space-4));
   }
 
-  /* `auto minmax(0, 1fr) auto` — and this is the overlap.
-
-     It was `1fr auto 1fr`, chosen so a centred logo would sit on the page's centre
-     line. But that puts the *navigation* on an `auto` track, sized to its own
-     content, and the two outer tracks on whatever is left. Seven menu items eat
-     the row: both `1fr` tracks collapse to zero, and their contents — the logo on
-     one side, the market pickers and actions on the other — overflow their empty
-     tracks and are painted straight over the menu.
-
-     That is what the screenshot shows. Nothing was mis-sized; the tracks holding
-     the controls had no width at all.
-
-     Now the outer tracks are `auto`: they take exactly what their contents need
-     and can never collapse, so nothing on either side can reach the middle. The
-     navigation gets what is left, with `minmax(0, …)` so the track may shrink
-     rather than force the row wider than the page.
-
-     True centring for a centred logo is handled separately, by taking it out of
-     the flow — see section 44. */
   .site-header__row {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
@@ -386,8 +181,6 @@
     justify-content: flex-end;
   }
 
-  /* An empty slot still occupies its grid track, which is what keeps a centred
-     logo centred when only one side has controls. */
   .site-header__slot:empty {
     min-block-size: 1px;
   }
@@ -402,38 +195,9 @@
      it simply never turns solid.
      -------------------------------------------------------------------------- */
 
-  /* Transparency is a *layout* change: the banner has to start at the top of the
-     viewport, underneath the header, or there is nothing for the header to be
-     transparent over and it simply reads as a white bar.
-
-     Taking the header out of the flow with `position: absolute` would do it, but
-     then it cannot be sticky. Pulling the following content up by the header's own
-     height does the same thing and leaves the sticky behaviour intact.
-
-     `--header-height` is published by `<sticky-header>` on every resize. */
-  /* The offset is taken off the main content, not off the header.
-
-     A negative bottom margin on the header pulls up whatever comes next — and in
-     a header group that is not always the page. With the header ordered last it
-     worked; reorder the group and it swallows a sibling section instead, which is
-     the overlap in the screenshot.
-
-     `#MainContent` is the thing that should slide under a transparent header, so
-     it is the thing that moves. No sibling can ever be affected. */
-  /* `--header-block-size` first, `--header-height` never.
-   *
-   * The measured value is written by the component from `offsetHeight`, and until
-   * it arrives this resolved to `0` — so the banner rendered *below* the header and
-   * then jumped up by the header's height as soon as the module loaded. Every
-   * element in the header appeared to move, because the thing behind them did.
-   *
-   * The section states its height from the settings before anything is painted, so
-   * the offset is right on the first frame. */
   body:has(.site-header--transparent) #MainContent {
     margin-block-start: calc(var(--header-block-size, 0px) * -1);
   }
-
-  /* Transparency is applied as a variable override — see section 27. */
 
   sticky-header[data-scrolled]:not([data-transparent]) {
     box-shadow: 0 6px 24px -12px rgb(0 0 0 / 0.18);
@@ -494,7 +258,6 @@
     opacity: 1;
   }
 
-  /* Once the header is solid the inverse logo has nothing to sit on. */
   sticky-header:not([data-transparent]) .site-header__logo--prefers-inverse .site-header__logo-image--solid {
     opacity: 1;
   }
@@ -544,8 +307,6 @@
     border-radius: 2px;
   }
 
-  /* The second bar is short, so the icon reads as a menu rather than as an equals
-     sign at the small sizes this button is used at. */
   .site-header__burger-bars i:last-child {
     inline-size: 11px;
   }
@@ -580,8 +341,6 @@
     list-style: none;
   }
 
-  /* Static by default so a full-width panel can span the header. Only the items
-     whose panel is anchored to them become a containing block. */
   .nav__item {
     position: static;
   }
@@ -616,7 +375,6 @@
       color var(--header-speed) var(--header-ease);
   }
 
-  /* Safari still paints a disclosure triangle without this. */
   .nav__link::-webkit-details-marker,
   .dropdown__toggle::-webkit-details-marker {
     display: none;
@@ -668,8 +426,6 @@
      out of it. That reads as the menu coming out from behind the header rather
      than fading in on top of the page, and it is one transform and one opacity
      rather than a height animation, which cannot be composited.
-
-     `padding-block-end` gives the drop shadow somewhere to land inside the clip.
      -------------------------------------------------------------------------- */
 
   .nav__panel {
@@ -681,14 +437,6 @@
     pointer-events: none;
   }
 
-  /* `page` is the layout container, because the panel's containing block *is*
-     `.site-header__inner` — the container element. Nothing extra is needed for it to
-     line up with the logo and the navigation above it.
-
-     `full` has to escape that container, and does it by pulling both edges out by
-     half the difference between the viewport and the container. The scrollbar is
-     subtracted or the panel is wider than the visible page and the whole document
-     gains a horizontal scrollbar. */
   .nav__panel--page {
     inset-inline: 0;
   }
@@ -703,16 +451,6 @@
     inline-size: max-content;
   }
 
-  /* Alignment applies to `compact` panels only.
-
-     This is the container-width bug. `--page` sets `inset-inline: 0`; the old
-     `[data-align='center']` rule then overrode only the *start* edge with `50%`
-     and left the end edge at `0`. The panel became half the container wide,
-     shifted right, then translated back by half its own width — the offset,
-     undersized panel in the screenshot.
-
-     A full or page width panel already spans its container, so there is no
-     alignment left to choose and the setting does not apply to it. */
   .nav__panel--compact[data-align='center'] {
     inset-inline-start: 50%;
     inset-inline-end: auto;
@@ -741,9 +479,6 @@
     pointer-events: auto;
   }
 
-  /* The clip exists only for the reveal. Held past it, it cuts off every submenu
-     that opens sideways out of this panel — which is why they were invisible
-     rather than unstyled. `header.js` adds `data-settled` on `transitionend`. */
   [data-settled] > .nav__panel {
     overflow: visible;
   }
@@ -753,14 +488,10 @@
     opacity: 1;
   }
 
-  /* No max-width. The panel is already inside the container, so constraining it
-     again would inset it from a header it is supposed to line up with. */
   .nav__panel--page > .nav__panel-inner {
     max-inline-size: none;
   }
 
-  /* A full-bleed panel still keeps its content on the layout grid — text running
-     to both screen edges at 1900px is unreadable however wide the panel is. */
   .nav__panel--full > .nav__panel-inner {
     max-inline-size: var(--container-wide, 1700px);
     margin-inline: auto;
@@ -814,9 +545,6 @@
      footer.css; the short version is that the origin is the end edge at rest and
      the start edge on hover, which draws the line out from the left and retracts
      it the way it came without a second keyframe.
-
-     `inset-inline` is inset by the link's own padding on the dropdown, so the
-     rule sits under the text rather than under the whole hit area.
      ========================================================================== */
 
   .dropdown__link::after,
@@ -860,8 +588,6 @@
     transform-origin: right center;
   }
 
-  /* The parent row is a `<summary>` with a chevron on the far side; a rule drawn
-     the full width of it would run under the chevron too. */
   .dropdown__link--parent::after {
     content: none;
   }
@@ -873,9 +599,6 @@
     }
   }
 
-  /* The parent item is the `<summary>` itself — it has to be the first child of
-     its `<details>` or the browser draws its own, which renders as a triangle and
-     the word "Details" in the middle of the menu. */
   .dropdown__link--parent {
     display: flex;
     align-items: center;
@@ -914,8 +637,6 @@
     position: relative;
   }
 
-  /* A submenu flies out sideways. Growing the parent list downwards moves the
-     link the customer was aiming at. */
   .nav__panel--sub {
     inset-block-start: calc(var(--space-2) * -1);
     inset-inline-start: 100%;
@@ -931,8 +652,6 @@
     padding-block-start: var(--space-2);
   }
 
-  /* A submenu opening within one panel-width of the viewport edge would run off
-     it. Flipping to the other side is the only fix that does not need JS. */
   @media screen and (max-width: 1280px) {
     .nav__panel--dropdown .nav__panel--sub {
       inset-inline: auto 100%;
@@ -980,16 +699,6 @@
     color: var(--color-heading);
   }
 
-  /* Multi-column flow, not a grid.
-   *
-   * A grid aligns rows: "Home" — one line, no children — sat in the same row as
-   * "Science", which has a heading and three links, so the row was as tall as
-   * Science and Home had a 60px hole under it. Repeat that down a menu of uneven
-   * lists and most of the panel is empty space, which is what the red boxes in
-   * the screenshot are marking.
-   *
-   * Columns flow instead: groups pack top to bottom and move to the next column
-   * when one fills. Nothing aligns to anything, so nothing waits for anything. */
   .megamenu__columns {
     display: block;
     column-count: var(--columns, 3);
@@ -997,7 +706,6 @@
     column-fill: balance;
   }
 
-  /* A group is atomic — its heading never separates from its list across a break. */
   .megamenu__column {
     break-inside: avoid;
     inline-size: 100%;
@@ -1179,15 +887,6 @@
     line-height: 1.25;
   }
 
-  /* Full width of its card, with no minimum.
-   *
-   * `min-inline-size: 160px` was a floor so the rule under the text looked
-   * deliberate. In a narrow card — a banner given two of twelve columns — 160px is
-   * wider than the card, so the arrow was pushed outside it and landed on the
-   * banner next door. That is the overflow the red boxes are marking on
-   * "Shop Gut" and "Shop Energy".
-   *
-   * The rule matches the card now, at every width, and cannot leave it. */
   .menu-promo__cta {
     display: flex;
     align-items: center;
@@ -1200,7 +899,6 @@
     font-size: var(--font-size-sm);
   }
 
-  /* The label truncates rather than pushing the arrow out. */
   .menu-promo__cta > span:first-child {
     min-inline-size: 0;
     overflow: hidden;
@@ -1254,32 +952,9 @@
     display: flex;
     gap: var(--space-1);
 
-    /* `base.css` puts a rule under every `[role="tablist"]`. That is the underline
-       tab pattern, and it is the right default for a tablist with no styling of
-       its own — but this component says which tab is selected with a marker that
-       slides between them, and a line under the strip on top of that is a second
-       answer to a question already answered.
-
-       Laid out vertically it is worse than redundant: the list is a column, so
-       the rule lands under the last tab name and reads as a divider belonging to
-       nothing. Off in both arrangements, and off for the mega menu too, which was
-       inheriting the same stray line. */
     border-block-end: 0;
   }
 
-  /* A row of tabs scrolls; it does not wrap.
-
-     Wrapping looks harmless until there is one tab too many, and then the strip
-     silently becomes two rows: the panel jumps down the page, the marker measures
-     a box on a line the customer is not looking at, and on a phone every strip
-     with more than three tabs did it. Scrolling keeps the strip one line at every
-     width, and the tab half in view is what says there are more of them — which a
-     second row cannot say, because it looks like a layout rather than an
-     invitation.
-
-     `scroll-behavior: smooth` is for the programmatic scrolls: arrowing along the
-     strip and `tabs.js` bringing the selected tab into view. Dragging is the
-     browser's own and is unaffected. */
   .tabs--horizontal .tabs__list {
     flex-direction: row;
     flex-wrap: nowrap;
@@ -1294,51 +969,19 @@
     display: none;
   }
 
-  /* Dragging the strip.
-     --------------------------------------------------------------------------
-     Both attributes are `tabs.js`'s, and neither is orientation-specific: below
-     990px a vertical rail is a row that scrolls too, and it is dragged the same
-     way.
-
-     `data-draggable` is on exactly while there are more tabs than the strip can
-     show. The scrollbar is hidden, so on a desktop with no touchscreen the cursor
-     is the only thing left that says the row goes further than it looks — and a
-     grab cursor on a strip that cannot move is worse than none. */
   .tabs__list[data-draggable] {
     cursor: grab;
 
-    /* A pull across a row of tab names is a text selection to the browser, and
-       the strip is left holding a half-highlighted label that reads as a glitch.
-
-       Here rather than on `[data-dragging]`, because a selection starts on the
-       first pixel of movement and `[data-dragging]` is deliberately five pixels
-       late — switching selection off at that point stops it growing but leaves
-       what has already been highlighted behind. On a strip whose labels are
-       button text nobody selects, the whole gesture is a scroll. */
     user-select: none;
   }
 
-  /* `.tabs` — which is on the `<tab-group>` this list belongs to — only for the
-     weight it carries. `scroll-behavior` and `scroll-snap-type` are set again by
-     `.tabs--vertical .tabs__list` below 990px and by `.drawer-nav .tabs__list`,
-     both later in this file and both exactly as specific as a class and an
-     attribute. Without the third selector a drag in a narrow window would be
-     fighting the smooth scrolling it is here to switch off. */
   .tabs .tabs__list[data-dragging] {
     cursor: grabbing;
 
-    /* The strip is being moved a pixel at a time by a hand that is already
-       holding it. `smooth` would animate towards a position that changed two
-       frames ago, and a snap point would pull the strip back between frames —
-       both are for the programmatic scrolls (arrowing along the strip, and
-       `tabs.js` bringing the selected tab into view) and both fight a drag. */
     scroll-behavior: auto;
     scroll-snap-type: none;
   }
 
-  /* The tabs are buttons and keep the pointer cursor at rest, because clicking
-     one is still the main thing they are for. Mid-drag they are cargo, and a hand
-     that is holding the strip should not be told it is hovering a button. */
   .tabs .tabs__list[data-dragging] .tabs__tab {
     cursor: grabbing;
   }
@@ -1349,9 +992,6 @@
     white-space: nowrap;
   }
 
-  /* The marker is measured from the tab box, so it has to travel with the strip
-     rather than stay pinned to the viewport — and the rail has to be allowed to
-     be narrower than its content for any of that to happen. */
   .tabs--horizontal .tabs__rail {
     min-inline-size: 0;
   }
@@ -1378,8 +1018,6 @@
       block-size var(--panel-speed, 420ms) var(--header-ease, cubic-bezier(0.22, 1, 0.36, 1));
   }
 
-  /* First placement, and every placement made while the group was not painted.
-     Without this the marker visibly flies in from the corner when a panel opens. */
   .tabs__marker[data-instant] {
     transition: none;
   }
@@ -1412,19 +1050,6 @@
     outline-offset: -2px;
   }
 
-  /* The tab name reads the same `--block-font-*` properties every text block in
-     the theme reads — the named presets are `.block-text--*` classes in
-     `base.css` pointing at the Theme settings › Typography tokens, and only the
-     Custom preset and the colour come through Liquid. `blocks/_tab.liquid` puts
-     the class and the style attribute on this span inside its `<template>`, and
-     `tabs.js` clones both into the button.
-
-     Every fallback is `inherit`, which is the button's own font above — so a tab
-     left on the Default preset renders exactly as it did before any of this, and
-     the icon beside it keeps its own size either way.
-
-     `.block-text` itself is not on the span: it sets `flex` and `inline-size`,
-     and this is a run of words inside a button, not a box. */
   .tabs__tab-label {
     font-family: var(--block-font-family, inherit);
     font-size: var(--block-font-size, inherit);
@@ -1435,18 +1060,12 @@
     color: var(--block-text-color, inherit);
   }
 
-  /* A rule and not a second inline declaration: an inline `font-size` beats every
-     stylesheet, and a style attribute cannot carry a breakpoint. */
   @media screen and (max-width: 749px) {
     .tabs__tab-label {
       font-size: var(--block-font-size-mobile, var(--block-font-size, inherit));
     }
   }
 
-  /* Gradient text is `background-image` plus a transparent colour, and the pair
-     has to land on the element holding the words. The Text block's rule aims at
-     the tags inside its rich text; a tab name is one bare span, so it clips the
-     gradient itself. */
   .tabs__tab-label.block-text--gradient {
     background-image: var(--block-text-gradient, var(--gradient-primary));
     -webkit-background-clip: text;
@@ -1461,14 +1080,6 @@
     }
   }
 
-  /* The ring is inset, like the tab buttons' own two lines above.
-   *
-   * It used to sit 4px outside the panel, and the panel fills its container
-   * exactly — so once `.tabs__panels` started clipping (see the rise animation
-   * below) a keyboard user tabbing into the panel got no visible ring at all. An
-   * inset ring cannot be clipped by the box it is inside, whatever that box's
-   * overflow is, so this is robust rather than dependent on `overflow-clip-margin`
-   * being supported. */
   .tabs__panel:focus-visible {
     outline: 2px solid currentColor;
     outline-offset: -2px;
@@ -1481,14 +1092,6 @@
      A filled track with the options sharing its width and the marker sliding
      inside it: the delivery-frequency chooser, a Monthly/Yearly price switch, a
      two-state filter.
-
-     Nothing below re-implements a tab. The marker still travels, the keyboard
-     still walks the strip, the ARIA is still the tablist's — this is a
-     background, a padding and a rule about how the tabs divide the space. That is
-     why it is a modifier on `.tabs` rather than a component of its own.
-
-     `--tabs-track-*` and `--tabs-marker-background` are `blocks/tabs.liquid`'s
-     settings; every one of them has a fallback here so the look is complete
      before a merchant touches anything. */
   .tabs--segmented .tabs__list {
     gap: 0;
@@ -1496,17 +1099,9 @@
     border-radius: var(--tabs-track-radius, 50px);
     background-color: var(--tabs-track-background, rgb(0 0 0 / 0.24));
 
-    /* The track is the box the marker is measured against, so it must not be the
-       thing that scrolls: a scrolled track leaves the marker behind by exactly
-       the scroll offset. Below 749px the options wrap instead — see the note
-       there. */
     overflow: visible;
   }
 
-  /* Equal thirds, whatever the words are. A switch whose segments resize with
-     their labels reads as three different controls rather than one choice, and
-     the marker travelling between two widths draws attention to the resize
-     rather than to the selection. */
   .tabs--segmented .tabs__tab {
     flex: 1 1 0;
     min-inline-size: 0;
@@ -1515,39 +1110,15 @@
     text-align: center;
   }
 
-  /* The unselected options are quieter than the plain strip's 0.65, because here
-     they sit on a filled track and the marker behind the selected one is already
-     carrying most of the contrast. */
   .tabs--segmented .tabs__tab[aria-selected='false'] {
     opacity: var(--tabs-tab-idle-opacity, 0.6);
   }
 
-  /* Doubled class, so the switch keeps its own answer whatever the file order is.
-     `.tabs--block .tabs__marker` below sets the same property at `(0,2,0)` and
-     later in the file; at `(0,3,0)` this wins on the cascade instead, which keeps
-     the segmented default — a faint white pill on the merchant's dark track —
-     rather than borrowing the primary button's fill from a rule written for the
-     plain strip. */
   .tabs--block.tabs--segmented .tabs__marker {
     background-color: var(--tabs-marker-background, rgb(255 255 255 / 0.12));
     box-shadow: none;
   }
 
-  /* The flag above an option — "Most Popular", "Best value", "New".
-     `blocks/_tab.liquid` puts it in the `<template>` the button is built from, so
-     it belongs to the option and travels with it in the strip's own order.
-
-     It is out of flow completely — positioned, and taking no room from anything.
-     The strip used to reserve 14px above every tab for it, which is why the
-     options sat low in their own track and the track carried a band of empty
-     colour along its top edge that only existed because one option somewhere had
-     a flag. The flag is decoration on the option, and decoration should not be
-     able to move the control it decorates.
-
-     Straddling the track's top edge is the intended look, not an overflow: the
-     translate centres the flag on that edge, `.tabs--segmented .tabs__list` is
-     `overflow: visible` so the half above is painted, and the marker underneath
-     is measured from the button's own box and never sees it. */
   .tabs__tab-pill {
     position: absolute;
     inset-block-start: 0;
@@ -1564,15 +1135,8 @@
     line-height: 1.6;
     white-space: nowrap;
 
-    /* The button is the containing block. `.tabs__tab` is already
-       `position: relative` for the marker's z-index to work against, so there is
-       nothing to add there. */
   }
 
-  /* Three segments at 390px are three words broken across two lines each. The
-     track keeps its shape and the options stack inside it, which is a taller
-     control and a legible one — and the marker follows without any change here,
-     because it is measured from whatever box the selected tab ends up with. */
   @media screen and (max-width: 749px) {
     .tabs--segmented .tabs__list {
       flex-wrap: wrap;
@@ -1592,26 +1156,6 @@
      measured and still travels, the keyboard still walks the strip, the ARIA is
      still the tablist's. What changes is where the outline is drawn, how the
      track is sized against the section, and what the chosen option's mark does.
-
-     Every `--tabs-*` below is that block's setting and every one has a fallback
-     here, so the look is complete before a merchant touches anything.
-
-     ## The track is sized apart from the group
-
-     The group is always full width, because it holds the panels as well as the
-     strip and a panel as wide as four option names is not a layout anybody
-     asked for. So the rail is the flex container that positions the track, and
-     `--tabs-track-*` sizes the track inside it. A fit track sits wherever
-     **Alignment** puts it; a fill track spans the section.
-
-     ## The track must not be the thing that scrolls
-
-     The marker is measured against the list's box, so a scrolled list leaves it
-     behind by exactly the scroll offset — the same constraint the segmented
-     switch documents above, and the same answer: `overflow: visible`, and the
-     options wrap onto a second line on a phone rather than running off the
-     edge. A wrapped *track* is still one control, which is what makes wrapping
-     safe here and not on the plain strip.
      -------------------------------------------------------------------------- */
 
   .tabs--pills {
@@ -1624,35 +1168,6 @@
     min-inline-size: 0;
   }
 
-  /* Before the element upgrades, show the panel that will open — not all of them.
-     --------------------------------------------------------------------------
-     `tabs.js` writes `hidden` onto the panels it is not showing, and until the
-     module arrives none of them carries it. That is the theme's no-JS answer
-     and it is the right one for a strip of short answers: four paragraphs
-     stacked is a readable page.
-
-     It is the wrong one here. Each panel in this section is a whole
-     composition — a photograph, a card, a column of rows — so four of them
-     stacked is four screens of content that resolves to one, and the theme
-     editor re-renders the section on every setting change, which replays that
-     wall each time. A merchant adding the section sees the stack, not the
-     design.
-
-     So the pre-upgrade state is the *selected* panel alone. `:not(:defined)`
-     scopes it exactly: the moment `<tab-group>` is registered the rule stops
-     matching and `tabs.js` owns visibility again, with nothing to undo.
-
-     `display`, not `hidden`: the attribute is the component's and writing it
-     from Liquid would be state in two places. The third rule is the fallback
-     for a strip where no option was marked — `tabs.js` opens the first one, so
-     that is the one to show.
-
-     Scoped to this section's own class. `blocks/tabs.liquid` keeps the stacked
-     fallback, which is still right for what it holds.
-
-     With JavaScript genuinely off there is no upgrade and no strip, so the
-     `<noscript>` block in `blocks/_featured-pills-tabs.liquid` puts every panel
-     back — unlayered, so it beats this. */
   tab-group.featured-pills__tabs:not(:defined) .tabs__panel {
     display: none;
   }
@@ -1685,66 +1200,25 @@
     padding: var(--tabs-tab-padding-block, 10px) var(--tabs-tab-padding-inline, 20px);
     border-radius: var(--tabs-track-radius, 50px);
 
-    /* **Option background**. Empty by default, which is the arrangement the
-       main strip uses: the track is painted and the options read as regions of
-       it. A strip with no track paints its options instead — see the note in
-       the block. */
     background: var(--tabs-tab-background, none);
   }
 
-  /* Only when the merchant gave a second colour; otherwise the chosen option
-     keeps the first, because a strip whose selection is already said by a rule
-     or a filled mark does not need its pill to change as well. */
   .tabs.tabs--block.tabs--pills .tabs__tab[aria-selected='true'] {
     background: var(--tabs-tab-background-active, var(--tabs-tab-background, none));
   }
 
-  /* Quieter than the plain strip's 0.65 but not by much: these options carry a
-     mark as well as a name, and a mark at 0.65 reads as disabled rather than as
-     available. Set **Tab color** and the block publishes 1 here instead — a
-     merchant who has named the colour has answered the question this was
-     guessing at. */
   .tabs--pills .tabs__tab[aria-selected='false'] {
     opacity: var(--tabs-tab-idle-opacity, 0.75);
   }
 
-  /* `.tabs--block .tabs__tab[aria-selected='true']` further down falls back to
-     the primary button's *text* colour, because on that strip the marker behind
-     the selected tab is the primary button's fill. Here it is a rule or nothing
-     at all, so that guarantee does not hold and white-on-mint is exactly wrong.
-     The heading colour is what a chosen word on the page's own background wants;
-     **Selected tab text color** overrides it.
-
-     Note what this rule does *not* do: it does not clear the option's own
-     border. That rule belongs to the filled marker alone — see below.
-
-     ## Why `.tabs` is in the selector
-
-     `.tabs--block .tabs__tab[aria-selected='true']` further down is (0,3,0) and
-     *later in this file*, so a pills rule written at (0,3,0) loses the tie on
-     source order and every declaration here is silently discarded — which is
-     how the chosen option came out with no border at all. Naming the class the
-     element already carries takes these to (0,5,0) and settles it on
-     specificity, which is stable whatever order these blocks end up in. */
   .tabs.tabs--block.tabs--pills .tabs__tab[aria-selected='true'] {
     color: var(--tabs-tab-active-color, var(--color-heading, inherit));
   }
 
-  /* A filled marker slides in behind the selected option, so the option's own
-     outline has to get out of the way: two rings, one inside the other, is what
-     a border left on looks like. Only the filled marker has that problem — a
-     rule sits on the edges and nothing is drawn behind the option at all. */
   .tabs.tabs--block.tabs--pills-marker-fill .tabs__tab[aria-selected='true'] {
     border-color: transparent;
   }
 
-  /* With no marker, the option's own outline *is* the marker.
-     `blocks/_featured-pills-tabs.liquid` offers None for a strip that says which
-     option is chosen with its own mark and colour — and a strip of outlined
-     pills where every one is outlined says nothing. So the border is drawn on
-     the chosen option and cleared on the rest, which is the numbered routine
-     chooser in the *How it works* panel. A strip that sets no border style
-     emits a zero width and none of this paints. */
   .tabs.tabs--block.tabs--pills-marker-none .tabs__tab[aria-selected='true'] {
     border-color: var(--tabs-tab-border-color, var(--color-border));
   }
@@ -1753,16 +1227,6 @@
     border-color: transparent;
   }
 
-  /* The marker, three ways.
-     --------------------------------------------------------------------------
-     Still one element that travels, in every one of them. **Rule** is the drawn
-     design — a line above and below the chosen option, which reads as a page
-     selected out of a set rather than as a button pressed. **Fill** is the pill
-     every other strip in the theme draws. **None** hands the whole job to the
-     option's own mark and colour.
-
-     Doubled class, so each beats `.tabs--block .tabs__marker` at (0,2,0) on
-     specificity rather than on source order. */
   .tabs--block.tabs--pills .tabs__marker {
     background-color: transparent;
     background-image: none;
@@ -1784,18 +1248,6 @@
     display: none;
   }
 
-  /* The mark inside an option.
-     --------------------------------------------------------------------------
-     `snippets/icon-mark.liquid` drew it and `blocks/_featured-pills-tab.liquid`
-     published its `--icon-mark-*` properties **inline on the mark itself**,
-     which is what makes the rules below target the painted result rather than
-     those properties: an inline custom property beats every stylesheet, so
-     redeclaring `--icon-mark-fill` from here would change nothing at all.
-
-     `::before` is the filled shape and `color` is the glyph — both ordinary
-     properties, neither set inline, both reachable. The strip publishes what
-     they become on its own root, so "the chosen one fills in" is one setting on
-     the set rather than four settings that can disagree. */
   .featured-pills__tab-mark {
     position: relative;
     flex: 0 0 auto;
@@ -1809,18 +1261,11 @@
     background: var(--tabs-mark-active-fill, transparent);
   }
 
-  /* The ring has nothing left to do once the mark is a filled disc, so it fades
-     rather than sitting as a dotted outline around a solid shape. **Keep the
-     ring on the chosen option** publishes 1 here and it stays. */
   .tabs--pills .tabs__tab[aria-selected='true'] .featured-pills__tab-mark .icon-mark__ring {
     opacity: var(--tabs-mark-active-ring-opacity, 1);
     transition: opacity var(--header-speed) var(--header-ease);
   }
 
-  /* The tick on the chosen option's mark.
-     Real markup rather than a `::after` glyph: it is `aria-hidden` in the
-     template, it takes two colours from the strip, and a merchant who does not
-     want it gets no element at all instead of a rule fighting one. */
   .featured-pills__tab-check {
     position: absolute;
     inset-block-start: -2px;
@@ -1839,17 +1284,11 @@
     display: grid;
   }
 
-  /* An option with no mark pins the tick to the button instead. `.tabs__tab` is
-     already `position: relative` — it has to be, for the marker's z-index to
-     work against it — so there is nothing to add there, and the badge straddles
-     the pill's corner the way it straddles the mark's. */
   .featured-pills__tab-check--alone {
     inset-block-start: -6px;
     inset-inline-end: -6px;
   }
 
-  /* The number before an option's name — "01 Morning Recovery". Part of the
-     accessible name deliberately; see the note in the block. */
   .featured-pills__tab-number {
     flex: 0 0 auto;
     font-family: var(--font-body-family);
@@ -1864,10 +1303,6 @@
       gap: var(--tabs-gap-mobile, var(--tabs-gap, var(--space-8)));
     }
 
-    /* Four options at 390px are four names running off the edge. The track keeps
-       its shape and the options wrap inside it, and the marker follows without
-       any change here because it is measured from whatever box the selected
-       option ends up with. */
     .tabs--pills .tabs__list {
       flex-wrap: wrap;
       justify-content: center;
@@ -1879,21 +1314,6 @@
      The panel rises when the tab changes
      --------------------------------------------------------------------------
      An `animation`, not a `transition`, and that is the whole reason this works.
-
-     `<tab-group>` switches panels with the `hidden` attribute, and `hidden` is
-     `display: none`. A `display: none` element has no running animations and
-     nothing to transition *from* — which is why the content used to appear in one
-     frame however the panels were styled.
-
-     But the same fact is what makes an animation fire: an element that starts
-     being rendered starts its animations from the beginning. So the new panel
-     plays this on every switch, without `tabs.js` having to stamp a class on it
-     and take it off again, and without any state to get out of step with the
-     attribute that actually decides what is shown.
-
-     `both` holds the opening frame, so there is no flash of the finished position
-     before the animation takes over. The travel is deliberately small — content
-     this wide sliding a long way reads as the panel falling into place rather
      than as a response to the tap. */
   @keyframes tab-panel-rise {
     from {
@@ -1911,17 +1331,9 @@
     animation: tab-panel-rise 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 
-  /* The rise happens inside the panel area. Without this the 14px of travel is
-     14px of overflow for the length of the animation, which on a mega menu whose
-     height is already at the viewport's limit is a scrollbar that appears and
-     disappears on every tab change. `clip` rather than `hidden` because it
-     establishes no scroll container of its own. */
   .tabs__panels {
     overflow: clip;
 
-    /* A little bleed, so a card's hover lift or a shadow inside the panel is not
-       shaved off at the edge. It costs nothing at rest and never creates a scroll
-       container — `clip` cannot scroll, so this only changes what is painted. */
     overflow-clip-margin: 8px;
   }
 
@@ -1937,43 +1349,17 @@
     gap: var(--space-5);
   }
 
-  /* Inside a carousel the track owns the columns, so the grid steps aside rather
-     than fighting the carousel for the same property. */
   .tabs__panel .carousel-shell__track {
     --grid-columns-desktop: var(--tab-columns, 3);
   }
 
-  /* ---- the standalone block ------------------------------------------------
-     `blocks/tabs.liquid` puts the same strip in a section, where there is no
-     tinted field behind it. The marker keeps its own colour there — a white pill
-     on a white section is an active tab nobody can see — and it takes the card
-     surface, which is the same tint the FAQ rows and every other panel in the
-     theme sit on. */
-  /* Fill or fit, written as both `flex` and `inline-size` — see the note in
-     `blocks/tabs.liquid`. The default is fill, so a strip dropped into a section
-     spans it rather than hugging its longest tab name. */
+  /* ---- the standalone block ---- */
   .tabs--block {
     flex: var(--tabs-flex, 1 1 0%);
     inline-size: var(--tabs-width, 100%);
     max-inline-size: 100%;
   }
 
-  /* The selected tab is the primary button's colours, not a pale card. The menu
-     gets away with a near-white marker because it sits in a tinted field; in a
-     section the same pill is invisible on half the colour schemes, and "which tab
-     am I on" is the one question a tab strip exists to answer.
-
-     `--tabs-marker-background` comes first, and that is a fix rather than an
-     extra. A segmented strip carries both classes — `tabs--block tabs--segmented`
-     — so this rule matched it too, and it used to hard-code the primary button's
-     fill. Same specificity as the segmented rule above and later in the file, so
-     it won: **Selected color** was in the panel, saved by merchants, and painted
-     over on every segmented strip in the theme. That rule now carries the extra
-     class and wins on the cascade, and this one reads the property as well, so
-     the setting reaches the marker by either route.
-
-     The fallback is unchanged, so a plain strip that sets nothing still gets the
-     primary button's colour and looks exactly as it did. */
   .tabs--block .tabs__marker {
     background-color: var(--tabs-marker-background, var(--color-primary-button-background));
     box-shadow: none;
@@ -1988,11 +1374,6 @@
     border: var(--tabs-tab-border-width, 1px) var(--tabs-tab-border-style, solid)
       var(--tabs-tab-border-color, var(--color-border));
 
-    /* **Tab color**, and `inherit` when the merchant has not picked one — which
-       is the value this rule had before the setting existed, so an untouched
-       strip renders unchanged. Only `blocks/tabs.liquid` emits the property; the
-       mega menu's and the drawer's strips share these classes and set nothing,
-       so they keep inheriting. */
     color: var(--tabs-tab-color, inherit);
     transition:
       opacity var(--header-speed) var(--header-ease),
@@ -2000,17 +1381,9 @@
       border-color var(--header-speed) var(--header-ease);
   }
 
-  /* The marker slides in behind the selected tab, so the tab's own outline has to
-     get out of the way — two rings, one inside the other, is what a border left
-     on looks like. */
   .tabs--block .tabs__tab[aria-selected='true'] {
     border-color: transparent;
 
-    /* **Selected tab text color** first, then the answer this rule gave on its
-       own: the marker behind the selected tab is the primary button's fill, so
-       its text colour is the one that is guaranteed to read against it. The
-       setting exists because the marker is not always that fill — the segmented
-       switch paints its own — and then the guarantee no longer holds. */
     color: var(--tabs-tab-active-color, var(--color-primary-button-text));
   }
 
@@ -2019,26 +1392,18 @@
     flex-shrink: 0;
   }
 
-  /* A rule between the rail and the panel, for the vertical arrangement only:
-     read down a column of names and the line is what says where the list ends
-     and the answer begins. Across the top the tabs are already a row of pills
-     above the content and a second horizontal line only crowds them. */
   .tabs--block.tabs--divided .tabs__panels {
     border-inline-start: 1px solid var(--color-border);
     padding-inline-start: var(--tabs-gap, var(--space-6));
   }
 
   @media screen and (max-width: 989px) {
-    /* The rail is a horizontal scroller at this width, so a line down the side of
-       the panel would divide nothing. */
     .tabs--block.tabs--divided .tabs__panels {
       border-inline-start: 0;
       padding-inline-start: 0;
     }
   }
 
-  /* The mega menu's rail is inset into a tinted field, which is what makes the
-     selected pill read as sitting *in* the rail rather than on top of it. */
   .tabs--menu {
     padding: var(--space-4);
     border-radius: var(--mega-radius, 20px);
@@ -2075,18 +1440,6 @@
     position: relative;
   }
 
-  /* <shopify-account>, the component the Theme Store asks a header to carry.
-
-     Shopify owns what is inside it and updates it independently of the theme,
-     so the theme styles only the two surfaces the component exposes: the slot
-     it takes the signed-out avatar from, and the custom properties for the
-     signed-in one. Everything else here is sizing, so the component occupies
-     the same 40px box as the search and cart controls beside it and the row
-     does not change height when a customer signs in. */
-  /* No box of its own. `<account-anchor>` exists to measure the icon and write
-     two custom properties onto the component; giving it a layout box would put
-     a wrapper between the actions row and its flex item for no reason, and the
-     measurement is taken from the component, not from the wrapper. */
   account-anchor {
     display: contents;
   }
@@ -2159,10 +1512,6 @@
     padding-inline: var(--space-4);
   }
 
-  /* Inline text beside the icon. `base.css` paints `[data-cart-count]` as a
-     floating red bubble for the previous header, which is why the number was
-     overflowing the control — so this one does not carry that attribute, and the
-     count arrives from Liquid on every section re-render instead. */
   .site-header__cart-count {
     position: static;
     min-inline-size: 0;
@@ -2185,27 +1534,13 @@
     block-size: 40px;
     padding-inline: var(--space-3) 4px;
     border-radius: 999px;
-    /* The captured tokens, not the live ones.
-
-       `--color-heading` is not the heading colour inside the header. Section 27
-       repurposes it on the shell: over a banner it becomes the transparent
-       header's *text* colour, which is white. So the outer pill turned white,
-       its content stayed `--color-background` - also white - and the tag icon
-       disappeared into it. Solid, where nothing is overridden, it looked correct,
-       which is why this only showed on the transparent header.
-
-       `--header-ink-heading` and `--header-surface` are the same two colours
-       captured on `.site-header` before any of that happens, and they follow the
-       sticky scheme. Section 41 already resets the panels this way. */
     background-color:var(--header-surface, var(--color-background));
-    color:  var(--header-ink-heading, var(--color-heading, var(--color-text))); 
+    color:  var(--header-ink-heading, var(--color-heading, var(--color-text)));
     font-size: var(--header-utility-size, 14px);
     text-decoration: none;
     white-space: nowrap;
   }
 
-  /* A pill inside a pill. The badge is the number the customer is meant to read,
-     so it carries the accent and the label around it stays quiet. */
   .site-header__promo-badge {
     display: inline-flex;
     align-items: center;
@@ -2328,9 +1663,6 @@
   .market-picker--drawer .market-picker__trigger {
     border: 1px solid var(--color-border);
   }
-
-  /* Superseded by section 38, which owns the drawer panel's position, surface and
-     stacking order in one place. */
 
   /* --------------------------------------------------------------------------
      16. Menu drawer
@@ -2502,36 +1834,15 @@
     rotate: 90deg;
   }
 
-  /* The vertical stroke rotates back to flat rather than disappearing, so the
-     plus visibly becomes the minus instead of one icon replacing another. */
   [data-open] > .drawer-nav__link .drawer-nav__sign::after {
     rotate: 0deg;
   }
 
   /* ---- accordion panel ---- */
 
-  /* A one-row grid animated from `0fr` to `1fr`.
-
-     This is the only way to transition to a height the browser has to measure.
-     `max-height` needs a guessed ceiling — too low and long menus are cut off,
-     too high and the animation spends most of its duration on empty space, which
-     is what made the accordion look like it was not animating at all. */
-  /* The height is written by `header.js` in pixels, measured from the content.
-
-     `grid-template-rows: 0fr → 1fr` is tidier, but it depends on the browser
-     laying the row out before the second value is applied — and inside a
-     `<details>` that has just been opened, that pass does not reliably happen.
-     The panel jumped to full height with no animation.
-
-     A measured pixel height has no such dependency, and the component releases it
-     back to `auto` once the transition ends so a submenu opening inside an
-     already-open panel still grows its parent. */
   .drawer-nav__panel {
     overflow: hidden;
     block-size: 0;
-    /* `will-change` promotes the panel before the first frame. Without it the
-       browser starts the transition on the main thread, spends the first two or
-       three frames deciding to promote, and the opening reads as a stutter. */
     will-change: block-size;
     transition: block-size var(--panel-speed) var(--header-ease);
   }
@@ -2541,10 +1852,6 @@
   }
 
   .drawer-nav__panel-inner {
-    /* No `overflow: hidden` here. The panel above already clips, and a second clip
-       on the element being measured means `scrollHeight` reports the *visible*
-       height rather than the content height — so the animation ran to the wrong
-       number and looked like a jump. */
     padding-block-end: var(--space-3);
     opacity: 0;
     transition: opacity var(--panel-fade) linear;
@@ -2554,8 +1861,6 @@
     opacity: 1;
   }
 
-  /* A mega panel cloned into the drawer is a flat block of content, not a
-     floating panel: no shadow, no border, no absolute positioning. */
   .drawer-nav .nav__panel--mobile {
     position: static;
     padding: 0;
@@ -2619,8 +1924,6 @@
     transition-delay: 0s;
   }
 
-  /* The root slides out of the way rather than sitting under the child panel,
-     which would show through during the transition. */
   .drawer-nav--slide[data-depth]:not([data-depth='0']) .drawer-nav__screen[data-menu-root] {
     transform: translateX(-30%);
     opacity: 0;
@@ -2674,9 +1977,6 @@
 
   @media screen and (max-width: 989px) {
     .site-header {
-      /* Was `--header-row-height: 56px`, which the section's inline style silently
-         beat — so the phone header has been using the desktop height all along.
-         The row reads the mobile variable directly instead. */
       --header-pad-inline: var(--space-4);
       --header-gap: var(--space-2);
     }
@@ -2791,22 +2091,6 @@
     }
   }
 
-  /* The field is styled against the PANEL, not against the header bar.
-   *
-   * Section 29 resets `--color-background`, `--color-text`, `--color-heading` and
-   * `--color-border` on this panel so it keeps the header's base scheme while the
-   * bar swaps to its sticky or transparent one. `--color-input-background` was
-   * not in that list, so it kept coming from whatever scheme the bar was wearing
-   * — and once the header pinned and turned charcoal, the search field was drawn
-   * black on a white panel with a placeholder nobody could read.
-   *
-   * Adding one more token to the reset would only move the problem: the panel's
-   * surface and the field's surface would still be two independent values that
-   * happen to agree. Mixing the field out of the panel's own two colours makes
-   * disagreement impossible — the field is the panel's background lifted
-   * slightly, and its text is the panel's text, in every header state.
-   *
-   * Each `color-mix()` is preceded by a flat value for browsers without it. */
   .market-picker__search input {
     inline-size: 100%;
     padding: 8px var(--space-3);
@@ -2837,9 +2121,6 @@
     opacity: 0.7;
   }
 
-  /* The list is a real `<ul>`. `listbox` semantics were removed: the options are
-     submit buttons in Shopify's localization form, and a listbox whose options
-     are buttons that navigate is a role that lies about what happens on Enter. */
   .market-picker__list li + li {
     margin-block-start: 1px;
   }
@@ -2853,12 +2134,6 @@
      -------------------------------------------------------------------------- */
 
   @media screen and (max-width: 989px) {
-    /* Horizontal and scrolling, always.
-
-       A vertical rail on a phone spends the whole screen width on category names
-       and leaves the panel below the fold. Laid across the top it costs one row,
-       and the partially visible next tab is what tells the customer there is more
-       to scroll — which a stacked list cannot say. */
     .tabs--menu .tabs__list,
     .tabs--vertical .tabs__list {
       flex-direction: row;
@@ -2883,15 +2158,12 @@
       white-space: nowrap;
     }
 
-    /* The marker is measured from the tab's box, so it has to travel with the
-       rail rather than stay pinned to the viewport. */
     .tabs--menu .tabs__rail,
     .tabs--vertical .tabs__rail {
       min-inline-size: 0;
     }
   }
 
-  /* The drawer's close button keeps the shared button styling but sits square. */
   .nav-drawer__close.button {
     --button-padding-inline: 0;
     inline-size: 40px;
@@ -2909,8 +2181,6 @@
      -------------------------------------------------------------------------- */
 
   @media screen and (max-width: 989px) {
-    /* The logo leaves whichever desktop slot it was in and takes the middle,
-       `order` moving it without a second copy in the markup. */
     .site-header[data-logo-mobile='center'] .site-header__row--top {
       grid-template-columns: auto minmax(0, 1fr) auto;
     }
@@ -2939,8 +2209,6 @@
       justify-content: flex-start;
     }
 
-    /* The promotional pill is the first thing to go. It is the widest control in
-       the row and the only one that is not navigation. */
     .site-header__actions[data-promo-desktop-only] .site-header__promo {
       display: none;
     }
@@ -2953,10 +2221,6 @@
      controls do not fit on a 1400px row, and a grid track whose content is wider
      than the track overflows it — which is why the menu was painting on top of
      the localization in the screenshot.
-
-     Three things stop that: the outer slots refuse to grow past their content,
-     the navigation is the only thing allowed to shrink, and below the widths
-     where it would have to shrink to nothing, the optional controls step out.
      ========================================================================== */
 
   .site-header__row {
@@ -2967,8 +2231,6 @@
     min-inline-size: 0;
   }
 
-  /* Everything except the navigation holds its size. These are targets the
-     customer reaches for by position, so they must not move. */
   .site-header__logo,
   .site-header__actions,
   .site-header__burger,
@@ -2976,12 +2238,6 @@
     flex-shrink: 0;
   }
 
-  /* The end slot is a cluster, and it must be measured as one.
-   *
-   * With the country and language controls loose in the row, the navigation had
-   * no way to know how much room they needed — it sized itself to its own content
-   * and the two overlapped. Grouped and non-shrinking, the end slot claims its
-   * width first and the navigation takes what is left. */
   .site-header__slot--end {
     flex-shrink: 0;
     gap: var(--space-3);
@@ -2991,17 +2247,6 @@
     min-inline-size: 0;
   }
 
-  /* The navigation is what gives.
-
-     It must NOT clip. A `compact` mega panel — the Science menu — is positioned
-     against its own `<li>`, which lives inside here, so `overflow: hidden` cut the
-     whole panel away and the menu opened onto nothing. Page and full width panels
-     survived because their containing block is `.site-header__inner`, an ancestor
-     of this element, and an overflow clip does not apply to a descendant whose
-     containing block is outside it.
-
-     Overlap is prevented by the width rules below instead: the row tightens, then
-     sheds its optional controls in order. */
   .site-header__nav {
     min-inline-size: 0;
     flex-shrink: 1;
@@ -3012,7 +2257,6 @@
   }
 
   @media screen and (min-width: 990px) and (max-width: 1399px) {
-    /* Tighten before hiding anything. Most rows fit again at this point. */
     .site-header {
       --header-pad-inline: var(--space-4);
     }
@@ -3023,8 +2267,6 @@
   }
 
   @media screen and (min-width: 990px) and (max-width: 1199px) {
-    /* The country name is the widest optional string in the row, and the flag and
-       the chevron still say what the control is. */
     .market-picker--header .market-picker__trigger > span[aria-hidden='true'] {
       display: none;
     }
@@ -3049,19 +2291,14 @@
   .site-header__slot--center { justify-content: center; }
   .site-header__slot--end { justify-content: flex-end; }
 
-  /* When the logo is alone in a slot with other controls, its own setting still
-     decides where in that slot it sits. */
   .site-header[data-logo-position='left'] .site-header__slot--start .site-header__logo { margin-inline-end: auto; }
   .site-header[data-logo-position='right'] .site-header__slot--end .site-header__logo { margin-inline-start: auto; }
   .site-header[data-logo-position='center'] .site-header__slot--center .site-header__logo { margin-inline: auto; }
 
-  /* Same for the navigation. In the start slot it hugs the logo; in the end slot
-     it hugs the actions; in the centre it is centred on the page. */
   .site-header[data-menu-position='left'] .site-header__slot--start .site-header__nav { margin-inline-end: auto; }
   .site-header[data-menu-position='right'] .site-header__slot--end .site-header__nav { margin-inline-start: auto; }
   .site-header[data-menu-position='center'] .site-header__slot--center .site-header__nav { margin-inline: auto; }
 
-  /* Search sits with whichever group it was put in rather than floating. */
   .site-header[data-search-position='left'] .site-header__slot--start .site-header__action--search { order: 10; }
   .site-header[data-search-position='right'] .site-header__slot--end .site-header__action--search { order: -1; }
 
@@ -3073,30 +2310,6 @@
      `.site-header[data-scrolled] .nav__link, .site-header__action, …` that had to
      grow every time a control was added — and how one of them got missed and left
      white text on a white bar.
-
-     So nothing here sets a colour on an element. The **scheme variables are
-     overridden on the shell**, and every descendant already reads from them:
-     `.nav__link` inherits, the icon buttons mix from `currentColor`, the panels
-     use `--color-background`, the borders use `--color-border`. One override,
-     whole header.
-
-     ## Three states, and `:has([open])` is the interesting one
-
-     - **transparent** — over the banner, untouched
-     - **surfaced** — pointer over the header, or a menu open beneath it
-     - **solid** — scrolled past the banner, on the sticky scheme
-
-     A mega menu opening from a transparent header is the case a hover rule alone
-     gets wrong: the pointer moves down into the panel, leaves the header, and the
-     bar behind the open menu snaps back to transparent. `:has([open])` keeps the
-     surface up for as long as something is open, so the header and the panel it
-     owns are one object.
-
-     ## Why the overrides sit on the shell
-
-     `--header-surface` is captured on `.site-header` (section 3). The overrides
-     have to happen somewhere that can still read it, and a custom property cannot
-     reference itself on the same element. One level down is enough.
      ========================================================================== */
 
   .site-header__shell {
@@ -3110,18 +2323,7 @@
 
   /* ---- transparent ---- */
 
-  /* `[data-transparent]` is written by Liquid and removed by the component past
-     the scroll threshold, so this whole block simply stops applying once the
-     banner is behind us — no second selector for the scrolled state, and no
-     `!important` to unpick it. */
   .site-header--transparent[data-transparent] .site-header__shell:not(:hover):not(:has([open])):not(:has(.market-picker__panel:not([hidden]))) {
-    /* Frosted, not invisible.
-     *
-     * A fully transparent bar reads as "no header" over a busy photograph, and the
-     * links only become legible once you are already pointing at them. A tenth of
-     * white with a deep blur keeps the banner visible while giving the text
-     * something to sit on — and it means the header is a surface in all three
-     * states, so the hover is a change of degree rather than an appearance. */
     --color-background: var(--header-veil, rgb(255 255 255 / 0.1));
     --gradient-background: none;
     --color-text: var(--header-transparent-text, #fff);
@@ -3135,16 +2337,11 @@
   /* ---- surfaced: hovered, or holding an open menu ---- */
 
   .site-header--transparent[data-transparent] .site-header__shell:is(:hover, :has([open]), :has(.market-picker__panel:not([hidden]))) {
-    /* Mixed from the scheme's own background rather than a fixed white, so a dark
-       scheme surfaces dark. 78% keeps the banner readable underneath, which is
-       what makes this feel like the header rising rather than the page changing. */
     --color-background: color-mix(in srgb, var(--header-surface) 78%, transparent);
 
     backdrop-filter: blur(18px) saturate(1.4);
   }
 
-  /* The inverse logo belongs to the transparent state only. As soon as there is a
-     surface behind it — hover, open menu, or scrolled — the solid one is correct. */
   .site-header--transparent[data-transparent] .site-header__shell:is(:hover, :has([open]), :has(.market-picker__panel:not([hidden]))) .site-header__logo--prefers-inverse .site-header__logo-image--solid,
   .site-header[data-scrolled] .site-header__logo--prefers-inverse .site-header__logo-image--solid {
     opacity: 1;
@@ -3157,40 +2354,10 @@
 
   /* ---- solid: the sticky scheme ---- */
 
-  /* Nothing to declare. The component swaps the scheme class on `.site-header` and
-     removes `[data-transparent]`, so the shell falls back to reading the sticky
-     scheme's own variables — and `--header-surface` has already followed it there.
-
-     The only addition is the lift, which says the header is now above the page
-     rather than part of the banner. */
   .site-header[data-scrolled]:not([data-transparent]) .site-header__shell {
     box-shadow: 0 8px 28px -18px color-mix(in srgb, var(--color-text) 60%, transparent);
   }
 
-  /* Panels opened from a transparent header must not inherit the transparent
-     background — they are their own surface and their contents have to be
-     readable regardless of what is behind the header. */
-  /* A panel is its own surface, so it restores the whole scheme — not just the
-     background.
-
-     Restoring only `--color-background` left the transparent header's *text*
-     override in place, which is white. The panel painted a light background and
-     then wrote white text, white headings and white hairlines onto it: a panel
-     that opens onto what looks like nothing at all.
-
-     All four are captured on `.site-header` before section 27 overrides them, so
-     this is the untouched scheme in every state — including the sticky one. */
-  /* `:where()` so this has zero specificity.
-   *
-   * A mega menu block renders its own `color-scheme-n` class on this element,
-   * because Panel colour scheme is a setting the merchant chose. Written as a
-   * plain class selector, this rule sat in `header.css` — which loads after
-   * `base.css` — and beat that class, so the setting did nothing.
-   *
-   * At zero specificity it is a floor rather than an override: panels with a
-   * scheme keep it, panels without one (the automatic dropdown, the account menu,
-   * the country list) fall back to the header's base scheme instead of inheriting
-   * the transparent or sticky overrides from the bar. */
   :where(.nav__panel-inner, .market-picker__panel, .nav__panel--mobile) {
     --color-background: var(--header-surface);
     --color-text: var(--header-ink);
@@ -3213,9 +2380,6 @@
      positioned, clipped for the reveal, `max-content` wide, capped at the panel's
      maximum width. All four are wrong in a 380px drawer, and the compact panel in
      particular arrived wider than the screen with its own scrollbar.
-
-     Everything below unwinds those, so the panel becomes what it should be on a
-     phone: a plain block of content in the flow of the accordion.
      ========================================================================== */
 
   .drawer-nav .nav__panel--mobile {
@@ -3237,9 +2401,6 @@
     border-radius: 0;
     background: none;
     box-shadow: none;
-    /* The desktop reveal slides the inner element down out of a clip. There is no
-       clip here, so an untouched transform would leave it sitting above the panel
-       it belongs to. */
     transform: none;
     opacity: 1;
   }
@@ -3248,8 +2409,6 @@
     padding: 0;
   }
 
-  /* One column. A twelve-column grid on a phone gives every block a slice of a
-     slice. */
   .drawer-nav .nav__panel--mobile .megamenu__grid,
   .drawer-nav .nav__panel--mobile .megamenu__columns {
     grid-template-columns: minmax(0, 1fr);
@@ -3260,7 +2419,6 @@
     grid-column: 1 / -1;
   }
 
-  /* The tab rail keeps its inset field, but loses the desktop two-column split. */
   .drawer-nav .nav__panel--mobile .tabs--vertical {
     grid-template-columns: minmax(0, 1fr);
     gap: var(--space-4);
@@ -3270,9 +2428,6 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  /* A carousel inside the drawer measures itself when the accordion opens — but
-     only if it has a width to measure. Without this it inherits `max-content` from
-     the compact panel and reports a track wider than the drawer. */
   .drawer-nav .nav__panel--mobile .carousel-shell {
     inline-size: 100%;
     max-inline-size: 100%;
@@ -3285,8 +2440,6 @@
      dropdown Liquid builds from those children is an empty `<ul>`. Until the block
      panel replaces it, that empty box is what opens — a bordered rectangle with
      nothing in it, which is what the screenshot shows.
-
-     An empty list is not something to style. It is something not to render.
      ========================================================================== */
 
   .nav__panel--dropdown > .nav__panel-inner:has(> .dropdown:empty) {
@@ -3332,10 +2485,6 @@
      The cloned panel was sized `max-content` and capped at the desktop panel's
      maximum width, so a 460px card list arrived in a 380px drawer and ran off the
      right edge with its text cut in half.
-
-     `min-inline-size: 0` on every level is the part that is easy to miss: a grid
-     or flex item defaults to `auto`, which refuses to shrink below its content,
-     and one un-shrinkable descendant pushes the whole chain wide.
      ========================================================================== */
 
   .drawer-nav,
@@ -3361,7 +2510,6 @@
     min-inline-size: 0;
   }
 
-  /* A long description has to wrap rather than set the card's width. */
   .drawer-nav .menu-card__title,
   .drawer-nav .menu-card__description,
   .drawer-nav .menu-promo__heading {
@@ -3375,25 +2523,11 @@
      The logo is centred by taking it out of the flow, which means it can run
      underneath the controls on either side — and on a phone those controls start
      about 60px in from each edge.
-
-     Constraining it to the space actually left over is what stops the overlap.
-     The burger is 40px, the actions are three 40px controls, and the gaps are the
-     row's own, so the reserved width is stated once here and the logo takes what
-     remains.
      ========================================================================== */
 
   @media screen and (max-width: 989px) {
-    /* The logo is centred by taking it out of the flow, so it has to be told how
-       much room the controls need — and the earlier attempt reserved the *total*
-       width of both sides. That is the wrong number.
-
-       A centred element grows equally in both directions, so what matters is the
-       widest single side, doubled. Reserving burger + actions gave 192px total,
-       96px per side, while the actions alone were about 130px — and the logo ran
-       straight under the account icon, which is exactly the screenshot. */
     .site-header[data-logo-mobile='center'] .site-header__row--top {
       position: relative;
-      /* The actions side is the wider one: cart with its count, plus search. */
       --mobile-side: 120px;
     }
 
@@ -3405,33 +2539,21 @@
       inset-block-start: 50%;
       z-index: 1;
       inline-size: fit-content;
-      /* Both sides, not the sum of them. */
       max-inline-size: calc(100% - (var(--mobile-side) * 2));
       margin-inline: auto;
       translate: 0 -50%;
     }
 
-    /* The account control moves to the drawer, which already has it in the footer.
-       Two icon controls beside a centred logo is the most a 380px row holds
-       without the logo shrinking to an initial. */
     .site-header[data-logo-mobile='center'] .site-header__action--account,
     .site-header[data-logo-mobile='center'] .site-header__account {
       display: none;
     }
 
-    /* Except the Shopify component, which the Theme Store requires to be visible
-       in the mobile header as well as the desktop one — so it is not the theme's
-       to move into the drawer. The second selector is the signed-out avatar the
-       theme passes into the slot: it carries the control classes to inherit the
-       row's circle and hover, and would otherwise be caught by the rule above
-       and hidden inside a component that is itself still shown. */
     .site-header[data-logo-mobile='center'] .site-header__account-component,
     .site-header[data-logo-mobile='center'] .site-header__account-component .site-header__action--account {
       display: inline-flex;
     }
 
-    /* The controls stay above the logo's box, so a long shop name is truncated by
-       its own max-width rather than drawn over them. */
     .site-header__actions,
     .site-header__burger {
       position: relative;
@@ -3451,16 +2573,6 @@
       inline-size: min(var(--logo-width-mobile, 110px), 100%);
     }
 
-    /* A left-aligned logo shares the row normally, but still must not push the
-       controls off the end. */
-    /* No percentage cap here.
-     *
-     * `100%` on a logo that is *in the flow* resolves against its slot, and the
-     * slot is only as wide as the burger and the logo — so `calc(100% - 160px)`
-     * was usually a negative number, clamped to zero, and the logo disappeared
-     * entirely. That is why it was missing rather than merely cramped.
-     *
-     * The track shrinks instead, and the text truncates inside it. */
     .site-header[data-logo-mobile='left'] .site-header__logo {
       min-inline-size: 0;
       max-inline-size: none;
@@ -3510,20 +2622,9 @@
      window `resize` so that any carousel inside would re-measure — but that told
      *every* carousel on the page to relayout, mid-transition, and the panel's own
      height changed under the reveal.
-
-     The dispatch is gone. `carousel.js` already observes its own track, so a
-     carousel that gains width when its panel opens re-measures on its own and does
-     it once, before anything is visible.
-
-     What is left here is making sure the panel's height is settled before it
-     moves: images inside a panel are given their aspect ratio up front so the box
-     does not grow as they arrive.
      ========================================================================== */
 
   .nav__panel-inner {
-    /* Promoted for the whole transition. Without it the first two or three frames
-       go to the compositor deciding to promote, which is felt as a stutter at the
-       start of every open. */
     will-change: transform, opacity;
     backface-visibility: hidden;
   }
@@ -3531,8 +2632,6 @@
   .nav__panel [data-ratio],
   .nav__panel .menu-promo__image,
   .nav__panel .menu-card__image {
-    /* A reserved box. An image that arrives after the panel has opened would
-       otherwise push everything below it down. */
     contain: layout paint;
   }
 
@@ -3542,14 +2641,6 @@
      Not a fade. A list that fades in has no direction and no origin — it could
      have come from anywhere. A dropdown grows out of the control that opened it,
      which is the one thing the animation has to say.
-
-     `scaleY` from the correct edge does that in one composited property, and the
-     contents counter-scale so the text does not stretch on the way. In the header
-     the origin is the top edge; in the drawer, where it opens upwards, the bottom.
-
-     The two-step lives in `header.js`: `hidden` comes off, `data-open` lands on the
-     next frame. A panel that is `display: none` has no from-state, so setting both
-     together animates nothing at all.
      ========================================================================== */
 
   /* ==========================================================================
@@ -3558,14 +2649,6 @@
      I moved these into the flow last round to stop the panel covering the login
      link. That fixed the overlap and lost the shape: two controls stacked full
      width, and the footer growing and shrinking under the customer's thumb.
-
-     Side by side is right — they are two halves of one decision. The panel opens
-     upwards, over the footer, because there is no room below it. What was actually
-     wrong was never the position: the panel had no solid background, so the links
-     behind it showed through and read as overlapping text.
-
-     So: an opaque surface, its own stacking order, and a slide up rather than a
-     fade in.
      ========================================================================== */
 
   .market-picker--drawer {
@@ -3596,15 +2679,10 @@
     inline-size: max(100%, 220px);
     max-block-size: 46vh;
 
-    /* Opaque, not translucent. The list sits directly over the account link and
-       the social row, and a background that lets them through is read as two
-       lines of text on top of each other — which is what the screenshot showed. */
     background-color: var(--color-background);
     box-shadow: 0 -18px 40px -24px rgb(0 0 0 / 0.45);
   }
 
-  /* The second control's panel is aligned to its own right edge so it cannot run
-     off the drawer. */
   .market-picker--drawer .market-picker__unit:last-child .market-picker__panel {
     inset-inline: auto 0;
   }
@@ -3644,7 +2722,6 @@
       gap: var(--space-1);
     }
 
-    /* Recalculated for the smaller controls: burger, search, cart and the gaps. */
     .site-header[data-logo-mobile='center'] .site-header__row--top {
       --mobile-side: 96px;
     }
@@ -3713,15 +2790,9 @@
      buttons will not fit on a laptop, and there is no clipping to fall back on —
      the navigation must not clip, because a compact mega menu panel is positioned
      inside it.
-
-     So the row sheds in a fixed order, widest and least essential first. The
-     country and language controls are the ones to go: they are in the drawer, they
-     are in the footer, and a customer changing market does it once.
      ========================================================================== */
 
   @media screen and (min-width: 990px) and (max-width: 1439px) {
-    /* The country's name is the widest optional string in the row. The flag and
-       the chevron still say what the control is. */
     .market-picker--header .market-picker__trigger > span[aria-hidden='true'] {
       display: none;
     }
@@ -3732,8 +2803,6 @@
   }
 
   @media screen and (min-width: 990px) and (max-width: 1279px) {
-    /* Both controls leave the row. They remain in the menu drawer and the footer,
-       which is where a market switch is looked for once and then forgotten. */
     .market-picker--header {
       display: none;
     }
@@ -3775,14 +2844,6 @@
      `auto minmax(0, 1fr) auto` cannot centre the logo on the page — the middle
      track is whatever is left between two content-sized sides, and it moves as
      soon as one side has more controls than the other.
-
-     So a centred logo is taken out of the flow and centred on the row itself. That
-     is the only way to have both: outer tracks that never collapse, and a logo on
-     the page's centre line.
-
-     It is absolute, so it can reach the controls. The row states how much they
-     need and the logo takes what is left — reserving the widest single side,
-     doubled, because a centred element grows equally in both directions.
      ========================================================================== */
 
   @media screen and (min-width: 990px) {
@@ -3802,8 +2863,6 @@
       translate: 0 -50%;
     }
 
-    /* The controls stay above it, so a long shop name truncates inside its own box
-       rather than being drawn over them. */
     .site-header__slot--start > *,
     .site-header__slot--end > * {
       position: relative;
@@ -3841,9 +2900,6 @@
      Set on the row's own `min-block-size`, not by overriding
      `--header-row-height` — the section writes that one inline from the Height
      setting, and an inline custom property beats a media query.
-
-     One number. The row, the logo's ceiling and the type size all read it, so
-     changing `--header-row-height-mobile` above is the whole edit.
      ========================================================================== */
 
   @media screen and (max-width: 989px) {
@@ -3855,10 +2911,6 @@
       min-block-size: calc(var(--header-row-height-mobile, 54px) * 0.72);
     }
 
-    /* An image logo cannot grow the row. `--logo-width-mobile` sets a width, and a
-       portrait mark at that width can be twice as tall as the header was asked to
-       be. `object-fit` keeps it from distorting when the ceiling is what
-       constrains it rather than the width. */
     .site-header__logo-image,
     .site-header__logo-image img,
     .site-header__logo-img {
@@ -3875,18 +2927,6 @@
      window pinned under the trigger, and the surface inside slides down out of it.
      Not a fade, not a scale — the identical animation, so a customer who has
      opened one menu already knows what this one does.
-
-     The split is what makes it possible. One element cannot both clip its contents
-     and be the thing that travels, which is why the earlier attempts kept coming
-     out as something else: they were animating the panel itself.
-
-       .market-picker__panel  the clip. No background, no border, no shadow.
-       .market-picker__inner  the surface. Appearance, scrolling, and the movement.
-
-     Scrolling waits for `data-settled`, written by the component on
-     `transitionend`. A panel that is scrollable while it moves paints its
-     scrollbar for the whole transition, and again on the way out — and this list
-     is filled as it opens, so the height is genuinely still changing.
      ========================================================================== */
 
   .market-picker__panel {
@@ -3898,12 +2938,10 @@
     min-inline-size: 220px;
     max-inline-size: min(320px, 90vw);
 
-    /* Room below for the surface's shadow to land inside the clip. */
     padding-block: var(--space-2) var(--space-6);
     overflow: hidden;
     pointer-events: none;
 
-    /* The appearance moved to the inner element. */
     max-block-size: none;
     border: 0;
     background: none;
@@ -3956,7 +2994,6 @@
 
   .market-picker--drawer .market-picker__inner {
     max-block-size: 46vh;
-    /* Out of the bottom of the clip rather than the top. */
     transform: translateY(101%);
     box-shadow: 0 -18px 40px -24px rgb(0 0 0 / 0.45);
   }
@@ -3972,8 +3009,6 @@
     }
   }
 
-  /* The section's own media covers the backing, so anything with a background of
-     its own is unaffected. This is only ever seen in the gap before it loads. */
   body:has(.site-header--transparent) #MainContent > .shopify-section:first-child > * {
     position: relative;
   }
@@ -3995,7 +3030,6 @@
     min-inline-size: 0;
   }
 
-  /* Link lists are scanned, not read, and the heading is what separates them. */
   .megamenu__eyebrow,
   .megamenu__column-heading {
     margin-block-end: var(--space-2);
@@ -4009,17 +3043,10 @@
     padding-block: 4px;
   }
 
-  /* A top-level entry with no children is one line. It should not be spaced as
-     though a list were about to follow it. */
   .megamenu__link--standalone {
     padding-block: 2px;
   }
 
-  /* Banners sitting side by side share a baseline.
-     Each is its own block with its own Column span and Image ratio, so their
-     widths are the merchant's choice — but their *internals* should not drift:
-     the image fills its box, and the caption starts at the same distance from it
-     whatever the image's proportions are. */
   .megamenu__grid > .menu-promo {
     display: flex;
     flex-direction: column;
@@ -4036,8 +3063,6 @@
     padding-block-start: var(--space-3);
   }
 
-  /* Two lines, then ellipsis. A three-line heading in one card and a one-line
-     heading in the next is what makes a row of banners look misaligned. */
   .menu-promo__heading {
     display: -webkit-box;
     -webkit-box-orient: vertical;
@@ -4053,10 +3078,6 @@
      including before their module has arrived. An inline box wrapping block
      content lays out differently from a block one, so the header reflowed the
      moment each module upgraded, and the controls appeared to shuffle into place.
-
-     Stating the display for the tags themselves means the first paint and the
-     upgraded paint are the same layout. It costs three rules and removes a whole
-     category of movement.
      ========================================================================== */
 
   nav-menu,
@@ -4071,7 +3092,6 @@
     position: relative;
   }
 
-  /* The drawer is closed at load; it must not reserve space or paint. */
   drawer-component:not([data-open]) > dialog:not([open]) {
     display: none;
   }
@@ -4084,12 +3104,6 @@
      white header over a white gap. On a page where transparency is off — a solid
      header, dark text — the gate never matched and the area below the header was
      the page's own white until the hero's image arrived.
-
-     The gate is gone. The backing is a neutral scheme colour rather than the
-     heading colour, so it reads as "loading" under a light hero and a dark one
-     alike, and it is covered the moment the section paints anything of its own.
-
-     `--first-section-backing: transparent` in a scheme turns it off.
      ========================================================================== */
 
   #MainContent > .shopify-section:first-child {
@@ -4099,8 +3113,6 @@
     );
   }
 
-  /* A transparent header still wants the darker backing: its text is light, and a
-     pale placeholder would leave it unreadable for the same reason white did. */
   body:has(.site-header--transparent) #MainContent > .shopify-section:first-child {
     background-color: var(--header-banner-placeholder, var(--color-heading, #0b2b26));
   }
@@ -4116,81 +3128,25 @@
 
   /* ---- 47.1 `<sticky-header>` is a block ---------------------------------- */
 
-  /* Section 2 of this file states the display for `nav-menu`, `nav-disclosure`,
-     `market-picker` and `mobile-nav`, and gives the reason: a custom element is
-     `display: inline` until a stylesheet says otherwise, including before its
-     module has arrived.
-
-     `sticky-header` was not in that list, and it is the element the whole header
-     hangs off. Inline is not merely a different box here — vertical padding on an
-     inline element does not affect layout at all, so `[data-section-spacing]`'s
-     `padding-block` was computed and then contributed nothing. The bar painted
-     `--header-row-height` tall while the section published
-     `--header-row-height + padding` as `--header-block-size`, and `#MainContent`
-     was pulled up by the larger of the two.
-
-     It also makes `offsetHeight` honest, which is what `#measure()` publishes as
-     `--header-height`. */
   sticky-header {
     display: block;
   }
 
-  /* `box-sizing` is set globally in the reset, but the header is the one element
-     whose height is quoted to the rest of the page as a number, so it is restated
-     here rather than assumed. */
   sticky-header.site-header {
     box-sizing: border-box;
 
-    /* The floor is the number the section published. The ceilings are 47.3 and
-       the row's own `min-block-size`, so the header cannot end up on either side
-       of the value `#MainContent` offsets itself by. */
     min-block-size: var(--header-block-size, auto);
   }
 
   /* ---- 47.2 The previous header's rules must not reach this one ----------- */
 
-  /* `base.css` used to carry the rules from the header this file replaced. They
-     were left in place deliberately — on the understanding that the class names
-     had changed and nothing could match. But three of them were keyed on the
-     *element name*:
-
-       sticky-header[data-sticky-mode='always'] { position: sticky; inset-block-start: 0 }
-       sticky-header[data-sticky-mode='scroll-up'] { … }
-       sticky-header[data-scrolled] { box-shadow: … }
-
-     and `<sticky-header>` is still `<sticky-header>`. So the inner element was
-     sticky, inside a `.header-section` that is also sticky — two pinned boxes,
-     one nested in the other, and a stacking context on the inner one that the
-     panel positioning in section 3 was never written against.
-
-     Those rules are gone from `base.css` now, along with the dead `.header*`
-     block around them. This rule stays: section 2 of this file is explicit that
-     the positioning belongs on `.header-section`, and stating it here means the
-     header does not depend on the absence of something in another file. */
   sticky-header.site-header {
     position: relative;
     inset-block-start: auto;
   }
 
-  /* The two `[data-hidden]` transforms in section 2 are unaffected: a transform
-     applies to a relatively positioned box exactly as it did to a sticky one. */
-
   /* ---- 47.3 An image logo may not grow the row --------------------------- */
 
-  /* Section 43 caps the logo's height on small screens and explains why: the
-     setting is a *width*, and a portrait mark at that width can be twice as tall
-     as the header was asked to be. That is just as true at 1440px, and there was
-     no desktop equivalent — so on desktop the row silently grew to whatever the
-     logo needed.
-
-     That is the movement on reload. `ratio: 'adapt'` gives the wrapper the
-     image's own aspect ratio, so the box is correct from the first frame — but it
-     is correct at a height nobody budgeted for, the row is taller than
-     `--header-row-height`, and every slot in the grid re-resolves against a row
-     that does not match the number the rest of the page was given.
-
-     Same three selectors and the same `object-fit` as the mobile rule, so a mark
-     constrained by the ceiling letterboxes rather than distorting. */
   .site-header__logo-image,
   .site-header__logo-image img,
   .site-header__logo-img {
@@ -4200,17 +3156,6 @@
 
   /* ---- 47.4 Nothing animates before the header exists -------------------- */
 
-  /* The shell transitions `background-color`, `color` and `border-radius`, the
-     logo transitions `opacity`, the burger transitions its background. Those are
-     right for a header being scrolled and wrong for a header being *built*: any
-     attribute the component writes on connect — `data-scrolled`, `data-transparent`,
-     the sticky scheme class — is a state change like any other, and each one
-     animates for 320ms while the customer is looking at a page that has only just
-     appeared.
-
-     Suppressed until the element is upgraded. `:defined` flips in the same frame
-     the component connects, so the first real interaction still transitions
-     normally. */
   sticky-header:not(:defined),
   sticky-header:not(:defined) *,
   announcement-bar:not(:defined),
@@ -4221,14 +3166,6 @@
 
   /* ---- 47.5 The announcement bar keeps its own space -------------------- */
 
-  /* A guard, not a fix — 47.1 and the section's arithmetic are the fix. But the
-     consequence of the two disagreeing was the banner painting *over* the
-     announcement text, which is unreadable rather than merely misaligned, and a
-     stacking order costs nothing.
-
-     Below the header's 110, above `#MainContent`. `position: relative` and not
-     `sticky`, so `#stickyOffset()` still measures 0 above the header and the
-     header still pins to the top of the viewport. */
   .announcement-bar-section {
     position: relative;
     z-index: 105;
@@ -4236,32 +3173,12 @@
 
   /* ---- 47.6 The logo's box is not a grey rectangle ----------------------- */
 
-  /* `responsive-image` paints `--color-secondary-background` behind every image
-     as a placeholder. That is right for a product card and wrong for a logo:
-     a shop mark is almost always a transparent PNG or SVG, so the placeholder is
-     not hidden by the image — it sits behind it as a pale block for as long as the
-     logo is on screen, and on a transparent header over a dark banner it is the
-     most obvious thing in the row.
-
-     The logo reserves its box through `aspect-ratio` either way, so removing the
-     backing costs no layout stability. */
   .site-header__logo-image {
     background-color: transparent;
   }
 
   /* ---- 47.7 The banner shows the section's backing, not the image's ------ */
 
-  /* Same placeholder, and here it is the white the customer sees on reload.
-
-     `#MainContent > .shopify-section:first-child` already carries a backing
-     colour chosen for this exact gap — a neutral under a solid header, the heading
-     colour under a transparent one, so light hero text stays readable before the
-     media arrives. But `responsive-image` paints its own pale placeholder *on top*
-     of that backing, edge to edge, because the hero's media layer covers the
-     section. The considered backing was never visible; the generic one always was.
-
-     Only the hero's own media layers are cleared, so cards, promos and anything
-     else inside the first section keep their placeholders. */
   .hero__image,
   .hero__poster,
   .hero__video {
@@ -4270,25 +3187,6 @@
 
   /* ---- 47.8 The header does not animate into its own starting state ------ */
 
-  /* `data-priming` is written by `<sticky-header>` for the two frames it takes to
-     adopt the page's restored scroll position, and removed once that state has
-     painted.
-
-     Reloading a page that was already scrolled is what this is for. The header
-     parses and paints in its top-of-page appearance — transparent, no sticky
-     scheme, no shadow — because that is what Liquid wrote. The component then
-     reads the restored offset and applies the scrolled appearance instead. Both
-     are correct; the problem is the 320ms of `background-color`, `color` and
-     `transform` transition between them, which reads as the bar changing under
-     the cursor a beat after the page arrives.
-
-     Suppressed rather than removed: the same transitions are what make scrolling
-     feel right a moment later, so they are switched off only for the frames where
-     there is nothing to animate *from*.
-
-     47.4 cannot cover this. `:not(:defined)` stops matching the instant the
-     element upgrades, and every one of these attribute writes happens inside
-     `setup()`, which runs after that. */
   sticky-header[data-priming],
   sticky-header[data-priming] * {
     transition: none !important;

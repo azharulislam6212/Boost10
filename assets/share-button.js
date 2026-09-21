@@ -1,34 +1,6 @@
 /**
- * share-button.js — Boost10, Phase 6 replacement
- *
  * Sharing: the native share sheet where it exists, explicit network links
  * where it does not, and copy-to-clipboard everywhere.
- *
- * ## Why both, when the previous version had only the sheet
- *
- * The old comment in `product-share.liquid` called nine social icons "a 2015
- * pattern", and on mobile that is right — `navigator.share` opens the sheet the
- * customer already has, with the apps they actually use.
- *
- * On desktop it is wrong. `navigator.share` is unavailable in desktop Firefox
- * and, until recently, desktop Chrome on Linux, so the block degraded to a
- * copy-link button on exactly the platform where a merchant most wants a
- * Pinterest link. Pinterest in particular is desktop-heavy and is the one
- * network where a share genuinely drives traffic for product photography.
- *
- * So: sheet when available, explicit links when not. The merchant chooses which
- * networks; the component chooses the presentation.
- *
- * ## Popups, not navigations
- *
- * Network links open in a sized popup with `noopener`. Without `noopener` the
- * opened page gets a handle on `window.opener` and can navigate the store tab
- * somewhere else — a real phishing vector, not a theoretical one.
- *
- * The links are real `<a href>` in the markup, so they work with the module
- * unloaded and respond to middle-click and modifier-click as links should. The
- * popup is an enhancement layered on top, and it steps aside when the customer
- * signals they want a tab.
  *
  * @element share-button
  * @attr {string} data-url    Absolute URL to share
@@ -46,9 +18,6 @@ export class ShareButton extends BaseComponent {
   #timer = null;
 
   setup() {
-    // The sheet is only offered where the browser has one, and where the
-    // merchant has not turned it off. Rendering the button and failing on click
-    // is worse than never showing it.
     if (this.refs.button) {
       this.refs.button.toggleAttribute('hidden', !this.canShareNatively);
       this.on(this.refs.button, 'click', () => this.shareNative());
@@ -62,7 +31,6 @@ export class ShareButton extends BaseComponent {
       const link = event.target instanceof Element ? event.target.closest('[data-share-network]') : null;
       if (!(link instanceof HTMLAnchorElement)) return;
 
-      // A modifier-click means the customer asked for a tab. Honour it.
       if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
 
       event.preventDefault();
@@ -75,7 +43,7 @@ export class ShareButton extends BaseComponent {
     this.#timer = null;
   }
 
-  /* --------------------------------------------------------- public API -- */
+  /* --------------------------------------------------------- public API -- ---- */
 
   get url() {
     return this.dataset.url || window.location.href;
@@ -96,8 +64,6 @@ export class ShareButton extends BaseComponent {
     try {
       await navigator.share({ title: this.dataset.title || document.title, url: this.url });
     } catch (error) {
-      // A dismissed sheet rejects with AbortError. That is the customer
-      // changing their mind, not a failure, and must not surface as one.
       if (error?.name !== 'AbortError') {
         console.error('[Boost10] Share failed.', error);
       }
@@ -109,14 +75,11 @@ export class ShareButton extends BaseComponent {
       await navigator.clipboard.writeText(this.url);
       this.#feedback(themeString('shareCopied', 'Link copied'));
     } catch {
-      // Clipboard access is denied outside a secure context and in some
-      // embedded webviews. Selecting the text lets the customer copy manually,
-      // which is a real fallback rather than a silent failure.
       this.#selectFallback();
     }
   }
 
-  /* ---------------------------------------------------------- internals -- */
+  /* ---------------------------------------------------------- internals -- ---- */
 
   /**
    * @param {string} message
@@ -128,9 +91,6 @@ export class ShareButton extends BaseComponent {
 
     target.textContent = message;
     target.removeAttribute('hidden');
-
-    // `role="status"` is on the element in Liquid, so setting textContent is
-    // what announces it. No separate announce() call — that would read twice.
 
     if (this.#timer) clearTimeout(this.#timer);
     this.#timer = window.setTimeout(() => {

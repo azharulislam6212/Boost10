@@ -1,21 +1,5 @@
 /**
- * media-zoom.js — Boost10
- *
  * `<media-zoom>` and `<media-zoom-modal>` — product image zoom.
- *
- * Two behaviours, chosen by pointer type rather than by screen width:
- *
- *   Pointer devices  Hover to magnify in place, by translating a
- *                    higher-resolution image behind a fixed frame.
- *   Touch devices    Tap to open a full-screen modal with pinch and drag.
- *
- * Pointer type, not viewport size, because a touchscreen laptop at 1440px wants
- * the modal and a phone in landscape does not want hover-magnify. `matchMedia`
- * answers the question the layout cannot.
- *
- * The zoom image is only downloaded when zoom is first used. A 2048px variant of
- * every product image, fetched on page load, is one of the most expensive things
- * a theme can do on a product page and one of the least noticed.
  *
  * @module @theme/media-zoom
  */
@@ -29,14 +13,6 @@ import { clamp, isTouchDevice, prefersReducedMotion, themeString, createPinchDet
    <media-zoom>
    ========================================================================== */
 
-/**
- * Markup:
- *
- *   <media-zoom data-zoom-src="…2048x.jpg" data-level="2">
- *     <img data-ref="image" src="…800x.jpg" alt="…">
- *     <button data-ref="trigger" aria-label="…">…</button>
- *   </media-zoom>
- */
 export class MediaZoom extends BaseComponent {
   /** @type {HTMLImageElement|null} */
   #zoomImage = null;
@@ -48,7 +24,6 @@ export class MediaZoom extends BaseComponent {
     this.#active = false;
 
     if (this.#usesModal()) {
-      // On touch, the whole thing is a button that opens the modal.
       this.on(this, 'click', (event) => {
         if (event.target instanceof Element && event.target.closest('a[href]')) return;
         event.preventDefault();
@@ -61,8 +36,6 @@ export class MediaZoom extends BaseComponent {
     this.on(this, 'pointerleave', () => this.leave());
     this.on(this, 'pointermove', this.#onPointerMove);
 
-    // Keyboard users get the modal, since hover-magnify has no keyboard
-    // equivalent that is not worse than a full-screen view.
     if (this.refs.trigger) {
       this.on(this.refs.trigger, 'click', (event) => {
         event.preventDefault();
@@ -75,7 +48,7 @@ export class MediaZoom extends BaseComponent {
     this.leave();
   }
 
-  /* --------------------------------------------------------- public API -- */
+  /* --------------------------------------------------------- public API -- ---- */
 
   /**
    * @returns {string} The high-resolution source.
@@ -107,9 +80,7 @@ export class MediaZoom extends BaseComponent {
     this.dispatch(EVENTS.ZOOM_OPEN, { src: this.zoomSrc, mode: 'inline' });
   }
 
-  /**
-   * Stop magnifying.
-   */
+  /** Stop magnifying. */
   leave() {
     if (!this.#active) return;
 
@@ -120,9 +91,7 @@ export class MediaZoom extends BaseComponent {
     this.dispatch(EVENTS.ZOOM_CLOSE, { mode: 'inline' });
   }
 
-  /**
-   * Open the full-screen zoom modal.
-   */
+  /** Open the full-screen zoom modal. */
   openModal() {
     const modal = document.querySelector('media-zoom-modal');
     if (!modal?.openWith) return;
@@ -134,7 +103,7 @@ export class MediaZoom extends BaseComponent {
     });
   }
 
-  /* ---------------------------------------------------------- internals -- */
+  /* ---------------------------------------------------------- internals -- ---- */
 
   /**
    * @returns {boolean}
@@ -165,7 +134,6 @@ export class MediaZoom extends BaseComponent {
       });
 
       image.addEventListener('error', () => {
-        // A failed zoom image must not leave the frame stuck in a zooming state.
         this.leave();
         resolve(null);
       });
@@ -176,9 +144,6 @@ export class MediaZoom extends BaseComponent {
 
   /**
    * Translate the magnified image so the point under the cursor stays put.
-   *
-   * Written as percentages into custom properties, so the CSS does the work on
-   * the compositor rather than this handler touching layout on every move.
    *
    * @param {PointerEvent} event
    * @private
@@ -201,30 +166,7 @@ defineComponent('media-zoom', MediaZoom);
    <media-zoom-modal>
    ========================================================================== */
 
-/**
- * Full-screen image zoom.
- *
- * Extends `<modal-dialog>`, so focus trapping, scroll locking and Escape all
- * come from the same place as every other overlay. On top of that it adds pinch,
- * double-tap and drag.
- *
- * Markup:
- *
- *   <media-zoom-modal id="MediaZoom">
- *     <dialog data-ref="dialog">
- *       <div data-ref="panel">
- *         <button data-overlay-close aria-label="…">…</button>
- *         <div data-ref="viewport" data-lenis-prevent>
- *           <img data-ref="image" alt="">
- *         </div>
- *         <button data-ref="zoomIn" aria-label="…">…</button>
- *         <button data-ref="zoomOut" aria-label="…">…</button>
- *         <button data-ref="reset" aria-label="…">…</button>
- *         <span class="visually-hidden" role="status" data-ref="zoomStatus"></span>
- *       </div>
- *     </dialog>
- *   </media-zoom-modal>
- */
+/** Full-screen image zoom. */
 export class MediaZoomModal extends ModalDialog {
   /** @type {number} */
   #scale = 1;
@@ -275,7 +217,7 @@ export class MediaZoomModal extends ModalDialog {
     super.teardown();
   }
 
-  /* --------------------------------------------------------- public API -- */
+  /* --------------------------------------------------------- public API -- ---- */
 
   /**
    * Open the modal showing a specific image.
@@ -311,8 +253,6 @@ export class MediaZoomModal extends ModalDialog {
   setScale(scale) {
     this.#scale = clamp(scale, 1, 4);
 
-    // At 1× there is nothing to pan, so any drag offset is stale and would leave
-    // the image hanging off centre.
     if (this.#scale === 1) this.#offset = { x: 0, y: 0 };
 
     this.#paint();
@@ -332,7 +272,7 @@ export class MediaZoomModal extends ModalDialog {
     this.#reset();
   }
 
-  /* ---------------------------------------------------------- internals -- */
+  /* ---------------------------------------------------------- internals -- ---- */
 
   /** @private */
   #reset() {
@@ -353,16 +293,6 @@ export class MediaZoomModal extends ModalDialog {
 
     this.toggleAttribute('data-zoomed', this.#scale > 1);
 
-    // Announced through a live region, not through `aria-label` on this element.
-    //
-    // This element is a custom element with no role, which makes it `generic`,
-    // and `aria-label` is prohibited on `generic` - so the attribute was both an
-    // audit failure and silent. A label describes a thing when focus reaches it;
-    // it is not re-read when it changes, so the zoom level was never actually
-    // announced to anyone.
-    //
-    // The status span is, on every change, which is the point of showing a level
-    // at all.
     const status = this.refs.zoomStatus;
     if (status instanceof HTMLElement) {
       status.textContent = themeString('zoomLevel', '', { level: this.#scale.toFixed(1) });

@@ -1,28 +1,6 @@
 /**
- * variant-picker.js — Boost10
- *
  * `<variant-picker>`, `<variant-swatches>`, `<inventory-status>`,
  * `<product-sku>` and `<pickup-availability>`.
- *
- * `<back-in-stock-form>` moved to its own module: it is only ever on a product
- * page with something out of stock, so every other page was paying for it.
- *
- * The picker owns which variant is selected. Everything else on the product page
- * — the form, the gallery, the price, the inventory line — reads that state or
- * listens for `variant:change`. Nothing else computes it.
- *
- * Two rules shape the implementation:
- *
- *   The controls are real form inputs. Radio buttons and selects, inside the
- *   product form, with names Shopify understands. With JavaScript disabled the
- *   form still submits the chosen variant, and screen readers get a grouped set
- *   of radios rather than a set of divs pretending to be one.
- *
- *   Combinations that do not exist are marked, not removed. Hiding an
- *   unavailable size tells the customer nothing; showing it struck through with
- *   "Mango – unavailable" tells them the flavour exists and this size does not.
- *   Shopify's own `variant_url` behaviour depends on the value staying
- *   selectable, and removing options makes the picker jump under the cursor.
  *
  * @module @theme/variant-picker
  */
@@ -36,21 +14,6 @@ import { morph } from '@theme/morph';
    <variant-picker>
    ========================================================================== */
 
-/**
- * Markup:
- *
- *   <variant-picker data-product-id="123" data-section-id="main-product" data-update-url="true">
- *     <script type="application/json" data-variants>[…]</script>
- *
- *     <fieldset data-option-index="1" data-option-name="Flavour">
- *       <legend>…</legend>
- *       <input type="radio" name="Flavour" value="Mango" id="…" checked>
- *       <label for="…">…</label>
- *     </fieldset>
- *
- *     <select name="id" data-ref="idInput" class="visually-hidden">…</select>
- *   </variant-picker>
- */
 export class VariantPicker extends BaseComponent {
   /** @type {Object[]} */
   #variants = [];
@@ -69,7 +32,7 @@ export class VariantPicker extends BaseComponent {
     this.#announceReady();
   }
 
-  /* --------------------------------------------------------- public API -- */
+  /* --------------------------------------------------------- public API -- ---- */
 
   /**
    * @returns {Object|null} The selected variant, or null when the combination
@@ -157,29 +120,10 @@ export class VariantPicker extends BaseComponent {
     return Boolean(this.#variants.find((item) => String(item.id) === String(id))?.available);
   }
 
-  /* ---------------------------------------------------------- internals -- */
+  /* ---------------------------------------------------------- internals -- ---- */
 
   /**
    * A control inside the picker was used.
-   *
-   * The guard is not defensive tidying — it is what stops this component from
-   * calling itself. `#commit()` ends in `#syncIdInput()`, which writes the
-   * chosen id onto `[name="id"]` and fires a bubbling `change` on it so anything
-   * watching the real form field hears about it. That field lives *inside*
-   * `<variant-picker>`, so the echo arrived back here, re-entered `#onChange`,
-   * committed the same variant again and fired the same echo — unbounded
-   * recursion that ended in a stack overflow every time.
-   *
-   * The damage was silent and specific, because of where in `#commit()` the
-   * overflow happened: `#markAvailability()` and `#syncSelectedLabels()` had
-   * already run, so the pills and the "Size: 120 Capsules" line moved to the new
-   * choice, while `variant:change` — dispatched *after* `#syncIdInput()` — was
-   * never reached. Everything downstream of the event therefore kept the variant
-   * the page was rendered with: the price block, the add button's label, and the
-   * variant the quick add modal handed to a bundle slot.
-   *
-   * So only a real option control counts as a choice. `selectOption()` and
-   * `selectVariant()` call this directly with no event, which is also a choice.
    *
    * @param {Event} [event]
    * @private
@@ -199,13 +143,6 @@ export class VariantPicker extends BaseComponent {
    * Echo each option's chosen value beside its own heading — the
    * "Choose Flavour :  Fresh Watermelon" line.
    *
-   * `snippets/variant-picker.liquid` has always rendered `[data-selected-value]`
-   * with the value Liquid knew at render time, and nothing ever updated it. So
-   * the label was right until the customer touched the picker and wrong from
-   * then on, which is worse than not showing it at all — and on a swatch row,
-   * where the value is a colour chip rather than a word, it is the only place
-   * the name of the chosen colour appears.
-   *
    * @private
    */
   #syncSelectedLabels() {
@@ -215,7 +152,6 @@ export class VariantPicker extends BaseComponent {
       const target = fieldset.querySelector('[data-selected-value]');
       if (!(target instanceof HTMLElement)) continue;
 
-      // `data-option-index` is Shopify's `option.position`, which is 1-based.
       const value = chosen[Number(fieldset.dataset.optionIndex) - 1];
       if (typeof value === 'string') target.textContent = value;
     }
@@ -230,9 +166,6 @@ export class VariantPicker extends BaseComponent {
     this.#syncIdInput();
 
     if (!variant) {
-      // The combination does not exist. Say so rather than silently keeping the
-      // last valid variant selected, which would let a customer add a product
-      // they did not choose.
       const message = themeString('unavailable', '');
       announce(message);
 
@@ -264,23 +197,6 @@ export class VariantPicker extends BaseComponent {
   /**
    * Say what is selected, once, to whatever was already listening.
    *
-   * Everything else on a product — the form, the price, the plan selector, the
-   * quick add summary — reads `currentVariant` directly in its own `setup()`.
-   * That only works for a component that upgrades *after* this one, and nothing
-   * guarantees it does: each component is a separate lazy module, so the order
-   * is whichever download finished first.
-   *
-   * A `<product-form>` that lost that race read `currentVariant` off an element
-   * that had not been upgraded yet, got `undefined`, and disabled its button
-   * with "Unavailable" — on a product with stock, and permanently, because this
-   * picker had nothing more to say until the customer touched it. It was most
-   * visible in the quick add modal, where every one of these components is
-   * upgraded for the first time inside the same fetch.
-   *
-   * `#commit()` is not what is called here on purpose. It means a choice was
-   * made: it rewrites the URL, moves the gallery and announces to a screen
-   * reader, none of which may happen because a component finished loading.
-   *
    * @private
    */
   #announceReady() {
@@ -308,10 +224,6 @@ export class VariantPicker extends BaseComponent {
   /**
    * Mark each option value as available, sold out or non-existent.
    *
-   * Availability is evaluated against the *other* currently selected options, so
-   * "Large" is only marked sold out for the flavour the customer is actually
-   * looking at.
-   *
    * @private
    */
   #markAvailability() {
@@ -327,8 +239,6 @@ export class VariantPicker extends BaseComponent {
         const match = this.#variants.find((variant) =>
           variant.options.every((value, index) => {
             if (index === position) return value === input.value;
-            // Options the customer has not reached yet must not constrain this
-            // one, or the second option looks entirely sold out on first load.
             return candidate[index] === undefined || value === candidate[index];
           })
         );
@@ -348,8 +258,6 @@ export class VariantPicker extends BaseComponent {
           );
         }
 
-        // Never disabled: a disabled radio cannot be focused, so a keyboard user
-        // can no longer discover that the value exists at all.
         if (input instanceof HTMLOptionElement) input.toggleAttribute('data-disabled', !available);
       }
     }
@@ -358,28 +266,9 @@ export class VariantPicker extends BaseComponent {
   /**
    * Write the chosen id onto every field that carries it.
    *
-   * Plural, and by selector rather than by ref, because there can genuinely be
-   * more than one and `refs.idInput` was read as if there were exactly one. The
-   * no-JS `<select>` answered to that name too, and it is normally invisible to
-   * this code — a browser parses `<noscript>` contents as text — but the quick
-   * add modal arrives through `DOMParser`, which parses with scripting disabled
-   * and therefore turns those contents into real elements. So in the modal, and
-   * only there, `refs.idInput` was an array: `array.value = …` set a property on
-   * it and `array.dispatchEvent` threw, taking the rest of `#commit()` with it —
-   * which is why the price and the add button kept the variant the modal opened
-   * on however many times the customer changed their mind.
-   *
-   * The echo is only fired when the value actually moved, so nothing downstream
-   * is woken up to be told what it already knows.
-   *
    * @private
    */
   #syncIdInput() {
-    // Every id control this picker owns, by what it is rather than by what it
-    // was named. A `data-ref` can be missing — the no-JS `<select>` deliberately
-    // has none now — and a control that carries the variant id and is *not*
-    // updated is worse than one that does not exist: it is form-associated by
-    // `form=` like the rest, so `FormData` can answer with it.
     const inputs = [...this.querySelectorAll('[name="id"]')];
 
     if (inputs.length === 0) {
@@ -401,9 +290,6 @@ export class VariantPicker extends BaseComponent {
    * Keep the address bar on the selected variant, so the page can be shared,
    * bookmarked and refreshed onto the same choice.
    *
-   * `replaceState`, not `pushState`: flicking through five flavours should not
-   * put five entries in the history stack for the Back button to walk through.
-   *
    * @param {Object} variant
    * @private
    */
@@ -422,23 +308,7 @@ defineComponent('variant-picker', VariantPicker);
    <variant-swatches>
    ========================================================================== */
 
-/**
- * Swatch presentation for one option.
- *
- * The inputs are the same radios the picker reads; this element only manages
- * what a swatch looks like and how many are shown before the "more" control.
- * The visual itself is produced by `snippets/swatch.liquid` from the merchant's
- * `Name=#hexcode` map — including for a **Flavour** option, since the option
- * names that get swatches are a setting rather than a hardcoded "Color".
- *
- * Markup:
- *
- *   <variant-swatches data-max-visible="5">
- *     <input type="radio" name="Flavour" value="Mango" id="…">
- *     <label for="…">{% render 'swatch', value: 'Mango' %}</label>
- *     <button data-ref="more" hidden>…</button>
- *   </variant-swatches>
- */
+/** Swatch presentation for one option. */
 export class VariantSwatches extends BaseComponent {
   setup() {
     this.#applyLimit();
@@ -447,14 +317,12 @@ export class VariantSwatches extends BaseComponent {
       this.on(this.refs.more, 'click', () => this.expand());
     }
 
-    // Hover previewing is opt-in, and never on touch, where "hover" fires on tap
-    // and would change the selection the customer was about to make.
     if (this.dataset.trigger === 'hover' && window.matchMedia('(hover: hover)').matches) {
       this.on(this, 'pointerenter', this.#onPreview, { capture: true });
     }
   }
 
-  /* --------------------------------------------------------- public API -- */
+  /* --------------------------------------------------------- public API -- ---- */
 
   /**
    * @returns {HTMLElement[]}
@@ -463,21 +331,17 @@ export class VariantSwatches extends BaseComponent {
     return Array.from(this.querySelectorAll('[data-swatch-item]'));
   }
 
-  /**
-   * Reveal every swatch.
-   */
+  /** Reveal every swatch. */
   expand() {
     for (const item of this.swatches) item.removeAttribute('hidden');
     this.refs.more?.setAttribute('hidden', '');
     this.setAttribute('data-expanded', '');
 
-    // Focus the first newly revealed swatch, or pressing "+3 more" leaves a
-    // keyboard user on a button that has just disappeared.
     const limit = Number(this.dataset.maxVisible) || 5;
     this.swatches[limit]?.querySelector('input')?.focus({ preventScroll: true });
   }
 
-  /* ---------------------------------------------------------- internals -- */
+  /* ---------------------------------------------------------- internals -- ---- */
 
   /** @private */
   #applyLimit() {
@@ -490,8 +354,6 @@ export class VariantSwatches extends BaseComponent {
     }
 
     for (const [index, item] of items.entries()) {
-      // The selected swatch is always shown, even past the limit: hiding the
-      // customer's own choice behind "show more" is disorienting.
       const isSelected = item.querySelector('input')?.checked;
       item.toggleAttribute('hidden', index >= limit && !isSelected);
     }
@@ -517,7 +379,6 @@ export class VariantSwatches extends BaseComponent {
     const mediaId = variant?.featured_media?.id;
     if (!mediaId) return;
 
-    // Preview only: the gallery moves, the selection does not.
     document.querySelector('media-gallery')?.goToMedia?.(mediaId, { animate: false });
   };
 }
@@ -528,20 +389,7 @@ defineComponent('variant-swatches', VariantSwatches);
    <inventory-status>
    ========================================================================== */
 
-/**
- * The stock line under the buy button.
- *
- * Reads the selected variant's inventory from the picker's own variant data, so
- * there is no second request and no second source of truth. Quantities are never
- * shown above the low-stock threshold: "312 in stock" is information a customer
- * did not ask for and a competitor did.
- *
- * Markup:
- *
- *   <inventory-status data-threshold="10">
- *     <span data-ref="label"></span>
- *   </inventory-status>
- */
+/** The stock line under the buy button. */
 export class InventoryStatus extends BaseComponent {
   static requiredRefs = ['label'];
 
@@ -596,10 +444,6 @@ export class InventoryStatus extends BaseComponent {
   /**
    * The bar only appears at or below the threshold.
    *
-   * A bar reading nearly full is scarcity pointing the wrong way: it tells a
-   * customer there is plenty of time. Above the threshold the element reports
-   * "in stock" and nothing else.
-   *
    * @param {string} state
    * @param {number} quantity
    * @param {number} threshold
@@ -630,24 +474,7 @@ defineComponent('inventory-status', InventoryStatus);
    <product-sku>
    ========================================================================== */
 
-/**
- * The SKU or barcode line, updated when the variant changes.
- *
- * Read from the variant data the picker already holds, so there is no second
- * request and no second source of truth.
- *
- * The whole element is hidden when the selected variant has no SKU, rather than
- * showing a label with nothing after it. Many stores fill SKUs in for some
- * variants and not others, and "SKU:" followed by empty space reads as a broken
- * page rather than as missing data.
- *
- * Markup:
- *
- *   <product-sku data-field="sku">
- *     <span class="product-sku__label">SKU</span>
- *     <span data-ref="value">ABC-123</span>
- *   </product-sku>
- */
+/** The SKU or barcode line, updated when the variant changes. */
 export class ProductSku extends BaseComponent {
   static requiredRefs = ['value'];
 
@@ -696,25 +523,7 @@ defineComponent('product-sku', ProductSku);
    <pickup-availability>
    ========================================================================== */
 
-/**
- * Local pickup availability for the selected variant.
- *
- * Shopify renders this itself: the theme requests
- * `/variants/{id}/?section_id=pickup-availability` and Shopify returns the
- * current availability for every location, already translated and already
- * respecting the merchant's pickup settings. Nothing is computed here, because
- * nothing here can know a store's opening hours or stock by location.
- *
- * Fetched on variant change rather than on page load, and only when the variant
- * is actually available — asking about pickup for a sold-out variant returns an
- * empty panel and costs a request.
- *
- * Markup:
- *
- *   <pickup-availability data-base-url="/" data-variant-id="123" data-available="true">
- *     <div data-ref="content"></div>
- *   </pickup-availability>
- */
+/** Local pickup availability for the selected variant. */
 export class PickupAvailability extends BaseComponent {
   /** @type {AbortController|null} */
   #request = null;
@@ -723,8 +532,6 @@ export class PickupAvailability extends BaseComponent {
     this.on(this.root, EVENTS.VARIANT_CHANGE, (event) => this.fetchFor(event.detail?.variant));
     this.on(this.root, EVENTS.VARIANT_UNAVAILABLE, () => this.clear());
 
-    // Opening the drawer is delegated, so the markup Shopify returns needs no
-    // wiring of its own.
     this.on(this, 'click', (event) => {
       const trigger = event.target instanceof Element ? event.target.closest('[data-pickup-open]') : null;
       if (!trigger) return;
@@ -787,8 +594,6 @@ export class PickupAvailability extends BaseComponent {
     } catch (error) {
       if (error?.name === 'AbortError') return false;
 
-      // Pickup information is supplementary. A failure hides it rather than
-      // putting an error where a store address should be.
       console.warn('[Boost10] Pickup availability could not be loaded.', error);
       this.clear();
       return false;
@@ -797,9 +602,7 @@ export class PickupAvailability extends BaseComponent {
     }
   }
 
-  /**
-   * Hide and empty the panel.
-   */
+  /** Hide and empty the panel. */
   clear() {
     this.hidden = true;
     if (this.refs.content instanceof HTMLElement) this.refs.content.replaceChildren();

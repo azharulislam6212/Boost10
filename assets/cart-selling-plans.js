@@ -1,31 +1,6 @@
 /**
- * cart-selling-plans.js — Boost10
- *
  * `<cart-selling-plan-selector>` and `<cart-variant-selector>` — change a subscription's delivery frequency,
  * or switch a line between one-time and subscription, from inside the cart.
- *
- * Selling plans come from a subscription app; the theme only presents them. The
- * available plans for a line are rendered by Liquid from
- * `item.variant.selling_plan_allocations`, so this module never has to know
- * which app is installed or how it prices its plans.
- *
- * Changing a plan means removing the line and adding it back with a different
- * `selling_plan`, because Shopify has no endpoint to change one in place. That
- * is a real mutation with a real failure mode, so the select reverts to the
- * cart's actual value when it fails rather than showing a frequency the customer
- * is not subscribed to.
- *
- * Markup:
- *
- *   <cart-selling-plan-selector
- *     data-key="{{ item.key }}"
- *     data-variant-id="{{ item.variant.id }}"
- *     data-quantity="{{ item.quantity }}">
- *     <select data-ref="select">
- *       <option value="">One-time purchase</option>
- *       <option value="12345" selected>Every 30 days</option>
- *     </select>
- *   </cart-selling-plan-selector>
  *
  * @module @theme/cart-selling-plans
  */
@@ -46,7 +21,7 @@ export class CartSellingPlanSelector extends BaseComponent {
     this.on(this.refs.select, 'change', this.#onChange);
   }
 
-  /* --------------------------------------------------------- public API -- */
+  /* --------------------------------------------------------- public API -- ---- */
 
   /**
    * @returns {string} The selling plan id currently in the cart, or '' for one-time.
@@ -95,7 +70,7 @@ export class CartSellingPlanSelector extends BaseComponent {
     }
   }
 
-  /* ---------------------------------------------------------- internals -- */
+  /* ---------------------------------------------------------- internals -- ---- */
 
   /**
    * @param {Event} event
@@ -125,23 +100,7 @@ export default { CartSellingPlanSelector, CartVariantSelector };
    <cart-variant-selector>
    ========================================================================== */
 
-/**
- * Change a line's variant without leaving the cart.
- *
- * Shopify's change endpoint cannot move a line to a different variant, so this
- * is a remove followed by an add. `cart.changeVariant` performs both in order
- * and reverts on failure, which is the part that matters: a half-completed swap
- * would leave the customer with a cart that lost a line and gained nothing.
- *
- * The select reverts to its previous value if either half fails, so the control
- * never shows a variant the cart does not contain.
- *
- * Markup:
- *
- *   <cart-variant-selector data-key="…" data-quantity="2">
- *     <select data-ref="select">…</select>
- *   </cart-variant-selector>
- */
+/** Change a line's variant without leaving the cart. */
 export class CartVariantSelector extends BaseComponent {
   static requiredRefs = ['select'];
 
@@ -182,8 +141,6 @@ export class CartVariantSelector extends BaseComponent {
       await cart.changeVariant(this.key, Number(id), this.quantity);
       this.#previous = id;
     } catch (error) {
-      // Put the control back to what the cart actually holds. A select showing a
-      // variant the cart does not contain is worse than no swap at all.
       this.refs.select.value = this.#previous;
       announceUrgent(error?.message || themeString('cartError', ''));
     } finally {

@@ -1,23 +1,6 @@
 {% doc %}
   Renders a product card.
 
-  Used by collection grids, search results, recommendations, the cart drawer
-  upsell. One card everywhere means one place to fix a layout
-  bug and one place where the settings are honoured.
-
-  Structure decisions worth keeping:
-
-    - The whole card is not a link. Only the title is, with `::after` stretching
-      it over the card in CSS. A card wrapped in an `<a>` swallows the quick add
-      button and the swatches, and screen readers announce
-      the entire card contents as one enormous link name.
-    - The second image is rendered as a real `<img>`, not a background, so it is
-      lazy-loaded and never downloaded on devices that cannot hover.
-    - Quick add and quick add are buttons that open something, not links. They
-      carry the product URL as data, and `<quick-add-modal>` fetches it.
-    - The image ratio comes from theme settings, so an entire grid keeps its
-      rhythm even when uploads are inconsistent.
-
   @param {product} product - [ratio]     (product, optional)
   @param {number} [index] - Position in the grid. Drives the reveal delay
   @param {string} [sizes] - Passed to snippets/image.liquid
@@ -53,53 +36,22 @@
 
   assign quick_add_style = quick_add | default: settings.quick_add_style
 
-  comment
-    Where the quick add sits. `bar` spans the bottom of the image; `corner` is a
-    single round control in the top corner, which keeps the product label
-    visible and stays clear of the swatch row below the image.
-
-    A corner control has no room for a label, so it forces the icon-only form
-    regardless of the style setting — a 40px circle with the words "Add to cart"
-    in it is a circle with clipped text.
-  endcomment
   assign quick_add_position = settings.quick_add_position | default: 'bar'
   assign quick_add_icon_only = false
   if quick_add_style == 'icon' or quick_add_position == 'corner'
     assign quick_add_icon_only = true
   endif
 
-  comment
-    The bar spans the image, so its button is full width; the corner control is a
-    40px circle and must not be. This was passing `quick_add_position` itself,
-    which is a non-empty string in both cases and therefore always truthy — so
-    the corner control was stretched across the card it was meant to sit in the
-    corner of.
-  endcomment
   assign quick_add_full = true
   if quick_add_position == 'corner'
     assign quick_add_full = false
   endif
 
-  comment
-    The card can carry its own colour scheme, the same way the bundle row
-    already does - and by the same rule: inherit is the default, so a store
-    that never opens the setting has every card painted by the section it
-    sits in, exactly as before.
-
-    Two settings rather than one because a colour_scheme setting has no
-    "none" value. Without the checkbox the only way to say "follow the
-    section" would be to leave the picker on whichever scheme happened to be
-    first, which is a different instruction that looks the same.
-  endcomment
   assign card_scheme_classes = ''
   if settings.card_inherit_color_scheme == false and settings.card_color_scheme != blank
     assign card_scheme_classes = ' color-scheme-container color-' | append: settings.card_color_scheme
   endif
 
-  comment
-    Which option gets swatches on a card is the same setting the product page
-    uses, so a store selling by Flavour gets flavour swatches in both places.
-  endcomment
   assign swatch_names = settings.swatch_option_names | default: 'Colour, Color' | downcase | split: ','
   assign swatch_option = blank
 
@@ -141,22 +93,13 @@
      target: '.product-card__media',
      delay: card_delay %}
   class="product-card product-card--{{ alignment }} product-card--hover-{{ hover_effect }}{{ card_scheme_classes }} {{ class }}"
-  {%- comment -%}
-    The placement lives on the card, not only on the actions, because the
-    reveal is driven by `:hover` on the card and the badge collision rule
-    needs to see both from one selector.
-  {%- endcomment -%}
+
   data-quick-add-position="{{ quick_add_position }}"
   data-product-id="{{ product.id }}"
   data-morph-key="{{ card_id }}"
 >
   <div class="product-card__media-wrapper">
     {%- liquid
-      comment
-        The slider is opt-in and only when there is more than one image. A
-        carousel wrapped around a single photo is controls with nothing to
-        control, and it costs the card its simple hover swap.
-      endcomment
       assign card_images = product.images | slice: 0, settings.card_slider_count | default: 4
       assign use_slider = false
       if settings.enable_card_slider and card_images.size > 1
@@ -165,13 +108,7 @@
     -%}
 
     {%- if use_slider -%}
-      {%- comment -%}
-        The slider sits *outside* the media link, not inside it. Swipe controls
-        nested in an anchor mean every arrow press is also a navigation, which is
-        how card sliders end up opening the product when you try to see photo
-        two. The card is still fully clickable — the title link's stretched
-        pseudo-element covers it, and this raises itself above that.
-      {%- endcomment -%}
+
       <carousel-slider
         class="product-card__slider carousel-shell"
         data-layout="carousel"
@@ -204,23 +141,7 @@
           role="list"
           aria-label="{{ product.title | escape }}"
         >
-          {%- comment -%}
-            Each slide is its own link.
 
-            `.product-card__link::after` stretches the title's anchor over the
-            whole card so the image is clickable. That overlay is also what was
-            swallowing the arrows: the media wrapper is its own stacking context,
-            so the arrows' `z-index` could not lift them above an overlay painted
-            in the parent context.
-
-            Raising the media wrapper above the overlay fixes the arrows — but it
-            also takes the image out from under the stretched link, so the image
-            has to carry its own. Which is better anyway: a slide that navigates
-            goes to the product whatever the overlay is doing.
-
-            `tabindex="-1"` and `aria-hidden` keep it out of the tab order; the
-            title link is the one real stop for this card.
-          {%- endcomment -%}
           {%- for card_image in card_images -%}
             <li class="product-card__slide">
               <a
@@ -273,27 +194,9 @@
 
     {% render 'badge', product: product %}
 
-
     {%- if quick_add_style != 'none' and product.available -%}
       <div class="product-card__actions" data-quick-add-position="{{ quick_add_position }}">
         {%- liquid
-          comment
-            Does this product need a choice made before it can be added?
-
-            This used to be `product.variants.size == 1 and
-            settings.enable_quick_add == false`, which read the setting the wrong
-            way round: with quick add switched on, a product with exactly one
-            variant — nothing to choose, one price, one SKU — still opened a
-            modal containing a variant picker with a single disabled option in
-            it. The setting turns the modal *on*, not the direct add off.
-
-            What is left is the test the bundle picker's rows already use, said
-            the same way: a product has something to ask only when it has real
-            options *and* more than one variant behind them. Shopify gives a
-            product with no options a single "Default Title" variant, so both
-            halves are needed — one catches the product that was never given
-            options, the other the product whose one option has one value.
-          endcomment
           assign needs_options = true
           if product.has_only_default_variant or product.variants.size == 1
             assign needs_options = false
@@ -301,11 +204,7 @@
         -%}
 
         {%- if needs_options == false -%}
-          {%- comment -%}
-            Nothing to choose, so it goes straight into the cart. Anything with
-            options must open the modal: silently adding the first variant is how
-            customers end up returning the wrong size.
-          {%- endcomment -%}
+
           <form action="{{ routes.cart_add_url }}" method="post" data-quick-add-form>
             <input type="hidden" name="id" value="{{ product.selected_or_first_available_variant.id }}">
             <input type="hidden" name="quantity" value="1">
@@ -313,25 +212,9 @@
             {% render 'button', label: add_to_cart_label, type: 'submit', variant: 'primary', size: 'small', full: quick_add_full, icon_only: quick_add_icon_only, icon: 'plus' %}
           </form>
         {%- else -%}
-          {%- comment -%}
-            `attributes` is one string, built here, and the product URL is part
-            of it. It was previously split across `attributes:` and a second
-            `append:` parameter, which the button snippet does not read — so
-            every card in the theme shipped `data-product-url=""` and the modal
-            opened with nothing to fetch.
 
-            `label` takes a translation key through `| t` for the same reason:
-            the snippet renders the label verbatim, so a bare key is what a
-            customer read.
-          {%- endcomment -%}
           {%- assign choose_options_label = 'products.product.choose_options' | t -%}
-          {%- comment -%}
-            With quick add switched off in Theme settings there is no
-            `<quick-add-modal>` on the page for `data-overlay-open` to find, and
-            a button that does nothing is worse than one that goes somewhere. So
-            the control is a link to the product page in that case — the same
-            place the modal's own "View full details" link points.
-          {%- endcomment -%}
+
           {%- if settings.enable_quick_add -%}
             {%- assign quick_add_attributes = 'data-overlay-open="QuickAdd" data-product-url="' | append: product.url | append: '" data-section-id="quick-add"' -%}
             {% render 'button', label: choose_options_label, variant: 'primary', size: 'small', full: quick_add_full, icon_only: quick_add_icon_only, icon: 'plus', attributes: quick_add_attributes %}
@@ -377,19 +260,10 @@
         </button>
       </compare-trigger>
     {%- endif -%}
-  
-    {%- comment -%}
-      `swatches_type` is the theme-level control for cards. The product page has
-      its own copy on the variant picker block, because a card in a grid and a
-      full-width option row rarely want the same treatment.
-    {%- endcomment -%}
+
     {%- assign card_swatch_type = settings.swatches_type | default: 'theme' -%}
     {%- if card_swatch_type != 'none' and swatch_option != blank -%}
-      {%- comment -%}
-        Card swatches swap the image and the price; they do not add to a cart.
-        `<variant-swatch>` exists for exactly that difference — a card has no
-        form and no page to update.
-      {%- endcomment -%}
+
       <variant-swatch data-product-url="{{ product.url }}">
         <script type="application/json" data-variants>
           {{- product.variants | json -}}
@@ -397,13 +271,7 @@
 
         <div class="swatch-group" role="group" aria-label="{{ 'accessibility.swatch_group' | t: option: swatch_option.name | escape }}">
           {%- for value in swatch_option.values limit: settings.swatch_max_visible -%}
-            {%- comment -%}
-              The variant is found by scanning options rather than by
-              `where: 'title', value`, which only ever matched single-option
-              products: on anything with a second option `variant.title` reads
-              "Red / Small", so the lookup returned nothing and every
-              image-backed swatch on a card fell back to its initials.
-            {%- endcomment -%}
+
             {%- assign value_variant = nil -%}
             {%- for variant in product.variants -%}
               {%- if variant.options contains value -%}
@@ -436,47 +304,3 @@
     {%- endif -%}
 </div>
 </motion-effect>
-{% comment %}
-
-This file has been rewritten to preserve the original behavior.
-
----
-Changes:
-- from: |-
-    {% render 'image',
-                       image: card_image,
-                       ratio: ratio,
-                       sizes: sizes,
-                       priority: priority and forloop.first,
-                       class: 'product-card__image' %}
-  to: "{% render 'image', image: card_image, ratio: ratio, sizes: sizes, priority:
-    priority, class: 'product-card__image' %}"
-  position: 7807..7924
-- from: |-
-    {% render 'button',
-                   label: 'products.product.add_to_cart' | t,
-                   type: 'submit',
-                   variant: 'primary',
-                   size: 'small',
-                   full: quick_add_position != 'corner',
-                   icon_only: quick_add_icon_only,
-                   icon: 'plus' %}
-  to: "{% render 'button', label: 'products.product.add_to_cart', type: 'submit',
-    variant: 'primary', size: 'small', full: quick_add_position, icon_only: quick_add_icon_only,
-    icon: 'plus' %}"
-  position: 10186..10369
-- from: |-
-    {% render 'button',
-                 label: 'products.product.choose_options' | t,
-                 variant: 'primary',
-                 size: 'small',
-                 full: quick_add_position != 'corner',
-                 icon_only: quick_add_icon_only,
-                 icon: 'plus',
-                 attributes: 'data-overlay-open="QuickAdd" data-product-url="' | append: product.url | append: '" data-section-id="quick-add"' %}
-  to: '{% render ''button'', label: ''products.product.choose_options'', variant:
-    ''primary'', size: ''small'', full: quick_add_position, icon_only: quick_add_icon_only,
-    icon: ''plus'', attributes: ''data-overlay-open="QuickAdd" data-product-url="'',
-    append: ''" data-section-id="quick-add"'' %}'
-  position: 10419..10698
-{% endcomment %}

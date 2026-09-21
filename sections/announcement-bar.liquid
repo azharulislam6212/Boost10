@@ -1,35 +1,5 @@
 {% comment %}
-  sections/announcement-bar.liquid
-
   Announcements as a slider or a marquee, with an optional close button.
-
-  ## What was wrong
-
-  **The bar could not render at all.** With "show close" enabled the section
-  emits `data-dismissible`, and `base.css` hides
-  `announcement-bar[data-dismissible]:not([data-ready])` until the component has
-  checked storage. `assets/announcement-bar.js` was in the import map but in no
-  module map, so it never loaded, `data-ready` was never written, and the whole
-  bar — carousel, marquee, close button and all — stayed `display: none`. Fixed
-  in `assets/global.js`.
-
-  **A single announcement rendered nothing.** The slider branch was
-  an `if count > 1` branch with an empty `else`, so one block produced an
-  empty bar. One announcement is now static markup, which is also the right
-  answer: a carousel with one slide is controls with nothing to control.
-
-  **The marquee moved the wrong element.** See `assets/motion-effect.js`.
-
-  **The slider ignored half its own schema.** `carousel_navigation` and
-  `carousel_pagination` were merchant-facing settings the markup never read, and
-  `carousel_speed` was declared in seconds here and milliseconds in every other
-  section, so this one carousel asked for a 5ms transition.
-
-  ## Layout
-
-  Deliberately no `layout` / `columns_*` settings. An announcement bar is one
-  full-width line at every breakpoint; those controls existed in the schema,
-  did nothing, and only invited a merchant to set four columns and wonder why.
 {% endcomment %}
 
 {%- liquid
@@ -62,22 +32,6 @@
     {%- content_for 'blocks' -%}
   {%- endcapture -%}
 
-  {%- comment -%}
-    The dismissal key, decided by Liquid rather than by JavaScript.
-
-    `announcement-bar.js` used to derive it by hashing the rendered text after
-    the module loaded, which is the only moment it could. That is also why a
-    dismissible bar had to start hidden: nothing could know whether this
-    customer had closed it until the module arrived, so the safe state was
-    `display: none` — and the bar then appeared late and pushed the entire page
-    down, header included.
-
-    Stated here, the key exists before the first byte of the bar is parsed, so
-    the tiny script below can answer the same question in the same paint. The
-    rule it keys on is unchanged, dismissal still lasts a session, and editing
-    the wording still brings the bar back — the key is a hash of the text, so
-    new copy means a new key.
-  {%- endcomment -%}
   {%- liquid
     assign announcement_text = announcements | strip_html | strip
     assign dismiss_key = announcement_text | md5 | slice: 0, 10
@@ -97,12 +51,7 @@
     <div class="container announcement-bar__inner">
       {%- case mode -%}
         {%- when 'marquee' -%}
-          {%- comment -%}
-            `data-target` names the track explicitly. The marquee translates the
-            element it is given and clips against that element's parent, so
-            leaving it to default to the host meant translating the viewport
-            itself — the bar slid off the page once and never returned.
-          {%- endcomment -%}
+
           <motion-effect
             class="announcement-bar__marquee marquee__viewport"
             data-effect="marquee"
@@ -155,12 +104,6 @@
                    size: 28 %}
               {%- endif -%}
 
-              {%- comment -%}
-                The pagination mount point was missing entirely, so choosing
-                dots, numbers or a progress bar changed nothing on the page.
-                `controls` carries its own arrows, so it replaces the pair above
-                rather than sitting alongside them.
-              {%- endcomment -%}
               {%- if pagination == 'controls' -%}
                 {% render 'carousel-controls', settings: section_settings, size: 28 %}
               {%- elsif pagination != 'none' -%}
@@ -213,26 +156,7 @@
   </announcement-bar>
 
   {%- if section_settings.show_close -%}
-    {%- comment -%}
-      The pre-paint dismissal check.
 
-      Placed immediately after the element and deliberately not deferred: a
-      parser-blocking inline script runs before the bar it follows can be
-      painted, so both outcomes are settled in the first frame.
-
-        dismissed   `data-dismissed` is set and the bar is never painted at
-                    all — the returning customer sees no flash of something
-                    they closed, which is what the hidden-by-default rule was
-                    protecting.
-
-        not         `data-ready` is set, the existing CSS reveals the bar in
-                    the same frame, and the page below it never moves. This is
-                    the layout shift that pushed the header down.
-
-      The module still owns dismissal itself — the click, the write, the theme
-      editor re-render. This only answers, early, the one question that decides
-      whether the bar occupies space.
-    {%- endcomment -%}
     <script>
       (function () {
         var bar = document.getElementById({{ bar_id | json }});
@@ -250,12 +174,6 @@
       })();
     </script>
 
-    {%- comment -%}
-      With scripting off the check above never runs, so `data-ready` is never
-      written and the CSS would hide a dismissible bar permanently — the
-      merchant's announcement lost to a feature that cannot work anyway. There
-      is nothing to dismiss without JavaScript, so the bar is simply shown.
-    {%- endcomment -%}
     <noscript>
       <style>
         #{{ bar_id }} { display: block; }

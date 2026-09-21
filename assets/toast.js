@@ -1,36 +1,5 @@
 /**
- * toast.js — Boost10
- *
  * `<toast-notification>` and the `toast` helper.
- *
- * A transient confirmation: item added, link copied, code applied. One element
- * per page, rendered in the overlay group, driven entirely through `toast.show()`.
- *
- * ## Three rules, and why each one exists
- *
- * **A toast never takes focus.** Stealing focus for a confirmation interrupts
- * whatever the customer was doing — mid-word in a search field, mid-scroll
- * through a grid. The message reaches assistive technology through the shared
- * live region instead, and any action it offers is always reachable from the
- * page itself. A toast is the fastest route to that action, never the only one.
- *
- * **The timer pauses on hover and focus.** A toast carrying a link that
- * disappears while someone is reaching for it is worse than no link at all. It
- * also pauses when the tab is hidden, so a customer who switches away and comes
- * back does not find an empty space where the confirmation was.
- *
- * **Errors do not auto-dismiss.** A confirmation can vanish because the customer
- * has already seen the result. A failure has to be read, and a customer who
- * looked away for two seconds should not have to guess what went wrong.
- *
- * ## Shadow DOM, deliberately
- *
- * This is the one component in the theme that uses a shadow root. A toast sits
- * above everything and appears while a customer is mid-task, so a merchant's
- * Custom CSS accidentally matching `.toast` — or a `z-index` from an app —
- * should not be able to break it. `part` attributes expose the pieces that are
- * genuinely meant to be themed. Everywhere else in this theme, merchant CSS
- * reaching a component is a feature; here it is a hazard.
  *
  * @module @theme/toast
  */
@@ -151,15 +120,12 @@ export class ToastNotification extends ShadowComponent {
 
     this.$('.toast__close')?.addEventListener('click', () => this.hide(), { signal: this.signal });
 
-    // A toast carrying a link that vanishes while someone is reaching for it is
-    // worse than no link at all.
     const container = this.$('.toast');
     container?.addEventListener('pointerenter', () => this.pause(), { signal: this.signal });
     container?.addEventListener('pointerleave', () => this.resume(), { signal: this.signal });
     container?.addEventListener('focusin', () => this.pause(), { signal: this.signal });
     container?.addEventListener('focusout', () => this.resume(), { signal: this.signal });
 
-    // Switching tabs should not consume the toast's lifetime.
     this.on(document, 'visibilitychange', () => {
       if (document.hidden) this.pause();
       else this.resume();
@@ -171,7 +137,7 @@ export class ToastNotification extends ShadowComponent {
     super.teardown?.();
   }
 
-  /* --------------------------------------------------------- public API -- */
+  /* --------------------------------------------------------- public API -- ---- */
 
   /**
    * Show a message.
@@ -214,14 +180,9 @@ export class ToastNotification extends ShadowComponent {
     container.dataset.state = 'visible';
     this.setAttribute('data-visible', '');
 
-    // Announced through the shared live region rather than by making this one,
-    // so there is exactly one live region on the page and messages never
-    // interleave. Errors interrupt; confirmations wait their turn.
     if (type === 'error') announceUrgent(message);
     else announce(message);
 
-    // An error has to be read. A confirmation can vanish, because the customer
-    // has already seen the result it is confirming.
     if (type !== 'error') {
       this.#remaining = Math.min(duration ?? DEFAULT_DURATION, MAX_DURATION);
       this.#run();
@@ -230,9 +191,7 @@ export class ToastNotification extends ShadowComponent {
     return true;
   }
 
-  /**
-   * Hide the toast.
-   */
+  /** Hide the toast. */
   hide() {
     this.#clear();
 
@@ -253,14 +212,10 @@ export class ToastNotification extends ShadowComponent {
 
     container.addEventListener('transitionend', finish, { once: true });
 
-    // A transition that never fires — because the element was hidden, or the
-    // tab was backgrounded — would otherwise leave the toast on screen forever.
     window.setTimeout(finish, 400);
   }
 
-  /**
-   * Stop the dismiss timer, keeping what is left of it.
-   */
+  /** Stop the dismiss timer, keeping what is left of it. */
   pause() {
     if (this.#timer === null) return;
 
@@ -269,9 +224,7 @@ export class ToastNotification extends ShadowComponent {
     this.#remaining -= Date.now() - this.#startedAt;
   }
 
-  /**
-   * Start the dismiss timer again from where it stopped.
-   */
+  /** Start the dismiss timer again from where it stopped. */
   resume() {
     if (this.#timer !== null || this.#remaining <= 0) return;
     if (!this.hasAttribute('data-visible')) return;
@@ -279,7 +232,7 @@ export class ToastNotification extends ShadowComponent {
     this.#run();
   }
 
-  /* ---------------------------------------------------------- internals -- */
+  /* ---------------------------------------------------------- internals -- ---- */
 
   /** @private */
   #run() {
@@ -299,12 +252,6 @@ defineComponent('toast-notification', ToastNotification);
 
 /**
  * Show a toast from anywhere.
- *
- * A function rather than an element lookup at every call site, because the
- * caller should not have to know whether the merchant kept the toast in their
- * overlay group. When it is absent this returns false and the announcement still
- * happens through the live region — the message reaches a screen reader either
- * way, which is the part that must not be optional.
  *
  * @param {string} message
  * @param {Object} [options] See `ToastNotification.show`.

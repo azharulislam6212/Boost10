@@ -1,26 +1,5 @@
 /**
- * variant-swatch.js — Boost10
- *
  * `<variant-swatch>` — swatches on a product card.
- *
- * The product page already has `<variant-picker>`, which owns variant state
- * inside a form. A card has no form and no page to update: clicking a swatch
- * there should swap the image and the price and change where the card links to,
- * not add anything to a cart. Those are different enough jobs that sharing one
- * element would mean an element that behaves differently depending on where it
- * sits, which is the kind of thing that looks fine until someone puts a card
- * inside a quick add.
- *
- * ## What it does
- *
- * Hovering or focusing a swatch previews its image; clicking commits — the card
- * keeps that variant, its price updates, and its links gain `?variant=`. Leaving
- * without clicking restores whatever was committed, so a customer sweeping a
- * cursor across a grid does not leave a trail of changed cards behind them.
- *
- * Images are preloaded on first intent, not on render. A grid of twenty cards
- * with six colours each is a hundred and twenty images; fetching those up front
- * to make a hover feel instant is the trade nobody asked for.
  *
  * @module @theme/variant-swatch
  */
@@ -29,19 +8,6 @@ import { BaseComponent, defineComponent } from '@theme/component';
 import { EVENTS, variantChangeDetail } from '@theme/events';
 import { formatMoney, themeString, announce, isTouchDevice } from '@theme/utilities';
 
-/**
- * Markup:
- *
- *   <variant-swatch data-product-url="/products/tee">
- *     <script type="application/json" data-variants>[…]</script>
- *
- *     <div data-ref="options">
- *       <button type="button" data-swatch-option data-value="Navy" aria-pressed="true">…</button>
- *     </div>
- *
- *     <span data-ref="more" hidden></span>
- *   </variant-swatch>
- */
 export class VariantSwatch extends BaseComponent {
   /** @type {Object[]} */
   #variants = [];
@@ -58,7 +24,6 @@ export class VariantSwatch extends BaseComponent {
     try {
       this.#variants = script ? JSON.parse(script.textContent) : [];
     } catch {
-      // A malformed payload disables the swatches rather than the whole card.
       console.warn('[Boost10] Card swatch data could not be parsed.');
       this.#variants = [];
       return;
@@ -69,15 +34,11 @@ export class VariantSwatch extends BaseComponent {
     this.on(this, 'click', this.#onClick);
     this.on(this, 'keydown', this.#onKeydown);
 
-    // Hover previewing is pointer-only. On a touchscreen "hover" fires on tap,
-    // so previewing there would fight the click that follows it.
     if (!isTouchDevice()) {
       this.on(this, 'pointerover', this.#onIntent);
       this.on(this, 'pointerleave', () => this.#restore());
     }
 
-    // Focus follows the same rule as hover: previewing on focus lets a keyboard
-    // user see each colour as they arrow through, which is the whole point.
     this.on(this, 'focusin', this.#onIntent);
     this.on(this, 'focusout', (event) => {
       if (this.contains(event.relatedTarget)) return;
@@ -87,7 +48,7 @@ export class VariantSwatch extends BaseComponent {
     this.#syncPressed();
   }
 
-  /* --------------------------------------------------------- public API -- */
+  /* --------------------------------------------------------- public API -- ---- */
 
   /**
    * @returns {HTMLElement[]}
@@ -139,14 +100,12 @@ export class VariantSwatch extends BaseComponent {
 
     announce(themeString('swatchSelected', '', { value }));
 
-    // Anything else on the card that cares — a quick add button, a compare
-    // trigger — hears this rather than being reached into from here.
     this.dispatch(EVENTS.VARIANT_CHANGE, variantChangeDetail(variant, { source: 'card' }));
 
     return true;
   }
 
-  /* ---------------------------------------------------------- internals -- */
+  /* ---------------------------------------------------------- internals -- ---- */
 
   /**
    * @param {string} value
@@ -242,7 +201,6 @@ export class VariantSwatch extends BaseComponent {
       if (!image.dataset.originalSrc) image.dataset.originalSrc = image.currentSrc || image.src;
 
       image.src = src;
-      // The srcset would otherwise keep winning over the src we just set.
       image.removeAttribute('srcset');
     }
 

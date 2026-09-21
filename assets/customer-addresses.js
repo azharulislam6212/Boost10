@@ -1,49 +1,5 @@
 /**
- * customer-addresses.js — Boost10
- *
  * `<customer-address-form>` — the address book on `/account/addresses`.
- *
- * Shopify's address forms are ordinary POST forms with `_method` overrides for
- * update and delete. They are not AJAX endpoints, and there is no JSON API for
- * them. So this element does not intercept submission: it lets the form post and
- * the page reload, which is what Shopify expects and what keeps flash messages,
- * validation errors and redirects working.
- *
- * What it does add:
- *
- *   - Province lists that follow the selected country, from data Shopify
- *     renders into the page. Getting this wrong is how customers end up unable
- *     to save an address for their own country.
- *   - Optional modal editing, so the address book does not become a wall of
- *     expanded forms.
- *   - A delete confirmation, because deletion is irreversible and the native
- *     `confirm()` dialog cannot be styled or translated consistently.
- *   - Focus management: opening a form focuses its first field, cancelling
- *     returns focus to the control that opened it.
- *
- * Markup:
- *
- *   <customer-address-form data-modal="true">
- *     <button data-ref="newTrigger" data-address-open="new">…</button>
- *
- *     <div data-address-form="new" hidden>
- *       <form method="post" action="/account/addresses">
- *         <select data-country name="address[country]" data-default="United Kingdom">…</select>
- *         <div data-province-wrapper>
- *           <select data-province name="address[province]"></select>
- *         </div>
- *         <button type="button" data-address-cancel>…</button>
- *       </form>
- *     </div>
- *
- *     <li data-address-item>
- *       <button data-address-open="123">…</button>
- *       <form method="post" action="/account/addresses/123" data-address-delete>
- *         <input type="hidden" name="_method" value="delete">
- *         <button type="submit" data-address-delete-trigger>…</button>
- *       </form>
- *     </li>
- *   </customer-address-form>
  *
  * @module @theme/customer-addresses
  */
@@ -71,7 +27,7 @@ export class CustomerAddressForm extends BaseComponent {
     });
   }
 
-  /* --------------------------------------------------------- public API -- */
+  /* --------------------------------------------------------- public API -- ---- */
 
   /**
    * @returns {boolean}
@@ -90,8 +46,6 @@ export class CustomerAddressForm extends BaseComponent {
     const form = this.querySelector(`[data-address-form="${CSS.escape(id)}"]`);
     if (!(form instanceof HTMLElement)) return;
 
-    // One at a time: two open address forms are two sets of identical field
-    // labels, and a screen reader cannot tell them apart.
     for (const other of this.querySelectorAll('[data-address-form]')) {
       if (other !== form) other.hidden = true;
     }
@@ -140,15 +94,12 @@ export class CustomerAddressForm extends BaseComponent {
     const label = form.dataset.addressLabel || '';
     const message = themeString('addressDeleteConfirm', '', { address: label });
 
-    // A native confirm is used deliberately. It cannot be styled, but it is
-    // keyboard accessible everywhere, cannot be missed, and cannot be dismissed
-    // by a stray click — which matters for an irreversible action.
     if (!window.confirm(message)) return;
 
     form.submit();
   }
 
-  /* ---------------------------------------------------------- internals -- */
+  /* ---------------------------------------------------------- internals -- ---- */
 
   /**
    * @param {MouseEvent} event
@@ -198,8 +149,6 @@ export class CustomerAddressForm extends BaseComponent {
    */
   #initCountries() {
     for (const select of this.querySelectorAll('select[data-country]')) {
-      // Shopify renders the saved country as `data-default`, and the option list
-      // itself only after `country_option_tags` has run.
       if (select.dataset.default) select.value = select.dataset.default;
       this.#syncProvinces(select);
     }
@@ -207,9 +156,6 @@ export class CustomerAddressForm extends BaseComponent {
 
   /**
    * Rebuild the province select for the selected country.
-   *
-   * Countries with no provinces hide the field entirely rather than showing an
-   * empty dropdown, which customers read as a required field they cannot fill.
    *
    * @param {HTMLSelectElement} countrySelect
    * @private
@@ -221,11 +167,6 @@ export class CustomerAddressForm extends BaseComponent {
 
     const option = countrySelect.selectedOptions[0];
 
-    // Shopify writes the list onto the `<option>` as `data-provinces`, so the
-    // attribute is the only source. This used to try `parseJSONScript(option)`
-    // first, which read the option's own label as JSON — it never matched and
-    // now that the helper parses what it is handed, it would warn on every
-    // country change instead of quietly returning nothing.
     const provinces = this.#parseAttribute(option);
     const wrapper = province.closest('[data-province-wrapper]');
 
@@ -268,7 +209,6 @@ export class CustomerAddressForm extends BaseComponent {
     try {
       return JSON.parse(raw);
     } catch {
-      // A malformed list must not break the whole form.
       console.warn('[Boost10] Could not parse the province list for this country.');
       return null;
     }
