@@ -1,0 +1,133 @@
+{% doc %}
+  The quantity price breaks Shopify returns for a variant: the tier table, the
+  per-unit price for the quantity in the form, and the quantity already in the
+  cart, which counts toward the next tier.
+
+  @param {product} product
+  @param {variant} [variant] - Defaults to the product's selected variant
+  @param {boolean} [show_heading] - Render the "Buy more, save more" line
+  @param {boolean} [show_unit_price] - Render the per-unit price
+  @param {boolean} [show_cart_quantity] - Render the "already in your cart" line
+  @param {number} [visible_tiers] - Rows shown before the toggle. 0 shows all.
+  @param {string} [attributes] - Extra attributes for the element
+
+  @example
+    {% render 'volume-pricing', product: product, variant: variant %}
+{% enddoc %}
+
+{%- liquid
+  assign target = variant | default: product.selected_or_first_available_variant
+  assign breaks = target.quantity_price_breaks | sort: 'minimum_quantity'
+  assign limit = visible_tiers | default: 0 | plus: 0
+
+  assign money_format = shop.money_format
+  if settings.currency_code_enabled
+    assign money_format = shop.money_with_currency_format
+  endif
+-%}
+
+{%- if product.quantity_price_breaks_configured? -%}
+  <volume-pricing
+    class="volume-pricing"
+    data-variant-id="{{ target.id }}"
+    data-variant-price="{{ target.price }}"
+    data-money-format="{{ money_format | escape }}"
+    {% if limit > 0 %}data-visible-tiers="{{ limit }}"{% endif %}
+    {% if breaks.size == 0 %}hidden{% endif %}
+    {{ attributes }}
+  >
+    <script type="application/json" data-tiers>
+      [
+        {%- assign wrote = false -%}
+        {%- for item in product.variants -%}
+          {%- if item.quantity_price_breaks.size > 0 -%}
+            {%- if wrote %},{% endif -%}
+            {
+              "id": {{ item.id }},
+              "tiers": [
+                {%- for tier in item.quantity_price_breaks -%}
+                  {%- unless forloop.first %},{% endunless -%}
+                  { "quantity": {{ tier.minimum_quantity }}, "price": {{ tier.price }} }
+                {%- endfor -%}
+              ]
+            }
+            {%- assign wrote = true -%}
+          {%- endif -%}
+        {%- endfor -%}
+      ]
+    </script>
+
+    {%- if show_heading -%}
+      <p class="volume-pricing__heading">{{ 'products.volume_pricing.title' | t }}</p>
+    {%- endif -%}
+
+    <ul class="volume-pricing__list" data-ref="list" role="list">
+      {%- for tier in breaks -%}
+        {%- liquid
+          if settings.currency_code_enabled
+            assign tier_price = tier.price | money_with_currency
+          else
+            assign tier_price = tier.price | money
+          endif
+
+          assign percent = 0
+          if target.price > 0 and tier.price < target.price
+            assign percent = target.price | minus: tier.price | times: 100.0 | divided_by: target.price | round
+          endif
+        -%}
+
+        <li class="volume-pricing__tier" data-quantity="{{ tier.minimum_quantity }}">
+          <span class="volume-pricing__tier-quantity">
+            {{- 'products.volume_pricing.minimum' | t: quantity: tier.minimum_quantity -}}
+          </span>
+
+          <span class="volume-pricing__tier-price">
+            {{- 'products.volume_pricing.each' | t: price: tier_price -}}
+          </span>
+
+          {%- if percent > 0 -%}
+            <span class="volume-pricing__tier-saving">
+              {{- 'products.volume_pricing.save_percent' | t: percent: percent -}}
+            </span>
+          {%- endif -%}
+        </li>
+      {%- endfor -%}
+    </ul>
+
+    {%- if limit > 0 -%}
+      <button
+        type="button"
+        class="volume-pricing__toggle"
+        data-ref="toggle"
+        aria-expanded="false"
+        hidden
+      >
+        {{- 'products.volume_pricing.show_more' | t: count: breaks.size -}}
+      </button>
+    {%- endif -%}
+
+    {%- if show_cart_quantity -%}
+      <variant-cart-qty
+        class="volume-pricing__in-cart"
+        data-variant-id="{{ target.id }}"
+        data-variant-price="{{ target.price }}"
+        data-money-format="{{ money_format | escape }}"
+        hidden
+      >
+        <span data-ref="label"></span>
+      </variant-cart-qty>
+    {%- endif -%}
+
+    {%- if show_unit_price -%}
+      <price-per-item
+        class="volume-pricing__unit"
+        data-variant-id="{{ target.id }}"
+        data-variant-price="{{ target.price }}"
+        data-money-format="{{ money_format | escape }}"
+      >
+        <span class="volume-pricing__unit-amount" data-ref="amount"></span>
+        <span class="volume-pricing__unit-saving" data-ref="saving" hidden></span>
+      </price-per-item>
+    {%- endif -%}
+  </volume-pricing>
+{%- endif -%}

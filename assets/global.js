@@ -58,6 +58,10 @@ const LAZY_MODULES = [
   { specifier: '@theme/product-selling-plans', tags: ['selling-plan-selector'] },
   { specifier: '@theme/quantity-selector', tags: ['quantity-selector'] },
   {
+    specifier: '@theme/price-per-item',
+    tags: ['volume-pricing', 'price-per-item', 'variant-cart-qty']
+  },
+  {
     specifier: '@theme/product-recommendations',
     tags: ['product-recommendations', 'complementary-products']
   },
