@@ -23,9 +23,18 @@ export class StickyAddToCart extends BaseComponent {
   setup() {
     this.hidden = true;
 
-    this.on(this.refs.submit, 'click', (event) => {
+    this.on(this.refs.submit, 'click', async (event) => {
       event.preventDefault();
-      this.form?.submit();
+
+      const button = this.refs.submit;
+      if (button.getAttribute('aria-busy') === 'true') return;
+
+      button.setAttribute('aria-busy', 'true');
+      try {
+        await this.form?.submit?.();
+      } finally {
+        button.removeAttribute('aria-busy');
+      }
     });
 
     this.on(this.root, EVENTS.VARIANT_CHANGE, (event) => this.render(event.detail?.variant));

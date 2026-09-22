@@ -400,7 +400,7 @@ function captureFocus(root) {
   const active = document.activeElement;
   if (!active || active === document.body || !root.contains(active)) return null;
 
-  const snapshot = { path: pathTo(root, active), selectionStart: null, selectionEnd: null };
+  const snapshot = { element: active, path: pathTo(root, active), selectionStart: null, selectionEnd: null };
 
   if (CARET_TYPES.has(active.type) || active.tagName === 'TEXTAREA') {
     try {
@@ -422,7 +422,7 @@ function captureFocus(root) {
 function restoreFocus(snapshot) {
   if (!snapshot) return;
 
-  const target = resolvePath(snapshot.path);
+  const target = snapshot.element.isConnected ? snapshot.element : resolvePath(snapshot.path);
   if (!(target instanceof HTMLElement) || !target.isConnected) return;
   if (document.activeElement === target) return;
 

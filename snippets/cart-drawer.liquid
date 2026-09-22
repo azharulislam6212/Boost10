@@ -303,12 +303,19 @@
             </tabs-element>
           {%- endif -%}
 
+          {%- assign has_cart_discounts = false -%}
           {%- if cart.cart_level_discount_applications.size > 0 -%}
+            {%- assign has_cart_discounts = true -%}
+            <div class="cart-drawer__row">
+              <span>{{ 'cart.general.subtotal' | t }}</span>
+              <span>{{ cart.items_subtotal_price | money }}</span>
+            </div>
+
             <ul class="cart-drawer__discounts" role="list">
               {%- for discount in cart.cart_level_discount_applications -%}
                 <li class="cart-drawer__discount">
                   {% render 'icon', icon: 'tag', size: 14 %}
-                  <span>{{ discount.title }}</span>
+                  <span>{{ discount.title | escape }}</span>
                   <span class="cart-drawer__discount-amount">
                     &minus;{{ discount.total_allocated_amount | money }}
                   </span>
@@ -318,9 +325,22 @@
           {%- endif -%}
 
           <div class="cart-drawer__totals">
-            <span>{{ 'cart.general.subtotal' | t }}</span>
+            <span>
+              {%- if has_cart_discounts -%}
+                {{ 'cart.general.total' | t }}
+              {%- else -%}
+                {{ 'cart.general.subtotal' | t }}
+              {%- endif -%}
+            </span>
             <span data-cart-subtotal>{{ cart.total_price | money }}</span>
           </div>
+
+          {%- if cart.total_discount > 0 -%}
+            <p class="cart-drawer__savings">
+              {%- assign savings_amount = cart.total_discount | money -%}
+              {{ 'cart.discount.savings' | t: amount: savings_amount }}
+            </p>
+          {%- endif -%}
 
           <p class="cart-drawer__notice">
             {{ 'cart.general.taxes_and_shipping_at_checkout' | t }}
@@ -331,6 +351,10 @@
               {{ 'cart.general.checkout' | t }}
             </button>
           </form>
+
+          {%- if additional_checkout_buttons and settings.show_cart_drawer_dynamic_checkout -%}
+            <div class="cart-drawer__dynamic">{{ content_for_additional_checkout_buttons }}</div>
+          {%- endif -%}
 
           <a class="cart-drawer__view" href="{{ routes.cart_url }}">{{ 'cart.general.view_cart' | t }}</a>
         </footer>

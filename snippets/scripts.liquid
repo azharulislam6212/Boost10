@@ -105,6 +105,21 @@
   document.documentElement.classList.remove('no-js');
   document.documentElement.classList.add('js');
 
+  document.addEventListener('click', function (event) {
+    var trigger = event.target instanceof Element ? event.target.closest('[data-overlay-open]') : null;
+    if (!trigger || trigger.hasAttribute('href') || !window.customElements) return;
+
+    var overlay = document.getElementById(trigger.getAttribute('data-overlay-open'));
+    if (!overlay || overlay.localName.indexOf('-') === -1 || customElements.get(overlay.localName)) return;
+
+    event.preventDefault();
+    customElements.whenDefined(overlay.localName).then(function () {
+      requestAnimationFrame(function () {
+        if (typeof overlay.open === 'function' && !overlay.isOpen) overlay.open(trigger);
+      });
+    });
+  });
+
   // ---- arm the entrance animations, before anything paints ---------------
   //
   // Every `<motion-effect>` used to be hidden by JavaScript only, on the

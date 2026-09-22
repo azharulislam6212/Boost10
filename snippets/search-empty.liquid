@@ -1,7 +1,7 @@
 {% doc %}
   The "nothing matched" state, in one place.
 
-  @param {string} [context] - 'panel' inside predictive search, 'filters' for a filtered grid, 'search' for a search page with no results. Default 'filters'
+  @param {string} [context] - 'panel' inside predictive search, 'filters' for a filtered grid, 'search' for a search page with no results, 'collection' for a collection with no products at all. Default 'filters'
   @param {string} [terms] - The query, echoed back in the panel variant
   @param {string} [url] - Where the reset link goes. Defaults to clearing filters
 
@@ -20,12 +20,18 @@
     when 'search'
       assign empty_title = 'search.empty.page_title' | t
       assign empty_text = 'search.empty.page_text' | t
+    when 'collection'
+      assign empty_title = 'collections.empty.title' | t
+      assign empty_text = 'collections.empty.text' | t
     else
       assign empty_title = 'products.facets.empty_title' | t
       assign empty_text = 'products.facets.empty_text' | t
   endcase
 
   assign reset_url = url
+  if variant == 'collection'
+    assign reset_url = routes.all_products_collection_url
+  endif
   if reset_url == blank
     if variant == 'search'
       assign reset_url = routes.search_url
@@ -35,6 +41,9 @@
   endif
 
   assign reset_label = 'products.facets.clear_all_filters' | t
+  if variant == 'collection'
+    assign reset_label = 'collections.empty.action' | t
+  endif
 -%}
 
 <div class="search-empty search-empty--{{ variant }}">

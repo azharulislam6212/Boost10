@@ -35,21 +35,44 @@
     {%- endif -%}
 
     <div class="cart-summary__totals">
+      {%- assign has_cart_discounts = false -%}
       {%- if cart.cart_level_discount_applications.size > 0 -%}
+        {%- assign has_cart_discounts = true -%}
+        <div class="cart-summary__row">
+          <span>{{ 'cart.general.subtotal' | t }}</span>
+          <span>{{ cart.items_subtotal_price | money }}</span>
+        </div>
+
         <ul class="cart-summary__discounts" role="list">
           {%- for discount in cart.cart_level_discount_applications -%}
-            <li>
-              {{ discount.title }}
-              <span>&minus;{{ discount.total_allocated_amount | money }}</span>
+            <li class="cart-summary__discount">
+              {% render 'icon', icon: 'tag', size: 14 %}
+              <span>{{ discount.title | escape }}</span>
+              <span class="cart-summary__discount-amount">
+                &minus;{{ discount.total_allocated_amount | money }}
+              </span>
             </li>
           {%- endfor -%}
         </ul>
       {%- endif -%}
 
       <div class="cart-summary__subtotal">
-        <span>{{ 'cart.general.subtotal' | t }}</span>
+        <span>
+          {%- if has_cart_discounts -%}
+            {{ 'cart.general.total' | t }}
+          {%- else -%}
+            {{ 'cart.general.subtotal' | t }}
+          {%- endif -%}
+        </span>
         <span data-cart-subtotal>{{ cart.total_price | money }}</span>
       </div>
+
+      {%- if cart.total_discount > 0 -%}
+        <p class="cart-summary__savings">
+          {%- assign savings_amount = cart.total_discount | money -%}
+          {{ 'cart.discount.savings' | t: amount: savings_amount }}
+        </p>
+      {%- endif -%}
 
       <p class="cart-summary__notice">{{ 'cart.general.taxes_and_shipping_at_checkout' | t }}</p>
 

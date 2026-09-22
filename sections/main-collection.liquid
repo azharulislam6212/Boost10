@@ -29,17 +29,18 @@
 
   <div class="{% render 'container', width: section.settings.container_width %}">
     {% paginate collection.products by per_page %}
-      {% content_for 'block',
-        type: '_filters',
-        id: 'filters',
-        results: collection,
-        results_size: collection.products_count,
-        paginate: paginate
-      %}
+      {%- if collection.all_products_count > 0 -%}
+        {% content_for 'block',
+          type: '_filters',
+          id: 'filters',
+          results: collection,
+          results_size: collection.products_count,
+          paginate: paginate
+        %}
+      {%- endif -%}
 
       {%- liquid
         assign grid_mode = section.settings.pagination_type | default: settings.pagination_type | default: 'paginate'
-        assign grid_total = collection.products_count
         assign grid_id = 'ProductGrid-' | append: section.id
         assign grid_desktop = section.settings.columns_desktop | default: 4
         assign grid_tablet = section.settings.columns_tablet | default: 3
@@ -88,8 +89,12 @@
 
         </ul>
 
-        <div class="product-grid__empty" data-ref="empty" {% if grid_total > 0 %}hidden{% endif %}>
-          {% render 'search-empty', context: 'filters', url: collection.url %}
+        <div class="product-grid__empty" data-ref="empty" {% if collection.products.size > 0 %}hidden{% endif %}>
+          {%- if collection.all_products_count == 0 -%}
+            {% render 'search-empty', context: 'collection' %}
+          {%- else -%}
+            {% render 'search-empty', context: 'filters', url: collection.url %}
+          {%- endif -%}
         </div>
 
         <div class="product-grid__pagination">

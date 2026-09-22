@@ -277,14 +277,35 @@ export class NavMenu extends BaseComponent {
    * @private
    */
   #onKeydown(event) {
+    const target = /** @type {Element|null} */ (event.target);
+
     if (event.key === 'Escape') {
-      const open = this.querySelector('[data-nav-details][data-open]');
+      const focused = target?.closest?.('[data-nav-details][data-state="open"]');
+      const open = focused || this.querySelector('[data-nav-details][data-state="open"]');
       if (!open) return;
 
       event.stopPropagation();
-      const summary = open.querySelector('[data-nav-summary]');
+      const summary = open.querySelector(':scope > [data-nav-summary]');
       this.close(/** @type {HTMLDetailsElement} */ (open));
       /** @type {HTMLElement|null} */ (summary)?.focus({ preventScroll: true });
+      return;
+    }
+
+    const trigger = target?.closest?.('[data-nav-summary]');
+
+    if (trigger && (event.key === 'Enter' || event.key === ' ' || event.key === 'ArrowDown')) {
+      const details = /** @type {HTMLDetailsElement|null} */ (trigger.closest('[data-nav-details]'));
+      if (!details) return;
+
+      event.preventDefault();
+      this.#clearHover();
+
+      if (event.key === 'ArrowDown' || details.dataset.state !== 'open') {
+        this.open(details);
+        if (event.key === 'ArrowDown') this.#focusFirstLink(details);
+      } else {
+        this.close(details);
+      }
       return;
     }
 
@@ -303,6 +324,19 @@ export class NavMenu extends BaseComponent {
     event.preventDefault();
     const step = event.key === 'ArrowRight' ? 1 : -1;
     stops[(current + step + stops.length) % stops.length]?.focus({ preventScroll: true });
+  }
+
+  /**
+   * Move focus to the first link in a panel once it is rendered.
+   *
+   * @param {HTMLDetailsElement} details
+   * @private
+   */
+  #focusFirstLink(details) {
+    requestAnimationFrame(() => {
+      const link = panelOf(details)?.querySelector('a[href], button, summary, [tabindex]:not([tabindex="-1"])');
+      /** @type {HTMLElement|null} */ (link)?.focus({ preventScroll: true });
+    });
   }
 
   /** @private */
@@ -508,6 +542,9 @@ export class MarketPicker extends BaseComponent {
 
     if (this.refs.filter) {
       this.on(this.refs.filter, 'input', () => this.#filter());
+      this.on(this.refs.filter, 'keydown', (event) => {
+        if (event.key === 'Enter') event.preventDefault();
+      });
     }
 
     this.on(this, 'keydown', (event) => {

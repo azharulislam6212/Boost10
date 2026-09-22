@@ -12,13 +12,17 @@
 
 {%- liquid
   assign mode = type | default: settings.pagination_type | default: 'paginate'
+  assign out_of_range = false
+  if paginate.current_page > paginate.pages
+    assign out_of_range = true
+  endif
 -%}
 
 {%- if mode == 'paginate' -%}
   {%- if paginate.pages > 1 -%}
     <nav class="pagination" data-ref="pagination" aria-label="{{ 'general.pagination.label' | t }}">
       <ul class="pagination__list" role="list">
-        {%- if paginate.previous -%}
+        {%- if paginate.previous and out_of_range == false -%}
           <li>
             <a class="pagination__link pagination__link--previous" href="{{ paginate.previous.url }}" rel="prev">
               {% render 'icon', icon: 'chevron-left' %}
@@ -69,7 +73,7 @@
     </a>
   {%- endif -%}
 
-  {%- if mode == 'infinite' -%}
+  {%- if mode == 'infinite' and paginate.items > 0 -%}
     <div class="pagination__sentinel" data-ref="sentinel" aria-hidden="true"></div>
   {%- endif -%}
 {%- endif -%}

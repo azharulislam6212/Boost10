@@ -123,6 +123,8 @@ export class ProductForm extends BaseComponent {
    * @returns {Promise<Object|null>}
    */
   async submit() {
+    if (this.hasAttribute('data-loading')) return null;
+
     const id = this.variantId;
     if (!id) {
       this.#error(themeString('unavailable', ''));

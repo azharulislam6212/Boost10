@@ -124,6 +124,8 @@ export class FacetFilters extends BaseComponent {
       this.#updateFilterMarkup(html);
       this.#syncActiveCount();
 
+      for (const range of this.querySelectorAll('price-range')) range.sync?.();
+
       this.dispatch(
         EVENTS.FILTER_UPDATE,
         filterUpdateDetail(target, { activeCount: this.activeCount })
@@ -328,20 +330,27 @@ defineComponent('facet-drawer', FacetDrawer);
 export class PriceRange extends BaseComponent {
   static requiredRefs = ['min', 'max'];
 
+  /** How long typing has to pause before the results refresh. */
+  static COMMIT_DELAY = 800;
+
   setup() {
-    const commit = debounce(() => this.commit(), 500);
+    const commit = debounce((edited) => {
+      this.#clampAgainstEachOther(edited);
+      this.#paint();
+      this.commit();
+    }, PriceRange.COMMIT_DELAY);
 
     for (const input of [this.refs.min, this.refs.max]) {
       this.on(input, 'input', () => {
-        this.#clampAgainstEachOther(input);
         this.#paint();
-        commit();
+        if (this.#isSettled(input)) commit(input);
       });
 
       this.on(input, 'change', () => {
+        commit.cancel();
         this.#clampAgainstEachOther(input);
         this.#paint();
-        commit();
+        this.commit();
       });
     }
 
@@ -373,6 +382,11 @@ export class PriceRange extends BaseComponent {
     return { min, max };
   }
 
+  /** Repaint the track after the markup has been re-rendered. */
+  sync() {
+    this.#paint();
+  }
+
   /** Clear both ends. */
   reset() {
     this.refs.min.value = '';
@@ -395,6 +409,17 @@ export class PriceRange extends BaseComponent {
   }
 
   /* ---------------------------------------------------------- internals -- ---- */
+
+  /**
+   * A half-typed value ("12.", "-") is not worth a request.
+   *
+   * @param {HTMLInputElement} input
+   * @returns {boolean}
+   * @private
+   */
+  #isSettled(input) {
+    return input.validity.valid && !/[.,]$/.test(input.value);
+  }
 
   /**
    * Stop the two ends crossing.

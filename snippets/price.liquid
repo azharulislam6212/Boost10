@@ -22,9 +22,15 @@
   assign compare_price = target.compare_at_price | default: product.compare_at_price
 
   assign varies = false
+  assign show_compare = true
   if variant == blank and product.price_varies
     assign varies = true
     assign current_price = product.price_min
+    assign compare_price = product.compare_at_price
+  endif
+
+  if variant == blank and product.price_varies == false and product.compare_at_price_varies
+    assign show_compare = false
   endif
 
   assign on_sale = false
@@ -66,13 +72,16 @@
       {%- endif -%}
     </span>
 
-    <span class="visually-hidden">{{ 'products.product.regular_price' | t }}</span>
-    <s class="price__compare" data-price-compare>{{ compare_display }}</s>
+    {%- if show_compare -%}
+      <span class="visually-hidden">{{ 'products.product.regular_price' | t }}</span>
+      <s class="price__compare" data-price-compare>{{ compare_display }}</s>
+    {%- endif -%}
 
-    {%- if show_badges -%}
+    {%- if show_badges and show_compare -%}
       {%- liquid
         assign saved_amount = compare_price | minus: current_price
         assign saved_percent = saved_amount | times: 100.0 | divided_by: compare_price | round
+        assign saved_display = saved_amount | money
       -%}
 
       {%- case settings.sale_badge_type -%}
@@ -82,7 +91,7 @@
           </span>
         {%- when 'amount' -%}
           <span class="price__saving" data-price-saving>
-            {{- 'products.product.sale_amount' | t: amount: saved_amount | money -}}
+            {{- 'products.product.sale_amount' | t: amount: saved_display -}}
           </span>
         {%- else -%}
           <span class="price__saving" data-price-saving>{{ 'products.product.on_sale' | t }}</span>

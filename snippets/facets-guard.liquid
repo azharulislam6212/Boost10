@@ -33,8 +33,108 @@
       {%- continue -%}
     {%- endif -%}
 
+    {%- capture group_content -%}
+      <div class="facets__group-content">
+      {%- case f.type -%}
+        {%- when 'price_range' -%}
+          {%- liquid
+            assign range_max = f.range_max | money_without_currency | replace: ',', ''
+            assign range_max_display = f.range_max | money
+          -%}
+          <price-range
+            class="price-range"
+            data-min="0"
+            data-max="{{ f.range_max }}"
+          >
+            <div class="price-range__inputs">
+              <label class="visually-hidden" for="{{ f.min_value.param_name }}-{{ layout }}">
+                {{ 'products.facets.price_from' | t }}
+              </label>
+              <input
+                id="{{ f.min_value.param_name }}-{{ layout }}"
+                data-ref="min"
+                type="number"
+                name="{{ f.min_value.param_name }}"
+                value="{{ f.min_value.value | money_without_currency | replace: ',', '' }}"
+                min="0"
+                max="{{ range_max }}"
+                inputmode="decimal"
+                placeholder="0"
+              >
+
+              <label class="visually-hidden" for="{{ f.max_value.param_name }}-{{ layout }}">
+                {{ 'products.facets.price_to' | t }}
+              </label>
+              <input
+                id="{{ f.max_value.param_name }}-{{ layout }}"
+                data-ref="max"
+                type="number"
+                name="{{ f.max_value.param_name }}"
+                value="{{ f.max_value.value | money_without_currency | replace: ',', '' }}"
+                min="0"
+                max="{{ range_max }}"
+                inputmode="decimal"
+                placeholder="{{ range_max }}"
+              >
+            </div>
+
+            <div class="price-range__track" data-ref="track" aria-hidden="true">
+              <span class="price-range__fill" data-ref="fill"></span>
+            </div>
+
+            <output class="price-range__output" data-ref="output"></output>
+            <p class="price-range__max">
+              {{ 'products.facets.max_price_html' | t: price: range_max_display }}
+            </p>
+          </price-range>
+
+        {%- else -%}
+          <ul class="facets__values facets__values--{{ f.presentation | default: 'text' }}" role="list">
+            {%- for value in f.values -%}
+              <li class="facets__value">
+                <label class="facets__checkbox">
+                  <input
+                    type="checkbox"
+                    name="{{ value.param_name }}"
+                    value="{{ value.value | escape }}"
+                    {% if value.active %}checked{% endif %}
+                    {% if value.count == 0 and value.active == false %}disabled{% endif %}
+                  >
+
+                  {%- case f.presentation -%}
+                    {%- when 'swatch' -%}
+                      {% render 'swatch',
+                         value: value.label,
+                         option_name: f.label,
+                         option_value: value,
+                         size: 'small' %}
+                    {%- when 'image' -%}
+                      {%- if value.image != blank -%}
+                        {{
+                          value.image
+                          | image_url: width: 80
+                          | image_tag: class: 'facets__value-image', alt: '', width: 40, height: 40, loading: 'lazy'
+                        }}
+                      {%- endif -%}
+                  {%- endcase -%}
+
+                  <span class="facets__value-label">{{ value.label | escape }}</span>
+                  <span class="facets__value-count">({{ value.count }})</span>
+                </label>
+              </li>
+            {%- endfor -%}
+          </ul>
+      {%- endcase -%}
+      </div>
+    {%- endcapture -%}
+
     {%- if wrap_in_details -%}
-      <details class="facets__group" data-default-open {% if f.active_values.size > 0 %}open{% endif %}>
+      <details
+        class="facets__group"
+        data-morph-key="{{ f.param_name | escape }}"
+        data-default-open
+        {% if f.active_values.size > 0 %}open{% endif %}
+      >
         <summary class="facets__summary">
           <span class="facets__group-label">{{ f.label }}</span>
           {%- if f.active_values.size > 0 -%}
@@ -43,169 +143,11 @@
           {% render 'icon', icon: 'chevron-down', size: 14 %}
         </summary>
 
-        <div class="facets__group-content">
-        {%- case f.type -%}
-          {%- when 'price_range' -%}
-            <price-range
-              class="price-range"
-              data-min="0"
-              data-max="{{ f.range_max }}"
-            >
-              <div class="price-range__inputs">
-                <label class="visually-hidden" for="{{ f.min_value.param_name }}-{{ layout }}">
-                  {{ 'products.facets.price_from' | t }}
-                </label>
-                <input
-                  id="{{ f.min_value.param_name }}-{{ layout }}"
-                  data-ref="min"
-                  type="number"
-                  name="{{ f.min_value.param_name }}"
-                  value="{{ f.min_value.value | money_without_currency | replace: ',', '' }}"
-                  min="0"
-                  max="{{ f.range_max | money_without_currency | replace: ',', '' }}"
-                  inputmode="numeric"
-                  placeholder="0"
-                >
-
-                <label class="visually-hidden" for="{{ f.max_value.param_name }}-{{ layout }}">
-                  {{ 'products.facets.price_to' | t }}
-                </label>
-                <input
-                  id="{{ f.max_value.param_name }}-{{ layout }}"
-                  data-ref="max"
-                  type="number"
-                  name="{{ f.max_value.param_name }}"
-                  value="{{ f.max_value.value | money_without_currency | replace: ',', '' }}"
-                  min="0"
-                  max="{{ f.range_max | money_without_currency | replace: ',', '' }}"
-                  inputmode="numeric"
-                  placeholder="{{ f.range_max | money_without_currency | replace: ',', '' }}"
-                >
-              </div>
-
-              <div class="price-range__track" data-ref="track" aria-hidden="true">
-                <span class="price-range__fill" data-ref="fill"></span>
-              </div>
-
-              <output class="price-range__output" data-ref="output"></output>
-              <p class="price-range__max">
-                {{ 'products.facets.max_price_html' | t: price: f.range_max | money }}
-              </p>
-            </price-range>
-
-          {%- else -%}
-            <ul class="facets__values" role="list">
-              {%- for value in f.values -%}
-                <li class="facets__value">
-                  <label class="facets__checkbox">
-                    <input
-                      type="checkbox"
-                      name="{{ value.param_name }}"
-                      value="{{ value.value }}"
-                      {% if value.active %}checked{% endif %}
-                      {% if value.count == 0 and value.active == false %}disabled{% endif %}
-                    >
-
-                    {%- if f.presentation == 'swatch' -%}
-                      {% render 'swatch',
-                         value: value.label,
-                         option_name: f.label,
-                         option_value: value,
-                         size: 'small' %}
-                    {%- else -%}
-                      <span class="facets__value-label">{{ value.label }}</span>
-                    {%- endif -%}
-
-                    <span class="facets__value-count">({{ value.count }})</span>
-                  </label>
-                </li>
-              {%- endfor -%}
-            </ul>
-        {%- endcase -%}
-        </div>
+        {{ group_content }}
       </details>
     {%- else -%}
-      <div class="facets__group facets__group--flat">
-        <div class="facets__group-content">
-        {%- case f.type -%}
-          {%- when 'price_range' -%}
-            <price-range
-              class="price-range"
-              data-min="0"
-              data-max="{{ f.range_max }}"
-            >
-              <div class="price-range__inputs">
-                <label class="visually-hidden" for="{{ f.min_value.param_name }}-{{ layout }}">
-                  {{ 'products.facets.price_from' | t }}
-                </label>
-                <input
-                  id="{{ f.min_value.param_name }}-{{ layout }}"
-                  data-ref="min"
-                  type="number"
-                  name="{{ f.min_value.param_name }}"
-                  value="{{ f.min_value.value | money_without_currency | replace: ',', '' }}"
-                  min="0"
-                  max="{{ f.range_max | money_without_currency | replace: ',', '' }}"
-                  inputmode="numeric"
-                  placeholder="0"
-                >
-
-                <label class="visually-hidden" for="{{ f.max_value.param_name }}-{{ layout }}">
-                  {{ 'products.facets.price_to' | t }}
-                </label>
-                <input
-                  id="{{ f.max_value.param_name }}-{{ layout }}"
-                  data-ref="max"
-                  type="number"
-                  name="{{ f.max_value.param_name }}"
-                  value="{{ f.max_value.value | money_without_currency | replace: ',', '' }}"
-                  min="0"
-                  max="{{ f.range_max | money_without_currency | replace: ',', '' }}"
-                  inputmode="numeric"
-                  placeholder="{{ f.range_max | money_without_currency | replace: ',', '' }}"
-                >
-              </div>
-
-              <div class="price-range__track" data-ref="track" aria-hidden="true">
-                <span class="price-range__fill" data-ref="fill"></span>
-              </div>
-
-              <output class="price-range__output" data-ref="output"></output>
-              <p class="price-range__max">
-                {{ 'products.facets.max_price_html' | t: price: f.range_max | money }}
-              </p>
-            </price-range>
-
-          {%- else -%}
-            <ul class="facets__values" role="list">
-              {%- for value in f.values -%}
-                <li class="facets__value">
-                  <label class="facets__checkbox">
-                    <input
-                      type="checkbox"
-                      name="{{ value.param_name }}"
-                      value="{{ value.value }}"
-                      {% if value.active %}checked{% endif %}
-                      {% if value.count == 0 and value.active == false %}disabled{% endif %}
-                    >
-
-                    {%- if f.presentation == 'swatch' -%}
-                      {% render 'swatch',
-                         value: value.label,
-                         option_name: f.label,
-                         option_value: value,
-                         size: 'small' %}
-                    {%- else -%}
-                      <span class="facets__value-label">{{ value.label }}</span>
-                    {%- endif -%}
-
-                    <span class="facets__value-count">({{ value.count }})</span>
-                  </label>
-                </li>
-              {%- endfor -%}
-            </ul>
-        {%- endcase -%}
-        </div>
+      <div class="facets__group facets__group--flat" data-morph-key="{{ f.param_name | escape }}">
+        {{ group_content }}
       </div>
     {%- endif -%}
   {%- endfor -%}

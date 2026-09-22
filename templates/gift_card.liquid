@@ -32,6 +32,8 @@
 
     {{ content_for_header }}
 
+    <script src="{{ 'vendor/qrcode.js' | shopify_asset_url }}" defer></script>
+
     {% render 'color-schemes' %}
     {{ 'base.css' | asset_url | stylesheet_tag: preload: true }}
 
@@ -60,17 +62,21 @@
     </main>
 
     <script type="module">
-      // The QR code is a Theme Store requirement (minimum 120 x 120px), and the
-      // library is vendored rather than fetched: a data-URI service would mean
-      // sending a redeemable code to a third party's server, and a hand-written
-      // encoder would mean betting a bearer instrument on getting Reed-Solomon
-      // and mask selection right.
-      import qrcode from '{{ 'qrcode.js' | asset_url }}';
-
+      // The QR code is a Theme Store requirement (minimum 120 x 120px). Shopify's
+      // hosted encoder draws it; the vendored one covers a failed CDN load.
       const target = document.getElementById('GiftCardQr');
 
-      if (target) {
+      if (target && typeof window.QRCode === 'function') {
+        new window.QRCode(target, {
+          text: target.dataset.code,
+          width: 160,
+          height: 160,
+          correctLevel: window.QRCode.CorrectLevel?.M
+        });
+        target.removeAttribute('hidden');
+      } else if (target) {
         try {
+          const { default: qrcode } = await import('{{ 'qrcode.js' | asset_url }}');
           // Type 0 auto-sizes to the content; 'M' error correction is what
           // Shopify's own gift card passes use, and survives a phone screen
           // being photographed at an angle.

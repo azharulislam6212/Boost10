@@ -113,7 +113,16 @@ export class Overlay extends BaseComponent {
     this.#open = true;
     this.setAttribute('data-state', 'opening');
 
-    if (!this.refs.dialog.open) this.refs.dialog.showModal();
+    try {
+      if (!this.refs.dialog.open) this.refs.dialog.showModal();
+    } catch (error) {
+      this.#open = false;
+      this.setAttribute('data-state', 'closed');
+      this.#trigger?.setAttribute('aria-expanded', 'false');
+      this.#trigger = null;
+      console.error(`[Boost10] ${this.id} could not open.`, error);
+      return;
+    }
 
     lockScroll();
 

@@ -10,6 +10,9 @@ import { themeString, announceUrgent } from '@theme/utilities';
 /** Fields worth validating. Buttons, hidden inputs and honeypots are not. */
 const FIELD_SELECTOR = 'input:not([type="hidden"]):not([type="submit"]):not([type="button"]), select, textarea';
 
+/** Browsers accept `name@host`; a real address also needs a dot in its domain. */
+const EMAIL_PATTERN = /^[^@s]+@[^@s]+.[^@s]+$/;
+
 export class ValidatedForm extends BaseComponent {
   /** True once a submit has been attempted and rejected. */
   #submitted = false;
@@ -30,7 +33,7 @@ export class ValidatedForm extends BaseComponent {
       });
 
       this.on(field, 'blur', () => {
-        if (this.#submitted) this.validateField(field);
+        if (this.#submitted || field.value) this.validateField(field);
       });
     }
   }
@@ -83,7 +86,7 @@ export class ValidatedForm extends BaseComponent {
   validateField(field) {
     if (typeof field.checkValidity !== 'function') return true;
 
-    const valid = field.checkValidity();
+    const valid = field.checkValidity() && !this.#isIncompleteEmail(field);
 
     if (valid) {
       this.#clearError(field);
@@ -105,7 +108,9 @@ export class ValidatedForm extends BaseComponent {
     const label = this.#labelFor(field);
 
     if (state.valueMissing) return themeString('formRequired', '', { field: label });
-    if (state.typeMismatch && field.type === 'email') return themeString('formEmail', '');
+    if ((state.typeMismatch && field.type === 'email') || this.#isIncompleteEmail(field)) {
+      return themeString('formEmail', '');
+    }
     if (state.typeMismatch && field.type === 'tel') return themeString('formPhone', '');
     if (state.typeMismatch && field.type === 'url') return themeString('formUrl', '');
     if (state.tooShort) return themeString('formTooShort', '', { min: field.minLength });
@@ -131,6 +136,15 @@ export class ValidatedForm extends BaseComponent {
     event.preventDefault();
     event.stopPropagation();
   };
+
+  /**
+   * @param {HTMLElement} field
+   * @returns {boolean}
+   * @private
+   */
+  #isIncompleteEmail(field) {
+    return field.type === 'email' && field.value !== '' && !EMAIL_PATTERN.test(field.value.trim());
+  }
 
   /**
    * The field's visible label, so a message can name it the way the customer
@@ -164,7 +178,9 @@ export class ValidatedForm extends BaseComponent {
       target.id = id;
       target.className = 'form-field__error';
 
-      field.insertAdjacentElement('afterend', target);
+      target.setAttribute('role', 'alert');
+
+      (field.closest('[data-error-anchor]') || field).insertAdjacentElement('afterend', target);
     }
 
     target.textContent = message;

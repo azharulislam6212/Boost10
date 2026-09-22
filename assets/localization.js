@@ -33,6 +33,15 @@ export class LocalizationForm extends BaseComponent {
       const filter = debounce((value) => this.filter(value), 150);
       this.on(this.refs.filter, 'input', (event) => filter(event.target.value));
 
+      this.on(this.refs.filter, 'keydown', (event) => {
+        if (event.key !== 'Enter') return;
+        event.preventDefault();
+
+        this.filter(event.target.value);
+        const matches = this.visibleOptions;
+        if (matches.length === 1) matches[0].click();
+      });
+
       this.refs.filter.closest('[data-filter-wrapper]')?.removeAttribute('hidden');
     }
 
