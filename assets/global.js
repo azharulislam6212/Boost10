@@ -47,7 +47,7 @@ const LAZY_MODULES = [
   { specifier: '@theme/cart-shipping', tags: ['shipping-calculator'] },
   { specifier: '@theme/free-shipping-bar', tags: ['free-shipping-bar'] },
 
-  { specifier: '@theme/product-form', tags: ['product-form', 'sticky-add-to-cart', 'bundle-builder'] },
+  { specifier: '@theme/product-form', tags: ['product-form', 'sticky-add-to-cart'] },
 
   { specifier: '@theme/product-bundle', tags: ['product-bundle'] },
   { specifier: '@theme/quick-add', tags: ['quick-add-summary'] },
