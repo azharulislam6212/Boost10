@@ -10,6 +10,9 @@ import { themeString, announce, announceUrgent } from '@theme/utilities';
 /** How far ahead a gift card may be scheduled, in days. */
 const MAX_SCHEDULE_DAYS = 365;
 
+/** A full address: something, an @, a domain and a dot-separated suffix. */
+const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
 export class GiftCardRecipientForm extends BaseComponent {
   static requiredRefs = ['toggle', 'fields'];
 
@@ -64,6 +67,10 @@ export class GiftCardRecipientForm extends BaseComponent {
       field.disabled = !enabled;
     }
 
+    if (this.refs.offset instanceof HTMLInputElement) {
+      this.refs.offset.value = String(new Date().getTimezoneOffset());
+    }
+
     if (this.refs.email instanceof HTMLInputElement) {
       this.refs.email.required = enabled;
       if (enabled && !silent) this.refs.email.focus({ preventScroll: true });
@@ -87,8 +94,13 @@ export class GiftCardRecipientForm extends BaseComponent {
     if (email instanceof HTMLInputElement) {
       const value = email.value.trim();
 
-      if (value === '' || !email.checkValidity()) {
+      if (value === '') {
         this.#fail(email, themeString('giftCardEmailRequired', ''));
+        return false;
+      }
+
+      if (!EMAIL_PATTERN.test(value) || !email.checkValidity()) {
+        this.#fail(email, themeString('formEmail', '') || themeString('giftCardEmailRequired', ''));
         return false;
       }
     }
