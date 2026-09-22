@@ -1,10 +1,23 @@
 {% comment %}
   Shopify's legal policies: refund, privacy, terms, shipping, contact
-  information.
+  information. The text comes from Settings › Policies, matched to the page by
+  handle; a page with no matching policy falls back to its own content.
 {% endcomment %}
 
 {%- liquid
   assign section_settings = section.settings
+
+  assign store_policy = blank
+  for candidate in shop.policies
+    assign candidate_handle = candidate.url | split: '/' | last
+    if candidate_handle == page.handle
+      assign store_policy = candidate
+      break
+    endif
+  endfor
+
+  assign policy_title = store_policy.title | default: page.title
+  assign policy_body = store_policy.body | default: page.content
 -%}
 
 <div
@@ -17,13 +30,10 @@
     {%- endif -%}
 
     <div class="policy__inner">
-
-  {% # theme-check-disable UndefinedObject %}
-  <h1 class="policy__title">{{ policy.title }}</h1>
+      <h1 class="policy__title">{{ policy_title }}</h1>
 
       <div class="policy__content rte">
-        {{ policy.body }}
-      {% # theme-check-enable UndefinedObject %}
+        {{ policy_body }}
       </div>
 
       {%- if section_settings.show_back_link -%}

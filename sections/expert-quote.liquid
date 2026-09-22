@@ -6,50 +6,8 @@
 {%- liquid
   assign s = section.settings
 
-  assign background_media = s.background_media | default: 'none'
-  assign has_background_media = false
-  if background_media != 'none'
-    assign has_background_media = true
-  endif
+  assign background_paint = s.background_color | default: ''
 
-  assign background_paint = ''
-  if has_background_media == false
-    assign background_paint = s.background_color | default: ''
-  endif
-
-  assign border_line = s.border_style | default: 'none'
-
-  assign bw_top = 0
-  assign bw_right = 0
-  assign bw_bottom = 0
-  assign bw_left = 0
-  assign border_any = 0
-
-  if border_line != 'none'
-    assign bw_top = s.border_width_top | default: 0 | plus: 0
-    assign bw_right = s.border_width_right | default: 0 | plus: 0
-    assign bw_bottom = s.border_width_bottom | default: 0 | plus: 0
-    assign bw_left = s.border_width_left | default: 0 | plus: 0
-    assign border_any = bw_top | plus: bw_right | plus: bw_bottom | plus: bw_left
-
-    assign border_percent = s.border_opacity | default: 100 | plus: 0
-    if s.border_color == blank
-      assign border_paint = 'color-mix(in srgb, currentColor ' | append: border_percent | append: '%, transparent)'
-    else
-      assign border_alpha = border_percent | divided_by: 100.0
-      assign border_paint = s.border_color | color_modify: 'alpha', border_alpha
-    endif
-  endif
-
-  assign r_tl = s.border_radius_top_left | default: 40 | plus: 0
-  assign r_tr = s.border_radius_top_right | default: 40 | plus: 0
-  assign r_bl = s.border_radius_bottom_left | default: 0 | plus: 0
-  assign r_br = s.border_radius_bottom_right | default: 0 | plus: 0
-
-  assign r_tl_m = s.border_radius_top_left_mobile | default: r_tl | plus: 0
-  assign r_tr_m = s.border_radius_top_right_mobile | default: r_tr | plus: 0
-  assign r_bl_m = s.border_radius_bottom_left_mobile | default: r_bl | plus: 0
-  assign r_br_m = s.border_radius_bottom_right_mobile | default: r_br | plus: 0
   assign margin_top = s.margin_top | default: 0 | plus: 0
   assign margin_bottom = s.margin_bottom | default: 0 | plus: 0
 
@@ -72,8 +30,8 @@
 
 {%- capture section_style -%}
   {%- render 'spacing', section: s, declarations: true -%}
-  --expert-quote-radius: {{ r_tl }}px {{ r_tr }}px {{ r_br }}px {{ r_bl }}px;
-  --expert-quote-radius-mobile: {{ r_tl_m }}px {{ r_tr_m }}px {{ r_br_m }}px {{ r_bl_m }}px;
+  --expert-quote-radius: var(--section-frame-radius, 40px 40px 0px 0px);
+  --expert-quote-radius-mobile: var(--section-frame-radius-mobile, 24px 24px 0px 0px);
   --expert-quote-margin-block-start: {{ margin_top }}px;
   --expert-quote-margin-block-end: {{ margin_bottom }}px;
   --expert-quote-gap-x: {{ gap_x }}px;
@@ -84,26 +42,26 @@
   --expert-quote-motion-angle: {{ motion_angle }}deg;
   --expert-quote-motion-scale: {{ motion_scale }};
   --expert-quote-motion-duration: {{ motion_duration }}ms;
-  {%- if border_any > 0 -%}
-    --expert-quote-border-width: {{ bw_top }}px {{ bw_right }}px {{ bw_bottom }}px {{ bw_left }}px;
-    --expert-quote-border-style: {{ border_line }};
-    --expert-quote-border-color: {{ border_paint }};
-  {%- endif -%}
+  --expert-quote-border-width: var(--section-frame-border-width, 1px 0px 0px 0px);
+  --expert-quote-border-style: var(--section-frame-border-style, dashed);
+  --expert-quote-border-color: var(--section-frame-border-color, #0F2E2F);
   {%- if background_paint != '' -%}
     background: {{ background_paint }};
   {%- endif -%}
 {%- endcapture -%}
 
+{%- capture frame_style -%}
+  {% content_for 'block', type: '_section-frame', id: 'section-frame' %}
+{%- endcapture -%}
+
 <div
-  class="expert-quote color-scheme-container color-{{ s.color_scheme | default: 'scheme-1' }}{% if has_background_media %} has-background-media{% endif %}"
+  class="expert-quote color-scheme-container color-{{ s.color_scheme | default: 'scheme-1' }}"
   data-section-spacing
   {%- if s.stack_layer != blank and s.stack_layer != 'default' %} data-section-layer="{{ s.stack_layer }}"{% endif %}
   data-section-id="{{ section.id }}"
-  style="{{ section_style | strip_newlines | strip }}"
+  style="{{ section_style | strip_newlines | strip }}{{ frame_style | strip_newlines | strip }}"
 >
-  {%- if has_background_media -%}
-    {% render 'background-media', settings: s %}
-  {%- endif -%}
+  {% content_for 'block', type: '_background-media', id: 'section-background' %}
 
   <div class="expert-quote__inner {% render 'container', width: s.container_width %}">
 
@@ -119,7 +77,6 @@
   </div>
 </div>
 
-{% # theme-check-disable ExcessiveSettingsCount %}
 {% schema %}
 {
   "name": "t:sections.expert_quote.name",
@@ -283,384 +240,15 @@
       "default": "scheme-1"
     },
     {
-      "type": "select",
-      "id": "background_media",
-      "label": "t:shared.background.media.label",
-      "options": [
-        {
-          "value": "none",
-          "label": "t:shared.background.media.options__1.label"
-        },
-        {
-          "value": "image",
-          "label": "t:shared.background.media.options__2.label"
-        },
-        {
-          "value": "video",
-          "label": "t:shared.background.media.options__3.label"
-        }
-      ],
-      "default": "none"
-    },
-    {
       "type": "color_background",
       "id": "background_color",
       "label": "t:shared.background.color.label",
       "info": "t:shared.background.color.info",
-      "default": "linear-gradient(90deg, #E5F1EE 0%, #FBFDFC 20%, #FBFDFC 40%, #F4F9F8 60%, #EDF5F3 80%, #E5F1EE 100%)",
-      "visible_if": "{{ section.settings.background_media == 'none' }}"
-    },
-    {
-      "type": "image_picker",
-      "id": "image",
-      "label": "t:shared.background.image.label",
-      "visible_if": "{{ section.settings.background_media == 'image' }}"
-    },
-    {
-      "type": "image_picker",
-      "id": "image_mobile",
-      "label": "t:shared.background.image_mobile.label",
-      "info": "t:shared.background.image_mobile.info",
-      "visible_if": "{{ section.settings.background_media == 'image' }}"
-    },
-    {
-      "type": "select",
-      "id": "image_position",
-      "label": "t:shared.background.image_position.label",
-      "info": "t:shared.background.image_position.info",
-      "options": [
-        {
-          "value": "cover",
-          "label": "t:shared.background.image_position.options__1.label"
-        },
-        {
-          "value": "fit",
-          "label": "t:shared.background.image_position.options__2.label"
-        }
-      ],
-      "default": "cover",
-      "visible_if": "{{ section.settings.background_media == 'image' }}"
-    },
-    {
-      "type": "checkbox",
-      "id": "image_parallax",
-      "label": "t:shared.background.image_parallax.label",
-      "info": "t:shared.background.image_parallax.info",
-      "default": false,
-      "visible_if": "{{ section.settings.background_media == 'image' }}"
-    },
-    {
-      "type": "range",
-      "id": "image_parallax_speed",
-      "label": "t:shared.background.image_parallax_speed.label",
-      "info": "t:shared.background.image_parallax_speed.info",
-      "min": 5,
-      "max": 40,
-      "step": 5,
-      "unit": "%",
-      "default": 15,
-      "visible_if": "{{ section.settings.background_media == 'image' and section.settings.image_parallax }}"
-    },
-    {
-      "type": "video",
-      "id": "video",
-      "label": "t:shared.background.video.label",
-      "info": "t:shared.background.video.info",
-      "visible_if": "{{ section.settings.background_media == 'video' }}"
-    },
-    {
-      "type": "video_url",
-      "id": "video_url",
-      "label": "t:shared.background.video_url.label",
-      "info": "t:shared.background.video_url.info",
-      "accept": [
-        "youtube",
-        "vimeo"
-      ],
-      "visible_if": "{{ section.settings.background_media == 'video' }}"
-    },
-    {
-      "type": "image_picker",
-      "id": "video_poster",
-      "label": "t:shared.background.video_poster.label",
-      "info": "t:shared.background.video_poster.info",
-      "visible_if": "{{ section.settings.background_media == 'video' }}"
-    },
-    {
-      "type": "select",
-      "id": "video_position",
-      "label": "t:shared.background.video_position.label",
-      "options": [
-        {
-          "value": "cover",
-          "label": "t:shared.background.video_position.options__1.label"
-        },
-        {
-          "value": "contain",
-          "label": "t:shared.background.video_position.options__2.label"
-        }
-      ],
-      "default": "cover",
-      "visible_if": "{{ section.settings.background_media == 'video' }}"
-    },
-    {
-      "type": "checkbox",
-      "id": "video_loop",
-      "label": "t:shared.background.video_loop.label",
-      "default": true,
-      "visible_if": "{{ section.settings.background_media == 'video' }}"
-    },
-    {
-      "type": "checkbox",
-      "id": "overlay_enabled",
-      "label": "t:shared.background.overlay_enabled.label",
-      "info": "t:shared.background.overlay_enabled.info",
-      "default": false,
-      "visible_if": "{{ section.settings.background_media != 'none' }}"
-    },
-    {
-      "type": "select",
-      "id": "overlay_style",
-      "label": "t:shared.background.overlay_style.label",
-      "info": "t:shared.background.overlay_style.info",
-      "options": [
-        {
-          "value": "solid",
-          "label": "t:shared.background.overlay_style.options__1.label"
-        },
-        {
-          "value": "gradient",
-          "label": "t:shared.background.overlay_style.options__2.label"
-        }
-      ],
-      "default": "solid",
-      "visible_if": "{{ section.settings.background_media != 'none' and section.settings.overlay_enabled }}"
-    },
-    {
-      "type": "color",
-      "id": "overlay_color",
-      "label": "t:shared.background.overlay_color.label",
-      "default": "#000000",
-      "visible_if": "{{ section.settings.background_media != 'none' and section.settings.overlay_enabled and section.settings.overlay_style == 'solid' }}"
-    },
-    {
-      "type": "color_background",
-      "id": "overlay_gradient",
-      "label": "t:shared.background.overlay_gradient.label",
-      "info": "t:shared.background.overlay_gradient.info",
-      "default": "linear-gradient(180deg, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 1) 100%)",
-      "visible_if": "{{ section.settings.background_media != 'none' and section.settings.overlay_enabled and section.settings.overlay_style == 'gradient' }}"
-    },
-    {
-      "type": "range",
-      "id": "overlay_opacity",
-      "label": "t:shared.background.overlay_opacity.label",
-      "min": 0,
-      "max": 100,
-      "step": 5,
-      "unit": "%",
-      "default": 40,
-      "visible_if": "{{ section.settings.background_media != 'none' and section.settings.overlay_enabled }}"
-    },
-    {
-      "type": "header",
-      "content": "t:blocks.group.headers.borders"
+      "default": "linear-gradient(90deg, #E5F1EE 0%, #FBFDFC 20%, #FBFDFC 40%, #F4F9F8 60%, #EDF5F3 80%, #E5F1EE 100%)"
     },
     {
       "type": "paragraph",
       "content": "t:sections.expert_quote.paragraphs.borders"
-    },
-    {
-      "type": "select",
-      "id": "border_style",
-      "label": "t:blocks.group.settings.border_style.label",
-      "options": [
-        {
-          "value": "none",
-          "label": "t:shared.options.none"
-        },
-        {
-          "value": "solid",
-          "label": "t:shared.options.solid"
-        },
-        {
-          "value": "dashed",
-          "label": "t:shared.border.style.options__2.label"
-        }
-      ],
-      "default": "dashed"
-    },
-    {
-      "type": "range",
-      "id": "border_width_top",
-      "label": "t:shared.border.sides.top.label",
-      "info": "t:shared.border.sides.info",
-      "min": 0,
-      "max": 12,
-      "step": 1,
-      "unit": "px",
-      "default": 1,
-      "visible_if": "{{ section.settings.border_style != 'none' }}"
-    },
-    {
-      "type": "range",
-      "id": "border_width_right",
-      "label": "t:shared.border.sides.right.label",
-      "min": 0,
-      "max": 12,
-      "step": 1,
-      "unit": "px",
-      "default": 0,
-      "visible_if": "{{ section.settings.border_style != 'none' }}"
-    },
-    {
-      "type": "range",
-      "id": "border_width_bottom",
-      "label": "t:shared.border.sides.bottom.label",
-      "min": 0,
-      "max": 12,
-      "step": 1,
-      "unit": "px",
-      "default": 0,
-      "visible_if": "{{ section.settings.border_style != 'none' }}"
-    },
-    {
-      "type": "range",
-      "id": "border_width_left",
-      "label": "t:shared.border.sides.left.label",
-      "min": 0,
-      "max": 12,
-      "step": 1,
-      "unit": "px",
-      "default": 0,
-      "visible_if": "{{ section.settings.border_style != 'none' }}"
-    },
-    {
-      "type": "range",
-      "id": "border_opacity",
-      "label": "t:shared.border.opacity.label",
-      "min": 0,
-      "max": 100,
-      "step": 5,
-      "unit": "%",
-      "default": 100,
-      "visible_if": "{{ section.settings.border_style != 'none' }}"
-    },
-    {
-      "type": "color",
-      "id": "border_color",
-      "label": "t:blocks.group.settings.border_color.label",
-      "default": "#0F2E2F",
-      "visible_if": "{{ section.settings.border_style != 'none' }}"
-    },
-    {
-      "type": "header",
-      "content": "t:shared.corners.header"
-    },
-    {
-      "type": "select",
-      "id": "radius_device",
-      "label": "t:shared.spacing.devices.label",
-      "options": [
-        {
-          "value": "desktop",
-          "label": "t:shared.spacing.devices.options__1.label"
-        },
-        {
-          "value": "mobile",
-          "label": "t:shared.spacing.devices.options__2.label"
-        }
-      ],
-      "default": "desktop"
-    },
-    {
-      "type": "range",
-      "id": "border_radius_top_left",
-      "label": "t:shared.corners.top_left.label",
-      "info": "t:shared.corners.paragraph",
-      "min": 0,
-      "max": 80,
-      "step": 2,
-      "unit": "px",
-      "default": 40,
-      "visible_if": "{{ section.settings.radius_device == 'desktop' }}"
-    },
-    {
-      "type": "range",
-      "id": "border_radius_top_right",
-      "label": "t:shared.corners.top_right.label",
-      "min": 0,
-      "max": 80,
-      "step": 2,
-      "unit": "px",
-      "default": 40,
-      "visible_if": "{{ section.settings.radius_device == 'desktop' }}"
-    },
-    {
-      "type": "range",
-      "id": "border_radius_bottom_left",
-      "label": "t:shared.corners.bottom_left.label",
-      "min": 0,
-      "max": 80,
-      "step": 2,
-      "unit": "px",
-      "default": 0,
-      "visible_if": "{{ section.settings.radius_device == 'desktop' }}"
-    },
-    {
-      "type": "range",
-      "id": "border_radius_bottom_right",
-      "label": "t:shared.corners.bottom_right.label",
-      "min": 0,
-      "max": 80,
-      "step": 2,
-      "unit": "px",
-      "default": 0,
-      "visible_if": "{{ section.settings.radius_device == 'desktop' }}"
-    },
-    {
-      "type": "range",
-      "id": "border_radius_top_left_mobile",
-      "label": "t:shared.corners.top_left.label",
-      "min": 0,
-      "max": 80,
-      "step": 2,
-      "unit": "px",
-      "default": 24,
-      "visible_if": "{{ section.settings.radius_device == 'mobile' }}"
-    },
-    {
-      "type": "range",
-      "id": "border_radius_top_right_mobile",
-      "label": "t:shared.corners.top_right.label",
-      "min": 0,
-      "max": 80,
-      "step": 2,
-      "unit": "px",
-      "default": 24,
-      "visible_if": "{{ section.settings.radius_device == 'mobile' }}"
-    },
-    {
-      "type": "range",
-      "id": "border_radius_bottom_left_mobile",
-      "label": "t:shared.corners.bottom_left.label",
-      "min": 0,
-      "max": 80,
-      "step": 2,
-      "unit": "px",
-      "default": 0,
-      "visible_if": "{{ section.settings.radius_device == 'mobile' }}"
-    },
-    {
-      "type": "range",
-      "id": "border_radius_bottom_right_mobile",
-      "label": "t:shared.corners.bottom_right.label",
-      "min": 0,
-      "max": 80,
-      "step": 2,
-      "unit": "px",
-      "default": 0,
-      "visible_if": "{{ section.settings.radius_device == 'mobile' }}"
     },
     {
       "type": "header",
@@ -874,21 +462,6 @@
         "motion_distance": 18,
         "motion_duration": 4000,
         "color_scheme": "scheme-1",
-        "border_style": "dashed",
-        "border_width_top": 1,
-        "border_width_right": 0,
-        "border_width_bottom": 0,
-        "border_width_left": 0,
-        "border_opacity": 100,
-        "border_color": "#0F2E2F",
-        "border_radius_top_left": 40,
-        "border_radius_top_right": 40,
-        "border_radius_bottom_left": 0,
-        "border_radius_bottom_right": 0,
-        "border_radius_top_left_mobile": 24,
-        "border_radius_top_right_mobile": 24,
-        "border_radius_bottom_left_mobile": 0,
-        "border_radius_bottom_right_mobile": 0,
         "animation_image": "fade-up",
         "animation_duration": 1000,
         "animation_stagger": 90,
@@ -898,6 +471,14 @@
         "padding_bottom_mobile": 56
       },
       "blocks": [
+        {
+          "type": "_section-frame",
+          "id": "section-frame",
+          "static": true,
+          "settings": {
+            "border_color": "#0F2E2F"
+          }
+        },
         {
           "type": "_expert-quote-image",
           "settings": {

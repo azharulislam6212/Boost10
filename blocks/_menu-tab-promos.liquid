@@ -1,0 +1,326 @@
+{% doc %}
+  The promotional cards a mega-menu tab can show instead of products. Static,
+  so the eight card slots sit beside the tab rather than inside its own list.
+
+  @param {string} [panel_id] - The tab panel this belongs to.
+  @param {string} [layout] - grid | carousel, from the tab.
+  @param {string} [title] - The tab label, for the carousel's accessible name.
+  @param {number} [columns] - Columns across, from the tab.
+  @param {string} [image_ratio] - The card image ratio, from the tab.
+  @param {object} [tab] - The tab's own settings, which carry the carousel options.
+{% enddoc %}
+
+{%- liquid
+  assign s = block.settings
+-%}
+
+{%- capture promo_items -%}
+  {%- for index in (1..8) -%}
+    {%- liquid
+      assign image_key = 'image_' | append: index
+      assign heading_key = 'heading_' | append: index
+      assign label_key = 'link_label_' | append: index
+      assign link_key = 'link_' | append: index
+
+      assign card_image = s[image_key]
+      assign card_heading = s[heading_key]
+      assign card_label = s[label_key]
+      assign card_link = s[link_key]
+
+      assign is_empty = false
+      if card_image == blank and card_heading == blank
+        assign is_empty = true
+      endif
+    -%}
+
+    {%- unless is_empty -%}
+      <div class="carousel-shell__item">
+      {%- if card_link != blank -%}
+        <a class="menu-promo menu-promo--{{ s.text_position }}" href="{{ card_link }}" style="--promo-radius: 16px;">
+      {%- else -%}
+        <div class="menu-promo menu-promo--{{ s.text_position }}" style="--promo-radius: 16px;">
+      {%- endif -%}
+
+        <span class="menu-promo__media">
+          {%- if card_image != blank -%}
+            {% render 'image',
+              image: card_image,
+              alt: card_heading,
+              ratio: image_ratio,
+              sizes: '(min-width: 990px) 30vw, 80vw',
+              wrapper_class: 'menu-promo__image',
+              class: 'menu-promo__img'
+            %}
+          {%- else -%}
+            <span class="menu-promo__image menu-promo__image--placeholder">
+              {{ 'product-' | append: index | placeholder_svg_tag: 'placeholder-svg' }}
+            </span>
+          {%- endif -%}
+
+          {%- if s.text_position == 'over' -%}
+            <span class="menu-promo__panel">
+              {%- if card_heading != blank -%}
+                <span class="menu-promo__heading">{{ card_heading | escape }}</span>
+              {%- endif -%}
+              {%- if card_label != blank -%}
+                <span class="menu-promo__cta">
+                  <span>{{ card_label | escape }}</span>
+                  {% render 'icon', icon: 'arrow-right', size: 16 %}
+                </span>
+              {%- endif -%}
+            </span>
+          {%- endif -%}
+        </span>
+
+        {%- if s.text_position != 'over' -%}
+          <span class="menu-promo__content">
+            {%- if card_heading != blank -%}
+              <span class="menu-promo__heading">{{ card_heading | escape }}</span>
+            {%- endif -%}
+            {%- if card_label != blank -%}
+              <span class="menu-promo__cta">
+                <span>{{ card_label | escape }}</span>
+                {% render 'icon', icon: 'arrow-right', size: 16 %}
+              </span>
+            {%- endif -%}
+          </span>
+        {%- endif -%}
+
+      {%- if card_link != blank -%}</a>{%- else -%}</div>{%- endif -%}
+      </div>
+    {%- endunless -%}
+  {%- endfor -%}
+{%- endcapture -%}
+
+{%- if layout == 'carousel' -%}
+  {% render 'carousel-shell', id: panel_id, append: '-promos', children: promo_items, layout: 'carousel', layout_mobile: 'carousel', label: title, columns_desktop: columns, columns_tablet: 2, columns_mobile: 1, settings: tab %}
+{%- else -%}
+  <div class="tabs__panel-grid">{{ promo_items }}</div>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "t:blocks.menu_tab_promos.name",
+  "tag": null,
+  "settings": [
+    {
+      "type": "header",
+      "content": "t:blocks.menu_tab.headers.promotions"
+    },
+    {
+      "type": "select",
+      "id": "text_position",
+      "label": "t:blocks.menu_promo.settings.text_position.label",
+      "options": [
+        {
+          "value": "over",
+          "label": "t:blocks.menu_promo.settings.text_position.options__2.label"
+        },
+        {
+          "value": "below",
+          "label": "t:blocks.menu_promo.settings.text_position.options__1.label"
+        }
+      ],
+      "default": "below"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.menu_tab.headers.card_1"
+    },
+    {
+      "type": "image_picker",
+      "id": "image_1",
+      "label": "t:shared.image.label"
+    },
+    {
+      "type": "text",
+      "id": "heading_1",
+      "label": "t:shared.heading.label",
+      "default": "Micronutrients for Peak Daily Vitality"
+    },
+    {
+      "type": "text",
+      "id": "link_label_1",
+      "label": "t:blocks.menu_promo.settings.link_label.label",
+      "default": "Shop Vitamin"
+    },
+    {
+      "type": "url",
+      "id": "link_1",
+      "label": "t:shared.link.label"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.menu_tab.headers.card_2"
+    },
+    {
+      "type": "image_picker",
+      "id": "image_2",
+      "label": "t:shared.image.label"
+    },
+    {
+      "type": "text",
+      "id": "heading_2",
+      "label": "t:shared.heading.label",
+      "default": "Fuel Your Body from the Cell Up"
+    },
+    {
+      "type": "text",
+      "id": "link_label_2",
+      "label": "t:blocks.menu_promo.settings.link_label.label",
+      "default": "Shop Vitamin"
+    },
+    {
+      "type": "url",
+      "id": "link_2",
+      "label": "t:shared.link.label"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.menu_tab.headers.card_3"
+    },
+    {
+      "type": "image_picker",
+      "id": "image_3",
+      "label": "t:shared.image.label"
+    },
+    {
+      "type": "text",
+      "id": "heading_3",
+      "label": "t:shared.heading.label",
+      "default": "Target Your Health Goals with Precision"
+    },
+    {
+      "type": "text",
+      "id": "link_label_3",
+      "label": "t:blocks.menu_promo.settings.link_label.label",
+      "default": "Shop Vitamin"
+    },
+    {
+      "type": "url",
+      "id": "link_3",
+      "label": "t:shared.link.label"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.menu_tab.headers.card_4"
+    },
+    {
+      "type": "image_picker",
+      "id": "image_4",
+      "label": "t:shared.image.label"
+    },
+    {
+      "type": "text",
+      "id": "heading_4",
+      "label": "t:shared.heading.label"
+    },
+    {
+      "type": "text",
+      "id": "link_label_4",
+      "label": "t:blocks.menu_promo.settings.link_label.label"
+    },
+    {
+      "type": "url",
+      "id": "link_4",
+      "label": "t:shared.link.label"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.menu_tab.headers.card_5"
+    },
+    {
+      "type": "image_picker",
+      "id": "image_5",
+      "label": "t:shared.image.label"
+    },
+    {
+      "type": "text",
+      "id": "heading_5",
+      "label": "t:shared.heading.label"
+    },
+    {
+      "type": "text",
+      "id": "link_label_5",
+      "label": "t:blocks.menu_promo.settings.link_label.label"
+    },
+    {
+      "type": "url",
+      "id": "link_5",
+      "label": "t:shared.link.label"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.menu_tab.headers.card_6"
+    },
+    {
+      "type": "image_picker",
+      "id": "image_6",
+      "label": "t:shared.image.label"
+    },
+    {
+      "type": "text",
+      "id": "heading_6",
+      "label": "t:shared.heading.label"
+    },
+    {
+      "type": "text",
+      "id": "link_label_6",
+      "label": "t:blocks.menu_promo.settings.link_label.label"
+    },
+    {
+      "type": "url",
+      "id": "link_6",
+      "label": "t:shared.link.label"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.menu_tab.headers.card_7"
+    },
+    {
+      "type": "image_picker",
+      "id": "image_7",
+      "label": "t:shared.image.label"
+    },
+    {
+      "type": "text",
+      "id": "heading_7",
+      "label": "t:shared.heading.label"
+    },
+    {
+      "type": "text",
+      "id": "link_label_7",
+      "label": "t:blocks.menu_promo.settings.link_label.label"
+    },
+    {
+      "type": "url",
+      "id": "link_7",
+      "label": "t:shared.link.label"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.menu_tab.headers.card_8"
+    },
+    {
+      "type": "image_picker",
+      "id": "image_8",
+      "label": "t:shared.image.label"
+    },
+    {
+      "type": "text",
+      "id": "heading_8",
+      "label": "t:shared.heading.label"
+    },
+    {
+      "type": "text",
+      "id": "link_label_8",
+      "label": "t:blocks.menu_promo.settings.link_label.label"
+    },
+    {
+      "type": "url",
+      "id": "link_8",
+      "label": "t:shared.link.label"
+    }
+  ]
+}
+{% endschema %}

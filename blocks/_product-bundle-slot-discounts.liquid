@@ -1,0 +1,296 @@
+{% doc %}
+  The per-slot discount codes, as the JSON payload the bundle element reads.
+  Static, so the codes sit beside the section instead of lengthening its list.
+{% enddoc %}
+
+{%- liquid
+  assign s = block.settings
+  assign slots = section.settings.bundle_size | default: 6 | plus: 0
+
+  assign entries = ''
+  for i in (1..slots)
+    assign code_key = 'tier_' | append: i | append: '_code'
+    assign type_key = 'tier_' | append: i | append: '_value_type'
+    assign percent_key = 'tier_' | append: i | append: '_discount_percent'
+    assign amount_key = 'tier_' | append: i | append: '_discount_amount'
+
+    assign code = s[code_key] | default: '' | strip
+    assign type = s[type_key] | default: 'percentage'
+
+    assign value = 0
+    if type == 'amount'
+      assign value = s[amount_key] | default: 0 | times: 100 | round
+    else
+      assign value = s[percent_key] | default: 0 | plus: 0
+    endif
+
+    if code != blank or value > 0
+      capture entry
+        echo '{"slot":'
+        echo i
+        echo ',"code":'
+        echo code | json
+        echo ',"type":'
+        echo type | json
+        echo ',"value":'
+        echo value
+        echo '}'
+      endcapture
+      assign entries = entries | append: entry | append: '||'
+    endif
+  endfor
+  assign entries = entries | split: '||' | join: ','
+-%}
+
+<script type="application/json" data-bundle-discounts>
+  [{{ entries }}]
+</script>
+
+{% schema %}
+{
+  "name": "t:blocks.product_bundle_slot_discounts.name",
+  "tag": null,
+  "settings": [
+    {
+      "type": "text",
+      "id": "tier_1_code",
+      "label": "t:sections.product_bundle.settings.slot_code.label",
+      "info": "t:sections.product_bundle.settings.slot_code.info"
+    },
+    {
+      "type": "select",
+      "id": "tier_1_value_type",
+      "label": "t:sections.product_bundle.settings.slot_value_type.label",
+      "options": [
+        {
+          "value": "percentage",
+          "label": "t:sections.product_bundle.settings.slot_value_type.options__1.label"
+        },
+        {
+          "value": "amount",
+          "label": "t:sections.product_bundle.settings.slot_value_type.options__2.label"
+        }
+      ],
+      "default": "percentage"
+    },
+    {
+      "type": "range",
+      "id": "tier_1_discount_percent",
+      "label": "t:sections.product_bundle.settings.slot_percent.label",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "%",
+      "default": 0,
+      "visible_if": "{{ block.settings.tier_1_value_type == 'percentage' }}"
+    },
+    {
+      "type": "number",
+      "id": "tier_1_discount_amount",
+      "label": "t:sections.product_bundle.settings.slot_amount.label",
+      "info": "t:sections.product_bundle.settings.slot_amount.info",
+      "visible_if": "{{ block.settings.tier_1_value_type == 'amount' }}"
+    },
+    {
+      "type": "text",
+      "id": "tier_2_code",
+      "label": "t:sections.product_bundle.settings.slot_code.label",
+      "info": "t:sections.product_bundle.settings.slot_code.info"
+    },
+    {
+      "type": "select",
+      "id": "tier_2_value_type",
+      "label": "t:sections.product_bundle.settings.slot_value_type.label",
+      "options": [
+        {
+          "value": "percentage",
+          "label": "t:sections.product_bundle.settings.slot_value_type.options__1.label"
+        },
+        {
+          "value": "amount",
+          "label": "t:sections.product_bundle.settings.slot_value_type.options__2.label"
+        }
+      ],
+      "default": "percentage"
+    },
+    {
+      "type": "range",
+      "id": "tier_2_discount_percent",
+      "label": "t:sections.product_bundle.settings.slot_percent.label",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "%",
+      "default": 0,
+      "visible_if": "{{ block.settings.tier_2_value_type == 'percentage' }}"
+    },
+    {
+      "type": "number",
+      "id": "tier_2_discount_amount",
+      "label": "t:sections.product_bundle.settings.slot_amount.label",
+      "info": "t:sections.product_bundle.settings.slot_amount.info",
+      "visible_if": "{{ block.settings.tier_2_value_type == 'amount' }}"
+    },
+    {
+      "type": "text",
+      "id": "tier_3_code",
+      "label": "t:sections.product_bundle.settings.slot_code.label",
+      "info": "t:sections.product_bundle.settings.slot_code.info"
+    },
+    {
+      "type": "select",
+      "id": "tier_3_value_type",
+      "label": "t:sections.product_bundle.settings.slot_value_type.label",
+      "options": [
+        {
+          "value": "percentage",
+          "label": "t:sections.product_bundle.settings.slot_value_type.options__1.label"
+        },
+        {
+          "value": "amount",
+          "label": "t:sections.product_bundle.settings.slot_value_type.options__2.label"
+        }
+      ],
+      "default": "percentage"
+    },
+    {
+      "type": "range",
+      "id": "tier_3_discount_percent",
+      "label": "t:sections.product_bundle.settings.slot_percent.label",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "%",
+      "default": 0,
+      "visible_if": "{{ block.settings.tier_3_value_type == 'percentage' }}"
+    },
+    {
+      "type": "number",
+      "id": "tier_3_discount_amount",
+      "label": "t:sections.product_bundle.settings.slot_amount.label",
+      "info": "t:sections.product_bundle.settings.slot_amount.info",
+      "visible_if": "{{ block.settings.tier_3_value_type == 'amount' }}"
+    },
+    {
+      "type": "text",
+      "id": "tier_4_code",
+      "label": "t:sections.product_bundle.settings.slot_code.label",
+      "info": "t:sections.product_bundle.settings.slot_code.info"
+    },
+    {
+      "type": "select",
+      "id": "tier_4_value_type",
+      "label": "t:sections.product_bundle.settings.slot_value_type.label",
+      "options": [
+        {
+          "value": "percentage",
+          "label": "t:sections.product_bundle.settings.slot_value_type.options__1.label"
+        },
+        {
+          "value": "amount",
+          "label": "t:sections.product_bundle.settings.slot_value_type.options__2.label"
+        }
+      ],
+      "default": "percentage"
+    },
+    {
+      "type": "range",
+      "id": "tier_4_discount_percent",
+      "label": "t:sections.product_bundle.settings.slot_percent.label",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "%",
+      "default": 0,
+      "visible_if": "{{ block.settings.tier_4_value_type == 'percentage' }}"
+    },
+    {
+      "type": "number",
+      "id": "tier_4_discount_amount",
+      "label": "t:sections.product_bundle.settings.slot_amount.label",
+      "info": "t:sections.product_bundle.settings.slot_amount.info",
+      "visible_if": "{{ block.settings.tier_4_value_type == 'amount' }}"
+    },
+    {
+      "type": "text",
+      "id": "tier_5_code",
+      "label": "t:sections.product_bundle.settings.slot_code.label",
+      "info": "t:sections.product_bundle.settings.slot_code.info"
+    },
+    {
+      "type": "select",
+      "id": "tier_5_value_type",
+      "label": "t:sections.product_bundle.settings.slot_value_type.label",
+      "options": [
+        {
+          "value": "percentage",
+          "label": "t:sections.product_bundle.settings.slot_value_type.options__1.label"
+        },
+        {
+          "value": "amount",
+          "label": "t:sections.product_bundle.settings.slot_value_type.options__2.label"
+        }
+      ],
+      "default": "percentage"
+    },
+    {
+      "type": "range",
+      "id": "tier_5_discount_percent",
+      "label": "t:sections.product_bundle.settings.slot_percent.label",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "%",
+      "default": 0,
+      "visible_if": "{{ block.settings.tier_5_value_type == 'percentage' }}"
+    },
+    {
+      "type": "number",
+      "id": "tier_5_discount_amount",
+      "label": "t:sections.product_bundle.settings.slot_amount.label",
+      "info": "t:sections.product_bundle.settings.slot_amount.info",
+      "visible_if": "{{ block.settings.tier_5_value_type == 'amount' }}"
+    },
+    {
+      "type": "text",
+      "id": "tier_6_code",
+      "label": "t:sections.product_bundle.settings.slot_code.label",
+      "info": "t:sections.product_bundle.settings.slot_code.info"
+    },
+    {
+      "type": "select",
+      "id": "tier_6_value_type",
+      "label": "t:sections.product_bundle.settings.slot_value_type.label",
+      "options": [
+        {
+          "value": "percentage",
+          "label": "t:sections.product_bundle.settings.slot_value_type.options__1.label"
+        },
+        {
+          "value": "amount",
+          "label": "t:sections.product_bundle.settings.slot_value_type.options__2.label"
+        }
+      ],
+      "default": "percentage"
+    },
+    {
+      "type": "range",
+      "id": "tier_6_discount_percent",
+      "label": "t:sections.product_bundle.settings.slot_percent.label",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "%",
+      "default": 0,
+      "visible_if": "{{ block.settings.tier_6_value_type == 'percentage' }}"
+    },
+    {
+      "type": "number",
+      "id": "tier_6_discount_amount",
+      "label": "t:sections.product_bundle.settings.slot_amount.label",
+      "info": "t:sections.product_bundle.settings.slot_amount.info",
+      "visible_if": "{{ block.settings.tier_6_value_type == 'amount' }}"
+    }
+  ]
+}
+{% endschema %}

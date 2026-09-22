@@ -1,0 +1,242 @@
+{% doc %}
+  The arrows and dots under the feature cards. Static, so the control settings
+  sit beside the section instead of lengthening its own list.
+{% enddoc %}
+
+{%- liquid
+  assign s = block.settings
+  assign ss = section.settings
+
+  assign layout = ss.layout | default: 'grid'
+  assign on_mobile = ss.carousel_on_mobile
+  if on_mobile == nil
+    assign on_mobile = true
+  endif
+
+  assign is_carousel = false
+  if layout == 'carousel' or on_mobile
+    assign is_carousel = true
+  endif
+
+  assign pagination = s.carousel_pagination | default: 'dots'
+  assign align = s.carousel_pagination_align | default: 'center'
+
+  assign nav = s.carousel_navigation
+  if nav == nil
+    assign nav = false
+  endif
+
+  assign show = false
+  if is_carousel and nav or is_carousel and pagination != 'none'
+    assign show = true
+  endif
+
+  assign classes = 'feature-cards__controls'
+  if layout == 'carousel'
+    assign classes = classes | append: ' feature-cards__controls--always'
+  elsif on_mobile
+    assign classes = classes | append: ' feature-cards__controls--mobile'
+  endif
+
+  assign carousel_id = 'feature-cards-' | append: section.id
+-%}
+
+{%- if show -%}
+  <div class="{{ classes }}" {{ block.shopify_attributes }}>
+    {%- if pagination == 'controls' -%}
+      {% render 'carousel-controls', settings: s, carousel: carousel_id, align: align %}
+    {%- else -%}
+      {%- if nav -%}
+        {% render 'carousel-nav', settings: s, carousel: carousel_id, position: 'bottom' %}
+      {%- endif -%}
+
+      {%- if pagination != 'none' -%}
+        {% render 'carousel-pagination', style: pagination, align: align, carousel: carousel_id %}
+      {%- endif -%}
+    {%- endif -%}
+  </div>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "t:blocks.carousel_controls.name",
+  "tag": null,
+  "settings": [
+    {
+      "type": "checkbox",
+      "id": "carousel_navigation",
+      "label": "t:shared.carousel.navigation.label",
+      "default": false,
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "select",
+      "id": "carousel_nav_icon",
+      "label": "t:shared.carousel.nav_glyph.label",
+      "options": [
+        {
+          "value": "arrow",
+          "label": "t:shared.carousel.nav_glyph.options__1.label"
+        },
+        {
+          "value": "chevron",
+          "label": "t:shared.carousel.nav_glyph.options__2.label"
+        },
+        {
+          "value": "arrow-large",
+          "label": "t:shared.carousel.nav_glyph.options__3.label"
+        },
+        {
+          "value": "chevron-large",
+          "label": "t:shared.carousel.nav_glyph.options__4.label"
+        },
+        {
+          "value": "none",
+          "label": "t:shared.carousel.nav_glyph.options__5.label"
+        }
+      ],
+      "default": "arrow",
+      "visible_if": "{{ block.settings.carousel_navigation and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "select",
+      "id": "carousel_nav_shape",
+      "label": "t:shared.carousel.nav_shape.label",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.carousel.nav_shape.options__1.label"
+        },
+        {
+          "value": "circle",
+          "label": "t:shared.carousel.nav_shape.options__2.label"
+        },
+        {
+          "value": "square",
+          "label": "t:shared.carousel.nav_shape.options__3.label"
+        }
+      ],
+      "default": "circle",
+      "visible_if": "{{ block.settings.carousel_navigation and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "select",
+      "id": "carousel_nav_border_style",
+      "label": "t:shared.carousel.nav_border_style.label",
+      "options": [
+        {
+          "value": "solid",
+          "label": "t:shared.options.solid"
+        },
+        {
+          "value": "dashed",
+          "label": "t:shared.options.dashed"
+        },
+        {
+          "value": "none",
+          "label": "t:shared.options.none"
+        }
+      ],
+      "default": "dashed",
+      "visible_if": "{{ block.settings.carousel_nav_shape != 'none' and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "range",
+      "id": "carousel_nav_border_radius",
+      "label": "t:shared.carousel.nav_border_radius.label",
+      "info": "t:shared.carousel.nav_border_radius.info",
+      "min": 0,
+      "max": 30,
+      "step": 1,
+      "unit": "px",
+      "default": 8,
+      "visible_if": "{{ block.settings.carousel_nav_shape == 'square' and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "select",
+      "id": "carousel_controls_style",
+      "label": "t:shared.carousel.controls_style.label",
+      "info": "t:shared.carousel.controls_style.info",
+      "options": [
+        {
+          "value": "split",
+          "label": "t:shared.carousel.controls_style.options__1.label"
+        },
+        {
+          "value": "ghost",
+          "label": "t:shared.carousel.controls_style.options__2.label"
+        },
+        {
+          "value": "solid",
+          "label": "t:shared.carousel.controls_style.options__3.label"
+        }
+      ],
+      "default": "ghost",
+      "visible_if": "{{ block.settings.carousel_navigation and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "range",
+      "id": "carousel_nav_size",
+      "label": "t:shared.carousel.nav_size.label",
+      "min": 28,
+      "max": 72,
+      "step": 2,
+      "unit": "px",
+      "default": 44,
+      "visible_if": "{{ block.settings.carousel_navigation and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "select",
+      "id": "carousel_pagination",
+      "label": "t:shared.carousel.pagination.label",
+      "info": "t:shared.carousel.pagination.info",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.carousel.pagination.options__1.label"
+        },
+        {
+          "value": "dots",
+          "label": "t:shared.carousel.pagination.options__2.label"
+        },
+        {
+          "value": "numbers",
+          "label": "t:shared.carousel.pagination.options__3.label"
+        },
+        {
+          "value": "progress",
+          "label": "t:shared.carousel.pagination.options__4.label"
+        },
+        {
+          "value": "controls",
+          "label": "t:shared.carousel.pagination.options__5.label"
+        }
+      ],
+      "default": "dots",
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "select",
+      "id": "carousel_pagination_align",
+      "label": "t:shared.carousel.pagination_align.label",
+      "info": "t:shared.carousel.pagination_align.info",
+      "options": [
+        {
+          "value": "start",
+          "label": "t:shared.carousel.controls_align.options__1.label"
+        },
+        {
+          "value": "center",
+          "label": "t:shared.carousel.controls_align.options__2.label"
+        },
+        {
+          "value": "end",
+          "label": "t:shared.carousel.controls_align.options__3.label"
+        }
+      ],
+      "default": "center",
+      "visible_if": "{{ block.settings.carousel_pagination != 'none' and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    }
+  ]
+}
+{% endschema %}
