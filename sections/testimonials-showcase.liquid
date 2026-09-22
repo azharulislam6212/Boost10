@@ -6,7 +6,51 @@
 {%- liquid
   assign s = section.settings
 
-  assign background_paint = s.background_color | default: ''
+  assign background_media = s.background_media | default: 'none'
+  assign has_background_media = false
+  if background_media != 'none'
+    assign has_background_media = true
+  endif
+
+  assign background_paint = ''
+  if has_background_media == false
+    assign background_paint = s.background_color | default: ''
+  endif
+
+  assign border_line = s.border_style | default: 'none'
+
+  assign bw_top = 0
+  assign bw_right = 0
+  assign bw_bottom = 0
+  assign bw_left = 0
+  assign border_any = 0
+  assign border_paint = ''
+
+  if border_line != 'none'
+    assign bw_top = s.border_width_top | default: 0 | plus: 0
+    assign bw_right = s.border_width_right | default: 0 | plus: 0
+    assign bw_bottom = s.border_width_bottom | default: 0 | plus: 0
+    assign bw_left = s.border_width_left | default: 0 | plus: 0
+    assign border_any = bw_top | plus: bw_right | plus: bw_bottom | plus: bw_left
+
+    assign border_percent = s.border_opacity | default: 100 | plus: 0
+    if s.border_color == blank
+      assign border_paint = 'color-mix(in srgb, currentColor ' | append: border_percent | append: '%, transparent)'
+    else
+      assign border_alpha = border_percent | divided_by: 100.0
+      assign border_paint = s.border_color | color_modify: 'alpha', border_alpha
+    endif
+  endif
+
+  assign r_tl = s.border_radius_top_left | default: 40 | plus: 0
+  assign r_tr = s.border_radius_top_right | default: 40 | plus: 0
+  assign r_bl = s.border_radius_bottom_left | default: 0 | plus: 0
+  assign r_br = s.border_radius_bottom_right | default: 0 | plus: 0
+
+  assign r_tl_m = s.border_radius_top_left_mobile | default: r_tl | plus: 0
+  assign r_tr_m = s.border_radius_top_right_mobile | default: r_tr | plus: 0
+  assign r_bl_m = s.border_radius_bottom_left_mobile | default: r_bl | plus: 0
+  assign r_br_m = s.border_radius_bottom_right_mobile | default: r_br | plus: 0
 
   assign margin_top = s.margin_top | default: 0 | plus: 0
   assign margin_bottom = s.margin_bottom | default: 0 | plus: 0
@@ -103,13 +147,15 @@
   {%- if intro_width > 0 -%}
     --sv-intro-col: {{ intro_width }}px;
   {%- endif -%}
-  --showcase-radius: var(--section-frame-radius, 40px 40px 0px 0px);
-  --showcase-radius-mobile: var(--section-frame-radius-mobile, 24px 24px 0px 0px);
+  --showcase-radius: {{ r_tl }}px {{ r_tr }}px {{ r_br }}px {{ r_bl }}px;
+  --showcase-radius-mobile: {{ r_tl_m }}px {{ r_tr_m }}px {{ r_br_m }}px {{ r_bl_m }}px;
   --showcase-margin-block-start: {{ margin_top }}px;
   --showcase-margin-block-end: {{ margin_bottom }}px;
-  --showcase-border-width: var(--section-frame-border-width, 0px 0px 0px 0px);
-  --showcase-border-style: var(--section-frame-border-style, none);
-  --showcase-border-color: var(--section-frame-border-color, transparent);
+  {%- if border_any > 0 -%}
+    --showcase-border-width: {{ bw_top }}px {{ bw_right }}px {{ bw_bottom }}px {{ bw_left }}px;
+    --showcase-border-style: {{ border_line }};
+    --showcase-border-color: {{ border_paint }};
+  {%- endif -%}
   {%- if background_paint != '' -%}
     background: {{ background_paint }};
   {%- endif -%}
@@ -118,18 +164,16 @@
   {%- endif -%}
 {%- endcapture -%}
 
-{%- capture frame_style -%}
-  {% content_for 'block', type: '_section-frame', id: 'section-frame' %}
-{%- endcapture -%}
-
 <div
-  class="testimonial-showcase color-scheme-container color-{{ s.color_scheme | default: 'scheme-1' }}"
+  class="testimonial-showcase color-scheme-container color-{{ s.color_scheme | default: 'scheme-1' }}{% if has_background_media %} has-background-media{% endif %}"
   data-section-spacing
   {%- if s.stack_layer != blank and s.stack_layer != 'default' %} data-section-layer="{{ s.stack_layer }}"{% endif %}
   data-section-id="{{ section.id }}"
-  style="{{ section_style | strip_newlines | strip }}{{ frame_style | strip_newlines | strip }}"
+  style="{{ section_style | strip_newlines | strip }}"
 >
-  {% content_for 'block', type: '_background-media', id: 'section-background' %}
+  {%- if has_background_media -%}
+    {% render 'background-media', settings: s %}
+  {%- endif -%}
 
   <div class="{% render 'container', width: s.container_width %}">
     <div class="showcase__layout showcase__layout--media-{{ media_position }}{% if show_intro or show_stats %} showcase__layout--split{% endif %}">
@@ -186,23 +230,6 @@
     }
   ],
   "settings": [
-    {
-      "type": "select",
-      "id": "device",
-      "label": "t:shared.spacing.devices.label",
-      "info": "t:shared.spacing.devices.info",
-      "options": [
-        {
-          "value": "desktop",
-          "label": "t:shared.spacing.devices.options__1.label"
-        },
-        {
-          "value": "mobile",
-          "label": "t:shared.spacing.devices.options__2.label"
-        }
-      ],
-      "default": "desktop"
-    },
     {
       "type": "header",
       "content": "t:sections.testimonials_showcase.headers.layout"
@@ -363,15 +390,19 @@
       "default": true
     },
     {
+      "type": "header",
+      "content": "t:sections.testimonials_showcase.headers.modal"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:sections.testimonials_showcase.paragraphs.modal"
+    },
+    {
       "type": "checkbox",
       "id": "modal_autoplay",
       "label": "t:sections.testimonials_showcase.settings.modal_autoplay.label",
       "info": "t:sections.testimonials_showcase.settings.modal_autoplay.info",
       "default": false
-    },
-    {
-      "type": "paragraph",
-      "content": "t:sections.testimonials_showcase.paragraphs.modal"
     },
     {
       "type": "header",
@@ -424,10 +455,221 @@
       "default": "#03D26F"
     },
     {
+      "type": "select",
+      "id": "background_media",
+      "label": "t:shared.background.media.label",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.background.media.options__1.label"
+        },
+        {
+          "value": "image",
+          "label": "t:shared.background.media.options__2.label"
+        }
+      ],
+      "default": "none"
+    },
+    {
       "type": "color_background",
       "id": "background_color",
       "label": "t:shared.background.color.label",
       "default": "linear-gradient(140deg, #14403C 0%, #0F2E2F 45%, #0B2324 100%)"
+    },
+    {
+      "type": "image_picker",
+      "id": "image",
+      "label": "t:shared.background.image.label",
+      "visible_if": "{{ section.settings.background_media == 'image' }}"
+    },
+    {
+      "type": "image_picker",
+      "id": "image_mobile",
+      "label": "t:shared.background.image_mobile.label",
+      "visible_if": "{{ section.settings.background_media == 'image' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.group.headers.borders"
+    },
+    {
+      "type": "select",
+      "id": "border_style",
+      "label": "t:blocks.group.settings.border_style.label",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.options.none"
+        },
+        {
+          "value": "solid",
+          "label": "t:shared.options.solid"
+        },
+        {
+          "value": "dashed",
+          "label": "t:shared.options.dashed"
+        },
+        {
+          "value": "dotted",
+          "label": "t:shared.border.style.options__3.label"
+        }
+      ],
+      "default": "none"
+    },
+    {
+      "type": "range",
+      "id": "border_width_top",
+      "label": "t:shared.border.sides.top.label",
+      "info": "t:shared.border.sides.info",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_width_right",
+      "label": "t:shared.border.sides.right.label",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_width_bottom",
+      "label": "t:shared.border.sides.bottom.label",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_width_left",
+      "label": "t:shared.border.sides.left.label",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_opacity",
+      "label": "t:shared.border.opacity.label",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 100,
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "color",
+      "id": "border_color",
+      "label": "t:blocks.group.settings.border_color.label",
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.corners.header"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_top_left",
+      "label": "t:shared.corners.top_left.label",
+      "info": "t:shared.corners.paragraph",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 40,
+      "visible_if": "{{ section.settings.device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_top_right",
+      "label": "t:shared.corners.top_right.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 40,
+      "visible_if": "{{ section.settings.device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_bottom_left",
+      "label": "t:shared.corners.bottom_left.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_bottom_right",
+      "label": "t:shared.corners.bottom_right.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_top_left_mobile",
+      "label": "t:shared.corners.top_left.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 24,
+      "visible_if": "{{ section.settings.device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_top_right_mobile",
+      "label": "t:shared.corners.top_right.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 24,
+      "visible_if": "{{ section.settings.device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_bottom_left_mobile",
+      "label": "t:shared.corners.bottom_left.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_bottom_right_mobile",
+      "label": "t:shared.corners.bottom_right.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.device == 'mobile' }}"
     },
     {
       "type": "header",
@@ -706,6 +948,23 @@
         }
       ],
       "default": "default"
+    },
+    {
+      "type": "select",
+      "id": "device",
+      "label": "t:shared.spacing.devices.label",
+      "info": "t:shared.spacing.devices.info",
+      "options": [
+        {
+          "value": "desktop",
+          "label": "t:shared.spacing.devices.options__1.label"
+        },
+        {
+          "value": "mobile",
+          "label": "t:shared.spacing.devices.options__2.label"
+        }
+      ],
+      "default": "desktop"
     }
   ],
   "presets": [
@@ -767,23 +1026,6 @@
             "badge_background": "#03D26F",
             "badge_text_color": "#0F2E2F",
             "badge_spin": 12
-          }
-        },
-        {
-          "type": "_section-frame",
-          "id": "section-frame",
-          "static": true,
-          "settings": {
-            "border_style": "none",
-            "border_width_top": 0
-          }
-        },
-        {
-          "type": "_background-media",
-          "id": "section-background",
-          "static": true,
-          "settings": {
-            "background_media": "none"
           }
         },
         {
@@ -989,23 +1231,7 @@
                 "headline": "95% love their experience",
                 "quote": "<p>“I used to crash after lunch, but now my energy stays stable. It’s such an easy habit.”</p>"
               },
-              "blocks": [
-                {
-                  "type": "_block-spacing",
-                  "id": "spacing",
-                  "static": true,
-                  "settings": {
-                    "padding_top": 20,
-                    "padding_bottom": 20,
-                    "padding_left": 18,
-                    "padding_right": 18,
-                    "padding_top_mobile": 16,
-                    "padding_bottom_mobile": 16,
-                    "padding_left_mobile": 14,
-                    "padding_right_mobile": 14
-                  }
-                }
-              ]
+              "blocks": []
             },
             {
               "type": "_showcase-video",
@@ -1015,23 +1241,7 @@
                 "headline": "Three weeks and no more bloating",
                 "quote": "<p>“I did not expect to notice a difference this quickly. It is the first thing I have stayed consistent with.”</p>"
               },
-              "blocks": [
-                {
-                  "type": "_block-spacing",
-                  "id": "spacing",
-                  "static": true,
-                  "settings": {
-                    "padding_top": 20,
-                    "padding_bottom": 20,
-                    "padding_left": 18,
-                    "padding_right": 18,
-                    "padding_top_mobile": 16,
-                    "padding_bottom_mobile": 16,
-                    "padding_left_mobile": 14,
-                    "padding_right_mobile": 14
-                  }
-                }
-              ]
+              "blocks": []
             },
             {
               "type": "_showcase-video",
@@ -1041,23 +1251,7 @@
                 "headline": "The taste is the reason I keep going",
                 "quote": "<p>“Mixes clean, tastes like nothing, and it is the one thing in my cupboard I have never run out of.”</p>"
               },
-              "blocks": [
-                {
-                  "type": "_block-spacing",
-                  "id": "spacing",
-                  "static": true,
-                  "settings": {
-                    "padding_top": 20,
-                    "padding_bottom": 20,
-                    "padding_left": 18,
-                    "padding_right": 18,
-                    "padding_top_mobile": 16,
-                    "padding_bottom_mobile": 16,
-                    "padding_left_mobile": 14,
-                    "padding_right_mobile": 14
-                  }
-                }
-              ]
+              "blocks": []
             }
           ]
         },
@@ -1086,23 +1280,7 @@
                 "headline": "I stopped waking at three in the morning",
                 "quote": "<p>“Nothing else in my routine changed, so I am giving this the credit.”</p>"
               },
-              "blocks": [
-                {
-                  "type": "_block-spacing",
-                  "id": "spacing",
-                  "static": true,
-                  "settings": {
-                    "padding_top": 20,
-                    "padding_bottom": 20,
-                    "padding_left": 18,
-                    "padding_right": 18,
-                    "padding_top_mobile": 16,
-                    "padding_bottom_mobile": 16,
-                    "padding_left_mobile": 14,
-                    "padding_right_mobile": 14
-                  }
-                }
-              ]
+              "blocks": []
             },
             {
               "type": "_showcase-video",
@@ -1112,23 +1290,7 @@
                 "headline": "My skin cleared up in a month",
                 "quote": "<p>“I was sceptical about the whole category. This is the one that changed my mind.”</p>"
               },
-              "blocks": [
-                {
-                  "type": "_block-spacing",
-                  "id": "spacing",
-                  "static": true,
-                  "settings": {
-                    "padding_top": 20,
-                    "padding_bottom": 20,
-                    "padding_left": 18,
-                    "padding_right": 18,
-                    "padding_top_mobile": 16,
-                    "padding_bottom_mobile": 16,
-                    "padding_left_mobile": 14,
-                    "padding_right_mobile": 14
-                  }
-                }
-              ]
+              "blocks": []
             },
             {
               "type": "_showcase-video",
@@ -1138,23 +1300,7 @@
                 "headline": "Energy without the crash",
                 "quote": "<p>“Consistent, gentle and something I actually look forward to taking every morning.”</p>"
               },
-              "blocks": [
-                {
-                  "type": "_block-spacing",
-                  "id": "spacing",
-                  "static": true,
-                  "settings": {
-                    "padding_top": 20,
-                    "padding_bottom": 20,
-                    "padding_left": 18,
-                    "padding_right": 18,
-                    "padding_top_mobile": 16,
-                    "padding_bottom_mobile": 16,
-                    "padding_left_mobile": 14,
-                    "padding_right_mobile": 14
-                  }
-                }
-              ]
+              "blocks": []
             }
           ]
         }

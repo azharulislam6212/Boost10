@@ -10,9 +10,6 @@
   @param {string} [styles] - Declarations appended to the wrapper's own `style`, because a second `style` attribute on the same tag is dropped by the browser
   @param {boolean} [priority] - Eager-load the background image. Above the fold only
   @param {string} [placeholder] - Placeholder to draw when the background image is not uploaded yet. Off unless a caller asks for it
-  @param {string} [background] - A rendered background layer, from a static block that owns the media settings
-  @param {string} [frame] - Border, corner and backdrop declarations, from a static block that owns those settings
-  @param {string} [link_layer] - A rendered overlay link, from a static block that owns the link settings
   @param {string} [shopify_attributes] - Editor attributes
 
   @example
@@ -201,17 +198,13 @@
   # ---- flags ------------------------------------------------------------
   assign background_media = settings.background_media | default: 'none'
   assign has_media = false
-  if background != blank
-    assign has_media = true
-  elsif background_media != 'none'
+  if background_media != 'none'
     assign has_media = true
   endif
 
   assign link_url = settings.link | default: ''
   assign has_link = false
-  if link_layer != blank
-    assign has_link = true
-  elsif link_url != ''
+  if link_url != ''
     assign has_link = true
   endif
 
@@ -316,26 +309,20 @@
     --group-width-tablet-size: {{ width_tablet_size }};
   {%- endif -%}
   --group-height: {{ height_value }};
-  {%- if frame != blank -%}
-    {{ frame }}
-  {%- else -%}
-    --group-radius: {{ radius }}px;
-    {%- if border_width > 0 -%}
-      --group-border-width: {{ border_width }}px;
-      --group-border-style: {{ border_line }};
-      --group-border-color: {{ border_paint }};
-    {%- endif -%}
-
-    {%- assign backdrop_blur = settings.backdrop_blur | default: 0 | plus: 0 -%}
-    {%- if backdrop_blur > 0 -%}
-      --group-backdrop-blur: {{ backdrop_blur }}px;
-    {%- endif -%}
+  --group-radius: {{ radius }}px;
+  {%- if border_width > 0 -%}
+    --group-border-width: {{ border_width }}px;
+    --group-border-style: {{ border_line }};
+    --group-border-color: {{ border_paint }};
   {%- endif -%}
-  {%- if frame == blank -%}
-    {%- assign background_color = settings.background_color | default: '' -%}
-    {%- if background_color != '' and has_media == false -%}
-      --group-background: {{ background_color }};
-    {%- endif -%}
+
+  {%- assign backdrop_blur = settings.backdrop_blur | default: 0 | plus: 0 -%}
+  {%- if backdrop_blur > 0 -%}
+    --group-backdrop-blur: {{ backdrop_blur }}px;
+  {%- endif -%}
+  {%- assign background_color = settings.background_color | default: '' -%}
+  {%- if background_color != '' and has_media == false -%}
+    --group-background: {{ background_color }};
   {%- endif -%}
 
   {{- styles -}}
@@ -358,9 +345,7 @@
   {{ attributes }}
   {{ shopify_attributes }}
 >
-  {%- if background != blank -%}
-    {{ background }}
-  {%- elsif has_media -%}
+  {%- if has_media -%}
     {% render 'background-media', settings: settings, priority: priority, placeholder: placeholder %}
   {%- endif -%}
 
@@ -368,9 +353,7 @@
     {{- children -}}
   </div>
 
-  {%- if link_layer != blank -%}
-    {{ link_layer }}
-  {%- elsif has_link -%}
+  {%- if has_link -%}
 
     <a
       class="block-group__link"

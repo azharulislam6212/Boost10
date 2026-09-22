@@ -6,7 +6,50 @@
 {%- liquid
   assign s = section.settings
 
-  assign background_paint = s.background_color | default: ''
+  assign background_media = s.background_media | default: 'none'
+  assign has_background_media = false
+  if background_media != 'none'
+    assign has_background_media = true
+  endif
+
+  assign background_paint = ''
+  if has_background_media == false
+    assign background_paint = s.background_color | default: ''
+  endif
+
+  assign border_line = s.border_style | default: 'none'
+
+  assign bw_top = 0
+  assign bw_right = 0
+  assign bw_bottom = 0
+  assign bw_left = 0
+  assign border_any = 0
+
+  if border_line != 'none'
+    assign bw_top = s.border_width_top | default: 0 | plus: 0
+    assign bw_right = s.border_width_right | default: 0 | plus: 0
+    assign bw_bottom = s.border_width_bottom | default: 0 | plus: 0
+    assign bw_left = s.border_width_left | default: 0 | plus: 0
+    assign border_any = bw_top | plus: bw_right | plus: bw_bottom | plus: bw_left
+
+    assign border_percent = s.border_opacity | default: 100 | plus: 0
+    if s.border_color == blank
+      assign border_paint = 'color-mix(in srgb, currentColor ' | append: border_percent | append: '%, transparent)'
+    else
+      assign border_alpha = border_percent | divided_by: 100.0
+      assign border_paint = s.border_color | color_modify: 'alpha', border_alpha
+    endif
+  endif
+
+  assign r_tl = s.border_radius_top_left | default: 40 | plus: 0
+  assign r_tr = s.border_radius_top_right | default: 40 | plus: 0
+  assign r_bl = s.border_radius_bottom_left | default: 0 | plus: 0
+  assign r_br = s.border_radius_bottom_right | default: 0 | plus: 0
+
+  assign r_tl_m = s.border_radius_top_left_mobile | default: r_tl | plus: 0
+  assign r_tr_m = s.border_radius_top_right_mobile | default: r_tr | plus: 0
+  assign r_bl_m = s.border_radius_bottom_left_mobile | default: r_bl | plus: 0
+  assign r_br_m = s.border_radius_bottom_right_mobile | default: r_br | plus: 0
 
   assign margin_top = s.margin_top | default: 0 | plus: 0
   assign margin_bottom = s.margin_bottom | default: 0 | plus: 0
@@ -77,32 +120,32 @@
 
 {%- capture section_style -%}
   {%- render 'spacing', section: s, declarations: true -%}
-  --featured-pills-radius: var(--section-frame-radius, 40px 40px 0px 0px);
-  --featured-pills-radius-mobile: var(--section-frame-radius-mobile, 24px 24px 0px 0px);
+  --featured-pills-radius: {{ r_tl }}px {{ r_tr }}px {{ r_br }}px {{ r_bl }}px;
+  --featured-pills-radius-mobile: {{ r_tl_m }}px {{ r_tr_m }}px {{ r_br_m }}px {{ r_bl_m }}px;
   --featured-pills-margin-block-start: {{ margin_top }}px;
   --featured-pills-margin-block-end: {{ margin_bottom }}px;
   --featured-pills-min-height: {{ min_height }}px;
   --featured-pills-min-height-mobile: {{ min_height_mobile }}px;
-  --featured-pills-border-width: var(--section-frame-border-width, 0px 0px 0px 0px);
-  --featured-pills-border-style: var(--section-frame-border-style, none);
-  --featured-pills-border-color: var(--section-frame-border-color, transparent);
+  {%- if border_any > 0 -%}
+    --featured-pills-border-width: {{ bw_top }}px {{ bw_right }}px {{ bw_bottom }}px {{ bw_left }}px;
+    --featured-pills-border-style: {{ border_line }};
+    --featured-pills-border-color: {{ border_paint }};
+  {%- endif -%}
   {%- if background_paint != '' -%}
     background: {{ background_paint }};
   {%- endif -%}
 {%- endcapture -%}
 
-{%- capture frame_style -%}
-  {% content_for 'block', type: '_section-frame', id: 'section-frame' %}
-{%- endcapture -%}
-
 <div
-  class="featured-pills color-scheme-container color-{{ s.color_scheme | default: 'scheme-1' }}"
+  class="featured-pills color-scheme-container color-{{ s.color_scheme | default: 'scheme-1' }}{% if has_background_media %} has-background-media{% endif %}"
   data-section-spacing
   {%- if s.stack_layer != blank and s.stack_layer != 'default' %} data-section-layer="{{ s.stack_layer }}"{% endif %}
   data-section-id="{{ section.id }}"
-  style="{{ section_style | strip_newlines | strip }}{{ frame_style | strip_newlines | strip }}"
+  style="{{ section_style | strip_newlines | strip }}"
 >
-  {% content_for 'block', type: '_background-media', id: 'section-background' %}
+  {%- if has_background_media -%}
+    {% render 'background-media', settings: s %}
+  {%- endif -%}
 
   <div class="featured-pills__inner {% render 'container', width: s.container_width %}">
 
@@ -169,23 +212,6 @@
         }
       ],
       "default": "standard"
-    },
-    {
-      "type": "select",
-      "id": "device",
-      "label": "t:shared.spacing.devices.label",
-      "info": "t:shared.spacing.devices.info",
-      "options": [
-        {
-          "value": "desktop",
-          "label": "t:shared.spacing.devices.options__1.label"
-        },
-        {
-          "value": "mobile",
-          "label": "t:shared.spacing.devices.options__2.label"
-        }
-      ],
-      "default": "desktop"
     },
     {
       "type": "header",
@@ -364,10 +390,361 @@
       "default": "scheme-1"
     },
     {
+      "type": "select",
+      "id": "background_media",
+      "label": "t:shared.background.media.label",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.background.media.options__1.label"
+        },
+        {
+          "value": "image",
+          "label": "t:shared.background.media.options__2.label"
+        },
+        {
+          "value": "video",
+          "label": "t:shared.background.media.options__3.label"
+        }
+      ],
+      "default": "none"
+    },
+    {
       "type": "color_background",
       "id": "background_color",
       "label": "t:shared.background.color.label",
       "info": "t:shared.background.color.info"
+    },
+    {
+      "type": "image_picker",
+      "id": "image",
+      "label": "t:shared.background.image.label",
+      "visible_if": "{{ section.settings.background_media == 'image' }}"
+    },
+    {
+      "type": "image_picker",
+      "id": "image_mobile",
+      "label": "t:shared.background.image_mobile.label",
+      "info": "t:shared.background.image_mobile.info",
+      "visible_if": "{{ section.settings.background_media == 'image' }}"
+    },
+    {
+      "type": "select",
+      "id": "image_position",
+      "label": "t:shared.background.image_position.label",
+      "info": "t:shared.background.image_position.info",
+      "options": [
+        {
+          "value": "cover",
+          "label": "t:shared.background.image_position.options__1.label"
+        },
+        {
+          "value": "fit",
+          "label": "t:shared.background.image_position.options__2.label"
+        }
+      ],
+      "default": "cover",
+      "visible_if": "{{ section.settings.background_media == 'image' }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "image_parallax",
+      "label": "t:shared.background.image_parallax.label",
+      "info": "t:shared.background.image_parallax.info",
+      "default": false,
+      "visible_if": "{{ section.settings.background_media == 'image' }}"
+    },
+    {
+      "type": "range",
+      "id": "image_parallax_speed",
+      "label": "t:shared.background.image_parallax_speed.label",
+      "info": "t:shared.background.image_parallax_speed.info",
+      "min": 5,
+      "max": 40,
+      "step": 5,
+      "unit": "%",
+      "default": 15,
+      "visible_if": "{{ section.settings.background_media == 'image' and section.settings.image_parallax }}"
+    },
+    {
+      "type": "video",
+      "id": "video",
+      "label": "t:shared.background.video.label",
+      "info": "t:shared.background.video.info",
+      "visible_if": "{{ section.settings.background_media == 'video' }}"
+    },
+    {
+      "type": "video_url",
+      "id": "video_url",
+      "label": "t:shared.background.video_url.label",
+      "info": "t:shared.background.video_url.info",
+      "accept": [
+        "youtube",
+        "vimeo"
+      ],
+      "visible_if": "{{ section.settings.background_media == 'video' }}"
+    },
+    {
+      "type": "image_picker",
+      "id": "video_poster",
+      "label": "t:shared.background.video_poster.label",
+      "info": "t:shared.background.video_poster.info",
+      "visible_if": "{{ section.settings.background_media == 'video' }}"
+    },
+    {
+      "type": "select",
+      "id": "video_position",
+      "label": "t:shared.background.video_position.label",
+      "options": [
+        {
+          "value": "cover",
+          "label": "t:shared.background.video_position.options__1.label"
+        },
+        {
+          "value": "contain",
+          "label": "t:shared.background.video_position.options__2.label"
+        }
+      ],
+      "default": "cover",
+      "visible_if": "{{ section.settings.background_media == 'video' }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "video_loop",
+      "label": "t:shared.background.video_loop.label",
+      "default": true,
+      "visible_if": "{{ section.settings.background_media == 'video' }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "overlay_enabled",
+      "label": "t:shared.background.overlay_enabled.label",
+      "info": "t:shared.background.overlay_enabled.info",
+      "default": false,
+      "visible_if": "{{ section.settings.background_media != 'none' }}"
+    },
+    {
+      "type": "select",
+      "id": "overlay_style",
+      "label": "t:shared.background.overlay_style.label",
+      "info": "t:shared.background.overlay_style.info",
+      "options": [
+        {
+          "value": "solid",
+          "label": "t:shared.background.overlay_style.options__1.label"
+        },
+        {
+          "value": "gradient",
+          "label": "t:shared.background.overlay_style.options__2.label"
+        }
+      ],
+      "default": "solid",
+      "visible_if": "{{ section.settings.background_media != 'none' and section.settings.overlay_enabled }}"
+    },
+    {
+      "type": "color",
+      "id": "overlay_color",
+      "label": "t:shared.background.overlay_color.label",
+      "default": "#000000",
+      "visible_if": "{{ section.settings.background_media != 'none' and section.settings.overlay_enabled and section.settings.overlay_style == 'solid' }}"
+    },
+    {
+      "type": "color_background",
+      "id": "overlay_gradient",
+      "label": "t:shared.background.overlay_gradient.label",
+      "info": "t:shared.background.overlay_gradient.info",
+      "default": "linear-gradient(180deg, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 1) 100%)",
+      "visible_if": "{{ section.settings.background_media != 'none' and section.settings.overlay_enabled and section.settings.overlay_style == 'gradient' }}"
+    },
+    {
+      "type": "range",
+      "id": "overlay_opacity",
+      "label": "t:shared.background.overlay_opacity.label",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 40,
+      "visible_if": "{{ section.settings.background_media != 'none' and section.settings.overlay_enabled }}"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.group.headers.borders"
+    },
+    {
+      "type": "select",
+      "id": "border_style",
+      "label": "t:blocks.group.settings.border_style.label",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.options.none"
+        },
+        {
+          "value": "solid",
+          "label": "t:shared.options.solid"
+        },
+        {
+          "value": "dashed",
+          "label": "t:shared.border.style.options__2.label"
+        }
+      ],
+      "default": "none"
+    },
+    {
+      "type": "range",
+      "id": "border_width_top",
+      "label": "t:shared.border.sides.top.label",
+      "info": "t:shared.border.sides.info",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 1,
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_width_right",
+      "label": "t:shared.border.sides.right.label",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_width_bottom",
+      "label": "t:shared.border.sides.bottom.label",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_width_left",
+      "label": "t:shared.border.sides.left.label",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_opacity",
+      "label": "t:shared.border.opacity.label",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 100,
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "color",
+      "id": "border_color",
+      "label": "t:blocks.group.settings.border_color.label",
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.corners.header"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_top_left",
+      "label": "t:shared.corners.top_left.label",
+      "info": "t:shared.corners.paragraph",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 40,
+      "visible_if": "{{ section.settings.device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_top_right",
+      "label": "t:shared.corners.top_right.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 40,
+      "visible_if": "{{ section.settings.device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_bottom_left",
+      "label": "t:shared.corners.bottom_left.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_bottom_right",
+      "label": "t:shared.corners.bottom_right.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_top_left_mobile",
+      "label": "t:shared.corners.top_left.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 24,
+      "visible_if": "{{ section.settings.device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_top_right_mobile",
+      "label": "t:shared.corners.top_right.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 24,
+      "visible_if": "{{ section.settings.device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_bottom_left_mobile",
+      "label": "t:shared.corners.bottom_left.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_bottom_right_mobile",
+      "label": "t:shared.corners.bottom_right.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.device == 'mobile' }}"
     },
     {
       "type": "header",
@@ -517,6 +894,23 @@
         }
       ],
       "default": "default"
+    },
+    {
+      "type": "select",
+      "id": "device",
+      "label": "t:shared.spacing.devices.label",
+      "info": "t:shared.spacing.devices.info",
+      "options": [
+        {
+          "value": "desktop",
+          "label": "t:shared.spacing.devices.options__1.label"
+        },
+        {
+          "value": "mobile",
+          "label": "t:shared.spacing.devices.options__2.label"
+        }
+      ],
+      "default": "desktop"
     }
   ],
   "presets": [
@@ -547,26 +941,6 @@
         "device": "desktop"
       },
       "blocks": [
-        {
-          "type": "_section-frame",
-          "id": "section-frame",
-          "static": true,
-          "settings": {
-            "border_width_right": 1,
-            "border_width_bottom": 1,
-            "border_width_left": 1,
-            "border_opacity": 20,
-            "border_color": "#0d2f26"
-          }
-        },
-        {
-          "type": "_background-media",
-          "id": "section-background",
-          "static": true,
-          "settings": {
-            "background_media": "none"
-          }
-        },
         {
           "type": "section-header",
           "settings": {
@@ -607,31 +981,12 @@
                 "border_color": "#0d2f26",
                 "border_radius": 40,
                 "width": "fit",
-                "alignment": "center"
+                "alignment": "center",
+                "font_size": "14",
+                "font_size_mobile": "13",
+                "text_color_custom": "#0d2f26"
               },
-              "blocks": [
-                {
-                  "type": "_block-typography",
-                  "id": "typography",
-                  "static": true,
-                  "settings": {
-                    "font_size": "14",
-                    "font_size_mobile": "13",
-                    "text_color_custom": "#0d2f26"
-                  }
-                },
-                {
-                  "type": "_block-spacing",
-                  "id": "spacing",
-                  "static": true,
-                  "settings": {
-                    "padding_top": 4,
-                    "padding_bottom": 4,
-                    "padding_left": 4,
-                    "padding_right": 16
-                  }
-                }
-              ]
+              "blocks": []
             },
             {
               "type": "text",
@@ -803,33 +1158,7 @@
                             "border_style_highlight": "solid",
                             "border_color_highlight": "#0d2f26"
                           },
-                          "blocks": [
-                            {
-                              "type": "_block-typography",
-                              "id": "typography",
-                              "static": true,
-                              "settings": {
-                                "font_family": "heading",
-                                "font_size": "16",
-                                "font_size_mobile": "15"
-                              }
-                            },
-                            {
-                              "type": "_block-spacing",
-                              "id": "spacing",
-                              "static": true,
-                              "settings": {
-                                "padding_top": 12,
-                                "padding_bottom": 12,
-                                "padding_left": 12,
-                                "padding_right": 20,
-                                "padding_top_mobile": 10,
-                                "padding_bottom_mobile": 10,
-                                "padding_left_mobile": 10,
-                                "padding_right_mobile": 16
-                              }
-                            }
-                          ]
+                          "blocks": []
                         },
                         {
                           "type": "_featured-pills-check",
@@ -853,35 +1182,11 @@
                             "highlight_fill": "linear-gradient(180deg, #00C853 0%, #23FF96 100%)",
                             "highlight_icon_color": "#04160E",
                             "border_style_highlight": "solid",
-                            "border_color_highlight": "#0d2f26"
+                            "border_color_highlight": "#0d2f26",
+                            "padding_top": 16,
+                            "padding_bottom": 16
                           },
-                          "blocks": [
-                            {
-                              "type": "_block-typography",
-                              "id": "typography",
-                              "static": true,
-                              "settings": {
-                                "font_family": "heading",
-                                "font_size": "16",
-                                "font_size_mobile": "15"
-                              }
-                            },
-                            {
-                              "type": "_block-spacing",
-                              "id": "spacing",
-                              "static": true,
-                              "settings": {
-                                "padding_top": 16,
-                                "padding_bottom": 16,
-                                "padding_left": 12,
-                                "padding_right": 20,
-                                "padding_top_mobile": 10,
-                                "padding_bottom_mobile": 10,
-                                "padding_left_mobile": 10,
-                                "padding_right_mobile": 16
-                              }
-                            }
-                          ]
+                          "blocks": []
                         },
                         {
                           "type": "_featured-pills-check",
@@ -905,33 +1210,7 @@
                             "border_style_highlight": "solid",
                             "border_color_highlight": "#0d2f26"
                           },
-                          "blocks": [
-                            {
-                              "type": "_block-typography",
-                              "id": "typography",
-                              "static": true,
-                              "settings": {
-                                "font_family": "heading",
-                                "font_size": "16",
-                                "font_size_mobile": "15"
-                              }
-                            },
-                            {
-                              "type": "_block-spacing",
-                              "id": "spacing",
-                              "static": true,
-                              "settings": {
-                                "padding_top": 12,
-                                "padding_bottom": 12,
-                                "padding_left": 12,
-                                "padding_right": 20,
-                                "padding_top_mobile": 10,
-                                "padding_bottom_mobile": 10,
-                                "padding_left_mobile": 10,
-                                "padding_right_mobile": 16
-                              }
-                            }
-                          ]
+                          "blocks": []
                         },
                         {
                           "type": "_featured-pills-check",
@@ -955,33 +1234,7 @@
                             "border_style_highlight": "solid",
                             "border_color_highlight": "#0d2f26"
                           },
-                          "blocks": [
-                            {
-                              "type": "_block-typography",
-                              "id": "typography",
-                              "static": true,
-                              "settings": {
-                                "font_family": "heading",
-                                "font_size": "16",
-                                "font_size_mobile": "15"
-                              }
-                            },
-                            {
-                              "type": "_block-spacing",
-                              "id": "spacing",
-                              "static": true,
-                              "settings": {
-                                "padding_top": 12,
-                                "padding_bottom": 12,
-                                "padding_left": 12,
-                                "padding_right": 20,
-                                "padding_top_mobile": 10,
-                                "padding_bottom_mobile": 10,
-                                "padding_left_mobile": 10,
-                                "padding_right_mobile": 16
-                              }
-                            }
-                          ]
+                          "blocks": []
                         },
                         {
                           "type": "group",
@@ -1049,14 +1302,6 @@
                         "padding_right": 20
                       },
                       "blocks": [
-                        {
-                          "type": "_block-frame",
-                          "id": "frame",
-                          "static": true,
-                          "settings": {
-                            "border_radius": 24
-                          }
-                        },
                         {
                           "type": "card-content",
                           "settings": {
@@ -1139,18 +1384,11 @@
                     "stack_on_mobile": true,
                     "gap": 24,
                     "gap_horizontal": 24,
-                    "gap_horizontal_mobile": 12
+                    "gap_horizontal_mobile": 12,
+                    "background_color": "linear-gradient(rgba(255, 255, 255, 1), rgba(255, 255, 255, 1))",
+                    "border_radius": 32
                   },
                   "blocks": [
-                    {
-                      "type": "_block-frame",
-                      "id": "frame",
-                      "static": true,
-                      "settings": {
-                        "background_color": "linear-gradient(rgba(255, 255, 255, 1), rgba(255, 255, 255, 1))",
-                        "border_radius": 32
-                      }
-                    },
                     {
                       "type": "_featured-pills-group",
                       "settings": {
@@ -1200,33 +1438,7 @@
                             "border_style_highlight": "solid",
                             "border_color_highlight": "#0d2f26"
                           },
-                          "blocks": [
-                            {
-                              "type": "_block-typography",
-                              "id": "typography",
-                              "static": true,
-                              "settings": {
-                                "font_family": "heading",
-                                "font_size": "16",
-                                "font_size_mobile": "15"
-                              }
-                            },
-                            {
-                              "type": "_block-spacing",
-                              "id": "spacing",
-                              "static": true,
-                              "settings": {
-                                "padding_top": 8,
-                                "padding_bottom": 8,
-                                "padding_left": 8,
-                                "padding_right": 20,
-                                "padding_top_mobile": 10,
-                                "padding_bottom_mobile": 10,
-                                "padding_left_mobile": 10,
-                                "padding_right_mobile": 16
-                              }
-                            }
-                          ]
+                          "blocks": []
                         },
                         {
                           "type": "_featured-pills-check",
@@ -1250,33 +1462,7 @@
                             "border_style_highlight": "solid",
                             "border_color_highlight": "#0d2f26"
                           },
-                          "blocks": [
-                            {
-                              "type": "_block-typography",
-                              "id": "typography",
-                              "static": true,
-                              "settings": {
-                                "font_family": "heading",
-                                "font_size": "16",
-                                "font_size_mobile": "15"
-                              }
-                            },
-                            {
-                              "type": "_block-spacing",
-                              "id": "spacing",
-                              "static": true,
-                              "settings": {
-                                "padding_top": 8,
-                                "padding_bottom": 8,
-                                "padding_left": 8,
-                                "padding_right": 20,
-                                "padding_top_mobile": 10,
-                                "padding_bottom_mobile": 10,
-                                "padding_left_mobile": 10,
-                                "padding_right_mobile": 16
-                              }
-                            }
-                          ]
+                          "blocks": []
                         },
                         {
                           "type": "_featured-pills-check",
@@ -1299,33 +1485,7 @@
                             "border_style_highlight": "solid",
                             "border_color_highlight": "#0d2f26"
                           },
-                          "blocks": [
-                            {
-                              "type": "_block-typography",
-                              "id": "typography",
-                              "static": true,
-                              "settings": {
-                                "font_family": "heading",
-                                "font_size": "16",
-                                "font_size_mobile": "15"
-                              }
-                            },
-                            {
-                              "type": "_block-spacing",
-                              "id": "spacing",
-                              "static": true,
-                              "settings": {
-                                "padding_top": 8,
-                                "padding_bottom": 8,
-                                "padding_left": 8,
-                                "padding_right": 20,
-                                "padding_top_mobile": 10,
-                                "padding_bottom_mobile": 10,
-                                "padding_left_mobile": 10,
-                                "padding_right_mobile": 16
-                              }
-                            }
-                          ]
+                          "blocks": []
                         },
                         {
                           "type": "_featured-pills-check",
@@ -1348,33 +1508,7 @@
                             "border_style_highlight": "solid",
                             "border_color_highlight": "#0d2f26"
                           },
-                          "blocks": [
-                            {
-                              "type": "_block-typography",
-                              "id": "typography",
-                              "static": true,
-                              "settings": {
-                                "font_family": "heading",
-                                "font_size": "16",
-                                "font_size_mobile": "15"
-                              }
-                            },
-                            {
-                              "type": "_block-spacing",
-                              "id": "spacing",
-                              "static": true,
-                              "settings": {
-                                "padding_top": 8,
-                                "padding_bottom": 8,
-                                "padding_left": 8,
-                                "padding_right": 20,
-                                "padding_top_mobile": 10,
-                                "padding_bottom_mobile": 10,
-                                "padding_left_mobile": 10,
-                                "padding_right_mobile": 16
-                              }
-                            }
-                          ]
+                          "blocks": []
                         },
                         {
                           "type": "_featured-pills-check",
@@ -1397,33 +1531,7 @@
                             "border_style_highlight": "solid",
                             "border_color_highlight": "#0d2f26"
                           },
-                          "blocks": [
-                            {
-                              "type": "_block-typography",
-                              "id": "typography",
-                              "static": true,
-                              "settings": {
-                                "font_family": "heading",
-                                "font_size": "16",
-                                "font_size_mobile": "15"
-                              }
-                            },
-                            {
-                              "type": "_block-spacing",
-                              "id": "spacing",
-                              "static": true,
-                              "settings": {
-                                "padding_top": 8,
-                                "padding_bottom": 8,
-                                "padding_left": 8,
-                                "padding_right": 20,
-                                "padding_top_mobile": 10,
-                                "padding_bottom_mobile": 10,
-                                "padding_left_mobile": 10,
-                                "padding_right_mobile": 16
-                              }
-                            }
-                          ]
+                          "blocks": []
                         },
                         {
                           "type": "button",
@@ -1436,18 +1544,10 @@
                             "icon_style": "solid",
                             "icon_position": "end",
                             "corner_radius": 40,
-                            "width": "auto"
+                            "width": "auto",
+                            "padding_top": 12
                           },
-                          "blocks": [
-                            {
-                              "type": "_block-spacing",
-                              "id": "spacing",
-                              "static": true,
-                              "settings": {
-                                "padding_top": 12
-                              }
-                            }
-                          ]
+                          "blocks": []
                         }
                       ]
                     },
@@ -1465,16 +1565,7 @@
                         "width_mobile": "fill",
                         "inherit_color_scheme": true
                       },
-                      "blocks": [
-                        {
-                          "type": "_block-frame",
-                          "id": "frame",
-                          "static": true,
-                          "settings": {
-                            "border_radius": 24
-                          }
-                        }
-                      ]
+                      "blocks": []
                     },
                     {
                       "type": "group",
@@ -1509,31 +1600,16 @@
                             "text": "<p>We source the finest ingredients from trusted partners around the world to ensure purity.</p>",
                             "inherit_color_scheme": true,
                             "alignment": "start",
-                            "hover": "none"
+                            "hover": "none",
+                            "padding_top": 20,
+                            "padding_bottom": 20,
+                            "padding_left": 20,
+                            "padding_right": 20,
+                            "background": "#E8F3EE",
+                            "radius": 20,
+                            "text_alignment": "start"
                           },
-                          "blocks": [
-                            {
-                              "type": "_badge-surface",
-                              "id": "surface",
-                              "static": true,
-                              "settings": {
-                                "background": "#E8F3EE",
-                                "radius": 20,
-                                "text_alignment": "start"
-                              }
-                            },
-                            {
-                              "type": "_block-spacing",
-                              "id": "spacing",
-                              "static": true,
-                              "settings": {
-                                "padding_top": 20,
-                                "padding_bottom": 20,
-                                "padding_left": 20,
-                                "padding_right": 20
-                              }
-                            }
-                          ]
+                          "blocks": []
                         },
                         {
                           "type": "image-card",
@@ -1547,18 +1623,10 @@
                             "position": "end",
                             "width": "fill",
                             "width_mobile": "fill",
-                            "inherit_color_scheme": true
+                            "inherit_color_scheme": true,
+                            "border_radius": 20
                           },
-                          "blocks": [
-                            {
-                              "type": "_block-frame",
-                              "id": "frame",
-                              "static": true,
-                              "settings": {
-                                "border_radius": 20
-                              }
-                            }
-                          ]
+                          "blocks": []
                         }
                       ]
                     }
@@ -1618,18 +1686,10 @@
                         "width_tablet": "custom",
                         "width_custom_tablet": 100,
                         "width_mobile": "fill",
-                        "inherit_color_scheme": true
+                        "inherit_color_scheme": true,
+                        "border_radius": 28
                       },
-                      "blocks": [
-                        {
-                          "type": "_block-frame",
-                          "id": "frame",
-                          "static": true,
-                          "settings": {
-                            "border_radius": 28
-                          }
-                        }
-                      ]
+                      "blocks": []
                     },
                     {
                       "type": "_featured-pills-group",
@@ -1989,17 +2049,10 @@
                     "padding_top_mobile": 16,
                     "padding_bottom_mobile": 16,
                     "padding_left_mobile": 12,
-                    "padding_right_mobile": 12
+                    "padding_right_mobile": 12,
+                    "border_radius": 28
                   },
                   "blocks": [
-                    {
-                      "type": "_block-frame",
-                      "id": "frame",
-                      "static": true,
-                      "settings": {
-                        "border_radius": 28
-                      }
-                    },
                     {
                       "type": "card-content",
                       "settings": {
