@@ -154,10 +154,6 @@
   {%- endif -%}
 {%- endcapture -%}
 
-{%- capture carousel_colors -%}
-  {% content_for 'block', type: '_carousel-colors', id: 'carousel-colors' %}
-{%- endcapture -%}
-
 <div
   class="featured-blog color-scheme-container color-{{ s.color_scheme }}"
   data-section-spacing
@@ -181,7 +177,6 @@
     <carousel-slider
       {% render 'carousel-shell-attrs',
          settings: s,
-         inline_style: carousel_colors,
          layout: cs_layout,
          layout_mobile: cs_layout_mobile,
          classes: 'featured-blog__carousel',
@@ -221,7 +216,10 @@
         {%- endif -%}
       </ul>
 
-      {% content_for 'block', type: '_featured-blog-controls', id: 'carousel-controls' %}
+      {% render 'carousel-shell-tail',
+         settings: s,
+         layout: cs_layout,
+         layout_mobile: cs_layout_mobile %}
     </carousel-slider>
 
     {%- if show_view_all -%}
@@ -771,9 +769,325 @@
       "visible_if": "{{ section.settings.layout == 'carousel' }}"
     },
     {
+      "type": "header",
+      "content": "t:shared.carousel.headers.navigation",
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "carousel_navigation",
+      "label": "t:shared.carousel.navigation.label",
+      "default": false,
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "select",
+      "id": "carousel_nav_position",
+      "label": "t:shared.carousel.nav_position.label",
+      "info": "t:shared.carousel.nav_position.info",
+      "options": [
+        {
+          "value": "outside",
+          "label": "t:shared.carousel.nav_position.options__1.label"
+        },
+        {
+          "value": "inside",
+          "label": "t:shared.carousel.nav_position.options__2.label"
+        },
+        {
+          "value": "bottom",
+          "label": "t:shared.carousel.nav_position.options__3.label"
+        },
+        {
+          "value": "inline",
+          "label": "t:shared.carousel.nav_position.options__4.label"
+        }
+      ],
+      "default": "outside",
+      "visible_if": "{{ section.settings.carousel_navigation and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "select",
+      "id": "carousel_nav_icon",
+      "label": "t:shared.carousel.nav_glyph.label",
+      "options": [
+        {
+          "value": "arrow",
+          "label": "t:shared.carousel.nav_glyph.options__1.label"
+        },
+        {
+          "value": "chevron",
+          "label": "t:shared.carousel.nav_glyph.options__2.label"
+        },
+        {
+          "value": "arrow-large",
+          "label": "t:shared.carousel.nav_glyph.options__3.label"
+        },
+        {
+          "value": "chevron-large",
+          "label": "t:shared.carousel.nav_glyph.options__4.label"
+        },
+        {
+          "value": "none",
+          "label": "t:shared.carousel.nav_glyph.options__5.label"
+        }
+      ],
+      "default": "arrow",
+      "visible_if": "{{ section.settings.carousel_navigation and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "select",
+      "id": "carousel_nav_shape",
+      "label": "t:shared.carousel.nav_shape.label",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.carousel.nav_shape.options__1.label"
+        },
+        {
+          "value": "circle",
+          "label": "t:shared.carousel.nav_shape.options__2.label"
+        },
+        {
+          "value": "square",
+          "label": "t:shared.carousel.nav_shape.options__3.label"
+        }
+      ],
+      "default": "circle",
+      "visible_if": "{{ section.settings.carousel_navigation and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "select",
+      "id": "carousel_nav_border_style",
+      "label": "t:shared.carousel.nav_border_style.label",
+      "options": [
+        {
+          "value": "solid",
+          "label": "t:shared.options.solid"
+        },
+        {
+          "value": "dashed",
+          "label": "t:shared.options.dashed"
+        },
+        {
+          "value": "none",
+          "label": "t:shared.options.none"
+        }
+      ],
+      "default": "solid",
+      "visible_if": "{{ section.settings.carousel_nav_shape != 'none' and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "range",
+      "id": "carousel_nav_border_radius",
+      "label": "t:shared.carousel.nav_border_radius.label",
+      "info": "t:shared.carousel.nav_border_radius.info",
+      "min": 0,
+      "max": 30,
+      "step": 1,
+      "unit": "px",
+      "default": 8,
+      "visible_if": "{{ section.settings.carousel_nav_shape == 'square' and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "select",
+      "id": "carousel_controls_style",
+      "label": "t:shared.carousel.controls_style.label",
+      "info": "t:shared.carousel.controls_style.info",
+      "options": [
+        {
+          "value": "split",
+          "label": "t:shared.carousel.controls_style.options__1.label"
+        },
+        {
+          "value": "ghost",
+          "label": "t:shared.carousel.controls_style.options__2.label"
+        },
+        {
+          "value": "solid",
+          "label": "t:shared.carousel.controls_style.options__3.label"
+        }
+      ],
+      "default": "ghost",
+      "visible_if": "{{ section.settings.carousel_navigation and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "range",
+      "id": "carousel_nav_size",
+      "label": "t:shared.carousel.nav_size.label",
+      "min": 28,
+      "max": 72,
+      "step": 2,
+      "unit": "px",
+      "default": 44,
+      "visible_if": "{{ section.settings.carousel_navigation and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.carousel.headers.pagination",
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "select",
+      "id": "carousel_pagination",
+      "label": "t:shared.carousel.pagination.label",
+      "info": "t:shared.carousel.pagination.info",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.carousel.pagination.options__1.label"
+        },
+        {
+          "value": "dots",
+          "label": "t:shared.carousel.pagination.options__2.label"
+        },
+        {
+          "value": "numbers",
+          "label": "t:shared.carousel.pagination.options__3.label"
+        },
+        {
+          "value": "progress",
+          "label": "t:shared.carousel.pagination.options__4.label"
+        },
+        {
+          "value": "controls",
+          "label": "t:shared.carousel.pagination.options__5.label"
+        }
+      ],
+      "default": "controls",
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "select",
+      "id": "carousel_pagination_align",
+      "label": "t:shared.carousel.pagination_align.label",
+      "info": "t:shared.carousel.pagination_align.info",
+      "options": [
+        {
+          "value": "start",
+          "label": "t:shared.carousel.controls_align.options__1.label"
+        },
+        {
+          "value": "center",
+          "label": "t:shared.carousel.controls_align.options__2.label"
+        },
+        {
+          "value": "end",
+          "label": "t:shared.carousel.controls_align.options__3.label"
+        }
+      ],
+      "default": "center",
+      "visible_if": "{{ section.settings.carousel_pagination != 'none' and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.carousel.headers.controls",
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
       "type": "paragraph",
       "content": "t:shared.carousel.paragraphs.colors",
       "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "carousel_inherit_scheme",
+      "label": "t:shared.carousel.inherit_scheme.label",
+      "info": "t:shared.carousel.inherit_scheme.info",
+      "default": true,
+      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+    },
+    {
+      "type": "color_scheme",
+      "id": "carousel_color_scheme",
+      "label": "t:shared.color_scheme.label",
+      "info": "t:shared.carousel.color_scheme.info",
+      "default": "scheme-1",
+      "visible_if": "{{ section.settings.carousel_inherit_scheme == false }}"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.carousel.headers.nav_colors",
+      "visible_if": "{{ section.settings.carousel_inherit_scheme == false }}"
+    },
+    {
+      "type": "select",
+      "id": "carousel_nav_style",
+      "label": "t:shared.carousel.nav_style.label",
+      "options": [
+        {
+          "value": "solid",
+          "label": "t:shared.carousel.nav_style.options__1.label"
+        },
+        {
+          "value": "gradient",
+          "label": "t:shared.carousel.nav_style.options__2.label"
+        }
+      ],
+      "default": "solid",
+      "visible_if": "{{ section.settings.carousel_inherit_scheme == false }}"
+    },
+    {
+      "type": "color",
+      "id": "carousel_nav_bg",
+      "label": "t:shared.carousel.nav_bg.label",
+      "visible_if": "{{ section.settings.carousel_inherit_scheme == false and section.settings.carousel_nav_style == 'solid' }}"
+    },
+    {
+      "type": "color",
+      "id": "carousel_nav_bg_hover",
+      "label": "t:shared.carousel.nav_bg_hover.label",
+      "visible_if": "{{ section.settings.carousel_inherit_scheme == false and section.settings.carousel_nav_style == 'solid' }}"
+    },
+    {
+      "type": "color_background",
+      "id": "carousel_nav_gradient",
+      "label": "t:shared.carousel.nav_gradient.label",
+      "default": "linear-gradient(135deg, #1a1a1a 0%, #4a4a4a 100%)",
+      "visible_if": "{{ section.settings.carousel_inherit_scheme == false and section.settings.carousel_nav_style == 'gradient' }}"
+    },
+    {
+      "type": "color_background",
+      "id": "carousel_nav_gradient_hover",
+      "label": "t:shared.carousel.nav_gradient_hover.label",
+      "visible_if": "{{ section.settings.carousel_inherit_scheme == false and section.settings.carousel_nav_style == 'gradient' }}"
+    },
+    {
+      "type": "color",
+      "id": "carousel_nav_icon_color",
+      "label": "t:shared.carousel.nav_icon_color.label",
+      "visible_if": "{{ section.settings.carousel_inherit_scheme == false }}"
+    },
+    {
+      "type": "color",
+      "id": "carousel_nav_icon_hover",
+      "label": "t:shared.carousel.nav_icon_hover.label",
+      "visible_if": "{{ section.settings.carousel_inherit_scheme == false }}"
+    },
+    {
+      "type": "color",
+      "id": "carousel_nav_border_color",
+      "label": "t:shared.carousel.nav_border_color.label",
+      "visible_if": "{{ section.settings.carousel_inherit_scheme == false }}"
+    },
+    {
+      "type": "color",
+      "id": "carousel_nav_border_hover",
+      "label": "t:shared.carousel.nav_border_hover.label",
+      "visible_if": "{{ section.settings.carousel_inherit_scheme == false }}"
+    },
+    {
+      "type": "color",
+      "id": "carousel_dot_color",
+      "label": "t:shared.carousel.dot_color.label",
+      "info": "t:shared.carousel.dot_color.info",
+      "visible_if": "{{ section.settings.carousel_inherit_scheme == false }}"
+    },
+    {
+      "type": "color",
+      "id": "carousel_dot_active_color",
+      "label": "t:shared.carousel.dot_active_color.label",
+      "visible_if": "{{ section.settings.carousel_inherit_scheme == false }}"
     },
     {
       "type": "header",
@@ -957,31 +1271,17 @@
         "gap_horizontal": 24,
         "gap_vertical": 32,
         "show_view_all": true,
-        "alignment": "center"
+        "alignment": "center",
+        "carousel_navigation": false,
+        "carousel_nav_icon": "arrow",
+        "carousel_nav_shape": "circle",
+        "carousel_nav_border_style": "solid",
+        "carousel_controls_style": "ghost",
+        "carousel_pagination": "controls",
+        "carousel_pagination_align": "center",
+        "carousel_inherit_scheme": true
       },
       "blocks": [
-        {
-          "type": "_carousel-colors",
-          "id": "carousel-colors",
-          "static": true,
-          "settings": {
-            "carousel_inherit_scheme": true
-          }
-        },
-        {
-          "type": "_featured-blog-controls",
-          "id": "carousel-controls",
-          "static": true,
-          "settings": {
-            "carousel_navigation": false,
-            "carousel_nav_icon": "arrow",
-            "carousel_nav_shape": "circle",
-            "carousel_nav_border_style": "solid",
-            "carousel_controls_style": "ghost",
-            "carousel_pagination": "controls",
-            "carousel_pagination_align": "center"
-          }
-        },
         {
           "type": "section-header",
           "name": "t:blocks.section_header.presets.vertical.name",
