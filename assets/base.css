@@ -797,6 +797,11 @@
     --button-border-width: var(--buttons-border-thickness, 1px);
     --button-border-style: solid;
 
+    /* The ring drawn around the pill, and how far it runs past the pill's end
+       when there is no icon filling that space. */
+    --button-frame: 2px;
+    --button-tail: 1.2rem;
+
     --button-inset: 0px;
     --button-inner: calc(
       var(--button-height) - (var(--button-inset) * 2) - (var(--button-border-width) * 2)
@@ -804,6 +809,8 @@
 
     --button-icon-size: 1.6rem;
     --button-icon-radius: 50%;
+    --button-icon-badge: clamp(2.8rem, calc(var(--button-icon-size) * 1.8), calc(var(--button-inner) - 1rem));
+    --button-icon-gutter: 0.6rem;
 
     --button-icon-box: min(calc(var(--button-icon-size) * 3), var(--button-inner));
 
@@ -813,6 +820,15 @@
     --button-hover-background: transparent;
     --button-hover-foreground: currentColor;
     --button-hover-border: transparent;
+
+    --button-badge-background: var(--button-background);
+    --button-badge-foreground: var(--button-border);
+    --button-hover-badge-background: var(--button-hover-background);
+    --button-hover-badge-foreground: var(--button-hover-border);
+
+    /* What fills the ring: the border colour on filled buttons, nothing on outline. */
+    --button-ring: var(--button-border);
+    --button-hover-ring: var(--button-hover-border);
 
     position: relative;
     display: inline-flex;
@@ -873,7 +889,10 @@
     block-size: var(--button-icon-size);
   }
 
-  /* ---- variants ---- */
+  /* ---- variants ----
+     Filled buttons read the scheme as: background = the pill, text = its
+     label, border = the ring around it. The badge takes the pill's colour
+     and the arrow the ring's, so it reads as a cut-out of the button. */
 
   .button--primary {
     --button-background: var(--color-primary-button-background);
@@ -894,23 +913,37 @@
   }
 
   .button--outline {
+    --button-border-style: dashed;
+    --button-frame: var(--button-border-width);
+    --button-ring: transparent;
+    --button-hover-ring: transparent;
     --button-background: transparent;
-    --button-foreground: var(--color-primary-button-hover-background);
+    --button-foreground: var(--color-primary-button-outline);
     --button-border: var(--color-primary-button-outline);
     --button-hover-background: transparent;
-    --button-hover-foreground: var(--color-primary-button-outline);
-    --button-hover-border: var(--color-primary-button-outline);
+    --button-hover-foreground: var(--color-primary-button-hover-outline);
+    --button-hover-border: var(--color-primary-button-hover-outline);
+    --button-badge-background: var(--color-primary-button-background);
+    --button-badge-foreground: var(--color-primary-button-outline);
+    --button-hover-badge-background: var(--color-primary-button-hover-outline);
+    --button-hover-badge-foreground: var(--color-primary-button-hover-text);
   }
 
-
-
   .button--secondary-outline {
+    --button-border-style: dashed;
+    --button-frame: var(--button-border-width);
+    --button-ring: transparent;
+    --button-hover-ring: transparent;
     --button-background: transparent;
-    --button-foreground: var(--color-secondary-button-outline);
+    --button-foreground: var(--color-secondary-button-text);
     --button-border: var(--color-secondary-button-outline);
     --button-hover-background: transparent;
-    --button-hover-foreground: var(--color-secondary-button-hover-outline);
+    --button-hover-foreground: var(--color-secondary-button-hover-text);
     --button-hover-border: var(--color-secondary-button-hover-outline);
+    --button-badge-background: var(--color-secondary-button-outline);
+    --button-badge-foreground: var(--color-secondary-button-background);
+    --button-hover-badge-background: var(--color-secondary-button-hover-outline);
+    --button-hover-badge-foreground: var(--color-secondary-button-hover-background);
   }
 
   .button--custom {
@@ -929,13 +962,25 @@
     --button-hover-background: transparent;
     --button-hover-foreground: var(--color-link-hover, var(--color-link));
     --button-hover-border: transparent;
+    --button-border-width: 0px;
+    --button-gap: 2.5rem;
+    --button-icon-size: 2rem;
 
     min-block-size: 0;
     --button-padding-inline: 0px;
     padding-inline: 0;
+    padding-block: 0 0.7rem;
     border-radius: 0;
     border-color: transparent;
+    font-weight: 400;
     text-decoration: none;
+    background-image: linear-gradient(
+      color-mix(in srgb, currentColor 20%, transparent),
+      color-mix(in srgb, currentColor 20%, transparent)
+    );
+    background-repeat: no-repeat;
+    background-position: 0 100%;
+    background-size: 100% var(--button-underline-size, 1px);
   }
 
   .button--link:hover,
@@ -943,13 +988,10 @@
     border-color: transparent;
   }
 
-  .button--link .button-text,
-  .button--link .button-text-hover {
-    background-image: linear-gradient(currentColor, currentColor);
-    background-repeat: no-repeat;
-    background-position: 0 100%;
-    background-size: 100% var(--button-underline-size, 2px);
-    padding-block-end: 0.3em;
+  .button--link .button__icon .icon {
+    inline-size: calc(var(--button-icon-size) * 0.675);
+    block-size: calc(var(--button-icon-size) * 0.675);
+    stroke-width: 2;
   }
 
   button-swap .button--link {
@@ -1074,11 +1116,8 @@
     transform: translateX(-0.3rem);
   }
 
-  .button--outline::before,
-  .button--secondary-outline::before,
   .button--link::before,
-  button-swap .button::before,
-  .button[data-fx='none']::before {
+  button-swap .button--has-icon::before {
     content: none;
   }
 
@@ -1089,6 +1128,59 @@
   .button[data-fx='none']:hover .button-text,
   .button[data-fx='none']:focus-visible .button-text {
     transform: none;
+  }
+
+  /* ==========================================================================
+     Framed pill: the label pill sits in a ring that runs on past its end.
+     The pill is the ::before, so hand-written `.button` markup gets it too,
+     and the sweep becomes the pill filling with its hover colour.
+     ========================================================================== */
+
+  .button:is(.button--primary, .button--secondary, .button--outline, .button--secondary-outline):not(.button--icon-only) {
+    --button-inset: max(0px, calc(var(--button-frame) - var(--button-border-width)));
+    padding-inline-start: calc(var(--button-padding-inline) + var(--button-inset));
+    padding-inline-end: calc(var(--button-padding-inline) + var(--button-tail) - var(--button-border-width));
+  }
+
+  .button:is(.button--primary, .button--secondary, .button--outline, .button--secondary-outline):not(.button--icon-only) {
+    background-color: var(--button-ring);
+  }
+
+  .button:is(.button--primary, .button--secondary, .button--outline, .button--secondary-outline):not(.button--icon-only):is(:hover, :focus-visible),
+  button-swap .button:is(.button--primary, .button--secondary, .button--outline, .button--secondary-outline):not(.button--icon-only):is(:hover, :focus-visible) {
+    background-color: var(--button-hover-ring);
+  }
+
+  .button:is(.button--primary, .button--secondary, .button--outline, .button--secondary-outline):not(.button--icon-only)::before {
+    inset-block: var(--button-inset);
+    inset-inline-start: var(--button-inset);
+    inset-inline-end: calc(var(--button-tail) - var(--button-border-width));
+    border-radius: var(--radius-button);
+    background-color: var(--button-background);
+    background-image: linear-gradient(var(--button-hover-background), var(--button-hover-background));
+    background-repeat: no-repeat;
+    background-position: 0 0;
+    background-size: 0% 100%;
+    transform: none;
+    transition: background-size var(--duration-base, 250ms) var(--ease-swap),
+      border-color var(--duration-base, 250ms) var(--ease-swap);
+  }
+
+  .button:is(.button--primary, .button--secondary, .button--outline, .button--secondary-outline):not(.button--icon-only):is(:hover, :focus-visible)::before {
+    background-size: 100% 100%;
+    transform: none;
+  }
+
+  .button:is(.button--outline, .button--secondary-outline):not(.button--icon-only)::before {
+    border-inline-end: var(--button-border-width) var(--button-border-style) var(--button-border);
+  }
+
+  .button:is(.button--outline, .button--secondary-outline):not(.button--icon-only):is(:hover, :focus-visible)::before {
+    border-color: var(--button-hover-border);
+  }
+
+  .button[data-fx='none']::before {
+    transition: none;
   }
 
   /* ==========================================================================
@@ -1181,22 +1273,34 @@
       border-color var(--duration-swap, 520ms) var(--ease-swap);
   }
 
-  /* ---- swap layout: the surround ---- */
+  /* ---- swap layout: the surround ----
+     Ring, then the label pill, then the icon in its own slot inside the ring.
+     `--button-icon-box` is that whole slot, which is what the swap travels by. */
 
   button-swap .button.button--has-icon:not(.button--icon-only):not(.button--link) {
-    --button-inset: 0.4rem;
+    --button-inset: max(0px, calc(var(--button-frame) - var(--button-border-width)));
+    --button-gap: 0px;
+    --button-icon-box: calc(var(--button-icon-badge) + var(--button-icon-gutter) * 2);
     display: inline-flex;
     padding: var(--button-inset);
-    background-color: var(--button-background);
+    background-color: var(--button-ring);
     color: var(--button-foreground);
-    transition: none;
+    transition: background-color var(--duration-swap, 520ms) var(--ease-swap),
+      border-color var(--duration-swap, 520ms) var(--ease-swap),
+      color var(--duration-swap, 520ms) var(--ease-swap);
   }
 
   button-swap .button.button--has-icon:not(.button--icon-only):not(.button--link):hover,
   button-swap .button.button--has-icon:not(.button--icon-only):not(.button--link):focus-visible {
-    border-color: var(--button-border);
-    background-color: var(--button-background);
-    color: var(--button-foreground);
+    border-color: var(--button-hover-border);
+    background-color: var(--button-hover-ring);
+    color: var(--button-hover-foreground);
+  }
+
+  /* Clip to the track, not the button, so the hidden copy can't show in the ring. */
+  button-swap .button.button--has-icon:not(.button--icon-only):not(.button--link) .button__track {
+    overflow: clip;
+    border-radius: var(--radius-button);
   }
 
   button-swap .button.button--has-icon:not(.button--icon-only):not(.button--link) :is(.button-text, .button-text-hover) {
@@ -1205,34 +1309,27 @@
 
   button-swap .button.button--has-icon:not(.button--icon-only):not(.button--link) .button__label {
     flex: 1 1 auto;
+    white-space: nowrap;
     display: flex;
     align-items: center;
     justify-content: center;
     min-block-size: var(--button-inner);
     padding-inline: var(--button-padding-inline);
     border-radius: var(--radius-button);
+    background-color: var(--button-background);
+    color: var(--button-foreground);
+    transition: background-color var(--duration-swap, 520ms) var(--ease-swap),
+      color var(--duration-swap, 520ms) var(--ease-swap),
+      border-color var(--duration-swap, 520ms) var(--ease-swap);
+  }
+
+  button-swap .button.button--has-icon:not(.button--icon-only):not(.button--link):is(:hover, :focus-visible) .button__label {
     background-color: var(--button-hover-background);
     color: var(--button-hover-foreground);
-    
   }
 
   button-swap .button:not(.button--has-icon) :is(.button-text, .button-text-hover) {
     justify-content: center;
-  }
-
-  button-swap .button--outline.button--has-icon,
-  button-swap .button--secondary-outline.button--has-icon {
-    background-color: transparent;
-    border-color: var(--button-border);
-  }
-
-  button-swap .button--outline.button--has-icon:hover,
-  button-swap .button--outline.button--has-icon:focus-visible,
-  button-swap .button--secondary-outline.button--has-icon:hover,
-  button-swap .button--secondary-outline.button--has-icon:focus-visible {
-    background-color: transparent;
-    border-color: var(--button-hover-border);
-    color: var(--button-hover-foreground);
   }
 
   /* ---- a plain glyph in the surround ---- */
@@ -1246,17 +1343,25 @@
   button-swap .button.button--has-icon:not(.button--icon-solid):not(.button--icon-only):not(.button--link) .button__icon {
     inline-size: var(--button-icon-box);
     block-size: var(--button-icon-box);
-    color: var(--button-icon-foreground, var(--button-background));
+    color: var(--button-icon-foreground, var(--button-badge-background));
+  }
+
+  button-swap .button.button--has-icon:not(.button--icon-solid):not(.button--icon-only):not(.button--link):is(:hover, :focus-visible) .button__icon {
+    color: var(--button-icon-foreground, var(--button-hover-badge-background));
   }
 
   button-swap .button--outline.button--has-icon:not(.button--icon-solid):not(.button--icon-only):not(.button--link) .button__icon,
-  button-swap .button--secondary-outline.button--has-icon:not(.button--icon-solid):not(.button--icon-only):not(.button--link) .button__icon {
+  button-swap .button--secondary-outline.button--has-icon:not(.button--icon-solid):not(.button--icon-only):not(.button--link) .button__icon,
+  button-swap .button--outline.button--has-icon:not(.button--icon-solid):not(.button--icon-only):not(.button--link):is(:hover, :focus-visible) .button__icon,
+  button-swap .button--secondary-outline.button--has-icon:not(.button--icon-solid):not(.button--icon-only):not(.button--link):is(:hover, :focus-visible) .button__icon {
     color: inherit;
   }
 
   /* ---- outline in the surround layout ---- */
-  button-swap .button--outline.button--has-icon :is(.button__label),
-  button-swap .button--secondary-outline.button--has-icon :is(.button__label) {
+  button-swap .button--outline.button--has-icon .button__label,
+  button-swap .button--secondary-outline.button--has-icon .button__label,
+  button-swap .button--outline.button--has-icon:is(:hover, :focus-visible) .button__label,
+  button-swap .button--secondary-outline.button--has-icon:is(:hover, :focus-visible) .button__label {
     background-color: transparent;
     color: inherit;
     border: 0;
@@ -1284,27 +1389,43 @@
     border-color: var(--button-hover-border);
   }
 
-  /* ---- the solid badge ---- */
+  /* ---- the solid badge ----
+     A small disc; its glyph and the disc both scale from the icon size. */
+
+  .button--icon-solid {
+    --button-icon-size: 2rem;
+  }
 
   .button--icon-solid .button__icon {
-    inline-size: var(--button-icon-box);
-    block-size: var(--button-icon-box);
+    inline-size: var(--button-icon-badge);
+    block-size: var(--button-icon-badge);
     border-radius: var(--button-icon-radius);
-    background-color: var(--button-icon-background, var(--button-hover-background));
-    color: var(--button-icon-foreground, var(--button-hover-foreground));
+    background-color: var(--button-icon-background, var(--button-badge-background));
+    color: var(--button-icon-foreground, var(--button-badge-foreground));
     box-shadow: none;
   }
 
-  .button--outline.button--icon-solid .button__icon,
-  .button--secondary-outline.button--icon-solid .button__icon {
-    background-color: var(--button-icon-background, var(--button-foreground));
-    color: var(--button-icon-foreground, var(--color-background));
-    box-shadow: none;
+  .button--icon-solid .button__icon .icon {
+    inline-size: calc(var(--button-icon-badge) * 0.55);
+    block-size: calc(var(--button-icon-badge) * 0.55);
+    stroke-width: 2;
+  }
+
+  .button--icon-solid:hover .button__icon,
+  .button--icon-solid:focus-visible .button__icon {
+    background-color: var(--button-icon-background, var(--button-hover-badge-background));
+    color: var(--button-icon-foreground, var(--button-hover-badge-foreground));
+  }
+
+  button-swap .button--icon-solid:not(.button--icon-only):not(.button--link) .button__icon {
+    margin-inline: var(--button-icon-gutter);
+    transition: background-color var(--duration-swap, 520ms) var(--ease-swap),
+      color var(--duration-swap, 520ms) var(--ease-swap);
   }
 
   .button--link.button--icon-solid .button__icon {
-    inline-size: calc(var(--button-icon-size) * 1.9);
-    block-size: calc(var(--button-icon-size) * 1.9);
+    inline-size: calc(var(--button-icon-size) * 1.2);
+    block-size: calc(var(--button-icon-size) * 1.2);
     background-color: var(--button-icon-background, var(--button-foreground));
     color: var(--button-icon-foreground, var(--color-background));
     box-shadow: none;
@@ -1313,6 +1434,7 @@
   .button--link.button--icon-solid:hover .button__icon,
   .button--link.button--icon-solid:focus-visible .button__icon {
     background-color: var(--button-icon-background, var(--button-hover-foreground));
+    color: var(--button-icon-foreground, var(--color-background));
   }
 
   .button--icon-only .button__icon {
@@ -1322,13 +1444,6 @@
     border-radius: 0;
     box-shadow: none;
     color: inherit;
-  }
-
-  .button--outline.button--icon-solid:hover .button__icon,
-  .button--outline.button--icon-solid:focus-visible .button__icon,
-  .button--secondary-outline.button--icon-solid:hover .button__icon,
-  .button--secondary-outline.button--icon-solid:focus-visible .button__icon {
-    background-color: var(--button-icon-background, var(--button-hover-foreground));
   }
 
   .button-swap {
