@@ -156,6 +156,9 @@ export class StickyHeader extends BaseComponent {
    */
   #pinned = null;
 
+  /** Scroll position past which the header pins; refreshed by `#measure()`. @type {number} */
+  #pinPoint = 0;
+
   /** @type {ResizeObserver|null} */
   #observer = null;
 
@@ -235,7 +238,9 @@ export class StickyHeader extends BaseComponent {
     }
 
     setCssVar('--header-sticky-offset', `${this.#stickyOffset()}px`);
-    setCssVar('--header-offset-above', `${this.#offsetAbove()}px`);
+    // Kept so the scroll handler never has to re-measure the page mid-scroll.
+    this.#pinPoint = this.#offsetAbove() + this.offsetHeight;
+    setCssVar('--header-offset-above', `${this.#pinPoint - this.offsetHeight}px`);
   }
 
   /**
@@ -306,8 +311,7 @@ export class StickyHeader extends BaseComponent {
     }
 
     if (mode === 'scroll-down') {
-      const pinPoint = this.#offsetAbove() + this.offsetHeight;
-      const pinned = position > pinPoint;
+      const pinned = position > this.#pinPoint;
 
       if (pinned !== this.#pinned) {
         this.#pinned = pinned;

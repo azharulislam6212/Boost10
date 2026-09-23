@@ -252,15 +252,6 @@ export class CarouselSlider extends BaseComponent {
 
   /* ------------------------------------------------------------ editor -- ---- */
 
-  sectionLoaded() {
-    this.#stop();
-    this.refreshRefs();
-    this.#external = findExternalControls(this.id);
-    this.#bindControls();
-    this.#watchSlides();
-    this.#sync();
-  }
-
   sectionUnloaded() {
     this.#stop();
   }

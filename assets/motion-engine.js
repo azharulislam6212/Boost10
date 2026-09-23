@@ -825,8 +825,15 @@ const tickerSubscribers = new Set();
 /** @type {number|null} */
 let tickerFrame = null;
 
+/** @type {number} */
+let lastTickY = -1;
+
+/** @type {(() => void)|null} */
+let tickerListener = null;
+
 /**
- * Subscribe to a single shared rAF loop driven by scroll position.
+ * Subscribe to a shared frame callback driven by scroll position. Frames run
+ * only while the page is scrolling or resizing, never while it sits still.
  *
  * @param {(scrollY: number) => void} callback
  * @returns {() => void} Unsubscribe.
@@ -834,6 +841,7 @@ let tickerFrame = null;
 export function subscribeToTicker(callback) {
   tickerSubscribers.add(callback);
   startTicker();
+  requestTick(true);
 
   return () => {
     tickerSubscribers.delete(callback);
@@ -841,30 +849,58 @@ export function subscribeToTicker(callback) {
   };
 }
 
-/** @private */
-function startTicker() {
+/**
+ * @param {boolean} [force] Run even when the scroll position has not moved.
+ * @private
+ */
+function requestTick(force = false) {
+  if (force) lastTickY = -1;
   if (tickerFrame !== null) return;
-
-  const tick = () => {
-    const scrollY = window.scrollY;
-    for (const callback of tickerSubscribers) {
-      try {
-        callback(scrollY);
-      } catch (error) {
-        console.error('[Boost10] motion ticker subscriber failed.', error);
-      }
-    }
-    tickerFrame = requestAnimationFrame(tick);
-  };
-
   tickerFrame = requestAnimationFrame(tick);
 }
 
 /** @private */
-function stopTicker() {
-  if (tickerFrame === null) return;
-  cancelAnimationFrame(tickerFrame);
+function tick() {
   tickerFrame = null;
+  const scrollY = window.scrollY;
+  if (scrollY === lastTickY) return;
+  lastTickY = scrollY;
+
+  for (const callback of tickerSubscribers) {
+    try {
+      callback(scrollY);
+    } catch (error) {
+      console.error('[Boost10] motion ticker subscriber failed.', error);
+    }
+  }
+
+  // Momentum and smooth scrolling keep moving between events.
+  requestTick();
+}
+
+/** @private */
+function startTicker() {
+  if (tickerListener) return;
+
+  const onScroll = () => requestTick();
+  const onResize = () => requestTick(true);
+
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('resize', onResize, { passive: true });
+
+  tickerListener = () => {
+    window.removeEventListener('scroll', onScroll);
+    window.removeEventListener('resize', onResize);
+  };
+}
+
+/** @private */
+function stopTicker() {
+  tickerListener?.();
+  tickerListener = null;
+  if (tickerFrame !== null) cancelAnimationFrame(tickerFrame);
+  tickerFrame = null;
+  lastTickY = -1;
 }
 
 /* ==========================================================================

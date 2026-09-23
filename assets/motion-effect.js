@@ -6,7 +6,7 @@
  */
 
 import { BaseComponent, defineComponent } from '@theme/component';
-import { reveal, parallax, marquee, unsplitText, getPreset, motionEnabled, EASING } from '@theme/motion-engine';
+import { reveal, parallax, marquee, unsplitText, getPreset, motionEnabled, subscribeToTicker, EASING } from '@theme/motion-engine';
 
 /** Effects that run continuously rather than once on entry. */
 const CONTINUOUS = new Set(['parallax', 'marquee']);
@@ -185,27 +185,6 @@ export class MotionEffect extends BaseComponent {
     }
     if (this.hasAttribute('data-motion-split')) unsplitText(this);
   }
-
-  /* ------------------------------------------------------- theme editor -- ---- */
-
-  /**
-   * Replay when a merchant selects the section, so the effect they just chose is
-   * visible without a manual reload.
-   */
-  sectionSelected() {
-    if (!motionEnabled()) return;
-    this.replay();
-  }
-
-  /**
-   * A section re-render replaces the markup underneath this element, so the
-   * split spans and inline resting styles are gone and the effect has to be
-   * rebuilt from scratch.
-   */
-  sectionLoaded() {
-    if (!motionEnabled()) return;
-    this.replay();
-  }
 }
 
 defineComponent('motion-effect', MotionEffect);
@@ -219,13 +198,11 @@ export class ParallaxMedia extends BaseComponent {
   /** Transparent to refs for the same reason `MotionEffect` is. @type {boolean} */
   static refBoundary = false;
 
-  /** @type {number|null} */
-  #frame = null;
+  /** @type {(() => void)|null} */
+  #unsubscribe = null;
 
   /** @type {IntersectionObserver|null} */
   #observer = null;
-
-  #active = false;
 
   setup() {
     if (!motionEnabled()) {
@@ -261,23 +238,19 @@ export class ParallaxMedia extends BaseComponent {
     return Math.min(Math.abs(Number(this.dataset.speed) || 0.3), 0.5);
   }
 
-  /** @private */
+  /** Follow the scroll while on screen; the ticker is idle when the page is still. @private */
   #start() {
-    if (this.#active) return;
-    this.#active = true;
-    this.#tick();
+    this.#unsubscribe ??= subscribeToTicker(this.#tick);
   }
 
   /** @private */
   #stop() {
-    this.#active = false;
-    if (this.#frame !== null) cancelAnimationFrame(this.#frame);
-    this.#frame = null;
+    this.#unsubscribe?.();
+    this.#unsubscribe = null;
   }
 
   /** @private */
   #tick = () => {
-    if (!this.#active) return;
 
     const rect = this.getBoundingClientRect();
     const viewport = window.innerHeight;
@@ -286,8 +259,6 @@ export class ParallaxMedia extends BaseComponent {
     const offset = progress * this.speed * rect.height * -1;
 
     this.style.setProperty('--parallax-offset', `${offset.toFixed(2)}px`);
-
-    this.#frame = requestAnimationFrame(this.#tick);
   };
 }
 

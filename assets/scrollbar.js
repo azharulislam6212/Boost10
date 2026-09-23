@@ -5,7 +5,7 @@
  */
 
 import { BaseComponent, defineComponent } from '@theme/component';
-import { clamp, prefersReducedMotion, rafThrottle, setCssVar, announce, themeString } from '@theme/utilities';
+import { clamp, isDesignMode, prefersReducedMotion, rafThrottle, setCssVar, announce, themeString } from '@theme/utilities';
 
 /* ==========================================================================
    <smooth-scrollbar>
@@ -123,6 +123,8 @@ export class SmoothScrollbar extends BaseComponent {
    */
   #shouldSmooth() {
     if (prefersReducedMotion()) return false;
+    // The editor scrolls to the selected section itself; Lenis would fight it.
+    if (isDesignMode()) return false;
     if (this.dataset.enabled === 'false') return false;
     return true;
   }
