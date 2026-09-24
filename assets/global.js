@@ -156,6 +156,9 @@ export class StickyHeader extends BaseComponent {
    */
   #pinned = null;
 
+  /** The last `data-scrolled` state written; null forces the next write. @type {boolean|null} */
+  #scrolled = null;
+
   /** Scroll position past which the header pins; refreshed by `#measure()`. @type {number} */
   #pinPoint = 0;
 
@@ -174,7 +177,8 @@ export class StickyHeader extends BaseComponent {
     const announcement = document.querySelector('[data-announcement-bar]');
     if (announcement instanceof HTMLElement) this.#observer.observe(announcement);
 
-    this.#unsubscribe = subscribeToTicker(rafThrottle((scrollY) => this.#onScroll(scrollY)));
+    // The ticker already runs once per frame; throttling again left the header a frame behind.
+    this.#unsubscribe = subscribeToTicker((scrollY) => this.#onScroll(scrollY));
 
     this.#prime();
 
@@ -198,6 +202,7 @@ export class StickyHeader extends BaseComponent {
     this.setAttribute('data-priming', '');
 
     this.#lastScroll = Math.max(0, window.scrollY);
+    this.#scrolled = null;
     this.#onScroll(window.scrollY, true);
 
     requestAnimationFrame(() => {
@@ -297,17 +302,21 @@ export class StickyHeader extends BaseComponent {
     const mode = this.dataset.stickyMode || 'always';
     const scrolled = position > threshold;
 
-    this.toggleAttribute('data-scrolled', scrolled);
+    // Everything below depends only on `scrolled`, which flips once per crossing.
+    if (scrolled !== this.#scrolled) {
+      this.#scrolled = scrolled;
+      this.toggleAttribute('data-scrolled', scrolled);
 
-    if (this.classList.contains('site-header--transparent')) {
-      this.toggleAttribute('data-transparent', !scrolled);
-    }
+      if (this.classList.contains('site-header--transparent')) {
+        this.toggleAttribute('data-transparent', !scrolled);
+      }
 
-    const scheme = this.dataset.stickyScheme;
-    const shell = this.querySelector('.site-header__shell');
+      const scheme = this.dataset.stickyScheme;
+      const shell = this.querySelector('.site-header__shell');
 
-    if (scheme && shell) {
-      shell.classList.toggle(scheme, scrolled);
+      if (scheme && shell) {
+        shell.classList.toggle(scheme, scrolled);
+      }
     }
 
     if (mode === 'scroll-down') {

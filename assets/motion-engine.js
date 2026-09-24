@@ -23,17 +23,24 @@ export const EASING = {
 };
 
 const DEFAULTS = {
-  duration: 700,
+  duration: 600,
   delay: 0,
-  stagger: 70,
+  stagger: 55,
   distance: 28,
-  threshold: 0.12,
-  rootMargin: '0px 0px -8% 0px',
+  threshold: 0.08,
+  rootMargin: '0px 0px -5% 0px',
   /** Cascade applied to elements already on screen when the page loads. */
-  loadStagger: 90,
+  loadStagger: 60,
   /** How long after navigation an intersection still counts as "on load". */
   loadWindow: 1200
 };
+
+/**
+ * Applied to preset durations and staggers, never to a value a merchant set.
+ * Presets were tuned long; content that takes most of a second to arrive is
+ * what makes a page feel slow to scroll through.
+ */
+const PRESET_PACE = 0.8;
 
 /* ==========================================================================
    Preset registry
@@ -433,9 +440,19 @@ const waitingOnFloor = new Set();
 /** @type {(() => void)|null} */
 let floorListener = null;
 
+/**
+ * Document height, kept current by a ResizeObserver so the scroll check never
+ * reads `scrollHeight` — a forced layout — mid-frame.
+ *
+ * @type {number}
+ */
+let documentHeight = 0;
+
+/** @type {ResizeObserver|null} */
+let documentHeightObserver = null;
+
 function checkScrollFloor() {
-  const doc = document.documentElement;
-  const atEnd = window.innerHeight + window.scrollY >= doc.scrollHeight - 2;
+  const atEnd = window.innerHeight + window.scrollY >= documentHeight - 2;
   if (!atEnd) return;
 
   for (const item of [...waitingOnFloor]) {
@@ -463,9 +480,18 @@ function startFloorListener() {
     });
   };
 
+  documentHeight = document.documentElement.scrollHeight;
+  documentHeightObserver = new ResizeObserver(() => {
+    documentHeight = document.documentElement.scrollHeight;
+    onScroll();
+  });
+  documentHeightObserver.observe(document.body ?? document.documentElement);
+
   window.addEventListener('scroll', onScroll, { passive: true });
   window.addEventListener('resize', onScroll, { passive: true });
   floorListener = () => {
+    documentHeightObserver?.disconnect();
+    documentHeightObserver = null;
     window.removeEventListener('scroll', onScroll);
     window.removeEventListener('resize', onScroll);
   };
@@ -623,14 +649,15 @@ export function reveal(element, options = {}) {
   const order = preset.random ? shuffledIndices(targets.length) : null;
 
   const play = (fromLoad) => {
-    const stagger = options.stagger ?? preset.stagger ?? (targets.length > 1 ? DEFAULTS.stagger : 0);
+    const stagger =
+      options.stagger ?? (preset.stagger ? preset.stagger * PRESET_PACE : targets.length > 1 ? DEFAULTS.stagger : 0);
     const baseDelay = (options.delay ?? DEFAULTS.delay) + (fromLoad ? loadCascadeDelay(options) : 0);
 
     targets.forEach((target, index) => {
       const position = order ? order[index] : index;
 
       const animation = animate(target, keyframes, {
-        duration: options.duration ?? preset.duration ?? DEFAULTS.duration,
+        duration: options.duration ?? (preset.duration ? preset.duration * PRESET_PACE : DEFAULTS.duration),
         delay: baseDelay + position * stagger,
         easing: options.easing ?? preset.easing ?? EASING.outExpo
       });
@@ -954,7 +981,21 @@ export function parallax(element, { speed = 0.2, axis = 'y', max = 120 } = {}) {
   measure();
   element.style.setProperty('will-change', 'transform');
 
-  const unsubscribe = subscribeToTicker(update);
+  // Follow the scroll only while the element is near the viewport; off screen
+  // there is nothing to see and the frame budget belongs to what is.
+  let unsubscribe = null;
+  const visibility = new IntersectionObserver(
+    ([entry]) => {
+      if (entry?.isIntersecting) {
+        unsubscribe ??= subscribeToTicker(update);
+      } else {
+        unsubscribe?.();
+        unsubscribe = null;
+      }
+    },
+    { rootMargin: '200px 0px' }
+  );
+  visibility.observe(element.parentElement ?? element);
 
   const resizeObserver = new ResizeObserver(remeasure);
   resizeObserver.observe(element);
@@ -962,7 +1003,9 @@ export function parallax(element, { speed = 0.2, axis = 'y', max = 120 } = {}) {
 
   return {
     destroy() {
-      unsubscribe();
+      unsubscribe?.();
+      unsubscribe = null;
+      visibility.disconnect();
       resizeObserver.disconnect();
       window.removeEventListener('resize', remeasure);
       element.style.removeProperty('transform');

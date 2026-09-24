@@ -935,7 +935,10 @@ export function labelTarget(button) {
  */
 export function setCssVar(name, value, target = document.documentElement) {
   const property = name.startsWith('--') ? name : `--${name}`;
-  target.style.setProperty(property, String(value));
+  const next = String(value);
+  // An unchanged write still invalidates styles; on <html> that is every element.
+  if (target.style.getPropertyValue(property) === next) return;
+  target.style.setProperty(property, next);
 }
 
 /**

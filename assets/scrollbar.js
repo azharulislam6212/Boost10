@@ -5,7 +5,7 @@
  */
 
 import { BaseComponent, defineComponent } from '@theme/component';
-import { clamp, isDesignMode, prefersReducedMotion, rafThrottle, setCssVar, announce, themeString } from '@theme/utilities';
+import { clamp, isDesignMode, prefersReducedMotion, rafThrottle, announce, themeString } from '@theme/utilities';
 
 /* ==========================================================================
    <smooth-scrollbar>
@@ -23,6 +23,12 @@ export class SmoothScrollbar extends BaseComponent {
 
   /** @type {(() => void)|null} */
   #unsubscribe = null;
+
+  /** @type {(() => void)|null} */
+  #unsubscribeWake = null;
+
+  /** Consecutive frames Lenis has sat still; the loop sleeps once this runs out. */
+  #idleFrames = 0;
 
   /**
    * The back-to-top control, looked up once.
@@ -53,6 +59,8 @@ export class SmoothScrollbar extends BaseComponent {
     this.#stopLoop();
     this.#unsubscribe?.();
     this.#unsubscribe = null;
+    this.#unsubscribeWake?.();
+    this.#unsubscribeWake = null;
     this.#lenis?.destroy();
     this.#lenis = null;
   }
@@ -67,6 +75,7 @@ export class SmoothScrollbar extends BaseComponent {
   /** Resume smoothing from the page's current position. */
   start() {
     this.#lenis?.start();
+    this.#startLoop();
   }
 
   /**
@@ -106,6 +115,7 @@ export class SmoothScrollbar extends BaseComponent {
         lock: false,
         force: true
       });
+      this.#startLoop();
       return;
     }
 
@@ -161,6 +171,9 @@ export class SmoothScrollbar extends BaseComponent {
     });
 
     this.#unsubscribe = this.#lenis.on?.('scroll', this.#onLenisScroll) ?? null;
+    // Wheel and touch input arrive here before Lenis starts animating, so a
+    // sleeping loop wakes in time to draw the first frame of the scroll.
+    this.#unsubscribeWake = this.#lenis.on?.('virtual-scroll', () => this.#startLoop()) ?? null;
     this.#adoptRestoredScroll();
     this.#startLoop();
   }
@@ -193,12 +206,36 @@ export class SmoothScrollbar extends BaseComponent {
     }
   }
 
-  /** @private */
+  /**
+   * Drive Lenis only while it is animating. A loop that never sleeps keeps the
+   * main thread busy on a page nobody is scrolling.
+   *
+   * @private
+   */
   #startLoop() {
-    if (this.#frame !== null) return;
+    this.#idleFrames = 0;
+    if (this.#frame !== null || !this.#lenis) return;
+
+    // Lenis times each step from its previous timestamp; after a sleep that gap
+    // is seconds long and the first frame would jump straight to the target.
+    this.#lenis.time = performance.now() - 1000 / 60;
 
     const tick = (time) => {
-      this.#lenis?.raf(time);
+      const lenis = this.#lenis;
+      if (!lenis) {
+        this.#frame = null;
+        return;
+      }
+
+      lenis.raf(time);
+
+      if (lenis.animate?.isRunning) {
+        this.#idleFrames = 0;
+      } else if (++this.#idleFrames > 10) {
+        this.#frame = null;
+        return;
+      }
+
       this.#frame = requestAnimationFrame(tick);
     };
 
@@ -241,8 +278,9 @@ export class SmoothScrollbar extends BaseComponent {
    * @private
    */
   #publishProgress(progress, scrollY) {
-    setCssVar('--scroll-progress', clamp(progress, 0, 1).toFixed(4));
-
+    // Written on the back-to-top control only: a custom property on <html> is
+    // inherited by every element, so writing it there each frame restyled the
+    // whole document for the length of every scroll.
     if (this.#backToTop === undefined) this.#backToTop = document.querySelector('scroll-to-top');
     this.#backToTop?.updateFromScroll?.(scrollY, progress);
   }
@@ -296,7 +334,8 @@ export class ScrollToTop extends BaseComponent {
     const threshold = Number(this.dataset.offset) || 400;
     const shouldShow = scrollY > threshold;
 
-    if (Number.isFinite(progress)) {
+    // The ring is only drawn while the control is on screen.
+    if (shouldShow && Number.isFinite(progress)) {
       this.style.setProperty('--scroll-progress', String(clamp(progress, 0, 1)));
     }
 

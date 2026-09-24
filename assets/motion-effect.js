@@ -7,9 +7,26 @@
 
 import { BaseComponent, defineComponent } from '@theme/component';
 import { reveal, parallax, marquee, unsplitText, getPreset, motionEnabled, subscribeToTicker, EASING } from '@theme/motion-engine';
+import { isDesignMode } from '@theme/utilities';
 
 /** Effects that run continuously rather than once on entry. */
 const CONTINUOUS = new Set(['parallax', 'marquee']);
+
+/**
+ * True once the Theme Editor preview has finished its first load. Anything that
+ * connects after that is a section the editor re-rendered.
+ *
+ * @type {boolean}
+ */
+let editorReady = false;
+
+if (isDesignMode()) {
+  if (document.readyState === 'complete') {
+    editorReady = true;
+  } else {
+    window.addEventListener('load', () => (editorReady = true), { once: true });
+  }
+}
 
 export class MotionEffect extends BaseComponent {
   /**
@@ -26,6 +43,9 @@ export class MotionEffect extends BaseComponent {
 
   /** @type {{ destroy: () => void }|null} */
   #instance = null;
+
+  /** True inside `replay()`, which always animates. @type {boolean} */
+  #replaying = false;
 
   /* ------------------------------------------------------------ lifecycle ---- */
 
@@ -44,6 +64,15 @@ export class MotionEffect extends BaseComponent {
       return;
     }
 
+    // The editor re-renders a section on every setting change. Replaying its
+    // entrance from invisible each time made every edit feel like a slow reload,
+    // so content that arrives after the preview has loaded simply appears.
+    if (editorReady && !this.#replaying) {
+      this.removeAttribute('data-motion-pending');
+      this.setAttribute('data-motion-revealed', '');
+      return;
+    }
+
     this.#setupReveal(effect);
   }
 
@@ -57,7 +86,9 @@ export class MotionEffect extends BaseComponent {
   replay() {
     this.removeAttribute('data-motion-revealed');
     for (const target of this.#targets()) target.removeAttribute('data-motion-revealed');
+    this.#replaying = true;
     this.setup();
+    this.#replaying = false;
   }
 
   /* ------------------------------------------------------------ effects -- ---- */
@@ -204,11 +235,29 @@ export class ParallaxMedia extends BaseComponent {
   /** @type {IntersectionObserver|null} */
   #observer = null;
 
+  /** @type {ResizeObserver|null} */
+  #resizeObserver = null;
+
+  /**
+   * Untransformed centre in document coordinates and rendered height, read once
+   * and reused so a scroll frame never has to ask the browser for layout.
+   *
+   * @type {{ centre: number, height: number }|null}
+   */
+  #geometry = null;
+
+  /** The offset last written, in pixels. @type {number} */
+  #offset = 0;
+
   setup() {
     if (!motionEnabled()) {
       this.dataset.parallax = 'off';
       return;
     }
+
+    this.#resizeObserver = new ResizeObserver(this.#invalidate);
+    this.#resizeObserver.observe(this);
+    this.on(window, 'resize', this.#invalidate, { passive: true });
 
     this.#observer = new IntersectionObserver(
       (entries) => {
@@ -227,6 +276,9 @@ export class ParallaxMedia extends BaseComponent {
     this.#stop();
     this.#observer?.disconnect();
     this.#observer = null;
+    this.#resizeObserver?.disconnect();
+    this.#resizeObserver = null;
+    this.#geometry = null;
   }
 
   /**
@@ -250,14 +302,35 @@ export class ParallaxMedia extends BaseComponent {
   }
 
   /** @private */
-  #tick = () => {
+  #invalidate = () => {
+    this.#geometry = null;
+  };
 
+  /** @private */
+  #measure() {
     const rect = this.getBoundingClientRect();
+    // The layer is translated by its own offset; take it back out so the centre
+    // is where layout put it. Scaling is about the centre and does not move it.
+    this.#geometry = {
+      centre: rect.top + rect.height / 2 + window.scrollY - this.#offset,
+      height: rect.height
+    };
+  }
+
+  /** @private */
+  #tick = (scrollY = window.scrollY) => {
+    if (!this.#geometry) this.#measure();
+    const { centre, height } = /** @type {{ centre: number, height: number }} */ (this.#geometry);
+
     const viewport = window.innerHeight;
+    const strength = this.speed * height;
 
-    const progress = (rect.top + rect.height / 2 - viewport / 2) / viewport;
-    const offset = progress * this.speed * rect.height * -1;
+    // The resting point of the old read-every-frame loop, whose measured centre
+    // included the offset it had just written: solved once instead of chased.
+    const distance = centre - scrollY - viewport / 2;
+    const offset = (-distance * strength) / (viewport + strength);
 
+    this.#offset = offset;
     this.style.setProperty('--parallax-offset', `${offset.toFixed(2)}px`);
   };
 }

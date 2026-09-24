@@ -186,6 +186,12 @@ export class CarouselSlider extends BaseComponent {
   /** @type {number|undefined} */
   #autoplayTimer;
 
+  /** @type {IntersectionObserver|null} */
+  #visibility = null;
+
+  /** True while the carousel is scrolled out of view; autoplay waits. */
+  #offscreen = false;
+
   /** @type {number|undefined} */
   #frame;
 
@@ -247,6 +253,9 @@ export class CarouselSlider extends BaseComponent {
   teardown() {
     this.#mutations?.disconnect();
     this.#mutations = null;
+    this.#visibility?.disconnect();
+    this.#visibility = null;
+    this.#offscreen = false;
     this.#stop();
   }
 
@@ -1237,6 +1246,17 @@ export class CarouselSlider extends BaseComponent {
         if (document.hidden) this.#pauseAutoplay();
         else this.#playAutoplay();
       });
+
+      // Slides changing off screen still cost frames while the page scrolls.
+      this.#visibility = new IntersectionObserver(([entry]) => {
+        if (!entry) return;
+        const offscreen = !entry.isIntersecting;
+        if (offscreen === this.#offscreen) return;
+        this.#offscreen = offscreen;
+        if (offscreen) this.#pauseAutoplay();
+        else this.#playAutoplay();
+      });
+      this.#visibility.observe(this);
     }
   }
 
@@ -1496,7 +1516,7 @@ export class CarouselSlider extends BaseComponent {
     if (pause) pause.hidden = !available;
     if (!available) return;
 
-    if (!this.running || this.#interacted || document.hidden) return;
+    if (!this.running || this.#interacted || document.hidden || this.#offscreen) return;
     if (this.hasAttribute('data-locked')) return;
 
     clearTimeout(this.#autoplayTimer);
