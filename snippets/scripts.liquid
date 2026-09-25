@@ -30,9 +30,120 @@
 {%- capture text_direction -%}{% render 'text-direction' %}{%- endcapture -%}
 {%- assign text_direction = text_direction | strip -%}
 
-<script>
-  if ('scrollRestoration' in history) history.scrollRestoration = 'auto';
-</script>
+{%- if request.design_mode -%}
+  <script>
+    if ('scrollRestoration' in history) history.scrollRestoration = 'auto';
+  </script>
+{%- else -%}
+  <script>
+    // Scroll restoration, done by hand. The browser can only restore a position
+    // once the page is tall enough to reach it, so a reload from the footer
+    // painted the first section and then jumped. Instead the section at the top
+    // of the screen is remembered, the page stays hidden until it is back in
+    // place, and it is held there while images and late content load above it.
+    (function () {
+      var KEY = 'boost10:scroll';
+      var here = location.pathname + location.search;
+
+      function sections() {
+        return document.querySelectorAll('.shopify-section');
+      }
+
+      window.addEventListener('pagehide', function () {
+        var y = window.scrollY;
+        var entry = { url: here, y: y, id: null, offset: 0 };
+        var list = sections();
+        for (var i = 0; i < list.length; i++) {
+          var rect = list[i].getBoundingClientRect();
+          if (rect.bottom > 0 && list[i].id) {
+            entry.id = list[i].id;
+            entry.offset = rect.top;
+            break;
+          }
+        }
+        try { sessionStorage.setItem(KEY, JSON.stringify(entry)); } catch (e) {}
+      });
+
+      if (!('scrollRestoration' in history)) return;
+      history.scrollRestoration = 'manual';
+
+      var saved = null;
+      try { saved = JSON.parse(sessionStorage.getItem(KEY)); } catch (e) {}
+
+      var nav = performance.getEntriesByType ? performance.getEntriesByType('navigation')[0] : null;
+      var type = nav ? nav.type : '';
+
+      if (!saved || saved.url !== here || !(saved.y > 0) || location.hash) return;
+      if (type !== 'reload' && type !== 'back_forward') return;
+
+      var root = document.documentElement;
+      var holding = true;
+      root.setAttribute('data-scroll-restoring', '');
+
+      function target() {
+        var anchor = saved.id ? document.getElementById(saved.id) : null;
+        if (!anchor) return null;
+        return anchor.getBoundingClientRect().top + window.scrollY - saved.offset;
+      }
+
+      function show() {
+        if (!root.hasAttribute('data-scroll-restoring')) return;
+        root.removeAttribute('data-scroll-restoring');
+        document.dispatchEvent(new CustomEvent('theme:scroll-restored'));
+      }
+
+      // Returns true once the page sits where it was left.
+      function place() {
+        var top = target();
+        if (top === null) return false;
+        top = Math.max(0, top);
+        if (Math.abs(window.scrollY - top) > 1) window.scrollTo({ top: top, behavior: 'instant' });
+        return Math.abs(window.scrollY - top) <= 1;
+      }
+
+      function release() {
+        holding = false;
+        show();
+      }
+
+      // Parsing: try every frame until the section exists and can be reached.
+      (function early() {
+        if (!holding) return;
+        if (place()) show();
+        if (document.readyState === 'loading') requestAnimationFrame(early);
+      })();
+
+      document.addEventListener('DOMContentLoaded', function () {
+        if (!holding) return;
+        place();
+        show();
+
+        // Content keeps changing height as images and sections load; stay on the
+        // section until the page settles or the customer takes over.
+        if (window.ResizeObserver) {
+          var observer = new ResizeObserver(function () { if (holding) place(); });
+          observer.observe(document.body);
+        }
+
+        window.addEventListener('load', function () {
+          place();
+          setTimeout(function () {
+            if (holding) place();
+            holding = false;
+            if (observer) observer.disconnect();
+          }, 800);
+        }, { once: true });
+      });
+
+      ['wheel', 'touchstart', 'keydown', 'mousedown'].forEach(function (name) {
+        window.addEventListener(name, release, { once: true, passive: true, capture: true });
+      });
+
+      // Never leave the page hidden, whatever else goes wrong.
+      setTimeout(show, 1500);
+    })();
+  </script>
+{%- endif -%}
 
 <script type="importmap">
   {

@@ -191,6 +191,9 @@ export class StickyHeader extends BaseComponent {
     });
 
     this.on(document, EVENTS.OVERLAY_OPEN, () => this.reveal());
+
+    // A restored reload lands mid-page; adopt it rather than animating in.
+    this.on(document, EVENTS.SCROLL_RESTORED, () => this.#prime());
   }
 
   /**

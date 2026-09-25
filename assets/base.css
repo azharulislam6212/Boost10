@@ -430,10 +430,10 @@
     min-block-size: 10rem;
   }
 
-  input:hover,
-  textarea:hover,
-  select:hover {
-    background-color: var(--color-input-hover-background);
+  :is(input:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file'], [type='submit'], [type='button']), textarea, select):focus {
+    border-color: var(--color-input-focus-border);
+    background-color: var(--color-input-focus-background);
+    color: var(--color-input-focus-text);
   }
 
   input::placeholder,
@@ -443,7 +443,9 @@
   }
 
   input[aria-invalid='true'],
-  textarea[aria-invalid='true'] {
+  textarea[aria-invalid='true'],
+  input[aria-invalid='true']:focus,
+  textarea[aria-invalid='true']:focus {
     border-color: var(--color-sale-price);
   }
 
@@ -822,9 +824,9 @@
     --button-hover-border: transparent;
 
     --button-badge-background: var(--button-background);
-    --button-badge-foreground: var(--button-border);
+    --button-badge-foreground: var(--button-foreground);
     --button-hover-badge-background: var(--button-hover-background);
-    --button-hover-badge-foreground: var(--button-hover-border);
+    --button-hover-badge-foreground: var(--button-hover-foreground);
 
     /* What fills the ring: the border colour on filled buttons, nothing on outline. */
     --button-ring: var(--button-border);
@@ -892,7 +894,7 @@
   /* ---- variants ----
      Filled buttons read the scheme as: background = the pill, text = its
      label, border = the ring around it. The badge takes the pill's colour
-     and the arrow the ring's, so it reads as a cut-out of the button. */
+     and the arrow the label colour. */
 
   .button--primary {
     --button-background: var(--color-primary-button-background);
@@ -924,8 +926,8 @@
     --button-hover-foreground: var(--color-primary-button-hover-outline);
     --button-hover-border: var(--color-primary-button-hover-outline);
     --button-badge-background: var(--color-primary-button-background);
-    --button-badge-foreground: var(--color-primary-button-outline);
-    --button-hover-badge-background: var(--color-primary-button-hover-outline);
+    --button-badge-foreground: var(--color-primary-button-text);
+    --button-hover-badge-background: var(--color-primary-button-hover-background);
     --button-hover-badge-foreground: var(--color-primary-button-hover-text);
   }
 
@@ -935,15 +937,15 @@
     --button-ring: transparent;
     --button-hover-ring: transparent;
     --button-background: transparent;
-    --button-foreground: var(--color-secondary-button-text);
+    --button-foreground: var(--color-secondary-button-outline);
     --button-border: var(--color-secondary-button-outline);
     --button-hover-background: transparent;
-    --button-hover-foreground: var(--color-secondary-button-hover-text);
+    --button-hover-foreground: var(--color-secondary-button-hover-outline);
     --button-hover-border: var(--color-secondary-button-hover-outline);
-    --button-badge-background: var(--color-secondary-button-outline);
-    --button-badge-foreground: var(--color-secondary-button-background);
-    --button-hover-badge-background: var(--color-secondary-button-hover-outline);
-    --button-hover-badge-foreground: var(--color-secondary-button-hover-background);
+    --button-badge-background: var(--color-secondary-button-background);
+    --button-badge-foreground: var(--color-secondary-button-text);
+    --button-hover-badge-background: var(--color-secondary-button-hover-background);
+    --button-hover-badge-foreground: var(--color-secondary-button-hover-text);
   }
 
   .button--custom {
@@ -974,10 +976,7 @@
     border-color: transparent;
     font-weight: 400;
     text-decoration: none;
-    background-image: linear-gradient(
-      color-mix(in srgb, currentColor 20%, transparent),
-      color-mix(in srgb, currentColor 20%, transparent)
-    );
+    background-image: linear-gradient(currentColor, currentColor);
     background-repeat: no-repeat;
     background-position: 0 100%;
     background-size: 100% var(--button-underline-size, 1px);
@@ -1343,18 +1342,25 @@
   button-swap .button.button--has-icon:not(.button--icon-solid):not(.button--icon-only):not(.button--link) .button__icon {
     inline-size: var(--button-icon-box);
     block-size: var(--button-icon-box);
-    color: var(--button-icon-foreground, var(--button-badge-background));
+    color: var(--button-icon-foreground, var(--button-badge-foreground));
   }
 
   button-swap .button.button--has-icon:not(.button--icon-solid):not(.button--icon-only):not(.button--link):is(:hover, :focus-visible) .button__icon {
-    color: var(--button-icon-foreground, var(--button-hover-badge-background));
+    color: var(--button-icon-foreground, var(--button-hover-badge-foreground));
   }
 
   button-swap .button--outline.button--has-icon:not(.button--icon-solid):not(.button--icon-only):not(.button--link) .button__icon,
-  button-swap .button--secondary-outline.button--has-icon:not(.button--icon-solid):not(.button--icon-only):not(.button--link) .button__icon,
-  button-swap .button--outline.button--has-icon:not(.button--icon-solid):not(.button--icon-only):not(.button--link):is(:hover, :focus-visible) .button__icon,
-  button-swap .button--secondary-outline.button--has-icon:not(.button--icon-solid):not(.button--icon-only):not(.button--link):is(:hover, :focus-visible) .button__icon {
+  button-swap .button--outline.button--has-icon:not(.button--icon-solid):not(.button--icon-only):not(.button--link):is(:hover, :focus-visible) .button__icon {
     color: inherit;
+  }
+
+  /* Secondary outline: the label takes the outline colour, the plain glyph keeps the label colour. */
+  .button--secondary-outline.button--has-icon:not(.button--icon-solid) .button__icon {
+    color: var(--button-icon-foreground, var(--button-badge-foreground));
+  }
+
+  .button--secondary-outline.button--has-icon:not(.button--icon-solid):is(:hover, :focus-visible) .button__icon {
+    color: var(--button-icon-foreground, var(--button-hover-badge-foreground));
   }
 
   /* ---- outline in the surround layout ---- */
@@ -1382,11 +1388,9 @@
     border-inline-start: var(--button-border-width) var(--button-border-style) var(--button-border);
   }
 
-  button-swap .button--outline:hover .button__label,
-  button-swap .button--outline:focus-visible .button__label,
-  button-swap .button--secondary-outline:hover .button__label,
-  button-swap .button--secondary-outline:focus-visible .button__label {
-    border-color: var(--button-hover-border);
+  /* Swap the variable, not border-color: the divider rules above outrank a hover selector. */
+  button-swap .button:is(.button--outline, .button--secondary-outline):is(:hover, :focus-visible) {
+    --button-border: var(--button-hover-border);
   }
 
   /* ---- the solid badge ----
