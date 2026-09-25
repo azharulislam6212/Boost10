@@ -80,8 +80,13 @@
   assign column_name = s.name | default: ''
 
   assign alternative = 1
+  assign own_options = s.options | strip
   if is_chooser
-    assign alternatives = section.settings.alternatives | strip | newline_to_br | split: '<br />'
+    if own_options != blank
+      assign alternatives = own_options | newline_to_br | split: '<br />'
+    else
+      assign alternatives = section.settings.alternatives | strip | newline_to_br | split: '<br />'
+    endif
     assign alternative = s.alternative | default: 1 | plus: 0
     if alternative > alternatives.size
       assign alternative = alternatives.size
@@ -140,6 +145,7 @@
   data-comparison-column
   data-comparison-role="{{ role }}"
   {%- if is_chooser %} data-comparison-alternative="{{ alternative }}"{% endif %}
+  {%- if is_chooser and own_options != blank %} data-comparison-options="[{% for name in alternatives %}{% unless forloop.first %},{% endunless %}{{ name | strip | json | escape }}{% endfor %}]"{% endif %}
   {%- if column_name != blank %} data-comparison-name="{{ column_name | escape }}"{% endif %}
   {%- if column_name != blank %} role="group" aria-label="{{ column_name | escape }}"{% endif %}
   style="{{ column_style | strip_newlines | strip }}"
@@ -148,28 +154,30 @@
   {%- if has_head -%}
     <div class="comparison-column__head">
       {%- if is_chooser -%}
-        <button
-          type="button"
-          class="comparison-choose__trigger"
-          data-comparison-trigger
-          aria-haspopup="listbox"
-          aria-expanded="false"
-          aria-disabled="true"
-        >
-          <span class="comparison-choose__name" data-comparison-trigger-label>
-            {%- if column_name != blank -%}{{ column_name | escape }}{%- else -%}{{ 'sections.comparison_table.alternative' | t }}{%- endif -%}
-          </span>
-          {% render 'icon', icon: 'chevron-down', class: 'comparison-choose__chevron', size: chevron_px %}
-        </button>
+        <div class="comparison-choose">
+          <button
+            type="button"
+            class="comparison-choose__trigger"
+            data-comparison-trigger
+            aria-haspopup="listbox"
+            aria-expanded="false"
+            aria-disabled="true"
+          >
+            <span class="comparison-choose__name" data-comparison-trigger-label>
+              {%- if column_name != blank -%}{{ column_name | escape }}{%- else -%}{{ 'sections.comparison_table.alternative' | t }}{%- endif -%}
+            </span>
+            {% render 'icon', icon: 'chevron-down', class: 'comparison-choose__chevron', size: chevron_px %}
+          </button>
 
-        <div
-          class="comparison-choose__panel"
-          data-comparison-panel
-          role="listbox"
-          tabindex="-1"
-          aria-label="{% if column_name != blank %}{{ column_name | escape }}{% else %}{{ 'sections.comparison_table.alternative' | t | escape }}{% endif %}"
-          hidden
-        ></div>
+          <div
+            class="comparison-choose__panel"
+            data-comparison-panel
+            role="listbox"
+            tabindex="-1"
+            aria-label="{% if column_name != blank %}{{ column_name | escape }}{% else %}{{ 'sections.comparison_table.alternative' | t | escape }}{% endif %}"
+            hidden
+          ></div>
+        </div>
       {%- elsif show_logo -%}
         <div class="comparison-column__logo">
           {% render 'image',
@@ -239,6 +247,13 @@
       "max": 8,
       "step": 1,
       "default": 1,
+      "visible_if": "{{ block.settings.role == 'product' }}"
+    },
+    {
+      "type": "textarea",
+      "id": "options",
+      "label": "t:sections.comparison_table.settings.alternatives.label",
+      "info": "t:blocks.comparison_column.settings.options.info",
       "visible_if": "{{ block.settings.role == 'product' }}"
     },
     {

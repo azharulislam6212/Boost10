@@ -22,12 +22,23 @@ export class ComparisonTable extends BaseComponent {
   /** @type {HTMLElement|null} */
   #features = null;
 
-  /** Every alternative the chooser offers, in the order the section lists them. @type {string[]} */
+  /** The section's shared list, used by every chooser without its own. @type {string[]} */
   #alternatives = [];
 
+  /** Each chooser's options, one list per entry in `#choosers`. @type {string[][]} */
+  #lists = [];
+
   /**
-   * Which alternative each chooser column shows. One 1-based index per entry
-   * in `#choosers`, and no two entries ever hold the same one.
+   * Which list each chooser draws from. Choosers on the shared list never show
+   * the same option; one with its own list stands alone.
+   *
+   * @type {string[]}
+   */
+  #groups = [];
+
+  /**
+   * Which option each chooser column shows. One 1-based index per entry in
+   * `#choosers`, never repeated within a group.
    *
    * @type {number[]}
    */
@@ -68,7 +79,7 @@ export class ComparisonTable extends BaseComponent {
         const position = this.#choosers.indexOf(column);
         if (position === -1) return;
 
-        this.#choice[position] = this.#published(column);
+        this.#choice[position] = this.#published(position);
         this.#settle(position);
         this.#apply();
       });
@@ -89,15 +100,25 @@ export class ComparisonTable extends BaseComponent {
     this.#features = this.#columns.find((column) => column.dataset.comparisonRole === 'features') ?? null;
     this.#choosers = this.#columns.filter((column) => column.dataset.comparisonRole === 'product');
 
-    this.#alternatives = this.#readAlternatives();
+    this.#alternatives = this.#parseList(this.dataset.comparisonAlternatives);
 
-    this.#choice = this.#choosers.map((column) => this.#published(column));
+    this.#lists = this.#choosers.map((column) => {
+      const own = this.#parseList(column.dataset.comparisonOptions);
+      return own.length > 0 ? own : this.#alternatives;
+    });
+    this.#groups = this.#choosers.map((column, position) =>
+      this.#lists[position] === this.#alternatives ? 'shared' : `own-${position}`
+    );
+
+    this.#choice = this.#choosers.map((_, position) => this.#published(position));
     for (let position = 0; position < this.#choice.length; position += 1) this.#settle(position);
   }
 
-  /** @returns {string[]} */
-  #readAlternatives() {
-    const raw = this.dataset.comparisonAlternatives;
+  /**
+   * @param {string|undefined} raw A JSON array of names.
+   * @returns {string[]}
+   */
+  #parseList(raw) {
     if (!raw) return [];
 
     try {
@@ -110,41 +131,52 @@ export class ComparisonTable extends BaseComponent {
   }
 
   /**
-   * The alternative a column was rendered on, clamped to the list.
+   * The option a chooser was rendered on, clamped to its list.
    *
-   * @param {HTMLElement} column
+   * @param {number} position Index into `#choosers`.
    * @returns {number}
    */
-  #published(column) {
-    const index = Number(column.dataset.comparisonAlternative ?? 1);
+  #published(position) {
+    const index = Number(this.#choosers[position]?.dataset.comparisonAlternative ?? 1);
     if (!Number.isFinite(index)) return 1;
-    return Math.min(Math.max(Math.round(index), 1), Math.max(this.#count(), 1));
+    return Math.min(Math.max(Math.round(index), 1), Math.max(this.#count(position), 1));
   }
 
-  /** How many alternatives there are to choose between. @returns {number} */
-  #count() {
-    if (this.#alternatives.length > 0) return this.#alternatives.length;
+  /**
+   * How many options a chooser offers. Without a list, the most values any
+   * cell in its group holds.
+   *
+   * @param {number} position Index into `#choosers`.
+   * @returns {number}
+   */
+  #count(position) {
+    const list = this.#lists[position] ?? [];
+    if (list.length > 0) return list.length;
 
     let most = 1;
-    for (const column of this.#choosers) {
+    this.#choosers.forEach((column, index) => {
+      if (this.#groups[index] !== this.#groups[position]) return;
       for (const cell of column.querySelectorAll(':scope > [data-comparison-cell]')) {
         most = Math.max(most, cell.querySelectorAll(':scope > [data-comparison-value]').length);
       }
-    }
+    });
     return most;
   }
 
   /**
-   * Moves the chooser at `position` off any alternative another one already
-   * shows, so the columns beside each other never repeat a value.
+   * Moves the chooser at `position` off any option another chooser in its
+   * group already shows, so the columns beside each other never repeat one.
    *
    * @param {number} position
    */
   #settle(position) {
-    const total = Math.max(this.#count(), 1);
+    const total = Math.max(this.#count(position), 1);
 
     for (let step = 0; step < total; step += 1) {
-      const taken = this.#choice.some((value, index) => index !== position && value === this.#choice[position]);
+      const taken = this.#choice.some(
+        (value, index) =>
+          index !== position && this.#groups[index] === this.#groups[position] && value === this.#choice[position]
+      );
       if (!taken) return;
       this.#choice[position] = (this.#choice[position] % total) + 1;
     }
@@ -189,7 +221,7 @@ export class ComparisonTable extends BaseComponent {
       const chosen = this.#choice[position];
       column.dataset.comparisonAlternative = String(chosen);
 
-      const name = this.#nameOf(chosen);
+      const name = this.#nameOf(position, chosen);
       if (name) column.dataset.comparisonName = name;
 
       const label = column.querySelector('[data-comparison-trigger-label]');
@@ -222,11 +254,11 @@ export class ComparisonTable extends BaseComponent {
     trigger.setAttribute('aria-controls', panelId);
     trigger.removeAttribute('aria-disabled');
 
-    const total = this.#count();
+    const total = this.#count(position);
     const options = [];
 
     for (let index = 1; index <= total; index += 1) {
-      const name = this.#nameOf(index);
+      const name = this.#nameOf(position, index);
       if (!name) continue;
 
       const option = document.createElement('div');
@@ -243,11 +275,12 @@ export class ComparisonTable extends BaseComponent {
   }
 
   /**
+   * @param {number} position Index into `#choosers`.
    * @param {number} index 1-based.
    * @returns {string}
    */
-  #nameOf(index) {
-    return this.#alternatives[index - 1] ?? '';
+  #nameOf(position, index) {
+    return this.#lists[position]?.[index - 1] ?? '';
   }
 
   /** @param {Event} event */
@@ -276,17 +309,19 @@ export class ComparisonTable extends BaseComponent {
   };
 
   /**
-   * Puts the chosen alternative in this column. A column already showing it
-   * takes this one's place, so the two never read the same.
+   * Puts the chosen option in this column. A chooser in the same group already
+   * showing it takes this one's place, so the two never read the same.
    *
    * @param {HTMLElement} column The column whose chooser was used.
-   * @param {number} index 1-based index into the alternatives.
+   * @param {number} index 1-based index into this chooser's list.
    */
   #choose(column, index) {
     const here = this.#choosers.indexOf(column);
     if (here === -1 || !Number.isFinite(index)) return;
 
-    const there = this.#choice.indexOf(index);
+    const there = this.#choice.findIndex(
+      (value, position) => position !== here && this.#groups[position] === this.#groups[here] && value === index
+    );
     if (there !== -1) this.#choice[there] = this.#choice[here];
     this.#choice[here] = index;
 
