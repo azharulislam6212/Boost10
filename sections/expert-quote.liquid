@@ -51,8 +51,12 @@
   assign r_bl_m = s.border_radius_bottom_left_mobile | default: r_bl | plus: 0
   assign r_br_m = s.border_radius_bottom_right_mobile | default: r_br | plus: 0
 
-  assign margin_top = s.margin_top | default: 0 | plus: 0
-  assign margin_bottom = s.margin_bottom | default: 0 | plus: 0
+  assign overlap = 0
+  assign overlap_mobile = 0
+  if s.stack_layer == 'over'
+    assign overlap = r_tl | at_least: r_tr
+    assign overlap_mobile = r_tl_m | at_least: r_tr_m
+  endif
 
   assign gap_x = s.gap_horizontal | default: 24 | plus: 0
   assign gap_y = s.gap_vertical | default: 24 | plus: 0
@@ -75,8 +79,8 @@
   {%- render 'spacing', section: s, declarations: true -%}
   --expert-quote-radius: {{ r_tl }}px {{ r_tr }}px {{ r_br }}px {{ r_bl }}px;
   --expert-quote-radius-mobile: {{ r_tl_m }}px {{ r_tr_m }}px {{ r_br_m }}px {{ r_bl_m }}px;
-  --expert-quote-margin-block-start: {{ margin_top }}px;
-  --expert-quote-margin-block-end: {{ margin_bottom }}px;
+  --section-overlap: {{ overlap }}px;
+  --section-overlap-mobile: {{ overlap_mobile }}px;
   --expert-quote-gap-x: {{ gap_x }}px;
   --expert-quote-gap-y: {{ gap_y }}px;
   --expert-quote-gap-x-mobile: {{ gap_x_mobile }}px;
@@ -306,8 +310,7 @@
       "type": "color_background",
       "id": "background_color",
       "label": "t:shared.background.color.label",
-      "info": "t:shared.background.color.info",
-      "default": "linear-gradient(90deg, #E5F1EE 0%, #FBFDFC 20%, #FBFDFC 40%, #F4F9F8 60%, #EDF5F3 80%, #E5F1EE 100%)"
+      "info": "t:shared.background.color.info"
     },
     {
       "type": "image_picker",
@@ -383,30 +386,6 @@
       "id": "video_poster",
       "label": "t:shared.background.video_poster.label",
       "info": "t:shared.background.video_poster.info",
-      "visible_if": "{{ section.settings.background_media == 'video' }}"
-    },
-    {
-      "type": "select",
-      "id": "video_position",
-      "label": "t:shared.background.video_position.label",
-      "options": [
-        {
-          "value": "cover",
-          "label": "t:shared.background.video_position.options__1.label"
-        },
-        {
-          "value": "contain",
-          "label": "t:shared.background.video_position.options__2.label"
-        }
-      ],
-      "default": "cover",
-      "visible_if": "{{ section.settings.background_media == 'video' }}"
-    },
-    {
-      "type": "checkbox",
-      "id": "video_loop",
-      "label": "t:shared.background.video_loop.label",
-      "default": true,
       "visible_if": "{{ section.settings.background_media == 'video' }}"
     },
     {
@@ -726,28 +705,6 @@
       "default": "fade-up"
     },
     {
-      "type": "range",
-      "id": "animation_duration",
-      "label": "t:shared.animation.animation_duration.label",
-      "info": "t:shared.animation.animation_duration.info",
-      "min": 0,
-      "max": 2000,
-      "step": 100,
-      "unit": "ms",
-      "default": 1000
-    },
-    {
-      "type": "range",
-      "id": "animation_stagger",
-      "label": "t:shared.animation.animation_stagger.label",
-      "info": "t:shared.animation.animation_stagger.info",
-      "min": 0,
-      "max": 300,
-      "step": 10,
-      "unit": "ms",
-      "default": 90
-    },
-    {
       "type": "header",
       "content": "t:shared.spacing.section_header"
     },
@@ -816,28 +773,6 @@
       "visible_if": "{{ section.settings.padding_device == 'mobile' }}"
     },
     {
-      "type": "range",
-      "id": "margin_top",
-      "label": "t:shared.spacing.margin_top.label",
-      "info": "t:shared.spacing.margin_negative.info",
-      "min": -160,
-      "max": 160,
-      "step": 4,
-      "unit": "px",
-      "default": 0
-    },
-    {
-      "type": "range",
-      "id": "margin_bottom",
-      "label": "t:shared.spacing.margin_bottom.label",
-      "info": "t:shared.spacing.margin_negative.info",
-      "min": -160,
-      "max": 160,
-      "step": 4,
-      "unit": "px",
-      "default": 0
-    },
-    {
       "type": "select",
       "id": "stack_layer",
       "label": "t:shared.spacing.stack_layer.label",
@@ -872,10 +807,8 @@
         "gap_vertical_mobile": 12,
         "motion_distance": 18,
         "motion_duration": 4000,
-        "color_scheme": "scheme-1",
+        "color_scheme": "scheme-2",
         "animation_image": "fade-up",
-        "animation_duration": 1000,
-        "animation_stagger": 90,
         "padding_top": 100,
         "padding_bottom": 100,
         "padding_top_mobile": 56,
@@ -895,8 +828,7 @@
             "radius_mobile": 20,
             "ratio": "portrait",
             "motion_style": "float",
-            "motion_delay": 0,
-            "animation_delay": 0
+            "motion_delay": 0
           }
         },
         {
@@ -912,8 +844,7 @@
             "radius_mobile": 20,
             "ratio": "portrait",
             "motion_style": "orbit",
-            "motion_delay": 3200,
-            "animation_delay": 250
+            "motion_delay": 3200
           }
         }
       ]

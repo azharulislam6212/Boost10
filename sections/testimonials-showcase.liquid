@@ -51,8 +51,12 @@
   assign r_bl_m = s.border_radius_bottom_left_mobile | default: r_bl | plus: 0
   assign r_br_m = s.border_radius_bottom_right_mobile | default: r_br | plus: 0
 
-  assign margin_top = s.margin_top | default: 0 | plus: 0
-  assign margin_bottom = s.margin_bottom | default: 0 | plus: 0
+  assign overlap = 0
+  assign overlap_mobile = 0
+  if s.stack_layer == 'over'
+    assign overlap = r_tl | at_least: r_tr
+    assign overlap_mobile = r_tl_m | at_least: r_tr_m
+  endif
 
   assign gap_x = s.gap_horizontal | default: 56 | plus: 0
   assign gap_y = s.gap_vertical | default: 40 | plus: 0
@@ -123,7 +127,7 @@
 
   assign accent = s.accent_color | default: ''
 
-  assign lane_stagger = s.animation_stagger | default: 140 | plus: 0
+  assign lane_stagger = 140
 -%}
 
 {%- capture section_style -%}
@@ -148,8 +152,8 @@
   {%- endif -%}
   --showcase-radius: {{ r_tl }}px {{ r_tr }}px {{ r_br }}px {{ r_bl }}px;
   --showcase-radius-mobile: {{ r_tl_m }}px {{ r_tr_m }}px {{ r_br_m }}px {{ r_bl_m }}px;
-  --showcase-margin-block-start: {{ margin_top }}px;
-  --showcase-margin-block-end: {{ margin_bottom }}px;
+  --section-overlap: {{ overlap }}px;
+  --section-overlap-mobile: {{ overlap_mobile }}px;
   {%- if border_any > 0 -%}
     --showcase-border-width: {{ bw_top }}px {{ bw_right }}px {{ bw_bottom }}px {{ bw_left }}px;
     --showcase-border-style: {{ border_line }};
@@ -180,7 +184,7 @@
 
         <motion-effect
           class="showcase__intro"
-          {% render 'motion-attrs', kind: 'text', section: s, children: true %}
+          {% render 'motion-attrs', kind: 'text', section: s, children: true, duration: 900, stagger: lane_stagger %}
         >
           {%- if show_intro -%}
             {% content_for 'block', type: '_showcase-intro', id: 'showcase-intro' %}
@@ -198,6 +202,7 @@
            kind: 'image',
            section: s,
            target: '.showcase-lane',
+           duration: 900,
            stagger: lane_stagger %}
       >
         <testimonial-showcase
@@ -467,8 +472,7 @@
     {
       "type": "color_background",
       "id": "background_color",
-      "label": "t:shared.background.color.label",
-      "default": "linear-gradient(140deg, #14403C 0%, #0F2E2F 45%, #0B2324 100%)"
+      "label": "t:shared.background.color.label"
     },
     {
       "type": "image_picker",
@@ -719,37 +723,6 @@
       "default": "inherit"
     },
     {
-      "type": "range",
-      "id": "animation_duration",
-      "label": "t:shared.animation.animation_duration.label",
-      "min": 0,
-      "max": 2000,
-      "step": 50,
-      "unit": "ms",
-      "default": 900
-    },
-    {
-      "type": "range",
-      "id": "animation_delay",
-      "label": "t:shared.animation.animation_delay.label",
-      "min": 0,
-      "max": 2000,
-      "step": 50,
-      "unit": "ms",
-      "default": 0
-    },
-    {
-      "type": "range",
-      "id": "animation_stagger",
-      "label": "t:shared.animation.animation_stagger.label",
-      "info": "t:sections.feature_cards.settings.animation_stagger.info",
-      "min": 0,
-      "max": 400,
-      "step": 10,
-      "unit": "ms",
-      "default": 140
-    },
-    {
       "type": "header",
       "content": "t:sections.testimonials_showcase.headers.content_padding"
     },
@@ -896,28 +869,6 @@
       "visible_if": "{{ section.settings.device == 'mobile' }}"
     },
     {
-      "type": "range",
-      "id": "margin_top",
-      "label": "t:shared.spacing.margin_top.label",
-      "info": "t:shared.spacing.margin_negative.info",
-      "min": -160,
-      "max": 160,
-      "step": 4,
-      "unit": "px",
-      "default": 0
-    },
-    {
-      "type": "range",
-      "id": "margin_bottom",
-      "label": "t:shared.spacing.margin_bottom.label",
-      "info": "t:shared.spacing.margin_negative.info",
-      "min": -160,
-      "max": 160,
-      "step": 4,
-      "unit": "px",
-      "default": 0
-    },
-    {
       "type": "select",
       "id": "stack_layer",
       "label": "t:shared.spacing.stack_layer.label",
@@ -976,10 +927,7 @@
         "container_width": "standard",
         "color_scheme": "scheme-4",
         "accent_color": "#03D26F",
-        "background_color": "linear-gradient(295deg, #0F2E2F 0%, #154546 19%, #0F2E2F 33%, #0F2E2F 67%, #338060 100%)",
         "animation_image": "fade-up",
-        "animation_duration": 900,
-        "animation_stagger": 140,
         "content_padding_top": 80,
         "content_padding_bottom": 80,
         "content_padding_left": 0,

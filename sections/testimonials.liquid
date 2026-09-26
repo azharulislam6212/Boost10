@@ -64,8 +64,12 @@
   assign r_bl_m = s.border_radius_bottom_left_mobile | default: r_bl | plus: 0
   assign r_br_m = s.border_radius_bottom_right_mobile | default: r_br | plus: 0
 
-  assign margin_top = s.margin_top | default: 0 | plus: 0
-  assign margin_bottom = s.margin_bottom | default: 0 | plus: 0
+  assign overlap = 0
+  assign overlap_mobile = 0
+  if s.stack_layer == 'over'
+    assign overlap = r_tl | at_least: r_tr
+    assign overlap_mobile = r_tl_m | at_least: r_tr_m
+  endif
 
   assign show_intro = s.show_intro
   if show_intro == nil
@@ -171,7 +175,7 @@
   assign thumb_scale = s.thumb_hover_scale | default: 112 | plus: 0
   assign thumb_scale = thumb_scale | divided_by: 100.0
 
-  assign card_stagger = s.animation_stagger | default: 120 | plus: 0
+  assign card_stagger = 120
 
   assign accent = s.accent_color | default: ''
 
@@ -193,8 +197,8 @@
   --tc-row-gap: {{ row_gap }}px;
   --testimonials-radius: {{ r_tl }}px {{ r_tr }}px {{ r_br }}px {{ r_bl }}px;
   --testimonials-radius-mobile: {{ r_tl_m }}px {{ r_tr_m }}px {{ r_br_m }}px {{ r_bl_m }}px;
-  --testimonials-margin-block-start: {{ margin_top }}px;
-  --testimonials-margin-block-end: {{ margin_bottom }}px;
+  --section-overlap: {{ overlap }}px;
+  --section-overlap-mobile: {{ overlap_mobile }}px;
   --testimonials-controls-gap: {{ s.carousel_controls_gap | default: 40 | plus: 0 }}px;
   --tc-thumb-size: {{ thumb_size }}px;
   --tc-thumb-overhang: {{ thumb_overhang }}px;
@@ -237,7 +241,7 @@
 
     <motion-effect
       class="testimonials__header testimonials__header--{{ s.alignment | default: 'center' }}"
-      {% render 'motion-attrs', kind: 'text', section: s, children: true %}
+      {% render 'motion-attrs', kind: 'text', section: s, children: true, duration: 800, stagger: card_stagger %}
     >
       {% content_for 'block', type: 'section-header', id: 'testimonials-header' %}
     </motion-effect>
@@ -246,7 +250,7 @@
       {%- if show_intro -%}
         <motion-effect
           class="testimonials__intro"
-          {% render 'motion-attrs', kind: 'image', section: s %}
+          {% render 'motion-attrs', kind: 'image', section: s, duration: 800, stagger: card_stagger %}
         >
           {% content_for 'block', type: '_testimonial-intro', id: 'testimonials-intro' %}
         </motion-effect>
@@ -258,6 +262,7 @@
            kind: 'image',
            section: s,
            target: '.testimonial-card',
+           duration: 800,
            stagger: card_stagger %}
       >
         <carousel-slider
@@ -1338,37 +1343,6 @@
       "default": "inherit"
     },
     {
-      "type": "range",
-      "id": "animation_duration",
-      "label": "t:shared.animation.animation_duration.label",
-      "min": 0,
-      "max": 2000,
-      "step": 50,
-      "unit": "ms",
-      "default": 1000
-    },
-    {
-      "type": "range",
-      "id": "animation_delay",
-      "label": "t:shared.animation.animation_delay.label",
-      "min": 0,
-      "max": 2000,
-      "step": 50,
-      "unit": "ms",
-      "default": 0
-    },
-    {
-      "type": "range",
-      "id": "animation_stagger",
-      "label": "t:shared.animation.animation_stagger.label",
-      "info": "t:sections.feature_cards.settings.animation_stagger.info",
-      "min": 0,
-      "max": 400,
-      "step": 10,
-      "unit": "ms",
-      "default": 120
-    },
-    {
       "type": "header",
       "content": "t:shared.spacing.section_header"
     },
@@ -1417,28 +1391,6 @@
       "unit": "px",
       "default": 56,
       "visible_if": "{{ section.settings.device == 'mobile' }}"
-    },
-    {
-      "type": "range",
-      "id": "margin_top",
-      "label": "t:shared.spacing.margin_top.label",
-      "info": "t:shared.spacing.margin_negative.info",
-      "min": -160,
-      "max": 160,
-      "step": 4,
-      "unit": "px",
-      "default": 0
-    },
-    {
-      "type": "range",
-      "id": "margin_bottom",
-      "label": "t:shared.spacing.margin_bottom.label",
-      "info": "t:shared.spacing.margin_negative.info",
-      "min": -160,
-      "max": 160,
-      "step": 4,
-      "unit": "px",
-      "default": 0
     },
     {
       "type": "select",
@@ -1500,8 +1452,6 @@
         "accent_color": "#03D26F",
         "carousel_peek_mobile": 25,
         "animation_image": "fade-up",
-        "animation_duration": 800,
-        "animation_stagger": 120,
         "padding_top": 100,
         "padding_bottom": 100,
         "gap_horizontal_mobile": 16,
@@ -1667,11 +1617,6 @@
             "show_product": true,
             "show_info_rating": true,
             "show_info_price": true,
-            "placeholder_title": "Product or topic",
-            "placeholder_rating": 5,
-            "placeholder_reviews": 889,
-            "placeholder_compare_price": "$54.9",
-            "placeholder_price": "$44.9",
             "frame_background": "#E5F1EE",
             "frame_background_opacity": 100,
             "frame_radius": 12,
@@ -1680,7 +1625,6 @@
             "border_style": "solid",
             "border_opacity": 100,
             "border_color": "#E5F1EE",
-            "ring_gap": 7,
             "border_radius": 20,
             "border_radius_mobile": 20,
             "hover_border_style": "dashed",
@@ -1705,11 +1649,6 @@
             "show_product": true,
             "show_info_rating": true,
             "show_info_price": true,
-            "placeholder_title": "Product or topic",
-            "placeholder_rating": 5,
-            "placeholder_reviews": 612,
-            "placeholder_compare_price": "$54.9",
-            "placeholder_price": "$44.9",
             "frame_background": "#E5F1EE",
             "frame_background_opacity": 100,
             "frame_radius": 12,
@@ -1718,7 +1657,6 @@
             "border_style": "solid",
             "border_opacity": 100,
             "border_color": "#E5F1EE",
-            "ring_gap": 7,
             "border_radius": 20,
             "border_radius_mobile": 20,
             "hover_border_style": "dashed",
@@ -1743,11 +1681,6 @@
             "show_product": true,
             "show_info_rating": true,
             "show_info_price": true,
-            "placeholder_title": "Product or topic",
-            "placeholder_rating": 5,
-            "placeholder_reviews": 1204,
-            "placeholder_compare_price": "$54.9",
-            "placeholder_price": "$44.9",
             "frame_background": "#E5F1EE",
             "frame_background_opacity": 100,
             "frame_radius": 12,
@@ -1756,7 +1689,6 @@
             "border_style": "solid",
             "border_opacity": 100,
             "border_color": "#E5F1EE",
-            "ring_gap": 7,
             "border_radius": 20,
             "border_radius_mobile": 20,
             "hover_border_style": "dashed",
@@ -1781,11 +1713,6 @@
             "show_product": true,
             "show_info_rating": true,
             "show_info_price": true,
-            "placeholder_title": "Product or topic",
-            "placeholder_rating": 5,
-            "placeholder_reviews": 734,
-            "placeholder_compare_price": "$54.9",
-            "placeholder_price": "$44.9",
             "frame_background": "#E5F1EE",
             "frame_background_opacity": 100,
             "frame_radius": 12,
@@ -1794,7 +1721,6 @@
             "border_style": "solid",
             "border_opacity": 100,
             "border_color": "#E5F1EE",
-            "ring_gap": 7,
             "border_radius": 20,
             "border_radius_mobile": 20,
             "hover_border_style": "dashed",
@@ -1819,11 +1745,6 @@
             "show_product": true,
             "show_info_rating": true,
             "show_info_price": true,
-            "placeholder_title": "Product or topic",
-            "placeholder_rating": 5,
-            "placeholder_reviews": 458,
-            "placeholder_compare_price": "$54.9",
-            "placeholder_price": "$44.9",
             "frame_background": "#E5F1EE",
             "frame_background_opacity": 100,
             "frame_radius": 12,
@@ -1832,7 +1753,6 @@
             "border_style": "solid",
             "border_opacity": 100,
             "border_color": "#E5F1EE",
-            "ring_gap": 7,
             "border_radius": 20,
             "border_radius_mobile": 20,
             "hover_border_style": "dashed",
@@ -1857,11 +1777,6 @@
             "show_product": true,
             "show_info_rating": true,
             "show_info_price": true,
-            "placeholder_title": "Product or topic",
-            "placeholder_rating": 5,
-            "placeholder_reviews": 521,
-            "placeholder_compare_price": "$54.9",
-            "placeholder_price": "$44.9",
             "frame_background": "#E5F1EE",
             "frame_background_opacity": 100,
             "frame_radius": 12,
@@ -1870,7 +1785,6 @@
             "border_style": "solid",
             "border_opacity": 100,
             "border_color": "#E5F1EE",
-            "ring_gap": 7,
             "border_radius": 20,
             "border_radius_mobile": 20,
             "hover_border_style": "dashed",

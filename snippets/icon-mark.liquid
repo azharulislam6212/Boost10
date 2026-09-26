@@ -4,6 +4,8 @@
 
   @param {object} block - The block's settings hash (`block.settings`)
   @param {boolean} [declarations] - Return the custom properties rather than the ring
+  @param {number} [offset] - Ring inset in px
+  @param {number} [dash_gap] - Gap between dashes of a dashed ring
 
   @example
     {%- capture mark -%}{% render 'icon-mark', block: s, declarations: true %}{%- endcapture -%}
@@ -74,7 +76,7 @@
     assign ring_offset = 0
   else
     assign ring_width = m.ring_width | default: 2 | plus: 0
-    assign ring_offset = m.ring_offset | default: 11 | plus: 0
+    assign ring_offset = offset | default: 0 | plus: 0
   endif
 
   assign ring_size = shape_size
@@ -87,8 +89,8 @@
   assign ring_dash = ''
   assign ring_cap = 'butt'
   if ring_style == 'dashed'
-    assign dash_on = m.ring_dash | default: 2 | plus: 0
-    assign dash_off = m.ring_dash_gap | default: 8 | plus: 0
+    assign dash_on = 2
+    assign dash_off = dash_gap | default: 8 | plus: 0
     assign ring_dash = dash_on | append: ' ' | append: dash_off
   elsif ring_style == 'dotted'
     assign dash_off = ring_width | times: 2
@@ -96,21 +98,14 @@
     assign ring_cap = 'round'
   endif
 
-  assign ring_spin = m.ring_spin | default: 0 | plus: 0
-  if from_frame
-    assign ring_spin = 0
-  endif
-
   if from_frame
     assign fill_paint = m.icon_frame_background
     assign fill_hover_paint = ''
     assign ring_paint = m.icon_frame_color
-    assign ring_hover_paint = ''
   else
     assign fill_paint = m.fill_color
     assign fill_hover_paint = m.fill_hover_color
     assign ring_paint = m.ring_color
-    assign ring_hover_paint = m.ring_hover_color
   endif
 -%}
 
@@ -127,8 +122,6 @@
   {%- if m.icon_hover_color != blank -%}--icon-mark-color-hover:{{ m.icon_hover_color }};{%- endif -%}
   {%- if has_ring -%}
     {%- if ring_paint != blank -%}--icon-mark-ring-color:{{ ring_paint }};{%- endif -%}
-    {%- if ring_hover_paint != blank -%}--icon-mark-ring-color-hover:{{ ring_hover_paint }};{%- endif -%}
-    {%- if ring_spin != 0 -%}--icon-mark-ring-spin:{{ ring_spin }}deg;{%- endif -%}
   {%- endif -%}
 
   {%- if has_ring and ring_offset > 0 -%}--icon-mark-inset:{{ ring_offset }}px;{%- endif -%}

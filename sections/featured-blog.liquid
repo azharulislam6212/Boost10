@@ -70,8 +70,12 @@
   assign r_bl_m = s.border_radius_bottom_left_mobile | default: r_bl | plus: 0
   assign r_br_m = s.border_radius_bottom_right_mobile | default: r_br | plus: 0
 
-  assign margin_top = s.margin_top | default: 0 | plus: 0
-  assign margin_bottom = s.margin_bottom | default: 0 | plus: 0
+  assign overlap = 0
+  assign overlap_mobile = 0
+  if s.stack_layer == 'over'
+    assign overlap = r_tl | at_least: r_tr
+    assign overlap_mobile = r_tl_m | at_least: r_tr_m
+  endif
 
   assign layout_type = s.layout | default: 'carousel'
 
@@ -142,8 +146,8 @@
   --fb-gap-y-mobile: {{ gap_y_mobile }}px;
   --featured-blog-radius: {{ r_tl }}px {{ r_tr }}px {{ r_br }}px {{ r_bl }}px;
   --featured-blog-radius-mobile: {{ r_tl_m }}px {{ r_tr_m }}px {{ r_br_m }}px {{ r_bl_m }}px;
-  --featured-blog-margin-block-start: {{ margin_top }}px;
-  --featured-blog-margin-block-end: {{ margin_bottom }}px;
+  --section-overlap: {{ overlap }}px;
+  --section-overlap-mobile: {{ overlap_mobile }}px;
   {%- if border_any > 0 -%}
     --featured-blog-border-width: {{ bw_top }}px {{ bw_right }}px {{ bw_bottom }}px {{ bw_left }}px;
     --featured-blog-border-style: {{ border_line }};
@@ -169,7 +173,7 @@
 
     <motion-effect
       class="featured-blog__header featured-blog__header--{{ s.alignment | default: 'start' }}"
-      {% render 'motion-attrs', kind: 'text', section: s, children: true %}
+      {% render 'motion-attrs', kind: 'text', section: s, children: true, duration: 1000 %}
     >
       {% content_for 'blocks' %}
     </motion-effect>
@@ -1122,28 +1126,6 @@
       "default": "inherit"
     },
     {
-      "type": "range",
-      "id": "animation_duration",
-      "label": "t:shared.animation.animation_duration.label",
-      "info": "t:shared.animation.animation_duration.info",
-      "min": 0,
-      "max": 2000,
-      "step": 100,
-      "unit": "ms",
-      "default": 1000
-    },
-    {
-      "type": "range",
-      "id": "animation_stagger",
-      "label": "t:shared.animation.animation_stagger.label",
-      "info": "t:shared.animation.animation_stagger.info",
-      "min": 0,
-      "max": 300,
-      "step": 10,
-      "unit": "ms",
-      "default": 0
-    },
-    {
       "type": "header",
       "content": "t:shared.spacing.section_header"
     },
@@ -1194,28 +1176,6 @@
       "unit": "px",
       "default": 50,
       "visible_if": "{{ section.settings.device == 'mobile' }}"
-    },
-    {
-      "type": "range",
-      "id": "margin_top",
-      "label": "t:shared.spacing.margin_top.label",
-      "info": "t:shared.spacing.margin_negative.info",
-      "min": -160,
-      "max": 160,
-      "step": 4,
-      "unit": "px",
-      "default": 0
-    },
-    {
-      "type": "range",
-      "id": "margin_bottom",
-      "label": "t:shared.spacing.margin_bottom.label",
-      "info": "t:shared.spacing.margin_negative.info",
-      "min": -160,
-      "max": 160,
-      "step": 4,
-      "unit": "px",
-      "default": 0
     },
     {
       "type": "select",

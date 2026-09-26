@@ -51,8 +51,12 @@
   assign r_bl_m = s.border_radius_bottom_left_mobile | default: r_bl | plus: 0
   assign r_br_m = s.border_radius_bottom_right_mobile | default: r_br | plus: 0
 
-  assign margin_top = s.margin_top | default: 0 | plus: 0
-  assign margin_bottom = s.margin_bottom | default: 0 | plus: 0
+  assign overlap = 0
+  assign overlap_mobile = 0
+  if s.stack_layer == 'over'
+    assign overlap = r_tl | at_least: r_tr
+    assign overlap_mobile = r_tl_m | at_least: r_tr_m
+  endif
 
   assign gap_x = s.gap_horizontal | default: 48 | plus: 0
   assign gap_y = s.gap_vertical | default: 16 | plus: 0
@@ -73,8 +77,8 @@
   {%- render 'spacing', section: s, declarations: true -%}
   --product-bundle-radius: {{ r_tl }}px {{ r_tr }}px {{ r_br }}px {{ r_bl }}px;
   --product-bundle-radius-mobile: {{ r_tl_m }}px {{ r_tr_m }}px {{ r_br_m }}px {{ r_bl_m }}px;
-  --product-bundle-margin-block-start: {{ margin_top }}px;
-  --product-bundle-margin-block-end: {{ margin_bottom }}px;
+  --section-overlap: {{ overlap }}px;
+  --section-overlap-mobile: {{ overlap_mobile }}px;
   --product-bundle-gap-x: {{ gap_x }}px;
   --product-bundle-gap-y: {{ gap_y }}px;
   --product-bundle-gap-x-mobile: {{ gap_x_mobile }}px;
@@ -511,13 +515,6 @@
     },
     {
       "type": "checkbox",
-      "id": "video_loop",
-      "label": "t:shared.background.video_loop.label",
-      "default": true,
-      "visible_if": "{{ section.settings.background_media == 'video' }}"
-    },
-    {
-      "type": "checkbox",
       "id": "overlay_enabled",
       "label": "t:shared.background.overlay_enabled.label",
       "info": "t:shared.background.overlay_enabled.info",
@@ -803,28 +800,6 @@
       "default": "inherit"
     },
     {
-      "type": "range",
-      "id": "animation_duration",
-      "label": "t:shared.animation.animation_duration.label",
-      "info": "t:shared.animation.animation_duration.info",
-      "min": 0,
-      "max": 2000,
-      "step": 100,
-      "unit": "ms",
-      "default": 800
-    },
-    {
-      "type": "range",
-      "id": "animation_stagger",
-      "label": "t:shared.animation.animation_stagger.label",
-      "info": "t:shared.animation.animation_stagger.info",
-      "min": 0,
-      "max": 300,
-      "step": 10,
-      "unit": "ms",
-      "default": 90
-    },
-    {
       "type": "header",
       "content": "t:shared.spacing.section_header"
     },
@@ -875,28 +850,6 @@
       "unit": "px",
       "default": 56,
       "visible_if": "{{ section.settings.device == 'mobile' }}"
-    },
-    {
-      "type": "range",
-      "id": "margin_top",
-      "label": "t:shared.spacing.margin_top.label",
-      "info": "t:shared.spacing.margin_negative.info",
-      "min": -160,
-      "max": 160,
-      "step": 4,
-      "unit": "px",
-      "default": 0
-    },
-    {
-      "type": "range",
-      "id": "margin_bottom",
-      "label": "t:shared.spacing.margin_bottom.label",
-      "info": "t:shared.spacing.margin_negative.info",
-      "min": -160,
-      "max": 160,
-      "step": 4,
-      "unit": "px",
-      "default": 0
     },
     {
       "type": "select",
@@ -963,8 +916,6 @@
         "gap_vertical": 16,
         "gap_horizontal_mobile": 24,
         "gap_vertical_mobile": 8,
-        "animation_duration": 800,
-        "animation_stagger": 90,
         "padding_top": 100,
         "padding_bottom": 100,
         "padding_top_mobile": 56,
@@ -1093,9 +1044,7 @@
                 "tab_padding_inline": 16,
                 "tab_gap": 10,
                 "tab_font_size": 14,
-                "tab_font_weight": "500",
-                "animation_duration": 800,
-                "animation_stagger": 90
+                "tab_font_weight": "500"
               },
               "blocks": [
                 {
