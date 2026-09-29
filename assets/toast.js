@@ -51,7 +51,7 @@ export class ToastNotification extends ShadowComponent {
       gap: 1.2rem;
       padding: 1.2rem 1.6rem;
       border-radius: var(--toast-radius, 0.8rem);
-      background: var(--toast-background, #1a1a1a);
+      background: var(--toast-background, #0f2e2f);
       color: var(--toast-text, #fff);
       box-shadow: 0 8px 30px rgb(0 0 0 / 0.24);
       font-size: 1.4rem;
@@ -65,7 +65,7 @@ export class ToastNotification extends ShadowComponent {
     .toast[data-state="visible"] { opacity: 1; transform: none; }
     .toast[data-state="hidden"] { visibility: hidden; }
 
-    .toast[data-type="error"] { background: var(--toast-error-background, #8a1b1b); }
+    .toast[data-type="error"] { background: var(--toast-error-background, #ff5f00); color: var(--toast-error-text, #0f2e2f); }
     .toast[data-type="success"] .toast__icon::before { content: "\\2713"; }
     .toast[data-type="error"] .toast__icon::before { content: "\\26A0"; }
 

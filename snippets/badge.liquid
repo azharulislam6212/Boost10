@@ -46,13 +46,13 @@
 
 <div class="badges badges--{{ settings.badge_position }} {{ class }}" data-badges>
   {%- if settings.show_sold_out_badge and available == false -%}
-    <span class="badge badge--sold-out">{{ 'products.product.sold_out' | t }}</span>
+    <span class="badge badge--sold-out">{% render 'badge-icon', icon: settings.badge_sold_out_icon %}{{ 'products.product.sold_out' | t }}</span>
     {%- assign shown = shown | plus: 1 -%}
   {%- endif -%}
 
   {%- if settings.show_preorder_badge and is_preorder and available -%}
     {%- if all or shown == 0 -%}
-      <span class="badge badge--preorder">{{ 'products.product.preorder' | t }}</span>
+      <span class="badge badge--preorder">{% render 'badge-icon', icon: settings.badge_preorder_icon %}{{ 'products.product.preorder' | t }}</span>
       {%- assign shown = shown | plus: 1 -%}
     {%- endif -%}
   {%- endif -%}
@@ -66,6 +66,7 @@
         assign saved_money = saved_amount | money
       -%}
       <span class="badge badge--sale">
+        {%- render 'badge-icon', icon: settings.badge_sale_icon -%}
         {%- case settings.sale_badge_type -%}
           {%- when 'percentage' -%}
             {{ 'products.product.sale_percent' | t: percent: saved_percent }}
@@ -77,6 +78,57 @@
       </span>
       {%- assign shown = shown | plus: 1 -%}
     {%- endif -%}
+  {%- endif -%}
+
+  {%- if available -%}
+    {%- liquid
+      assign tag_list = product.tags | join: '|' | downcase | prepend: '|' | append: '|'
+
+      assign is_new = false
+      if settings.show_new_badge and product.published_at != blank
+        assign now_seconds = 'now' | date: '%s' | plus: 0
+        assign published_seconds = product.published_at | date: '%s' | plus: 0
+        assign published_age = now_seconds | minus: published_seconds
+        assign new_window = settings.new_label_date_limit | times: 86400
+        if published_age <= new_window
+          assign is_new = true
+        endif
+      endif
+    -%}
+    {%- assign statuses = 'new,hot,popular' | split: ',' -%}
+    {%- for status in statuses -%}
+      {%- liquid
+        case status
+          when 'new'
+            assign status_on = is_new
+            assign status_icon = settings.badge_new_icon
+            assign status_label = 'products.product.badge_new' | t
+          when 'hot'
+            assign status_on = false
+            if settings.show_hot_badge and tag_list contains '|__trending|'
+              assign status_on = true
+            endif
+            assign status_icon = settings.badge_hot_icon
+            assign status_label = 'products.product.badge_hot' | t
+          else
+            assign status_on = false
+            if settings.show_popular_badge and tag_list contains '|__best-seller|'
+              assign status_on = true
+            endif
+            assign status_icon = settings.badge_popular_icon
+            assign status_label = 'products.product.badge_popular' | t
+        endcase
+      -%}
+      {%- if status_on -%}
+        {%- if all or shown == 0 -%}
+          <span class="badge badge--{{ status }}">
+            {%- render 'badge-icon', icon: status_icon -%}
+            {{- status_label -}}
+          </span>
+          {%- assign shown = shown | plus: 1 -%}
+        {%- endif -%}
+      {%- endif -%}
+    {%- endfor -%}
   {%- endif -%}
 
   {%- if settings.show_custom_tag_badges and settings.custom_tag_badges != blank and available -%}
