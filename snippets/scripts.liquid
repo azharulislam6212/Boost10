@@ -49,13 +49,22 @@
         return document.querySelectorAll('.shopify-section');
       }
 
+      // A sticky header stays on screen at any depth, so it can't mark the spot.
+      function pinned(el) {
+        for (; el && el !== document.body; el = el.parentElement) {
+          var position = getComputedStyle(el).position;
+          if (position === 'sticky' || position === 'fixed') return true;
+        }
+        return false;
+      }
+
       window.addEventListener('pagehide', function () {
         var y = window.scrollY;
         var entry = { url: here, y: y, id: null, offset: 0 };
         var list = sections();
         for (var i = 0; i < list.length; i++) {
           var rect = list[i].getBoundingClientRect();
-          if (rect.bottom > 0 && list[i].id) {
+          if (rect.bottom > 0 && rect.height > 0 && list[i].id && !pinned(list[i])) {
             entry.id = list[i].id;
             entry.offset = rect.top;
             break;
@@ -82,7 +91,10 @@
 
       function target() {
         var anchor = saved.id ? document.getElementById(saved.id) : null;
-        if (!anchor) return null;
+        if (!anchor) {
+          if (document.readyState === 'loading') return null;
+          return saved.y;
+        }
         return anchor.getBoundingClientRect().top + window.scrollY - saved.offset;
       }
 
