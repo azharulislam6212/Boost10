@@ -85,6 +85,7 @@ export class MotionEffect extends BaseComponent {
   /** Replay the animation from its resting state. */
   replay() {
     this.removeAttribute('data-motion-revealed');
+    this.removeAttribute('data-motion-played');
     for (const target of this.#targets()) target.removeAttribute('data-motion-revealed');
     this.#replaying = true;
     this.setup();
@@ -115,6 +116,9 @@ export class MotionEffect extends BaseComponent {
       onReveal: () => {
         this.removeAttribute('data-motion-pending');
         this.setAttribute('data-motion-revealed', '');
+        // Only an entrance that actually played sets this, so CSS keyed to it
+        // never runs for "none", reduced motion or an editor re-render.
+        this.setAttribute('data-motion-played', '');
       },
       targets: preset.split && targets.length <= 1 ? undefined : targets,
       duration: this.#number('duration'),

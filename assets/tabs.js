@@ -29,8 +29,6 @@ export class TabGroup extends BaseComponent {
   #swallowClick = false;
 
   setup() {
-    this.#buildTabs();
-
     const initial = this.tabs.findIndex((tab) => tab.getAttribute('aria-selected') === 'true');
     this.#index = initial === -1 ? 0 : initial;
 
@@ -271,49 +269,36 @@ export class TabGroup extends BaseComponent {
   }
 
   /**
-   * Build the strip from the panels when the caller supplied none.
+   * A tab's box inside the list, from layout offsets so transforms are ignored.
    *
+   * @param {HTMLElement} tab
+   * @returns {{ x: number, y: number, width: number, height: number }}
    * @private
    */
-  #buildTabs() {
-    if (this.refs.list.querySelector('[role="tab"]')) return;
+  #layoutBox(tab) {
+    const list = this.refs.list;
+    let x = 0;
+    let y = 0;
+    let node = /** @type {HTMLElement|null} */ (tab);
 
-    const panels = this.panels.filter((panel) => panel.dataset.tabLabel);
-    if (panels.length === 0) return;
-
-    const preferred = panels.findIndex((panel) => panel.dataset.tabSelected != null);
-    const selected = preferred === -1 ? 0 : preferred;
-
-    const fragment = document.createDocumentFragment();
-
-    panels.forEach((panel, index) => {
-      const id = panel.id || `${this.id || 'TabGroup'}-panel-${index}`;
-      panel.id = id;
-
-      const tab = document.createElement('button');
-      tab.type = 'button';
-      tab.className = 'tabs__tab';
-      tab.setAttribute('role', 'tab');
-      tab.id = `${id}-tab`;
-      tab.setAttribute('aria-controls', id);
-      tab.setAttribute('aria-selected', index === selected ? 'true' : 'false');
-      tab.tabIndex = index === selected ? 0 : -1;
-
-      const template = panel.querySelector(':scope > template[data-tab-button]');
-
-      if (template instanceof HTMLTemplateElement) {
-        tab.append(template.content.cloneNode(true));
-      } else {
-        tab.textContent = panel.dataset.tabLabel || '';
+    while (node && node !== list) {
+      x += node.offsetLeft;
+      y += node.offsetTop;
+      const parent = /** @type {HTMLElement|null} */ (node.offsetParent);
+      if (parent && parent !== list && !list.contains(parent)) {
+        const listBox = list.getBoundingClientRect();
+        const tabBox = tab.getBoundingClientRect();
+        return {
+          x: tabBox.left - listBox.left + list.scrollLeft,
+          y: tabBox.top - listBox.top + list.scrollTop,
+          width: tabBox.width,
+          height: tabBox.height
+        };
       }
+      node = parent;
+    }
 
-      panel.setAttribute('aria-labelledby', tab.id);
-      panel.toggleAttribute('hidden', index !== selected);
-
-      fragment.append(tab);
-    });
-
-    this.refs.list.append(fragment);
+    return { x, y, width: tab.offsetWidth, height: tab.offsetHeight };
   }
 
   /**
@@ -325,17 +310,18 @@ export class TabGroup extends BaseComponent {
     const tab = this.tabs[this.#index];
     if (!marker || !tab) return;
 
-    const listBox = this.refs.list.getBoundingClientRect();
-    const tabBox = tab.getBoundingClientRect();
+    // Layout offsets, not client rects: an entrance animation that is still
+    // moving the tab must not drag the marker along with it.
+    const box = this.#layoutBox(tab);
 
-    if (tabBox.width === 0 && tabBox.height === 0) return;
+    if (box.width === 0 && box.height === 0) return;
 
     marker.toggleAttribute('data-instant', !animate || prefersReducedMotion());
 
-    marker.style.setProperty('--marker-width', `${tabBox.width}px`);
-    marker.style.setProperty('--marker-height', `${tabBox.height}px`);
-    marker.style.setProperty('--marker-x', `${tabBox.left - listBox.left + this.refs.list.scrollLeft}px`);
-    marker.style.setProperty('--marker-y', `${tabBox.top - listBox.top + this.refs.list.scrollTop}px`);
+    marker.style.setProperty('--marker-width', `${box.width}px`);
+    marker.style.setProperty('--marker-height', `${box.height}px`);
+    marker.style.setProperty('--marker-x', `${box.x}px`);
+    marker.style.setProperty('--marker-y', `${box.y}px`);
 
     if (!animate) {
       void marker.offsetWidth;

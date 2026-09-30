@@ -1,13 +1,14 @@
 {% doc %}
-  A tab strip and its panels.
+  A tab strip and its panels. When each panel is preceded by `tab-button`,
+  the buttons are sorted into the tablist here, so they ship in the HTML.
 
   @param {string} [panels] - The `role="tabpanel"` elements
-  @param {string} [tabs] - The `role="tab"` buttons. Omit when the panels carry `data-tab-label`
+  @param {string} [tabs] - The `role="tab"` buttons. Omit when the panels come with `tab-button`
   @param {string} [orientation] - horizontal | vertical. Default: horizontal
   @param {string} [activation] - auto | manual. Default: auto
   @param {boolean} [hover] - Select on pointer hover as well as click
   @param {string} [label] - Accessible name for the tablist
-  @param {string} [id] - Element id. `tabs.js` derives generated panel ids from it
+  @param {string} [id] - Element id
   @param {string} [styles] - Declarations for the group's own `style` attribute
   @param {string} [attributes] - Raw attributes, e.g. `block.shopify_attributes`
   @param {string} [classes]
@@ -19,6 +20,48 @@
 {%- liquid
   assign tab_orientation = orientation | default: 'horizontal'
   assign tab_activation = activation | default: 'auto'
+  assign tab_markup = tabs
+  assign panel_markup = panels
+
+  if panels contains '<!--tab-panel-->'
+    assign tab_items = panels | split: '<!--tab-->'
+
+    assign selected_at = 0
+    assign position = 0
+    for item in tab_items
+      unless item contains '<!--tab-panel-->'
+        continue
+      endunless
+      assign item_tab = item | split: '<!--tab-panel-->' | first
+      if item_tab contains 'data-tab-selected'
+        assign selected_at = position
+        break
+      endif
+      assign position = position | plus: 1
+    endfor
+
+    assign tab_markup = ''
+    assign panel_markup = ''
+    assign position = 0
+    for item in tab_items
+      unless item contains '<!--tab-panel-->'
+        continue
+      endunless
+      assign item_parts = item | split: '<!--tab-panel-->'
+      assign item_tab = item_parts | first
+      assign item_panel = item_parts | last
+
+      if position == selected_at
+        assign item_tab = item_tab | replace_first: 'aria-selected="false" tabindex="-1"', 'aria-selected="true" tabindex="0"'
+      else
+        assign item_panel = item_panel | replace_first: 'data-tab-panel', 'data-tab-panel hidden'
+      endif
+
+      assign tab_markup = tab_markup | append: item_tab
+      assign panel_markup = panel_markup | append: item_panel
+      assign position = position | plus: 1
+    endfor
+  endif
 -%}
 
 <tab-group
@@ -39,11 +82,11 @@
       data-ref="list"
     >
       <span class="tabs__marker" data-ref="marker" aria-hidden="true"></span>
-      {{ tabs }}
+      {{ tab_markup }}
     </div>
   </div>
 
   <div class="tabs__panels" data-ref="panels">
-    {{ panels }}
+    {{ panel_markup }}
   </div>
 </tab-group>

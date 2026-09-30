@@ -5,38 +5,33 @@
 {%- liquid
   assign st = block.settings
   assign tab_id = 'MegaTabs-' | append: block.id
+  assign tabs_style = '--tabs-rail-width: ' | append: st.rail_width | append: 'px; --tabs-marker-radius: ' | append: st.marker_radius | append: 'px;'
+
+  if st.stack_on_mobile
+    assign tab_attributes = 'data-stack="true"'
+  else
+    assign tab_attributes = 'data-stack="false"'
+  endif
 -%}
+
+{%- capture panels -%}
+  {% content_for 'blocks' %}
+{%- endcapture -%}
 
 <div
   class="megamenu__item megamenu__item--tabs"
   style="--span: {{ st.column_span }};"
   {{ block.shopify_attributes }}
 >
-  <tab-group
-    id="{{ tab_id }}"
-    class="tabs tabs--{{ st.orientation }} tabs--menu"
-    data-orientation="{{ st.orientation }}"
-    data-activation="auto"
-    data-stack="{% if st.stack_on_mobile %}true{% else %}false{% endif %}"
-    {% if st.select_on_hover %}data-hover="true"{% endif %}
-    style="--tabs-rail-width: {{ st.rail_width }}px; --tabs-marker-radius: {{ st.marker_radius }}px;"
-  >
-    <div class="tabs__rail">
-      <div
-        class="tabs__list"
-        role="tablist"
-        aria-orientation="{{ st.orientation }}"
-        {% if st.heading != blank %}aria-label="{{ st.heading | escape }}"{% endif %}
-        data-ref="list"
-      >
-        <span class="tabs__marker" data-ref="marker" aria-hidden="true"></span>
-      </div>
-    </div>
-
-    <div class="tabs__panels" data-ref="panels">
-      {% content_for 'blocks' %}
-    </div>
-  </tab-group>
+  {% render 'tab-group',
+     id: tab_id,
+     panels: panels,
+     orientation: st.orientation,
+     classes: 'tabs--menu',
+     hover: st.select_on_hover,
+     label: st.heading,
+     styles: tabs_style,
+     attributes: tab_attributes %}
 </div>
 
 {% schema %}
