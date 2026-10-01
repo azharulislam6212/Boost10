@@ -929,6 +929,30 @@ export function labelTarget(button) {
 }
 
 /**
+ * Keep a click on a `[data-overlay-open]` button whose overlay module has not
+ * defined the element yet, and open the overlay once it has. Links are left
+ * alone: they already work without the overlay.
+ *
+ * @param {Document|HTMLElement} [root=document]
+ */
+export function bufferOverlayTriggers(root = document) {
+  root.addEventListener('click', (event) => {
+    const trigger = event.target instanceof Element ? event.target.closest('[data-overlay-open]') : null;
+    if (!trigger || trigger.hasAttribute('href')) return;
+
+    const overlay = document.getElementById(trigger.getAttribute('data-overlay-open') ?? '');
+    if (!overlay || !overlay.localName.includes('-') || customElements.get(overlay.localName)) return;
+
+    event.preventDefault();
+    customElements.whenDefined(overlay.localName).then(() => {
+      requestAnimationFrame(() => {
+        if (typeof overlay.open === 'function' && !overlay.isOpen) overlay.open(trigger);
+      });
+    });
+  });
+}
+
+/**
  * @param {string} name Custom property name, with or without the leading dashes.
  * @param {string|number} value
  * @param {HTMLElement} [target=document.documentElement]

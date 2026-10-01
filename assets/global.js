@@ -13,7 +13,8 @@ import {
   storage,
   isRTL,
   prefersReducedMotion,
-  getFocusableElements
+  getFocusableElements,
+  bufferOverlayTriggers
 } from '@theme/utilities';
 import { subscribeToTicker } from '@theme/motion-engine';
 
@@ -733,6 +734,8 @@ function onAnchorClick(event) {
   if (!target.hasAttribute('tabindex')) target.setAttribute('tabindex', '-1');
   target.focus({ preventScroll: true });
 }
+
+bufferOverlayTriggers();
 
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', boot, { once: true });

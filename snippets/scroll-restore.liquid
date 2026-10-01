@@ -1,0 +1,22 @@
+{% doc %}
+  Hides the page before first paint on a reload or back/forward that has a
+  saved position, so `restoreScroll()` in `assets/scrollbar.js` can put it
+  back before anything shows. The hidden state and its failsafe live in
+  `snippets/critical-style.liquid`.
+{% enddoc %}
+
+{%- unless request.design_mode -%}
+  <script>
+    (function () {
+      try {
+        var restore = JSON.parse(sessionStorage.getItem('boost10:scroll'));
+        var navigation = performance.getEntriesByType('navigation')[0];
+        if ('scrollRestoration' in history && restore && restore.y > 0 && !location.hash &&
+            restore.url === location.pathname + location.search &&
+            navigation && (navigation.type === 'reload' || navigation.type === 'back_forward')) {
+          document.documentElement.setAttribute('data-scroll-restoring', '');
+        }
+      } catch (error) {}
+    })();
+  </script>
+{%- endunless -%}

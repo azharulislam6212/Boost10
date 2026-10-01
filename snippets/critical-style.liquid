@@ -250,9 +250,14 @@
         .lenis.lenis-stopped { overflow: hidden; }
         .lenis.lenis-smooth iframe { pointer-events: none; }
 
-        /* Held for the moment a reload takes to return to where it was left
-           (snippets/scripts.liquid), so the top of the page never flashes. */
-        html[data-scroll-restoring] body { opacity: 0; }
+        /* Held while scrollbar.js returns a reload to where it was left; the
+           animation shows the page anyway if that module never runs. */
+        html[data-scroll-restoring] body {
+          opacity: 0;
+          animation: scroll-restore-failsafe 0s 1.5s forwards;
+        }
+
+        @keyframes scroll-restore-failsafe { to { opacity: 1; } }
 
         @media (prefers-reduced-motion: reduce) {
           html { scroll-behavior: auto; }
@@ -475,8 +480,10 @@
            preset name, and a visitor who has asked for reduced motion.
 
            `data-motion-arm` on `<html>` is set by the head script in
-           `snippets/scripts.liquid`, so it exists only when scripting does, and
-           is removed again if the motion module never arrives. Parallax and
+           `snippets/scripts.liquid`, so it exists only when scripting does. If
+           the motion module never arrives, the delayed animation shows the
+           element anyway; the module marks every host pending on setup, which
+           drops the rule before the delay runs out. Parallax and
            marquee are excluded — they are continuous effects with no entrance,
            so there is nothing to wait for. */
         /* Wrapped in `no-preference` rather than paired with a `reduce`
@@ -491,7 +498,10 @@
         @media (prefers-reduced-motion: no-preference) {
           html[data-motion-arm] motion-effect[data-effect]:not([data-effect='none']):not([data-effect='']):not([data-effect='parallax']):not([data-effect='marquee']):not([data-motion-pending]):not([data-motion-revealed]) {
             opacity: 0;
+            animation: motion-arm-failsafe 0s 2.5s forwards;
           }
         }
+
+        @keyframes motion-arm-failsafe { to { opacity: 1; } }
       }
     {% endstyle %}

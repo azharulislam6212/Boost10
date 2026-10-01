@@ -213,6 +213,22 @@
     display: none;
   }
 
+  /* ---- before <footer-columns> upgrades: desktop paints expanded ---- */
+
+  @media screen and (min-width: 750px) {
+    footer-columns:not(:defined) .footer-column__summary {
+      cursor: default;
+    }
+
+    footer-columns:not(:defined) .footer-column__summary :is(.footer-column__icon, .footer-column__marker) {
+      display: none;
+    }
+
+    footer-columns:not(:defined) .footer-column::details-content {
+      content-visibility: visible;
+    }
+  }
+
   /* ==========================================================================
      Menu block
      --------------------------------------------------------------------------
@@ -977,17 +993,21 @@
   }
 
   /* ---- the pre-paint hidden state ---- */
-  .footer-legal__wordmark[data-motion-armed]:not([data-motion-revealed]) {
-    clip-path: inset(100% 0 0 0);
-    transform: translate3d(0, 16px, 0);
-  }
+  @media (prefers-reduced-motion: no-preference) {
+    html[data-motion-arm] .footer-legal__wordmark:not([data-animation='none']):not([data-motion-revealed]) {
+      clip-path: inset(100% 0 0 0);
+      transform: translate3d(0, 16px, 0);
+    }
 
-  @media (prefers-reduced-motion: reduce) {
-    .footer-legal__wordmark[data-motion-armed]:not([data-motion-revealed]) {
-      clip-path: none;
-      transform: none;
+    /* Shown anyway if the motion module never marks it pending. Important
+       because the general failsafe (critical-style, utilities layer) only
+       restores opacity and would otherwise win over this layer. */
+    html[data-motion-arm] .footer-legal__wordmark:not([data-animation='none']):not([data-motion-revealed]):not([data-motion-pending]) {
+      animation: wordmark-arm-failsafe 0s 2.5s forwards !important;
     }
   }
+
+  @keyframes wordmark-arm-failsafe { to { opacity: 1; clip-path: none; transform: none; } }
 
   .footer-legal__wordmark-text {
     display: block;
