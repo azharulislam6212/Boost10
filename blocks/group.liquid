@@ -9,9 +9,26 @@
   {% content_for 'blocks' %}
 {%- endcapture -%}
 
+{%- liquid
+  assign s = block.settings
+  assign background_paint = ''
+  assign background_media = s.background_media | default: 'none'
+  if background_media == 'none' and s.background_style != 'gradient' and s.background_solid_color != blank
+    assign background_alpha = s.background_opacity | default: 100 | plus: 0 | divided_by: 100.0
+    assign background_paint = s.background_solid_color | color_modify: 'alpha', background_alpha
+  endif
+-%}
+
+{%- capture group_styles -%}
+  {%- if background_paint != '' -%}
+    --group-background: {{ background_paint }};
+  {%- endif -%}
+{%- endcapture -%}
+
 {% render 'group',
    children: children,
-   settings: block.settings,
+   settings: s,
+   styles: group_styles,
    shopify_attributes: block.shopify_attributes %}
 
 {% schema %}
@@ -337,11 +354,44 @@
       "default": "none"
     },
     {
+      "type": "select",
+      "id": "background_style",
+      "label": "t:blocks.card_content.settings.background_style.label",
+      "options": [
+        {
+          "value": "solid",
+          "label": "t:blocks.card_content.settings.background_style.options__1.label"
+        },
+        {
+          "value": "gradient",
+          "label": "t:blocks.card_content.settings.background_style.options__2.label"
+        }
+      ],
+      "default": "solid",
+      "visible_if": "{{ block.settings.background_media == 'none' }}"
+    },
+    {
       "type": "color_background",
       "id": "background_color",
+      "label": "t:blocks.card_content.settings.background_gradient.label",
+      "visible_if": "{{ block.settings.background_media == 'none' and block.settings.background_style == 'gradient' }}"
+    },
+    {
+      "type": "color",
+      "id": "background_solid_color",
       "label": "t:shared.background.color.label",
-      "info": "t:shared.background.color.info",
-      "visible_if": "{{ block.settings.background_media == 'none' }}"
+      "visible_if": "{{ block.settings.background_media == 'none' and block.settings.background_style == 'solid' }}"
+    },
+    {
+      "type": "range",
+      "id": "background_opacity",
+      "label": "t:blocks.card_content.settings.background_opacity.label",
+      "visible_if": "{{ block.settings.background_media == 'none' and block.settings.background_style == 'solid' }}",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 100
     },
     {
       "type": "range",
