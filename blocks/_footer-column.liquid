@@ -9,6 +9,19 @@
   assign order = block.settings.column_order | default: 0 | plus: 0
   assign marker = block.settings.accordion_icon | default: 'chevron'
 
+  assign background_paint = ''
+  if block.settings.background_style == 'gradient'
+    assign background_paint = block.settings.background_gradient | default: ''
+  elsif block.settings.background_color != blank
+    assign background_alpha = block.settings.background_opacity | default: 100 | plus: 0 | divided_by: 100.0
+    assign background_paint = block.settings.background_color | color_modify: 'alpha', background_alpha
+  endif
+
+  assign scheme_class = ''
+  if block.settings.inherit_color_scheme == false and block.settings.color_scheme != blank
+    assign scheme_class = ' color-scheme-container color-' | append: block.settings.color_scheme
+  endif
+
   assign collapsible = false
   if heading != blank
     assign collapsible = true
@@ -27,8 +40,11 @@
   --column-width: {{ width }}%;
   --column-order: {{ order }};
   --column-gap: {{ block.settings.vertical_gap | default: 4 }}px;
-  {%- if block.settings.background_color != blank -%}
-    --column-background: {{ block.settings.background_color }};
+  {%- if background_paint != '' -%}
+    --column-background: {{ background_paint }};
+  {%- endif -%}
+  {%- if block.settings.backdrop_blur > 0 -%}
+    --column-backdrop-blur: {{ block.settings.backdrop_blur }}px;
   {%- endif -%}
   {%- if block.settings.heading_color != blank -%}
     --column-heading-color: {{ block.settings.heading_color }};
@@ -38,7 +54,7 @@
 
 {%- if collapsible -%}
   <details
-    class="footer-column footer-column--collapsible"
+    class="footer-column footer-column--collapsible{{ scheme_class }}"
     data-heading-preset="{{ heading_preset }}"
     data-marker="{{ marker }}"
     {% if block.settings.open_by_default %}data-default-open open{% endif %}
@@ -63,7 +79,7 @@
   </details>
 {%- else -%}
   <div
-    class="footer-column"
+    class="footer-column{{ scheme_class }}"
     {% if block.settings.show_divider %}data-divider{% endif %}
     data-block-spacing
     style="{{ column_styles | strip_newlines | strip }}"
@@ -158,9 +174,66 @@
       "default": 4
     },
     {
+      "type": "checkbox",
+      "id": "inherit_color_scheme",
+      "label": "t:blocks.group.settings.inherit_color_scheme.label",
+      "default": true
+    },
+    {
+      "type": "color_scheme",
+      "id": "color_scheme",
+      "label": "t:shared.color_scheme.label",
+      "visible_if": "{{ block.settings.inherit_color_scheme == false }}"
+    },
+    {
+      "type": "select",
+      "id": "background_style",
+      "label": "t:blocks.card_content.settings.background_style.label",
+      "options": [
+        {
+          "value": "solid",
+          "label": "t:blocks.card_content.settings.background_style.options__1.label"
+        },
+        {
+          "value": "gradient",
+          "label": "t:blocks.card_content.settings.background_style.options__2.label"
+        }
+      ],
+      "default": "solid"
+    },
+    {
+      "type": "color_background",
+      "id": "background_gradient",
+      "label": "t:blocks.card_content.settings.background_gradient.label",
+      "visible_if": "{{ block.settings.background_style == 'gradient' }}"
+    },
+    {
       "type": "color",
       "id": "background_color",
-      "label": "t:blocks.menu.settings.background_color.label"
+      "label": "t:blocks.menu.settings.background_color.label",
+      "visible_if": "{{ block.settings.background_style == 'solid' }}"
+    },
+    {
+      "type": "range",
+      "id": "background_opacity",
+      "label": "t:blocks.card_content.settings.background_opacity.label",
+      "visible_if": "{{ block.settings.background_style == 'solid' }}",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 100
+    },
+    {
+      "type": "range",
+      "id": "backdrop_blur",
+      "label": "t:blocks.card_content.settings.backdrop_blur.label",
+      "info": "t:blocks.card_content.settings.backdrop_blur.info",
+      "min": 0,
+      "max": 40,
+      "step": 2,
+      "unit": "px",
+      "default": 0
     },
     {
       "type": "color",
