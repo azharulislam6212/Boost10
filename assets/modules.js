@@ -705,6 +705,53 @@ export class ShowMore extends BaseComponent {
 defineComponent('show-more', ShowMore);
 
 /* ==========================================================================
+   <fit-text>
+   ========================================================================== */
+
+/** Sizes one line of text so it spans its container edge to edge. */
+export class FitText extends BaseComponent {
+  static requiredRefs = ['text'];
+
+  /** @type {ResizeObserver|null} */
+  #observer = null;
+
+  #width = 0;
+
+  setup() {
+    this.#observer = new ResizeObserver(rafThrottle(() => this.#fit()));
+    this.#observer.observe(this);
+
+    document.fonts?.ready.then(() => this.#fit(true));
+  }
+
+  teardown() {
+    this.#observer?.disconnect();
+    this.#observer = null;
+  }
+
+  /**
+   * Text width scales linearly with font size, so one measurement is enough.
+   *
+   * @param {boolean} [force] - Refit even when the width has not changed
+   */
+  #fit(force = false) {
+    const available = this.clientWidth;
+    if (!available || (!force && available === this.#width)) return;
+    this.#width = available;
+
+    const text = this.refs.text;
+    const size = parseFloat(getComputedStyle(text).fontSize);
+    const natural = text.getBoundingClientRect().width;
+    if (!size || !natural) return;
+
+    this.style.setProperty('--fit-size', `${((size * available) / natural).toFixed(2)}px`);
+    this.setAttribute('data-fitted', '');
+  }
+}
+
+defineComponent('fit-text', FitText);
+
+/* ==========================================================================
    <deferred-media>
    ========================================================================== */
 
