@@ -63,7 +63,18 @@
   endif
 
   # ---- classes -----------------------------------------------------------
-  assign classes = 'block-image block-image--' | append: s.alignment | default: 'block-image block-image--start'
+  # Alignment is the block's own unless it is Fit; a Fit box follows its parent.
+  assign alignment = s.alignment | default: 'start'
+  assign alignment_mobile = s.alignment_mobile | default: alignment
+  if s.width_type == 'fit'
+    assign alignment = 'inherit'
+  endif
+  if s.width_type_mobile == 'fit'
+    assign alignment_mobile = 'inherit'
+  endif
+
+  assign classes = 'block-image block-image--' | append: alignment
+  assign classes = classes | append: ' block-image--mobile-' | append: alignment_mobile
   if fills_height
     assign classes = classes | append: ' block-image--fill-height'
   endif
@@ -385,7 +396,32 @@
         }
       ],
       "default": "start",
-      "visible_if": "{{ block.settings.width_type != 'fill' }}"
+      "visible_if": "{{ block.settings.width_type != 'fit' }}"
+    },
+    {
+      "type": "select",
+      "id": "alignment_mobile",
+      "label": "t:shared.layout.alignment_mobile.label",
+      "options": [
+        {
+          "value": "",
+          "label": "t:blocks.group.settings.width_tablet.options__1.label"
+        },
+        {
+          "value": "start",
+          "label": "t:blocks.group.settings.alignment.options__1.label"
+        },
+        {
+          "value": "center",
+          "label": "t:blocks.group.settings.alignment.options__2.label"
+        },
+        {
+          "value": "end",
+          "label": "t:blocks.group.settings.alignment.options__3.label"
+        }
+      ],
+      "default": "",
+      "visible_if": "{{ block.settings.width_type_mobile != 'fit' }}"
     },
     {
       "type": "header",
