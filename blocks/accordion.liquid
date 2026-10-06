@@ -1,11 +1,26 @@
 {% doc %}
-  The group its rows belong to.
+  The group its rows belong to. It also sets the look every row shares:
+  toggle, icon style, background, border and corners.
 {% enddoc %}
 
 {%- liquid
   assign s = block.settings
   assign gap = s.gap | default: 16 | plus: 0
   assign alignment = s.alignment | default: 'start'
+
+  assign border_style = s.border_style | default: 'none'
+  assign border_width = 0
+  if border_style != 'none'
+    assign border_width = s.border_width | default: 1 | plus: 0
+
+    if s.border_color == blank
+      assign border_paint = 'color-mix(in srgb, currentColor 20%, transparent)'
+    else
+      assign border_paint = s.border_color
+    endif
+  endif
+
+  assign radius = s.border_radius | default: 14 | plus: 0
 -%}
 
 {%- capture accordion_style -%}
@@ -16,6 +31,15 @@
   --block-padding-inline-end-mobile: 0px;
   --accordion-gap: {{ gap }}px;
   --accordion-align: {{ alignment }};
+  --accordion-row-radius: {{ radius }}px;
+  {%- if s.background_color != blank -%}
+    --accordion-row-background: {{ s.background_color }};
+  {%- endif -%}
+  {%- if border_width > 0 -%}
+    --accordion-row-border-width: {{ border_width }}px;
+    --accordion-row-border-style: {{ border_style }};
+    --accordion-row-border-color: {{ border_paint }};
+  {%- endif -%}
 {%- endcapture -%}
 
 <motion-effect
@@ -25,6 +49,8 @@
   <accordion-element
     class="accordion"
     {% if s.single_open %}data-single{% endif %}
+    data-toggle="{{ s.toggle_style | default: 'plus' }}"
+    data-icon-style="{{ s.icon_style | default: 'soft' }}"
     data-block-spacing
     style="{{ accordion_style | strip_newlines | strip }}"
     {{ block.shopify_attributes }}
@@ -82,6 +108,118 @@
       "label": "t:blocks.accordion.settings.single_open.label",
       "info": "t:blocks.accordion.settings.single_open.info",
       "default": false
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.accordion_row.headers.toggle"
+    },
+    {
+      "type": "select",
+      "id": "toggle_style",
+      "label": "t:blocks.accordion_row.settings.toggle_style.label",
+      "info": "t:blocks.accordion_row.settings.toggle_style.info",
+      "options": [
+        {
+          "value": "plus",
+          "label": "t:blocks.accordion_row.settings.toggle_style.options__1.label"
+        },
+        {
+          "value": "cross",
+          "label": "t:blocks.accordion_row.settings.toggle_style.options__3.label"
+        },
+        {
+          "value": "arrow",
+          "label": "t:blocks.accordion_row.settings.toggle_style.options__2.label"
+        }
+      ],
+      "default": "plus"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.subheading.headers.icon"
+    },
+    {
+      "type": "select",
+      "id": "icon_style",
+      "label": "t:blocks.subheading.settings.icon_style.label",
+      "options": [
+        {
+          "value": "solid",
+          "label": "t:blocks.utility_item.settings.icon_background.options__1.label"
+        },
+        {
+          "value": "soft",
+          "label": "t:blocks.utility_item.settings.icon_background.options__2.label"
+        },
+        {
+          "value": "outline",
+          "label": "t:blocks.utility_item.settings.icon_background.options__3.label"
+        },
+        {
+          "value": "none",
+          "label": "t:shared.options.none"
+        }
+      ],
+      "default": "soft"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.appearance.header"
+    },
+    {
+      "type": "color",
+      "id": "background_color",
+      "label": "t:shared.background.color.label",
+      "info": "t:blocks.accordion_row.settings.background_color.info"
+    },
+    {
+      "type": "select",
+      "id": "border_style",
+      "label": "t:blocks.group.settings.border_style.label",
+      "info": "t:blocks.accordion_row.settings.border_style.info",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.options.none"
+        },
+        {
+          "value": "solid",
+          "label": "t:shared.options.solid"
+        },
+        {
+          "value": "dashed",
+          "label": "t:shared.border.style.options__2.label"
+        }
+      ],
+      "default": "none"
+    },
+    {
+      "type": "range",
+      "id": "border_width",
+      "label": "t:shared.border.thickness.label",
+      "min": 1,
+      "max": 6,
+      "step": 1,
+      "unit": "px",
+      "default": 1,
+      "visible_if": "{{ block.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "color",
+      "id": "border_color",
+      "label": "t:shared.border.color.label",
+      "info": "t:shared.border.color.info",
+      "visible_if": "{{ block.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius",
+      "label": "t:shared.corner_radius.label",
+      "min": 0,
+      "max": 40,
+      "step": 2,
+      "unit": "px",
+      "default": 14
     },
     {
       "type": "header",

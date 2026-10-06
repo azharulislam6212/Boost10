@@ -21,22 +21,6 @@
     assign has_icon = true
   endif
 
-  assign toggle = s.toggle_style | default: 'plus'
-
-  assign border_style = s.border_style | default: 'none'
-  assign border_width = 0
-  if border_style != 'none'
-    assign border_width = s.border_width | default: 1 | plus: 0
-
-    if s.border_color == blank
-      assign border_paint = 'color-mix(in srgb, currentColor 20%, transparent)'
-    else
-      assign border_paint = s.border_color
-    endif
-  endif
-
-  assign radius = s.border_radius | default: 14 | plus: 0
-
   # The icon tile grows with the glyph rather than taking a second slider that
   # can be set smaller than the thing it contains.
   assign icon_box = icon_size | plus: 12
@@ -64,15 +48,6 @@
       --accordion-row-icon-size: {{ icon_size }}px;
       --accordion-row-icon-box: {{ icon_box }}px;
     {%- endif -%}
-    --accordion-row-radius: {{ radius }}px;
-    {%- if s.background_color != blank -%}
-      --accordion-row-background: {{ s.background_color }};
-    {%- endif -%}
-    {%- if border_width > 0 -%}
-      --accordion-row-border-width: {{ border_width }}px;
-      --accordion-row-border-style: {{ border_style }};
-      --accordion-row-border-color: {{ border_paint }};
-    {%- endif -%}
   {%- endcapture -%}
 
   <motion-effect
@@ -80,7 +55,7 @@
     {% render 'motion-attrs', kind: 'text', block: s, duration: 1000 %}
   >
   <details
-    class="accordion-row icon-mark-host accordion-row--toggle-{{ toggle }}{% if has_icon %} accordion-row--has-icon{% endif %}"
+    class="accordion-row icon-mark-host{% if has_icon %} accordion-row--has-icon{% endif %}"
     {% if s.open_by_default %}open data-default-open{% endif %}
     data-block-spacing
     style="{{ row_style | strip_newlines | strip }}"
@@ -91,7 +66,6 @@
 
         <span
           class="accordion-row__icon icon-mark"
-          data-icon-style="{{ s.icon_style | default: 'soft' }}"
           style="{{ icon_mark_style | strip_newlines | strip }}">
           {% render 'icon-mark', block: s, dash_gap: 4 %}
           {%- if icon_source == 'image' -%}
@@ -111,11 +85,8 @@
       </span>
 
       <span class="accordion-row__toggle" aria-hidden="true">
-        {%- if toggle == 'arrow' -%}
-          {% render 'icon', icon: 'chevron-down', size: 14, class: 'accordion-row__chevron' %}
-        {%- else -%}
-          {% render 'icon', icon: 'plus', size: 14, class: 'accordion-row__plus' %}
-        {%- endif -%}
+        {% render 'icon', icon: 'chevron-down', size: 14, class: 'accordion-row__chevron' %}
+        {% render 'icon', icon: 'plus', size: 14, class: 'accordion-row__plus' %}
       </span>
     </summary>
 
@@ -316,31 +287,6 @@
       "unit": "px",
       "default": 16,
       "visible_if": "{{ block.settings.icon_size == 'custom' }}"
-    },
-    {
-      "type": "select",
-      "id": "icon_style",
-      "label": "t:blocks.subheading.settings.icon_style.label",
-      "options": [
-        {
-          "value": "solid",
-          "label": "t:blocks.utility_item.settings.icon_background.options__1.label"
-        },
-        {
-          "value": "soft",
-          "label": "t:blocks.utility_item.settings.icon_background.options__2.label"
-        },
-        {
-          "value": "outline",
-          "label": "t:blocks.utility_item.settings.icon_background.options__3.label"
-        },
-        {
-          "value": "none",
-          "label": "t:shared.options.none"
-        }
-      ],
-      "default": "soft",
-      "visible_if": "{{ block.settings.icon_source != 'none' }}"
     },
     {
       "type": "color",
@@ -802,90 +748,6 @@
       "label": "t:shared.typography.text_gradient.label",
       "info": "t:shared.typography.text_gradient.info",
       "visible_if": "{{ block.settings.color == 'gradient' }}"
-    },
-    {
-      "type": "header",
-      "content": "t:shared.appearance.header"
-    },
-    {
-      "type": "color",
-      "id": "background_color",
-      "label": "t:shared.background.color.label",
-      "info": "t:blocks.accordion_row.settings.background_color.info"
-    },
-    {
-      "type": "select",
-      "id": "border_style",
-      "label": "t:blocks.group.settings.border_style.label",
-      "info": "t:blocks.accordion_row.settings.border_style.info",
-      "options": [
-        {
-          "value": "none",
-          "label": "t:shared.options.none"
-        },
-        {
-          "value": "solid",
-          "label": "t:shared.options.solid"
-        },
-        {
-          "value": "dashed",
-          "label": "t:shared.border.style.options__2.label"
-        }
-      ],
-      "default": "none"
-    },
-    {
-      "type": "range",
-      "id": "border_width",
-      "label": "t:shared.border.thickness.label",
-      "min": 1,
-      "max": 6,
-      "step": 1,
-      "unit": "px",
-      "default": 1,
-      "visible_if": "{{ block.settings.border_style != 'none' }}"
-    },
-    {
-      "type": "color",
-      "id": "border_color",
-      "label": "t:shared.border.color.label",
-      "info": "t:shared.border.color.info",
-      "visible_if": "{{ block.settings.border_style != 'none' }}"
-    },
-    {
-      "type": "range",
-      "id": "border_radius",
-      "label": "t:shared.corner_radius.label",
-      "min": 0,
-      "max": 40,
-      "step": 2,
-      "unit": "px",
-      "default": 14
-    },
-    {
-      "type": "header",
-      "content": "t:blocks.accordion_row.headers.toggle"
-    },
-    {
-      "type": "select",
-      "id": "toggle_style",
-      "label": "t:blocks.accordion_row.settings.toggle_style.label",
-      "info": "t:blocks.accordion_row.settings.toggle_style.info",
-      "options": [
-        {
-          "value": "plus",
-          "label": "t:blocks.accordion_row.settings.toggle_style.options__1.label"
-        },
-        {
-          "value": "cross",
-          "label": "t:blocks.accordion_row.settings.toggle_style.options__3.label"
-        },
-        {
-          "value": "arrow",
-          "label": "t:blocks.accordion_row.settings.toggle_style.options__2.label"
-        }
-      ],
-      "default": "plus"
     },
     {
       "type": "header",
