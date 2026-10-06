@@ -39,36 +39,63 @@
   assign border_paint = ''
 
   if border_line != 'none'
-    assign bw_top = s.border_width_top | default: 0 | plus: 0
-    assign bw_right = s.border_width_right | default: 0 | plus: 0
-    assign bw_bottom = s.border_width_bottom | default: 0 | plus: 0
-    assign bw_left = s.border_width_left | default: 0 | plus: 0
-    assign border_any = bw_top | plus: bw_right | plus: bw_bottom | plus: bw_left
+    assign border_sides = s.border_sides | default: 'top'
+    assign border_size = s.border_width | default: 1 | plus: 0
 
-    assign border_percent = s.border_opacity | default: 100 | plus: 0
+    case border_sides
+      when 'all'
+        assign bw_top = border_size
+        assign bw_right = border_size
+        assign bw_bottom = border_size
+        assign bw_left = border_size
+      when 'bottom'
+        assign bw_bottom = border_size
+      when 'top_bottom'
+        assign bw_top = border_size
+        assign bw_bottom = border_size
+      else
+        assign bw_top = border_size
+    endcase
+    assign border_any = border_size
+
     if s.border_color == blank
-      assign border_paint = 'color-mix(in srgb, currentColor ' | append: border_percent | append: '%, transparent)'
+      assign border_paint = 'currentColor'
     else
-      assign border_alpha = border_percent | divided_by: 100.0
-      assign border_paint = s.border_color | color_modify: 'alpha', border_alpha
+      assign border_paint = s.border_color
     endif
   endif
 
-  assign r_tl = s.border_radius_top_left | default: 40 | plus: 0
-  assign r_tr = s.border_radius_top_right | default: 40 | plus: 0
-  assign r_bl = s.border_radius_bottom_left | default: 0 | plus: 0
-  assign r_br = s.border_radius_bottom_right | default: 0 | plus: 0
+  assign corner_position = s.corner_position | default: 'top'
+  assign radius = s.border_radius | default: 40 | plus: 0
+  assign radius_mobile = s.border_radius_mobile | default: 24 | plus: 0
 
-  assign r_tl_m = s.border_radius_top_left_mobile | default: r_tl | plus: 0
-  assign r_tr_m = s.border_radius_top_right_mobile | default: r_tr | plus: 0
-  assign r_bl_m = s.border_radius_bottom_left_mobile | default: r_bl | plus: 0
-  assign r_br_m = s.border_radius_bottom_right_mobile | default: r_br | plus: 0
+  assign r_tl = 0
+  assign r_tr = 0
+  assign r_bl = 0
+  assign r_br = 0
+  assign r_tl_m = 0
+  assign r_tr_m = 0
+  assign r_bl_m = 0
+  assign r_br_m = 0
+
+  if corner_position != 'bottom'
+    assign r_tl = radius
+    assign r_tr = radius
+    assign r_tl_m = radius_mobile
+    assign r_tr_m = radius_mobile
+  endif
+  if corner_position != 'top'
+    assign r_bl = radius
+    assign r_br = radius
+    assign r_bl_m = radius_mobile
+    assign r_br_m = radius_mobile
+  endif
 
   assign overlap = 0
   assign overlap_mobile = 0
   if s.stack_layer == 'over' or s.stack_layer == 'under'
-    assign overlap = r_tl | at_least: r_tr
-    assign overlap_mobile = r_tl_m | at_least: r_tr_m
+    assign overlap = r_tl
+    assign overlap_mobile = r_tl_m
   endif
 
   assign show_intro = s.show_intro
@@ -752,59 +779,39 @@
       "default": "dashed"
     },
     {
+      "type": "select",
+      "id": "border_sides",
+      "label": "t:shared.border.sides.label",
+      "options": [
+        {
+          "value": "all",
+          "label": "t:shared.options.all"
+        },
+        {
+          "value": "top",
+          "label": "t:shared.border.sides.top.label"
+        },
+        {
+          "value": "bottom",
+          "label": "t:shared.border.sides.bottom.label"
+        },
+        {
+          "value": "top_bottom",
+          "label": "t:shared.border.sides.top_bottom.label"
+        }
+      ],
+      "default": "top",
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
       "type": "range",
-      "id": "border_width_top",
-      "label": "t:shared.border.sides.top.label",
-      "info": "t:shared.border.sides.info",
-      "min": 0,
+      "id": "border_width",
+      "label": "t:shared.border.thickness.label",
+      "min": 1,
       "max": 12,
       "step": 1,
       "unit": "px",
       "default": 1,
-      "visible_if": "{{ section.settings.border_style != 'none' }}"
-    },
-    {
-      "type": "range",
-      "id": "border_width_right",
-      "label": "t:shared.border.sides.right.label",
-      "min": 0,
-      "max": 12,
-      "step": 1,
-      "unit": "px",
-      "default": 0,
-      "visible_if": "{{ section.settings.border_style != 'none' }}"
-    },
-    {
-      "type": "range",
-      "id": "border_width_bottom",
-      "label": "t:shared.border.sides.bottom.label",
-      "min": 0,
-      "max": 12,
-      "step": 1,
-      "unit": "px",
-      "default": 0,
-      "visible_if": "{{ section.settings.border_style != 'none' }}"
-    },
-    {
-      "type": "range",
-      "id": "border_width_left",
-      "label": "t:shared.border.sides.left.label",
-      "min": 0,
-      "max": 12,
-      "step": 1,
-      "unit": "px",
-      "default": 0,
-      "visible_if": "{{ section.settings.border_style != 'none' }}"
-    },
-    {
-      "type": "range",
-      "id": "border_opacity",
-      "label": "t:shared.border.opacity.label",
-      "min": 0,
-      "max": 100,
-      "step": 5,
-      "unit": "%",
-      "default": 100,
       "visible_if": "{{ section.settings.border_style != 'none' }}"
     },
     {
@@ -818,12 +825,31 @@
       "content": "t:shared.corners.header"
     },
     {
+      "type": "select",
+      "id": "corner_position",
+      "label": "t:shared.corners.position.label",
+      "options": [
+        {
+          "value": "top",
+          "label": "t:shared.border.sides.top.label"
+        },
+        {
+          "value": "bottom",
+          "label": "t:shared.border.sides.bottom.label"
+        },
+        {
+          "value": "all",
+          "label": "t:shared.options.all"
+        }
+      ],
+      "default": "top"
+    },
+    {
       "type": "range",
-      "id": "border_radius_top_left",
-      "label": "t:shared.corners.top_left.label",
-      "info": "t:shared.corners.paragraph",
+      "id": "border_radius",
+      "label": "t:shared.corners.radius.label",
       "min": 0,
-      "max": 60,
+      "max": 80,
       "step": 2,
       "unit": "px",
       "default": 40,
@@ -831,79 +857,13 @@
     },
     {
       "type": "range",
-      "id": "border_radius_top_right",
-      "label": "t:shared.corners.top_right.label",
+      "id": "border_radius_mobile",
+      "label": "t:shared.corners.radius.label",
       "min": 0,
-      "max": 60,
-      "step": 2,
-      "unit": "px",
-      "default": 40,
-      "visible_if": "{{ section.settings.device == 'desktop' }}"
-    },
-    {
-      "type": "range",
-      "id": "border_radius_bottom_left",
-      "label": "t:shared.corners.bottom_left.label",
-      "min": 0,
-      "max": 60,
-      "step": 2,
-      "unit": "px",
-      "default": 0,
-      "visible_if": "{{ section.settings.device == 'desktop' }}"
-    },
-    {
-      "type": "range",
-      "id": "border_radius_bottom_right",
-      "label": "t:shared.corners.bottom_right.label",
-      "min": 0,
-      "max": 60,
-      "step": 2,
-      "unit": "px",
-      "default": 0,
-      "visible_if": "{{ section.settings.device == 'desktop' }}"
-    },
-    {
-      "type": "range",
-      "id": "border_radius_top_left_mobile",
-      "label": "t:shared.corners.top_left.label",
-      "min": 0,
-      "max": 60,
+      "max": 80,
       "step": 2,
       "unit": "px",
       "default": 24,
-      "visible_if": "{{ section.settings.device == 'mobile' }}"
-    },
-    {
-      "type": "range",
-      "id": "border_radius_top_right_mobile",
-      "label": "t:shared.corners.top_right.label",
-      "min": 0,
-      "max": 60,
-      "step": 2,
-      "unit": "px",
-      "default": 24,
-      "visible_if": "{{ section.settings.device == 'mobile' }}"
-    },
-    {
-      "type": "range",
-      "id": "border_radius_bottom_left_mobile",
-      "label": "t:shared.corners.bottom_left.label",
-      "min": 0,
-      "max": 60,
-      "step": 2,
-      "unit": "px",
-      "default": 0,
-      "visible_if": "{{ section.settings.device == 'mobile' }}"
-    },
-    {
-      "type": "range",
-      "id": "border_radius_bottom_right_mobile",
-      "label": "t:shared.corners.bottom_right.label",
-      "min": 0,
-      "max": 60,
-      "step": 2,
-      "unit": "px",
-      "default": 0,
       "visible_if": "{{ section.settings.device == 'mobile' }}"
     },
     {
