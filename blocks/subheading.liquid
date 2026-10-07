@@ -66,11 +66,24 @@
   assign has_divider = has_icon
 
   # ---- the block's own border ---------------------------------------------
-  # Independent of the background: an outlined pill with nothing behind it is a
-  # shape merchants ask for constantly, and gating the outline on a background
-  # would make it unreachable. Radius is independent of both, which is why it
-  # is no longer hidden when the background is set to Inherit.
-  assign border_style = s.border_style | default: 'none'
+  # Inherit is the theme's own pill: a dashed outline in the text colour, no
+  # background, 40px radius. The custom fields only apply once it is off.
+  assign inherit_appearance = true
+  if s.appearance_inherit == false
+    assign inherit_appearance = false
+  endif
+
+  if inherit_appearance
+    assign border_style = 'dashed'
+    assign border_radius = 40
+    assign background_color = blank
+    assign border_color = blank
+  else
+    assign border_style = s.border_style | default: 'none'
+    assign border_radius = s.border_radius | default: 0 | plus: 0
+    assign background_color = s.background_color
+    assign border_color = s.border_color
+  endif
   assign border_width = 1
   assign has_border = false
   if border_style != 'none'
@@ -145,7 +158,7 @@
     assign classes = classes | append: ' block-text--colored'
   endif
 
-  if s.background_color != blank
+  if background_color != blank
     assign classes = classes | append: ' block-text--has-background'
   endif
 
@@ -176,21 +189,18 @@
       --subheading-icon-box-width: {{ icon_box }}px;
       --subheading-icon-box-height: {{ icon_box }}px;
       --subheading-icon-radius: {{ icon_radius }}px;
-      {%- if icon_style == 'solid' and s.icon_background != blank -%}
-        --subheading-icon-background: {{ s.icon_background }};
-      {%- endif -%}
     {%- endif -%}
   {%- endif -%}
 
-  --block-text-radius: {{ s.border_radius | default: 0 | plus: 0 }}px;
-  {%- if s.background_color != blank -%}
-    --block-text-background: {{ s.background_color }};
+  --block-text-radius: {{ border_radius }}px;
+  {%- if background_color != blank -%}
+    --block-text-background: {{ background_color }};
   {%- endif -%}
   {%- if has_border -%}
     --subheading-border-width: {{ border_width }}px;
     --subheading-border-style: {{ border_style }};
-    {%- if s.border_color != blank -%}
-      --subheading-border-color: {{ s.border_color }};
+    {%- if border_color != blank -%}
+      --subheading-border-color: {{ border_color }};
     {%- endif -%}
   {%- endif -%}
 {%- endcapture -%}
@@ -423,13 +433,6 @@
       ],
       "default": "solid",
       "visible_if": "{{ block.settings.icon_source != 'none' }}"
-    },
-    {
-      "type": "color",
-      "id": "icon_background",
-      "label": "t:blocks.subheading.settings.icon_background.label",
-      "info": "t:blocks.subheading.settings.icon_background.info",
-      "visible_if": "{{ block.settings.icon_source != 'none' and block.settings.icon_style == 'solid' }}"
     },
     {
       "type": "color",
@@ -834,10 +837,17 @@
       "visible_if": "{{ block.settings.color == 'gradient' }}"
     },
     {
+      "type": "checkbox",
+      "id": "appearance_inherit",
+      "label": "t:shared.inherit.label",
+      "default": true
+    },
+    {
       "type": "color_background",
       "id": "background_color",
       "label": "t:shared.appearance.background.label",
-      "info": "t:shared.appearance.background.info"
+      "info": "t:shared.appearance.background.info",
+      "visible_if": "{{ block.settings.appearance_inherit == false }}"
     },
     {
       "type": "select",
@@ -858,14 +868,15 @@
           "label": "t:shared.border.style.options__2.label"
         }
       ],
-      "default": "dashed"
+      "default": "dashed",
+      "visible_if": "{{ block.settings.appearance_inherit == false }}"
     },
     {
       "type": "color",
       "id": "border_color",
       "label": "t:shared.border.color.label",
       "info": "t:blocks.subheading.settings.border_color.info",
-      "visible_if": "{{ block.settings.border_style != 'none' }}"
+      "visible_if": "{{ block.settings.appearance_inherit == false and block.settings.border_style != 'none' }}"
     },
     {
       "type": "range",
@@ -876,7 +887,8 @@
       "max": 60,
       "step": 2,
       "unit": "px",
-      "default": 40
+      "default": 40,
+      "visible_if": "{{ block.settings.appearance_inherit == false }}"
     },
     {
       "type": "header",
