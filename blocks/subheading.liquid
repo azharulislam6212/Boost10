@@ -10,8 +10,6 @@
   assign alignment = s.alignment | default: 'start'
   assign alignment_mobile = s.alignment_mobile | default: 'start'
   assign color_mode = s.color | default: 'inherit'
-  assign highlight = s.highlight_style | default: 'none'
-  assign background_mode = s.background | default: 'inherit'
   assign icon_source = s.icon_source | default: 'none'
 
   # ---- tag ----------------------------------------------------------------
@@ -54,24 +52,18 @@
   endif
 
   capture icon_px
-    render 'icon-size', size: s.icon_size, custom: s.icon_size_custom
+    render 'icon-size', size: s.icon_size
   endcapture
   assign icon_size = icon_px | plus: 0
 
   assign icon_style = s.icon_style | default: 'none'
 
-  assign icon_box_width = s.icon_width | default: 40 | plus: 0
-  assign icon_box_height = s.icon_height | default: 40 | plus: 0
+  assign icon_box = s.icon_width | default: 40 | plus: 0
   assign icon_radius = s.icon_border_radius | default: 0 | plus: 0
-  assign icon_border_style = s.icon_border_style | default: 'none'
-  assign icon_border_width = s.icon_border_thickness | default: 0 | plus: 0
 
   assign icon_image_sizes = icon_size | append: 'px'
 
-  assign has_divider = false
-  if has_icon and s.show_divider
-    assign has_divider = true
-  endif
+  assign has_divider = has_icon
 
   # ---- the block's own border ---------------------------------------------
   # Independent of the background: an outlined pill with nothing behind it is a
@@ -79,9 +71,9 @@
   # would make it unreachable. Radius is independent of both, which is why it
   # is no longer hidden when the background is set to Inherit.
   assign border_style = s.border_style | default: 'none'
-  assign border_width = s.border_thickness | default: 0 | plus: 0
+  assign border_width = 1
   assign has_border = false
-  if border_style != 'none' and border_width > 0
+  if border_style != 'none'
     assign has_border = true
   endif
 
@@ -101,14 +93,6 @@
   else
     assign width_flex = '0 0 auto'
     assign width_size = 'fit-content'
-  endif
-
-  if s.width_mobile == 'fill'
-    assign width_flex_mobile = '1 1 0%'
-    assign width_size_mobile = '100%'
-  else
-    assign width_flex_mobile = '0 0 auto'
-    assign width_size_mobile = 'fit-content'
   endif
 
   # ---- the row's own alignment --------------------------------------------
@@ -147,8 +131,6 @@
   # Alignment is the block's own only when it fills; a Fit box follows its parent.
   if s.width != 'fill'
     assign alignment = 'inherit'
-  endif
-  if s.width_mobile != 'fill'
     assign alignment_mobile = 'inherit'
   endif
 
@@ -163,13 +145,7 @@
     assign classes = classes | append: ' block-text--colored'
   endif
 
-  if highlight != 'none' and highlight != blank
-    assign highlight_target = s.highlight_target | default: 'em'
-    assign classes = classes | append: ' block-text--highlight block-text--highlight-' | append: highlight
-    assign classes = classes | append: ' block-text--hl-' | append: highlight_target
-  endif
-
-  if background_mode == 'custom'
+  if s.background_color != blank
     assign classes = classes | append: ' block-text--has-background'
   endif
 
@@ -185,8 +161,8 @@
   {%- render 'block-typography', block: s -%}
   --block-text-flex: {{ width_flex }};
   --block-text-width: {{ width_size }};
-  --block-text-flex-mobile: {{ width_flex_mobile }};
-  --block-text-width-mobile: {{ width_size_mobile }};
+  --block-text-flex-mobile: {{ width_flex }};
+  --block-text-width-mobile: {{ width_size }};
   --subheading-justify: {{ justify }};
   --subheading-justify-mobile: {{ justify_mobile }};
   {%- if has_icon -%}
@@ -197,30 +173,17 @@
       --subheading-icon-color: {{ s.icon_color }};
     {%- endif -%}
     {%- if icon_style != 'none' -%}
-      --subheading-icon-box-width: {{ icon_box_width }}px;
-      --subheading-icon-box-height: {{ icon_box_height }}px;
+      --subheading-icon-box-width: {{ icon_box }}px;
+      --subheading-icon-box-height: {{ icon_box }}px;
       --subheading-icon-radius: {{ icon_radius }}px;
       {%- if icon_style == 'solid' and s.icon_background != blank -%}
         --subheading-icon-background: {{ s.icon_background }};
       {%- endif -%}
-      {%- if icon_border_style != 'none' and icon_border_width > 0 -%}
-        --subheading-icon-border-width: {{ icon_border_width }}px;
-        --subheading-icon-border-style: {{ icon_border_style }};
-        {%- if s.icon_border_color != blank -%}
-          --subheading-icon-border-color: {{ s.icon_border_color }};
-        {%- endif -%}
-      {%- endif -%}
     {%- endif -%}
-    {%- if has_divider and s.divider_color != blank -%}
-      --subheading-divider-color: {{ s.divider_color }};
-    {%- endif -%}
-  {%- endif -%}
-  {%- if highlight != 'none' and s.highlight_color != blank -%}
-    --block-highlight-color: {{ s.highlight_color }};
   {%- endif -%}
 
   --block-text-radius: {{ s.border_radius | default: 0 | plus: 0 }}px;
-  {%- if background_mode == 'custom' and s.background_color != blank -%}
+  {%- if s.background_color != blank -%}
     --block-text-background: {{ s.background_color }};
   {%- endif -%}
   {%- if has_border -%}
@@ -434,26 +397,10 @@
         {
           "value": "extra_large",
           "label": "t:shared.icon_size.options__5.label"
-        },
-        {
-          "value": "custom",
-          "label": "t:shared.icon_size.options__6.label"
         }
       ],
       "default": "medium",
       "visible_if": "{{ block.settings.icon_source != 'none' }}"
-    },
-    {
-      "type": "range",
-      "id": "icon_size_custom",
-      "label": "t:shared.icon_size.custom.label",
-      "info": "t:shared.icon_size.custom.info",
-      "min": 12,
-      "max": 48,
-      "step": 2,
-      "unit": "px",
-      "default": 20,
-      "visible_if": "{{ block.settings.icon_source != 'none' and block.settings.icon_size == 'custom' }}"
     },
     {
       "type": "select",
@@ -504,55 +451,6 @@
     },
     {
       "type": "range",
-      "id": "icon_height",
-      "label": "t:blocks.subheading.settings.icon_height.label",
-      "min": 16,
-      "max": 96,
-      "step": 2,
-      "unit": "px",
-      "default": 40,
-      "visible_if": "{{ block.settings.icon_source != 'none' and block.settings.icon_style != 'none' }}"
-    },
-    {
-      "type": "select",
-      "id": "icon_border_style",
-      "label": "t:blocks.subheading.settings.icon_border_style.label",
-      "options": [
-        {
-          "value": "none",
-          "label": "t:shared.none.label"
-        },
-        {
-          "value": "solid",
-          "label": "t:shared.border.style.options__1.label"
-        },
-        {
-          "value": "dashed",
-          "label": "t:shared.border.style.options__2.label"
-        }
-      ],
-      "default": "none",
-      "visible_if": "{{ block.settings.icon_source != 'none' and block.settings.icon_style != 'none' }}"
-    },
-    {
-      "type": "range",
-      "id": "icon_border_thickness",
-      "label": "t:shared.border.thickness.label",
-      "min": 0,
-      "max": 8,
-      "step": 1,
-      "unit": "px",
-      "default": 1,
-      "visible_if": "{{ block.settings.icon_source != 'none' and block.settings.icon_style != 'none' and block.settings.icon_border_style != 'none' }}"
-    },
-    {
-      "type": "color",
-      "id": "icon_border_color",
-      "label": "t:blocks.subheading.settings.icon_border_color.label",
-      "visible_if": "{{ block.settings.icon_source != 'none' and block.settings.icon_style != 'none' and block.settings.icon_border_style != 'none' }}"
-    },
-    {
-      "type": "range",
       "id": "icon_border_radius",
       "label": "t:shared.border.radius.label",
       "info": "t:blocks.subheading.settings.icon_border_radius.info",
@@ -562,20 +460,6 @@
       "unit": "px",
       "default": 50,
       "visible_if": "{{ block.settings.icon_source != 'none' and block.settings.icon_style != 'none' }}"
-    },
-    {
-      "type": "checkbox",
-      "id": "show_divider",
-      "label": "t:blocks.subheading.settings.show_divider.label",
-      "info": "t:blocks.subheading.settings.show_divider.info",
-      "default": true,
-      "visible_if": "{{ block.settings.icon_source != 'none' }}"
-    },
-    {
-      "type": "color",
-      "id": "divider_color",
-      "label": "t:blocks.subheading.settings.divider_color.label",
-      "visible_if": "{{ block.settings.icon_source != 'none' and block.settings.show_divider }}"
     },
     {
       "type": "range",
@@ -950,28 +834,10 @@
       "visible_if": "{{ block.settings.color == 'gradient' }}"
     },
     {
-      "type": "select",
-      "id": "background",
-      "label": "t:shared.appearance.background.label",
-      "info": "t:shared.appearance.background.info",
-      "options": [
-        {
-          "value": "inherit",
-          "label": "t:shared.appearance.background.options__1.label"
-        },
-        {
-          "value": "custom",
-          "label": "t:shared.appearance.background.options__2.label"
-        }
-      ],
-      "default": "inherit"
-    },
-    {
       "type": "color_background",
       "id": "background_color",
-      "label": "t:shared.appearance.background_color.label",
-      "default": "#000000",
-      "visible_if": "{{ block.settings.background == 'custom' }}"
+      "label": "t:shared.appearance.background.label",
+      "info": "t:shared.appearance.background.info"
     },
     {
       "type": "select",
@@ -995,17 +861,6 @@
       "default": "dashed"
     },
     {
-      "type": "range",
-      "id": "border_thickness",
-      "label": "t:shared.border.thickness.label",
-      "min": 0,
-      "max": 8,
-      "step": 1,
-      "unit": "px",
-      "default": 1,
-      "visible_if": "{{ block.settings.border_style != 'none' }}"
-    },
-    {
       "type": "color",
       "id": "border_color",
       "label": "t:shared.border.color.label",
@@ -1022,83 +877,6 @@
       "step": 2,
       "unit": "px",
       "default": 40
-    },
-    {
-      "type": "header",
-      "content": "t:shared.highlight.header"
-    },
-    {
-      "type": "paragraph",
-      "content": "t:shared.highlight.paragraph"
-    },
-    {
-      "type": "select",
-      "id": "highlight_style",
-      "label": "t:shared.highlight.style.label",
-      "options": [
-        {
-          "value": "none",
-          "label": "t:shared.highlight.style.options__1.label"
-        },
-        {
-          "value": "standard",
-          "label": "t:shared.highlight.style.options__2.label"
-        },
-        {
-          "value": "wavy",
-          "label": "t:shared.highlight.style.options__3.label"
-        },
-        {
-          "value": "solid",
-          "label": "t:shared.highlight.style.options__4.label"
-        },
-        {
-          "value": "marker",
-          "label": "t:shared.highlight.style.options__5.label"
-        },
-        {
-          "value": "underline",
-          "label": "t:shared.highlight.style.options__6.label"
-        },
-        {
-          "value": "outline",
-          "label": "t:shared.highlight.style.options__7.label"
-        },
-        {
-          "value": "strikethrough",
-          "label": "t:shared.highlight.style.options__8.label"
-        }
-      ],
-      "default": "none"
-    },
-    {
-      "type": "select",
-      "id": "highlight_target",
-      "label": "t:shared.highlight.target.label",
-      "info": "t:shared.highlight.target.info",
-      "options": [
-        {
-          "value": "em",
-          "label": "t:shared.highlight.target.options__1.label"
-        },
-        {
-          "value": "strong",
-          "label": "t:shared.highlight.target.options__2.label"
-        },
-        {
-          "value": "all",
-          "label": "t:shared.highlight.target.options__3.label"
-        }
-      ],
-      "default": "em",
-      "visible_if": "{{ block.settings.highlight_style != 'none' }}"
-    },
-    {
-      "type": "color",
-      "id": "highlight_color",
-      "label": "t:shared.highlight.color.label",
-      "info": "t:shared.highlight.color.info",
-      "visible_if": "{{ block.settings.highlight_style != 'none' }}"
     },
     {
       "type": "header",
@@ -1144,22 +922,6 @@
     },
     {
       "type": "select",
-      "id": "width_mobile",
-      "label": "t:shared.layout.width_mobile.label",
-      "options": [
-        {
-          "value": "fit",
-          "label": "t:blocks.group.settings.width.options__1.label"
-        },
-        {
-          "value": "fill",
-          "label": "t:blocks.group.settings.width.options__2.label"
-        }
-      ],
-      "default": "fit"
-    },
-    {
-      "type": "select",
       "id": "alignment_mobile",
       "label": "t:shared.layout.alignment_mobile.label",
       "options": [
@@ -1177,7 +939,7 @@
         }
       ],
       "default": "start",
-      "visible_if": "{{ block.settings.width_mobile == 'fill' }}"
+      "visible_if": "{{ block.settings.width == 'fill' }}"
     },
     {
       "type": "header",
@@ -1341,12 +1103,9 @@
         "icon_style": "solid",
         "icon_size": "small",
         "icon_width": 22,
-        "icon_height": 22,
         "icon_border_radius": 50,
-        "show_divider": true,
         "gap": 8,
         "border_style": "dashed",
-        "border_thickness": 1,
         "border_radius": 40
       },
       "blocks": []
