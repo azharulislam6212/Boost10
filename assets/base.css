@@ -4353,6 +4353,9 @@
   /* ---- accordion ---- */
 
   .accordion {
+    /* Accent, not the button colour: a dark scheme's button would vanish here. */
+    --accordion-accent: var(--color-accent, var(--color-primary-button-background));
+
     display: flex;
     flex-direction: column;
     gap: var(--accordion-gap, var(--space-4));
@@ -4360,18 +4363,27 @@
     min-inline-size: 0;
   }
 
+  /* The question and the answer are two tiles; the border outlines an open row. */
   .accordion-row {
-    border: var(--accordion-row-border-width, 0) var(--accordion-row-border-style, solid)
-      var(--accordion-row-border-color, transparent);
-    border-radius: var(--accordion-row-radius, var(--radius-card, 14px));
-    background-color: var(--accordion-row-background, var(--color-secondary-background));
+    --accordion-row-tile: var(--accordion-row-background, var(--color-secondary-background));
+
+    border-radius: calc(var(--accordion-row-radius, var(--radius-card, 14px)) + 4px);
+    outline: var(--accordion-row-border-width, 0) var(--accordion-row-border-style, solid) transparent;
+    outline-offset: 4px;
+    transition: outline-color var(--transition-base);
+  }
+
+  .accordion-row[open] {
+    outline-color: var(--accordion-row-border-color, transparent);
   }
 
   .accordion-row__summary {
     display: flex;
     align-items: center;
-    gap: var(--space-3);
+    gap: var(--space-4);
     padding: var(--space-4);
+    border-radius: var(--accordion-row-radius, var(--radius-card, 14px));
+    background-color: var(--accordion-row-tile);
     cursor: pointer;
     list-style: none;
   }
@@ -4388,13 +4400,10 @@
   .accordion-row__icon {
     --icon-mark-own-size: var(--accordion-row-icon-box, 28px);
     --icon-mark-own-radius: 6px;
-    --icon-mark-own-fill: rgb(var(--color-primary-button-background-rgb) / 0.2);
+    --icon-mark-own-fill: color-mix(in srgb, var(--accordion-accent) 20%, transparent);
     --icon-mark-own-color: var(--color-heading);
 
-    --icon-mark-own-ring-color: rgb(var(--color-primary-button-background-rgb) / 0.45);
-
-    border: var(--accordion-row-border-width, 0) var(--accordion-row-border-style, solid)
-      var(--accordion-row-border-color, transparent);
+    --icon-mark-own-ring-color: color-mix(in srgb, var(--accordion-accent) 45%, transparent);
 
     /* The Accordion owns the mark; an unset one falls through to the defaults. */
     --icon-mark-size-desktop: var(--accordion-mark-size-desktop);
@@ -4453,8 +4462,8 @@
   }
 
   .accordion[data-icon-style='solid'] > .accordion-row-motion > .accordion-row > .accordion-row__summary > .accordion-row__icon {
-    --icon-mark-own-fill: rgb(var(--color-primary-button-background-rgb));
-    --icon-mark-own-color: var(--color-primary-button-text);
+    --icon-mark-own-fill: var(--accordion-accent);
+    --icon-mark-own-color: var(--color-primary-button-outline-icon);
   }
 
   .accordion[data-icon-style='outline'] > .accordion-row-motion > .accordion-row > .accordion-row__summary > .accordion-row__icon {
@@ -4511,7 +4520,7 @@
     inline-size: 2.4rem;
     block-size: 2.4rem;
     border: var(--accordion-row-border-width, 0) var(--accordion-row-border-style, solid)
-      var(--accordion-row-border-color, transparent);
+      var(--accordion-accent);
     border-radius: 8px;
     background-color: transparent;
     color: var(--color-heading);
@@ -4522,8 +4531,8 @@
 
   .accordion-row[open] > .accordion-row__summary .accordion-row__toggle {
     border-color: transparent;
-    background-color: var(--color-primary-button-background);
-    color: var(--color-primary-button-text);
+    background-color: var(--accordion-accent);
+    color: var(--color-primary-button-outline-icon);
   }
 
   .accordion-row__plus { stroke-width: 2; }
@@ -4553,18 +4562,19 @@
     transform: none;
   }
 
+  .accordion-row__panel {
+    padding-block-start: var(--space-1);
+  }
+
   .accordion-row__answer {
     display: flex;
     flex-direction: column;
     gap: var(--space-3);
-    padding-inline: var(--space-4) calc(var(--space-4) + 2.4rem + var(--space-3));
-    padding-block-end: var(--space-4);
+    padding: var(--space-4);
+    border-radius: var(--accordion-row-radius, var(--radius-card, 14px));
+    background-color: var(--accordion-row-tile);
     color: var(--color-text);
     min-inline-size: 0;
-  }
-
-  .accordion-row--has-icon .accordion-row__answer {
-    padding-inline-start: calc(var(--space-4) + var(--accordion-row-icon-box, 28px) + var(--space-3));
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -4988,6 +4998,11 @@
     align-items: var(--group-block, start);
   }
 
+  /* In a column the flex basis is a height, so a Custom width must not set it. */
+  .block-group--column > .block-group__content > .block-group[style*='--group-width: 0 0 '] {
+    flex: 0 0 auto;
+  }
+
   .block-group--column:where([style*='--group-inline: center']) { text-align: center; }
   .block-group--column:where([style*='--group-inline: end']) { text-align: end; }
 
@@ -5130,6 +5145,12 @@
 
   .image-card--over {
     aspect-ratio: var(--image-card-ratio, auto);
+  }
+
+  /* The picture covers the card; a scheme fill behind it only halos the corners. */
+  .image-card--over.color-scheme-container {
+    background-color: transparent;
+    background-image: none;
   }
 
   .image-card__media {
