@@ -1,6 +1,6 @@
 {% doc %}
   The group its rows belong to. It also sets the look every row shares:
-  toggle, icon style, background, border and corners.
+  toggle, icon size, shape and ring, background, border and corners.
 {% enddoc %}
 
 {%- liquid
@@ -21,6 +21,39 @@
   endif
 
   assign radius = s.border_radius | default: 14 | plus: 0
+
+  # ---- the row icon -------------------------------------------------------
+  # One look for every row. Rows cannot read this block's settings, so the
+  # mark is handed down as `--accordion-mark-*` properties that only the row
+  # icon maps back onto `--icon-mark-*`; icons inside an answer never see them.
+  capture icon_px
+    render 'icon-size', size: s.icon_size, custom: s.icon_size_custom
+  endcapture
+  assign icon_size = icon_px | plus: 0
+  assign icon_box = icon_size | plus: 12
+
+  capture mark_declarations
+    render 'icon-mark', block: s, declarations: true, dash_gap: 4
+  endcapture
+  assign mark_declarations = mark_declarations | replace: '--icon-mark-', '--accordion-mark-'
+
+  assign shape = s.shape | default: 'none'
+  assign ring_style = s.ring_style | default: 'none'
+  assign ring_width = s.ring_width | default: 1 | plus: 0
+  assign ring = 'none'
+  if shape != 'none' and ring_style != 'none'
+    assign ring = shape
+  endif
+
+  assign ring_dash = 'none'
+  assign ring_cap = 'butt'
+  if ring_style == 'dashed'
+    assign ring_dash = '2px 4px'
+  elsif ring_style == 'dotted'
+    assign dot_gap = ring_width | times: 2
+    assign ring_dash = '0.01px ' | append: dot_gap | append: 'px'
+    assign ring_cap = 'round'
+  endif
 -%}
 
 {%- capture accordion_style -%}
@@ -32,6 +65,14 @@
   --accordion-gap: {{ gap }}px;
   --accordion-align: {{ alignment }};
   --accordion-row-radius: {{ radius }}px;
+  --accordion-row-icon-size: {{ icon_size }}px;
+  --accordion-row-icon-box: {{ icon_box }}px;
+  {{ mark_declarations }}
+  {%- if ring != 'none' -%}
+    --accordion-ring-width: {{ ring_width }}px;
+    --accordion-ring-dash: {{ ring_dash }};
+    --accordion-ring-cap: {{ ring_cap }};
+  {%- endif -%}
   {%- if s.background_color != blank -%}
     --accordion-row-background: {{ s.background_color }};
   {%- endif -%}
@@ -51,6 +92,7 @@
     {% if s.single_open %}data-single{% endif %}
     data-toggle="{{ s.toggle_style | default: 'plus' }}"
     data-icon-style="{{ s.icon_style | default: 'soft' }}"
+    data-ring="{{ ring }}"
     data-block-spacing
     style="{{ accordion_style | strip_newlines | strip }}"
     {{ block.shopify_attributes }}
@@ -65,7 +107,7 @@
   "tag": null,
   "blocks": [
     {
-      "type": "accordion-row"
+      "type": "_accordion-row"
     },
     {
       "type": "@app"
@@ -161,6 +203,182 @@
         }
       ],
       "default": "soft"
+    },
+    {
+      "type": "select",
+      "id": "icon_size",
+      "label": "t:shared.icon_size.label",
+      "options": [
+        {
+          "value": "extra_small",
+          "label": "t:shared.icon_size.options__1.label"
+        },
+        {
+          "value": "small",
+          "label": "t:shared.icon_size.options__2.label"
+        },
+        {
+          "value": "medium",
+          "label": "t:shared.icon_size.options__3.label"
+        },
+        {
+          "value": "large",
+          "label": "t:shared.icon_size.options__4.label"
+        },
+        {
+          "value": "extra_large",
+          "label": "t:shared.icon_size.options__5.label"
+        },
+        {
+          "value": "custom",
+          "label": "t:shared.icon_size.options__6.label"
+        }
+      ],
+      "default": "medium"
+    },
+    {
+      "type": "range",
+      "id": "icon_size_custom",
+      "label": "t:shared.icon_size.custom.label",
+      "info": "t:shared.icon_size.custom.info",
+      "min": 12,
+      "max": 72,
+      "step": 2,
+      "unit": "px",
+      "default": 16,
+      "visible_if": "{{ block.settings.icon_size == 'custom' }}"
+    },
+    {
+      "type": "color",
+      "id": "icon_color",
+      "label": "t:shared.border.color.label"
+    },
+    {
+      "type": "color",
+      "id": "icon_hover_color",
+      "label": "t:blocks.accordion_row.settings.icon_hover_color.label",
+      "info": "t:blocks.feature_icon.settings.icon_hover_color.info"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.feature_icon.headers.shape"
+    },
+    {
+      "type": "select",
+      "id": "shape",
+      "label": "t:blocks.feature_icon.settings.shape.label",
+      "info": "t:blocks.feature_icon.settings.shape.info",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.options.none"
+        },
+        {
+          "value": "circle",
+          "label": "t:shared.carousel.nav_shape.options__2.label"
+        },
+        {
+          "value": "square",
+          "label": "t:shared.carousel.nav_shape.options__3.label"
+        }
+      ],
+      "default": "square"
+    },
+    {
+      "type": "range",
+      "id": "shape_size",
+      "label": "t:blocks.feature_icon.settings.shape_size.label",
+      "min": 16,
+      "max": 160,
+      "step": 2,
+      "unit": "px",
+      "default": 32,
+      "visible_if": "{{ block.settings.shape != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "shape_size_mobile",
+      "label": "t:blocks.feature_icon.settings.shape_size_mobile.label",
+      "info": "t:blocks.feature_icon.settings.shape_size_mobile.info",
+      "min": 16,
+      "max": 160,
+      "step": 2,
+      "unit": "px",
+      "default": 26,
+      "visible_if": "{{ block.settings.shape != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "shape_radius",
+      "label": "t:shared.corners.radius.label",
+      "min": 0,
+      "max": 48,
+      "step": 2,
+      "unit": "px",
+      "default": 6,
+      "visible_if": "{{ block.settings.shape == 'square' }}"
+    },
+    {
+      "type": "color_background",
+      "id": "fill_color",
+      "label": "t:blocks.feature_icon.settings.fill_color.label",
+      "visible_if": "{{ block.settings.shape != 'none' }}"
+    },
+    {
+      "type": "color_background",
+      "id": "fill_hover_color",
+      "label": "t:blocks.feature_icon.settings.fill_hover_color.label",
+      "visible_if": "{{ block.settings.shape != 'none' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.feature_icon.headers.ring"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:blocks.feature_icon.paragraphs.ring"
+    },
+    {
+      "type": "select",
+      "id": "ring_style",
+      "label": "t:shared.border.style.label",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.options.none"
+        },
+        {
+          "value": "solid",
+          "label": "t:shared.options.solid"
+        },
+        {
+          "value": "dashed",
+          "label": "t:shared.options.dashed"
+        },
+        {
+          "value": "dotted",
+          "label": "t:shared.options.dotted"
+        }
+      ],
+      "default": "dashed",
+      "visible_if": "{{ block.settings.shape != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "ring_width",
+      "label": "t:shared.border.thickness.label",
+      "min": 1,
+      "max": 8,
+      "step": 1,
+      "unit": "px",
+      "default": 1,
+      "visible_if": "{{ block.settings.shape != 'none' and block.settings.ring_style != 'none' }}"
+    },
+    {
+      "type": "color",
+      "id": "ring_color",
+      "label": "t:shared.border.color.label",
+      "visible_if": "{{ block.settings.shape != 'none' and block.settings.ring_style != 'none' }}"
     },
     {
       "type": "header",
@@ -324,13 +542,13 @@
       "category": "t:categories.text",
       "blocks": [
         {
-          "type": "accordion-row"
+          "type": "_accordion-row"
         },
         {
-          "type": "accordion-row"
+          "type": "_accordion-row"
         },
         {
-          "type": "accordion-row"
+          "type": "_accordion-row"
         }
       ]
     }
