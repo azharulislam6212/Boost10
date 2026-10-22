@@ -1306,6 +1306,14 @@
     justify-content: flex-start;
   }
 
+  /* Before the track is built (block picker preview, first paint) the group
+     fills the ring itself, so the pill already sits where the track puts it. */
+  button-swap .button.button--has-icon:not(.button--icon-only):not(.button--link) > .button-text {
+    flex: 1 1 auto;
+    align-self: stretch;
+    align-items: center;
+  }
+
   button-swap .button.button--has-icon:not(.button--icon-only):not(.button--link) .button__label {
     flex: 1 1 auto;
     white-space: nowrap;
@@ -4724,9 +4732,20 @@
   /* ---- marketing sections ---- */
 
   .rich-text__inner { max-inline-size: var(--rich-text-width, 72rem); }
-  .rich-text__inner--center { margin-inline: auto; text-align: center; }
-  .rich-text__inner--end { margin-inline-start: auto; text-align: end; }
+  .rich-text__inner--center { --group-align: center; margin-inline: auto; text-align: center; }
+  .rich-text__inner--end { --group-align: end; margin-inline-start: auto; text-align: end; }
   .rich-text__inner > * + * { margin-block-start: var(--space-4); }
+
+  /* Blocks left on Default sit where the section's alignment puts them. */
+  @media screen and (min-width: 750px) {
+    .rich-text__inner--center > :is(.block-text--align-inherit, .block-image--inherit, .block-group) { margin-inline: auto; }
+    .rich-text__inner--end > :is(.block-text--align-inherit, .block-image--inherit, .block-group) { margin-inline: auto 0; }
+  }
+
+  @media screen and (max-width: 749px) {
+    .rich-text__inner--center > :is(.block-text--align-mobile-inherit, .block-image--mobile-inherit, .block-group) { margin-inline: auto; }
+    .rich-text__inner--end > :is(.block-text--align-mobile-inherit, .block-image--mobile-inherit, .block-group) { margin-inline: auto 0; }
+  }
 
   .image-with-text__grid { display: grid; gap: var(--space-6); }
   .image-with-text__content { display: flex; flex-direction: column; justify-content: center; gap: var(--space-4); }
@@ -5288,6 +5307,40 @@
   .block-button--center { align-items: center; }
   .block-button--end { align-items: flex-end; }
 
+  /* Default follows the parent's alignment; a chosen one places itself, the
+     way the text block's alignment does. */
+  .block-button--inherit { align-items: var(--group-align, flex-start); }
+
+  :is(.block-button--start, .block-buttons--start) { align-self: flex-start; }
+  :is(.block-button--center, .block-buttons--center) { align-self: center; }
+  :is(.block-button--end, .block-buttons--end) { align-self: flex-end; }
+
+  .block-button--full,
+  .block-buttons:has(.button--width-full) { align-self: stretch; }
+
+  /* In a row the cross axis is vertical, so the group keeps placing them. */
+  .block-group--row > .block-group__content > :is(.block-button, .block-buttons) { align-self: auto; }
+
+  /* Parents that align their own way hand that alignment to Default children. */
+  [style*='--faq-content-align'] { --group-align: var(--faq-content-align); }
+  [style*='--featured-offer-align'] { --group-align: var(--featured-offer-align); }
+  [style*='--featured-pills-align'] { --group-align: var(--featured-pills-align); }
+  [style*='--product-highlight-point-align'] { --group-align: var(--product-highlight-point-align); }
+  [style*='--accordion-align'] { --group-align: var(--accordion-align); }
+  [style*='--feature-card-align'] { --group-align: var(--feature-card-align); }
+  [style*='--tc-intro-align'] { --group-align: var(--tc-intro-align); }
+  [style*='--article-content-align'] { --group-align: var(--article-content-align); }
+  [style*='--sv-intro-align'] { --group-align: var(--sv-intro-align); }
+
+  @media screen and (max-width: 749px) {
+    [style*='--sv-intro-align-mobile'] { --group-align: var(--sv-intro-align-mobile); }
+  }
+
+  :is(.featured-blog__header, .feature-cards__header, .testimonials__header):is([class*='--center']) { --group-align: center; }
+  :is(.featured-blog__header, .feature-cards__header, .testimonials__header):is([class*='--end']) { --group-align: end; }
+  .comparison-section--center { --group-align: center; }
+  .comparison-section--end { --group-align: end; }
+
   .block-button--full { align-items: stretch; }
 
   .block-group--row > .block-group__content > .block-button--full {
@@ -5308,6 +5361,7 @@
   }
   .block-buttons--center { justify-content: center; }
   .block-buttons--end { justify-content: flex-end; }
+  .block-buttons--inherit { justify-content: var(--group-align, flex-start); }
 
     /* ==========================================================================
        Image block
