@@ -3517,7 +3517,7 @@
   }
 
   .badge-highlight--top { flex-direction: column; }
-  .badge-highlight--center { flex-direction: column; align-items: center; text-align: center; justify-content: center; }
+  .badge-highlight--center { flex-direction: column; align-items: center; text-align: center; justify-content: flex-start; }
   .badge-highlight--start { flex-direction: row; align-items: flex-start; }
 
   /* ---- the mark ---- */
@@ -3537,15 +3537,6 @@
   .badge-highlight__image { object-fit: contain; }
 
   .badge-highlight__body { min-inline-size: 0; display: flex; flex-direction: column; gap: var(--space-2); }
-
-  .badge-highlight__pill {
-    align-self: flex-start;
-    padding: 0.2rem var(--space-3);
-    border-radius: 999px;
-    background-color: var(--pill-background, var(--color-secondary-background));
-    color: var(--pill-color, var(--color-text));
-    font-size: var(--font-size-xs);
-  }
 
   /* ---- a border that is a gradient ---- */
   .badge-highlight--gradient-border {
@@ -3571,7 +3562,29 @@
     pointer-events: none;
   }
 
-  .badge-highlight--center .badge-highlight__pill { align-self: center; }
+  .block-group.card-content--gradient-border[style*='--group-border-width'] {
+    border-color: transparent;
+  }
+
+  .card-content--gradient-border::before {
+    content: '';
+    position: absolute;
+    inset: calc(-1 * var(--group-border-width, 1px));
+    border-radius: inherit;
+    padding: var(--group-border-width, 1px);
+    background: var(--card-border-paint, transparent);
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+
+    pointer-events: none;
+  }
+
   .badge-highlight__heading { font-size: var(--font-size-md); }
   .badge-highlight__text { font-size: var(--font-size-sm); color: var(--color-muted-text); }
   .badge-highlight { position: relative; }
@@ -9454,6 +9467,120 @@
       flex-direction: column;
       justify-content: var(--featured-offer-block, start);
       align-items: var(--featured-offer-align, var(--featured-offer-inline, start));
+    }
+  }
+
+  /* ---- the panel: room for its three cards until the desktop width carries it ---- */
+  @media screen and (min-width: 750px) and (max-width: 1199px) {
+    .featured-offer__content .card-content {
+      flex: 0 0 auto;
+      inline-size: min(100%, 56rem);
+    }
+  }
+
+  /* ---- rows inside the panel stay on one line; badges share it equally ---- */
+  .featured-offer .card-content .block-group--row:not(.block-group--stack-mobile) > .block-group__content {
+    flex-wrap: nowrap;
+  }
+
+  .featured-offer .card-content .block-group--row:not(.block-group--stack-mobile) > .block-group__content > .block-icon-text {
+    min-inline-size: 0;
+  }
+
+  .featured-offer .card-content .block-group--row > .block-group__content > .badge-highlight {
+    flex: 1 1 0%;
+    min-inline-size: 0;
+  }
+
+  @media screen and (max-width: 749px) {
+    /* ---- the icon-with-text row in the panel keeps its line, stacked or not ---- */
+    .featured-offer .card-content .block-group--row:has(> .block-group__content > .block-icon-text),
+    .featured-offer .card-content .block-group--row:has(> .block-group__content > .block-icon-text) > .block-group__content {
+      flex-direction: row;
+      flex-wrap: nowrap;
+      align-items: center;
+    }
+
+    .featured-offer .card-content .block-group--row:has(> .block-group__content > .block-icon-text) > .block-group__content > .block-icon-text {
+      min-inline-size: 0;
+    }
+
+    /* ---- the panel's badge cards: two side by side, an odd last one full width ---- */
+    .featured-offer .card-content .block-group--row:has(> .block-group__content > .badge-highlight),
+    .featured-offer .card-content .block-group--row:has(> .block-group__content > .badge-highlight) > .block-group__content {
+      flex-direction: row;
+      flex-wrap: wrap;
+      align-items: stretch;
+    }
+
+    .featured-offer .card-content .block-group--row:has(> .block-group__content > .badge-highlight) > .block-group__content > .badge-highlight {
+      flex: 1 1 calc(50% - 1rem);
+      min-inline-size: 0;
+    }
+
+    .featured-offer .card-content .block-group--row:has(> .block-group__content > .badge-highlight) > .block-group__content > .badge-highlight:last-child:nth-child(odd) {
+      flex-basis: 100%;
+    }
+
+    /* ---- the badge strip under the panel swipes ---- */
+    .featured-offer__content > .block-group--row:has(> .block-group__content > .badge-highlight) {
+      overflow-x: auto;
+      overscroll-behavior-inline: contain;
+      scroll-snap-type: x mandatory;
+      --strip-pad: var(
+        --block-padding-inline-start-mobile,
+        calc(var(--block-padding-inline-start, 0px) * var(--block-padding-scale-mobile, 0.75))
+      );
+      scroll-padding-inline: var(--strip-pad);
+      scrollbar-width: none;
+
+      /* a centred row that overflows loses its start off-screen, out of scroll reach */
+      justify-content: flex-start;
+    }
+
+    .featured-offer__content > .block-group--row:has(> .block-group__content > .badge-highlight)::-webkit-scrollbar {
+      display: none;
+    }
+
+    .featured-offer__content > .block-group--row:has(> .block-group__content > .badge-highlight) > .block-group__content {
+      flex-direction: row;
+      flex-wrap: nowrap;
+      align-items: stretch;
+      justify-content: flex-start;
+    }
+
+    /* about a tenth of the next card shows beside the first */
+    .featured-offer__content > .block-group--row:has(> .block-group__content > .badge-highlight) > .block-group__content > .badge-highlight {
+      flex: 0 0 86%;
+      max-inline-size: 86%;
+      scroll-snap-align: start;
+      scroll-snap-stop: always;
+    }
+
+    /* the last card can still snap to the start: the row runs on by the peek */
+    .featured-offer__content > .block-group--row:has(> .block-group__content > .badge-highlight) > .block-group__content::after {
+      content: '';
+      flex: 0 0 calc(14% - var(--group-gap-x-mobile, var(--group-gap-x, 12px)) + var(--strip-pad, 0px));
+    }
+  }
+
+  /* ---- a row of badges shares the width: one line on desktop, two on tablet ---- */
+  @media screen and (min-width: 750px) {
+    .featured-offer__content > .block-group--row > .block-group__content > .badge-highlight {
+      flex: 1 1 0%;
+      min-inline-size: 0;
+    }
+  }
+
+  @media screen and (min-width: 990px) {
+    .featured-offer__content > .block-group--row > .block-group__content:has(> .badge-highlight) {
+      flex-wrap: nowrap;
+    }
+  }
+
+  @media screen and (min-width: 750px) and (max-width: 989px) {
+    .featured-offer__content > .block-group--row > .block-group__content > .badge-highlight {
+      flex-basis: calc(50% - var(--group-gap-x, var(--group-gap, var(--space-4))));
     }
   }
 }

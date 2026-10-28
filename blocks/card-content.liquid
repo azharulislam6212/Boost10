@@ -16,9 +16,19 @@
     assign background_alpha = background_alpha | divided_by: 100.0
     assign background_paint = s.background_color | color_modify: 'alpha', background_alpha
   endif
+
+  assign card_classes = 'card-content'
+  assign border_gradient = ''
+  if s.border_style == 'solid' and s.border_gradient != blank
+    assign border_gradient = s.border_gradient
+    assign card_classes = card_classes | append: ' card-content--gradient-border'
+  endif
 -%}
 
 {%- capture card_style -%}
+  {%- if border_gradient != '' -%}
+    --card-border-paint: {{ border_gradient }};
+  {%- endif -%}
   {%- if background_paint != '' -%}
     --group-background: {{ background_paint }};
   {%- endif -%}
@@ -26,6 +36,7 @@
     color: {{ s.text_color }};
     --color-text: {{ s.text_color }};
     --color-heading: {{ s.text_color }};
+    --color-muted-text: {{ s.text_color | color_modify: 'alpha', 0.7 }};
   {%- endif -%}
 {%- endcapture -%}
 
@@ -36,7 +47,7 @@
 {% render 'group',
    children: children,
    settings: s,
-   extra_classes: 'card-content',
+   extra_classes: card_classes,
    styles: card_style,
    shopify_attributes: block.shopify_attributes %}
 
@@ -312,6 +323,12 @@
       "label": "t:shared.border.color.label",
       "info": "t:shared.border.color.info",
       "visible_if": "{{ block.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "color_background",
+      "id": "border_gradient",
+      "label": "t:shared.color_source.gradient_label",
+      "visible_if": "{{ block.settings.border_style == 'solid' }}"
     },
     {
       "type": "range",

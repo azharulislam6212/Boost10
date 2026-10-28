@@ -1,5 +1,5 @@
 {% doc %}
-  One trust badge: an icon, an optional pill, a heading and some text.
+  One trust badge: an icon, a heading and some text.
 {% enddoc %}
 
 {%- liquid
@@ -45,6 +45,15 @@
     assign has_shape = true
   endif
 
+  assign background_paint = ''
+  if s.background != blank
+    assign background_alpha = s.background_opacity | default: 100 | plus: 0
+    assign background_alpha = background_alpha | divided_by: 100.0
+    assign background_paint = s.background | color_modify: 'alpha', background_alpha
+  endif
+
+  assign backdrop_blur = s.backdrop_blur | default: 0 | plus: 0
+
   assign border_is_gradient = false
   if s.border_color contains 'gradient'
     assign border_is_gradient = true
@@ -69,7 +78,7 @@
 
 {%- capture badge_style -%}
   {%- render 'spacing', block: s, declarations: true -%}
-  
+  {%- if background_paint != '' -%}--badge-background: {{ background_paint }};{%- endif -%}
   {%- if s.border_color != blank -%}
     {%- if border_is_gradient -%}
       --badge-border-paint: {{ s.border_color }};
@@ -78,10 +87,16 @@
     {%- endif -%}
   {%- endif -%}
 
+  {%- if s.text_alignment != blank and s.text_alignment != 'inherit' -%}
+    --badge-text-align: {{ s.text_alignment }};
+  {%- endif -%}
+  --badge-border-width: {{ s.border_width | default: 0 }}px;
+  --badge-radius: {{ s.radius | default: 8 }}px;
   --badge-icon-size: {{ icon_size }}px;
   {%- if s.icon_color != blank -%}--badge-icon-color: {{ s.icon_color }};{%- endif -%}
   {%- if box_width > 0 -%}--badge-width: {{ box_width }}px;{%- endif -%}
   {%- if box_height > 0 -%}--badge-height: {{ box_height }}px;{%- endif -%}
+  {%- if backdrop_blur > 0 -%}--badge-backdrop-blur: {{ backdrop_blur }}px;{%- endif -%}
 {%- endcapture -%}
 
 {%- capture icon_mark_style -%}
@@ -116,18 +131,6 @@
   {%- endif -%}
 
   <div class="badge-highlight__body">
-    {%- if s.pill != blank -%}
-      <span
-        class="badge-highlight__pill"
-        style="
-          {%- if s.pill_background != blank %}--pill-background: {{ s.pill_background }};{% endif -%}
-          {%- if s.pill_color != blank %}--pill-color: {{ s.pill_color }};{% endif -%}
-        "
-      >
-        {{ s.pill }}
-      </span>
-    {%- endif -%}
-
     {%- if s.heading != blank -%}
       <h3 class="badge-highlight__heading">
         {%- if has_link -%}
@@ -483,21 +486,6 @@
     {
       "type": "header",
       "content": "t:blocks.badge_highlight.headers.content"
-    },
-    {
-      "type": "text",
-      "id": "pill",
-      "label": "t:blocks.badge_highlight.settings.pill.label"
-    },
-    {
-      "type": "color",
-      "id": "pill_background",
-      "label": "t:blocks.badge_highlight.settings.pill_background.label"
-    },
-    {
-      "type": "color",
-      "id": "pill_color",
-      "label": "t:blocks.badge_highlight.settings.pill_color.label"
     },
     {
       "type": "text",
