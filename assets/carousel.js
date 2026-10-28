@@ -404,12 +404,13 @@ export class CarouselSlider extends BaseComponent {
   /* ----------------------------------------------------- run / stand by -- ---- */
 
   /**
-   * Whether this breakpoint should be a carousel.
+   * Whether this breakpoint should be a carousel. Tablet takes the mobile
+   * layout; `data-layout` starts at 990px.
    *
    * @returns {boolean}
    */
   get #shouldRun() {
-    const wide = this.#tablet?.matches ?? true;
+    const wide = this.#desktop?.matches ?? true;
     const layout = wide
       ? this.dataset.layout || 'carousel'
       : this.dataset.layoutMobile || this.dataset.layout || 'carousel';
