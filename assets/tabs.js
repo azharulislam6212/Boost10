@@ -322,6 +322,7 @@ export class TabGroup extends BaseComponent {
     marker.style.setProperty('--marker-height', `${box.height}px`);
     marker.style.setProperty('--marker-x', `${box.x}px`);
     marker.style.setProperty('--marker-y', `${box.y}px`);
+    this.setAttribute('data-marker-ready', '');
 
     if (!animate) {
       void marker.offsetWidth;
