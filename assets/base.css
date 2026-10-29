@@ -9953,6 +9953,59 @@
     }
   }
 
+  /* ---- scroll: the feature zooms in, the scattered pictures slide out from behind it ----
+     Scroll-driven, so it runs on the compositor with no script. The last frame is the
+     resting layout; browsers without scroll timelines simply show that layout. */
+  @supports (animation-timeline: view()) {
+    @media screen and (min-width: 750px) and (prefers-reduced-motion: no-preference) {
+      .expert-quote__stage {
+        view-timeline-name: --expert-quote-stage;
+      }
+
+      .expert-quote-lead {
+        position: relative;
+        z-index: 2;
+      }
+
+      .expert-quote-pic--feature,
+      .expert-quote-pic--scatter {
+        position: relative;
+        animation-timing-function: var(--ease-in-out-sine, cubic-bezier(0.37, 0, 0.63, 1));
+        animation-fill-mode: both;
+        animation-timeline: --expert-quote-stage;
+        animation-range: entry 25% cover 55%;
+      }
+
+      .expert-quote-pic--feature {
+        z-index: 1;
+        animation-name: expert-quote-feature-in;
+      }
+
+      /* From the stage centre: half its own box, the gap, half the feature; level with the feature's top. */
+      .expert-quote-pic--scatter {
+        z-index: 0;
+        --eqp-spread: calc(50% + var(--expert-quote-gap-x, 24px) + var(--expert-quote-feature-half, 116px));
+        --eqp-rise: calc(var(--expert-quote-feature-space, 28px) - var(--eqp-offset, 0px));
+        animation-name: expert-quote-scatter-in;
+      }
+
+      .expert-quote-pic--end {
+        --eqp-spread: calc(-50% - var(--expert-quote-gap-x, 24px) - var(--expert-quote-feature-half, 116px));
+      }
+    }
+  }
+
+  @keyframes expert-quote-feature-in {
+    from { scale: 0.78; }
+  }
+
+  @keyframes expert-quote-scatter-in {
+    from {
+      translate: var(--eqp-spread, 0px) var(--eqp-rise, 0px);
+      scale: 0.82;
+    }
+  }
+
   /* ---- the phone ---- */
   @media screen and (max-width: 749px) {
     .expert-quote__stage {
