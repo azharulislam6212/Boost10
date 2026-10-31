@@ -1,0 +1,952 @@
+{% comment %}
+  A heading cluster and the theme blocks under it, on the shared section frame.
+{% endcomment %}
+
+{%- liquid
+  assign s = section.settings
+
+  assign background_media = s.background_media | default: 'none'
+  assign has_background_media = false
+  if background_media != 'none'
+    assign has_background_media = true
+  endif
+
+  assign background_paint = ''
+  if has_background_media == false
+    assign background_paint = s.background_color | default: ''
+  endif
+
+  assign border_line = s.border_style | default: 'none'
+
+  assign bw_top = 0
+  assign bw_right = 0
+  assign bw_bottom = 0
+  assign bw_left = 0
+  assign border_any = 0
+
+  if border_line != 'none'
+    assign border_sides = s.border_sides | default: 'top'
+    assign border_size = s.border_width | default: 1 | plus: 0
+
+    case border_sides
+      when 'all'
+        assign bw_top = border_size
+        assign bw_right = border_size
+        assign bw_bottom = border_size
+        assign bw_left = border_size
+      when 'bottom'
+        assign bw_bottom = border_size
+      when 'top_bottom'
+        assign bw_top = border_size
+        assign bw_bottom = border_size
+      else
+        assign bw_top = border_size
+    endcase
+    assign border_any = border_size
+
+    if s.border_color == blank
+      assign border_paint = 'currentColor'
+    else
+      assign border_paint = s.border_color
+    endif
+  endif
+
+  assign corner_position = s.corner_position | default: 'top'
+  assign radius = s.border_radius | default: 40 | plus: 0
+  assign radius_mobile = s.border_radius_mobile | default: 24 | plus: 0
+
+  assign r_tl = 0
+  assign r_tr = 0
+  assign r_bl = 0
+  assign r_br = 0
+  assign r_tl_m = 0
+  assign r_tr_m = 0
+  assign r_bl_m = 0
+  assign r_br_m = 0
+
+  if corner_position != 'bottom'
+    assign r_tl = radius
+    assign r_tr = radius
+    assign r_tl_m = radius_mobile
+    assign r_tr_m = radius_mobile
+  endif
+  if corner_position != 'top'
+    assign r_bl = radius
+    assign r_br = radius
+    assign r_bl_m = radius_mobile
+    assign r_br_m = radius_mobile
+  endif
+
+  assign overlap = 0
+  assign overlap_mobile = 0
+  if s.stack_layer == 'over' or s.stack_layer == 'under'
+    assign overlap = r_tl
+    assign overlap_mobile = r_tl_m
+  endif
+
+  assign direction = s.direction | default: 'column'
+  assign is_row = false
+  if direction == 'row'
+    assign is_row = true
+  endif
+
+  assign alignment_setting = s.alignment | default: 'start'
+
+  case alignment_setting
+    when 'center'
+      assign alignment_axis = 'center'
+    when 'end'
+      assign alignment_axis = 'end'
+    else
+      assign alignment_axis = 'start'
+  endcase
+
+  assign inline_axis = alignment_axis
+  if is_row
+    case alignment_setting
+      when 'space-between', 'space-around', 'space-evenly'
+        assign inline_axis = alignment_setting
+    endcase
+  endif
+
+  case s.position
+    when 'center'
+      assign block_axis = 'center'
+    when 'end'
+      assign block_axis = 'end'
+    when 'stretch'
+      assign block_axis = 'stretch'
+    else
+      assign block_axis = 'start'
+  endcase
+
+  assign gap_x = s.gap_horizontal | default: 24 | plus: 0
+  assign gap_y = s.gap_vertical | default: 24 | plus: 0
+  assign gap_x_mobile = s.gap_horizontal_mobile | default: gap_x | plus: 0
+  assign gap_y_mobile = s.gap_vertical_mobile | default: gap_y | plus: 0
+
+  assign content_classes = 'custom-section__content custom-section__content--' | append: direction
+  if is_row and s.stack_on_mobile != false
+    assign content_classes = content_classes | append: ' custom-section__content--stack-mobile'
+  endif
+
+  if is_row and s.reverse
+    assign content_classes = content_classes | append: ' custom-section__content--reverse'
+  endif
+-%}
+
+
+{%- capture content_style -%}
+  --custom-section-gap-x: {{ gap_x }}px;
+  --custom-section-gap-y: {{ gap_y }}px;
+  --custom-section-gap-x-mobile: {{ gap_x_mobile }}px;
+  --custom-section-gap-y-mobile: {{ gap_y_mobile }}px;
+  --custom-section-inline: {{ inline_axis }};
+  --custom-section-align: {{ alignment_axis }};
+  --custom-section-block: {{ block_axis }};
+{%- endcapture -%}
+
+{%- capture section_style -%}
+  {%- render 'spacing', section: s, declarations: true -%}
+  --custom-section-radius: {{ r_tl }}px {{ r_tr }}px {{ r_br }}px {{ r_bl }}px;
+  --custom-section-radius-mobile: {{ r_tl_m }}px {{ r_tr_m }}px {{ r_br_m }}px {{ r_bl_m }}px;
+  --section-overlap: {{ overlap }}px;
+  --section-overlap-mobile: {{ overlap_mobile }}px;
+  {%- if border_any > 0 -%}
+    --custom-section-border-width: {{ bw_top }}px {{ bw_right }}px {{ bw_bottom }}px {{ bw_left }}px;
+    --custom-section-border-style: {{ border_line }};
+    --custom-section-border-color: {{ border_paint }};
+  {%- endif -%}
+  {%- if background_paint != '' -%}
+    background: {{ background_paint }};
+  {%- endif -%}
+{%- endcapture -%}
+
+
+<div
+  class="custom-section hero-features-stats-section color-scheme-container color-{{ s.color_scheme | default: 'scheme-1' }}{% if has_background_media %} has-background-media{% endif %}"
+  data-section-spacing
+  {%- if s.stack_layer != blank and s.stack_layer != 'default' %} data-section-layer="{{ s.stack_layer }}"{% endif %}
+  data-section-id="{{ section.id }}"
+  style="{{ section_style | strip_newlines | strip }}"
+>
+  {%- if has_background_media -%}
+    {% render 'background-media', settings: s, placeholder: 'hero-apparel-1' %}
+  {%- endif -%}
+
+  <div class="custom-section__inner {% render 'container', width: s.container_width %}">
+    <motion-effect
+      class="{{ content_classes }}"
+      data-easing="outQuint"
+      style="{{ content_style | strip_newlines | strip }}"
+      {% render 'motion-attrs', kind: 'text', section: s, children: true, duration: 1000 %}
+    >
+      {% content_for 'block', type: 'section-header', id: 'hero-features-stats-header' %}
+      {% content_for 'blocks' %}
+    </motion-effect>
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "t:sections.hero_features_stats.name",
+  "tag": "section",
+  "class": "section",
+  "blocks": [
+    {
+      "type": "@theme"
+    },
+    {
+      "type": "@app"
+    }
+  ],
+  "settings": [
+    {
+      "type": "select",
+      "id": "container_width",
+      "label": "t:shared.container.width.label",
+      "info": "t:shared.container.width.info",
+      "options": [
+        {
+          "value": "edge",
+          "label": "t:shared.container.width.options__1.label"
+        },
+        {
+          "value": "wide",
+          "label": "t:shared.container.width.options__2.label"
+        },
+        {
+          "value": "standard",
+          "label": "t:shared.container.width.options__3.label"
+        },
+        {
+          "value": "compact",
+          "label": "t:shared.container.width.options__4.label"
+        },
+        {
+          "value": "custom",
+          "label": "t:shared.container.width.options__5.label"
+        }
+      ],
+      "default": "standard"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.group.headers.layout"
+    },
+    {
+      "type": "select",
+      "id": "direction",
+      "label": "t:blocks.group.settings.direction.label",
+      "options": [
+        {
+          "value": "column",
+          "label": "t:blocks.group.settings.direction.options__1.label"
+        },
+        {
+          "value": "row",
+          "label": "t:blocks.group.settings.direction.options__2.label"
+        }
+      ],
+      "default": "column"
+    },
+    {
+      "type": "checkbox",
+      "id": "reverse",
+      "label": "t:sections.faq.settings.reverse.label",
+      "default": false,
+      "visible_if": "{{ section.settings.direction == 'row' }}"
+    },
+    {
+      "type": "select",
+      "id": "alignment",
+      "label": "t:blocks.group.settings.alignment.label",
+      "options": [
+        {
+          "value": "start",
+          "label": "t:blocks.group.settings.alignment.options__1.label"
+        },
+        {
+          "value": "center",
+          "label": "t:blocks.group.settings.alignment.options__2.label"
+        },
+        {
+          "value": "end",
+          "label": "t:blocks.group.settings.alignment.options__3.label"
+        },
+        {
+          "value": "space-between",
+          "label": "t:blocks.group.settings.distribution.options__2.label"
+        },
+        {
+          "value": "space-around",
+          "label": "t:blocks.group.settings.distribution.options__3.label"
+        },
+        {
+          "value": "space-evenly",
+          "label": "t:blocks.group.settings.distribution.options__4.label"
+        }
+      ],
+      "default": "start"
+    },
+    {
+      "type": "select",
+      "id": "position",
+      "label": "t:blocks.group.settings.position.label",
+      "options": [
+        {
+          "value": "start",
+          "label": "t:blocks.group.settings.position.options__1.label"
+        },
+        {
+          "value": "center",
+          "label": "t:blocks.group.settings.position.options__2.label"
+        },
+        {
+          "value": "end",
+          "label": "t:blocks.group.settings.position.options__3.label"
+        }
+      ],
+      "default": "start",
+      "visible_if": "{{ section.settings.direction == 'row' }}"
+    },
+    {
+      "type": "select",
+      "id": "gap_device",
+      "label": "t:shared.gap.label",
+      "options": [
+        {
+          "value": "desktop",
+          "label": "t:shared.spacing.devices.options__1.label"
+        },
+        {
+          "value": "mobile",
+          "label": "t:shared.spacing.devices.options__2.label"
+        }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "gap_horizontal",
+      "label": "t:shared.gap.horizontal.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 24,
+      "visible_if": "{{ section.settings.gap_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "gap_vertical",
+      "label": "t:shared.gap.vertical.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 24,
+      "visible_if": "{{ section.settings.gap_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "gap_horizontal_mobile",
+      "label": "t:shared.gap.horizontal.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 12,
+      "visible_if": "{{ section.settings.gap_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "gap_vertical_mobile",
+      "label": "t:shared.gap.vertical.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 12,
+      "visible_if": "{{ section.settings.gap_device == 'mobile' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.appearance.header"
+    },
+    {
+      "type": "color_scheme",
+      "id": "color_scheme",
+      "label": "t:shared.color_scheme.label",
+      "default": "scheme-1"
+    },
+    {
+      "type": "color_background",
+      "id": "background_color",
+      "label": "t:shared.background.color.label",
+      "info": "t:shared.background.color.info"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.group.headers.borders"
+    },
+    {
+      "type": "select",
+      "id": "border_style",
+      "label": "t:blocks.group.settings.border_style.label",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.options.none"
+        },
+        {
+          "value": "solid",
+          "label": "t:shared.options.solid"
+        },
+        {
+          "value": "dashed",
+          "label": "t:shared.border.style.options__2.label"
+        }
+      ],
+      "default": "none"
+    },
+    {
+      "type": "select",
+      "id": "border_sides",
+      "label": "t:shared.border.sides.label",
+      "options": [
+        {
+          "value": "all",
+          "label": "t:shared.options.all"
+        },
+        {
+          "value": "top",
+          "label": "t:shared.border.sides.top.label"
+        },
+        {
+          "value": "bottom",
+          "label": "t:shared.border.sides.bottom.label"
+        },
+        {
+          "value": "top_bottom",
+          "label": "t:shared.border.sides.top_bottom.label"
+        }
+      ],
+      "default": "top",
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_width",
+      "label": "t:shared.border.thickness.label",
+      "min": 1,
+      "max": 12,
+      "step": 1,
+      "unit": "px",
+      "default": 1,
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "color",
+      "id": "border_color",
+      "label": "t:blocks.group.settings.border_color.label",
+      "visible_if": "{{ section.settings.border_style != 'none' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.corners.header"
+    },
+    {
+      "type": "select",
+      "id": "radius_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        {
+          "value": "desktop",
+          "label": "t:shared.spacing.devices.options__1.label"
+        },
+        {
+          "value": "mobile",
+          "label": "t:shared.spacing.devices.options__2.label"
+        }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "select",
+      "id": "corner_position",
+      "label": "t:shared.corners.position.label",
+      "options": [
+        {
+          "value": "top",
+          "label": "t:shared.border.sides.top.label"
+        },
+        {
+          "value": "bottom",
+          "label": "t:shared.border.sides.bottom.label"
+        },
+        {
+          "value": "all",
+          "label": "t:shared.options.all"
+        }
+      ],
+      "default": "all"
+    },
+    {
+      "type": "range",
+      "id": "border_radius",
+      "label": "t:shared.corners.radius.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.radius_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "border_radius_mobile",
+      "label": "t:shared.corners.radius.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ section.settings.radius_device == 'mobile' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.animation.header"
+    },
+    {
+      "type": "select",
+      "id": "animation_text",
+      "label": "t:shared.animation.animation_text.label",
+      "options": [
+        {
+          "value": "inherit",
+          "label": "t:shared.animation.animation_text.options__1.label"
+        },
+        {
+          "value": "none",
+          "label": "t:shared.animation.animation_text.options__2.label"
+        },
+        {
+          "value": "fade-in",
+          "label": "t:shared.animation.animation_text.options__3.label"
+        },
+        {
+          "value": "fade-up",
+          "label": "t:shared.animation.animation_text.options__4.label"
+        },
+        {
+          "value": "slide-up",
+          "label": "t:shared.animation.animation_text.options__5.label"
+        }
+      ],
+      "default": "inherit"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.spacing.section_header"
+    },
+    {
+      "type": "paragraph",
+      "content": "t:shared.spacing.section_paragraph"
+    },
+    {
+      "type": "select",
+      "id": "padding_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        {
+          "value": "desktop",
+          "label": "t:shared.spacing.devices.options__1.label"
+        },
+        {
+          "value": "mobile",
+          "label": "t:shared.spacing.devices.options__2.label"
+        }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 160,
+      "step": 2,
+      "unit": "px",
+      "default": 100,
+      "visible_if": "{{ section.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 160,
+      "step": 2,
+      "unit": "px",
+      "default": 100,
+      "visible_if": "{{ section.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 160,
+      "step": 2,
+      "unit": "px",
+      "default": 50,
+      "visible_if": "{{ section.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 160,
+      "step": 2,
+      "unit": "px",
+      "default": 50,
+      "visible_if": "{{ section.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "select",
+      "id": "stack_layer",
+      "label": "t:shared.spacing.stack_layer.label",
+      "info": "t:shared.spacing.stack_layer.info",
+      "options": [
+        {
+          "value": "under",
+          "label": "t:shared.spacing.stack_layer.options__1.label"
+        },
+        {
+          "value": "default",
+          "label": "t:shared.spacing.stack_layer.options__2.label"
+        },
+        {
+          "value": "over",
+          "label": "t:shared.spacing.stack_layer.options__3.label"
+        }
+      ],
+      "default": "default"
+    }
+  ],
+  "presets": [
+    {
+      "name": "t:sections.hero_features_stats.name",
+      "category": "t:categories.banners",
+      "settings": {
+        "padding_top": 128,
+        "padding_bottom": 96,
+        "padding_top_mobile": 112,
+        "padding_bottom_mobile": 56,
+        "background_color": "linear-gradient(90deg, #e5f1ee 0%, #fbfdfc 38%, #fbfdfc 62%, #e5f1ee 100%)",
+        "border_radius": 40,
+        "border_radius_mobile": 24,
+        "alignment": "center",
+        "gap_vertical": 48,
+        "gap_vertical_mobile": 24
+      },
+      "blocks": [
+        {
+          "type": "section-header",
+          "settings": {
+            "alignment": "center"
+          },
+          "static": true,
+          "id": "hero-features-stats-header",
+          "blocks": [
+            {
+              "type": "text",
+              "settings": {
+                "text": "<p>The Next Generation of Daily Nutrition, Thoughtfully Made.</p>",
+                "preset": "h1"
+              }
+            },
+            {
+              "type": "text",
+              "settings": {
+                "text": "<p>Formulated with bioactive phytonutrients, prebiotics and essential vitamins — and checked by independent labs.</p>",
+                "preset": "paragraph",
+                "max_width": "normal"
+              }
+            },
+            {
+              "type": "button",
+              "settings": {
+                "label": "Explore Our Research",
+                "link": "/collections/all"
+              }
+            }
+          ]
+        },
+        {
+          "type": "group",
+          "settings": {
+            "direction": "row",
+            "gap_horizontal": 32
+          },
+          "blocks": [
+            {
+              "type": "icon-with-text",
+              "settings": {
+                "icon": "leaf",
+                "shape": "circle",
+                "ring_style": "dashed",
+                "shape_size": 48,
+                "shape_size_mobile": 40,
+                "heading": "Bioavailable Nutrients",
+                "text": "<p>Gentle, well-absorbed forms</p>"
+              }
+            },
+            {
+              "type": "icon-with-text",
+              "settings": {
+                "icon": "check-circle",
+                "shape": "circle",
+                "ring_style": "dashed",
+                "shape_size": 48,
+                "shape_size_mobile": 40,
+                "heading": "Triple-Tested Potency",
+                "text": "<p>Independent lab audited</p>"
+              }
+            },
+            {
+              "type": "icon-with-text",
+              "settings": {
+                "icon": "shield",
+                "shape": "circle",
+                "ring_style": "dashed",
+                "shape_size": 48,
+                "shape_size_mobile": 40,
+                "heading": "Delayed-Release Capsule",
+                "text": "<p>Acid-resistant delivery</p>"
+              }
+            },
+            {
+              "type": "icon-with-text",
+              "settings": {
+                "icon": "award",
+                "shape": "circle",
+                "ring_style": "dashed",
+                "shape_size": 48,
+                "shape_size_mobile": 40,
+                "heading": "Zero Synthetic Fillers",
+                "text": "<p>Clean label</p>"
+              }
+            }
+          ]
+        },
+        {
+          "type": "group",
+          "settings": {
+            "direction": "row",
+            "gap_horizontal": 24,
+            "position": "stretch"
+          },
+          "blocks": [
+            {
+              "type": "group",
+              "settings": {
+                "border_style": "solid",
+                "border_opacity": 20,
+                "border_radius": 24,
+                "gap_vertical_mobile": 12,
+                "padding_top": 32,
+                "padding_bottom": 32,
+                "padding_left": 28,
+                "padding_right": 28,
+                "padding_top_mobile": 24,
+                "padding_bottom_mobile": 24,
+                "padding_left_mobile": 20,
+                "padding_right_mobile": 20,
+                "inherit_color_scheme": false,
+                "color_scheme": "scheme-4",
+                "width": "custom",
+                "width_custom": 35
+              },
+              "blocks": [
+                {
+                  "type": "subheading",
+                  "settings": {
+                    "text": "<p>Daily cellular support</p>",
+                    "icon_source": "none"
+                  }
+                },
+                {
+                  "type": "text",
+                  "settings": {
+                    "text": "<p>Support your natural daily energy.</p>",
+                    "preset": "h3"
+                  }
+                },
+                {
+                  "type": "text",
+                  "settings": {
+                    "text": "<p>An evidence-first formula designed for steady, everyday energy without stimulants.</p>",
+                    "preset": "paragraph"
+                  }
+                },
+                {
+                  "type": "text",
+                  "settings": {
+                    "text": "<p>Research summaries available on request</p>",
+                    "preset": "paragraph",
+                    "color": "muted"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "group",
+              "settings": {
+                "direction": "row",
+                "gap_horizontal": 24
+              },
+              "blocks": [
+                {
+                  "type": "group",
+                  "settings": {
+                    "border_style": "solid",
+                    "border_opacity": 20,
+                    "border_radius": 24,
+                    "gap_vertical_mobile": 12,
+                    "padding_top": 32,
+                    "padding_bottom": 32,
+                    "padding_left": 28,
+                    "padding_right": 28,
+                    "padding_top_mobile": 24,
+                    "padding_bottom_mobile": 24,
+                    "padding_left_mobile": 20,
+                    "padding_right_mobile": 20
+                  },
+                  "blocks": [
+                    {
+                      "type": "text",
+                      "settings": {
+                        "text": "<p>63%</p>",
+                        "preset": "h2"
+                      }
+                    },
+                    {
+                      "type": "text",
+                      "settings": {
+                        "text": "<p>Describe a measured result here, with its source.¹</p>",
+                        "preset": "paragraph"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "group",
+                  "settings": {
+                    "border_style": "solid",
+                    "border_opacity": 20,
+                    "border_radius": 24,
+                    "gap_vertical_mobile": 12,
+                    "padding_top": 32,
+                    "padding_bottom": 32,
+                    "padding_left": 28,
+                    "padding_right": 28,
+                    "padding_top_mobile": 24,
+                    "padding_bottom_mobile": 24,
+                    "padding_left_mobile": 20,
+                    "padding_right_mobile": 20
+                  },
+                  "blocks": [
+                    {
+                      "type": "text",
+                      "settings": {
+                        "text": "<p>+312%</p>",
+                        "preset": "h2"
+                      }
+                    },
+                    {
+                      "type": "text",
+                      "settings": {
+                        "text": "<p>Describe a measured result here, with its source.²</p>",
+                        "preset": "paragraph"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "group",
+                  "settings": {
+                    "border_style": "solid",
+                    "border_opacity": 20,
+                    "border_radius": 24,
+                    "gap_vertical_mobile": 12,
+                    "padding_top": 32,
+                    "padding_bottom": 32,
+                    "padding_left": 28,
+                    "padding_right": 28,
+                    "padding_top_mobile": 24,
+                    "padding_bottom_mobile": 24,
+                    "padding_left_mobile": 20,
+                    "padding_right_mobile": 20
+                  },
+                  "blocks": [
+                    {
+                      "type": "text",
+                      "settings": {
+                        "text": "<p>84%</p>",
+                        "preset": "h2"
+                      }
+                    },
+                    {
+                      "type": "text",
+                      "settings": {
+                        "text": "<p>Describe a measured result here, with its source.³</p>",
+                        "preset": "paragraph"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "group",
+                  "settings": {
+                    "border_style": "solid",
+                    "border_opacity": 20,
+                    "border_radius": 24,
+                    "gap_vertical_mobile": 12,
+                    "padding_top": 32,
+                    "padding_bottom": 32,
+                    "padding_left": 28,
+                    "padding_right": 28,
+                    "padding_top_mobile": 24,
+                    "padding_bottom_mobile": 24,
+                    "padding_left_mobile": 20,
+                    "padding_right_mobile": 20
+                  },
+                  "blocks": [
+                    {
+                      "type": "text",
+                      "settings": {
+                        "text": "<p>100%</p>",
+                        "preset": "h2"
+                      }
+                    },
+                    {
+                      "type": "text",
+                      "settings": {
+                        "text": "<p>Batches verified by an accredited third-party lab.</p>",
+                        "preset": "paragraph"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+{% endschema %}

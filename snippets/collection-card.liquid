@@ -1,8 +1,8 @@
 {% doc %}
   One collection, as a card.
 
-  @param {collection} collection
-  @param {number} [index] - For the animation cascade
+  @param {collection} [collection] - Blank draws the placeholder card
+  @param {string} [title] - Replaces the collection's own title
   @param {boolean} [priority] - Eager load, hero cards only
   @param {string} [sizes]
   @param {string} [ratio] - Defaults to the theme card ratio
@@ -11,7 +11,7 @@
   @param {object} [section] - `section.settings`, for the animation cascade
 
   @example
-    {% render 'collection-card', collection: collection, index: forloop.index0, show_count: true %}
+    {% render 'collection-card', collection: collection, show_count: true %}
 {% enddoc %}
 
 {%- liquid
@@ -26,11 +26,12 @@
 <div
   class="collection-card"
   data-collection-id="{{ collection.id }}"
-  {% render 'motion-attrs', kind: 'image', section: section, index: index %}
+  {% render 'motion-attrs', kind: 'image', section: section %}
 >
   <div class="collection-card__media">
     {%- if card_image != blank -%}
-      {% render 'image', image: card_image, alt: '', ratio: card_ratio, priority: priority, sizes: sizes, default: '(min-width: 990px) 25vw, 50vw', class: 'collection-card__image' %}
+      {%- assign card_sizes = sizes | default: '(min-width: 990px) 25vw, 50vw' -%}
+      {% render 'image', image: card_image, alt: '', ratio: card_ratio, priority: priority, sizes: card_sizes, class: 'collection-card__image' %}
     {%- else -%}
       <div class="collection-card__placeholder">
         {{ 'collection-apparel-1' | placeholder_svg_tag: 'collection-card__placeholder-svg' }}
@@ -41,8 +42,9 @@
   <div class="collection-card__info">
     <h3 class="collection-card__title">
 
-      <a class="collection-card__link" href="{{ collection.url }}">
-        {{ collection.title }}
+      <a class="collection-card__link" href="{{ collection.url | default: routes.collections_url }}">
+        {%- assign fallback_title = 'onboarding.collection_title' | t -%}
+        {{ title | default: collection.title | default: fallback_title }}
       </a>
     </h3>
 
