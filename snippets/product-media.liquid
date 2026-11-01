@@ -23,6 +23,8 @@
   case nav_style
     when 'chevrons'
       assign nav_icon = 'chevron'
+    when 'controls'
+      assign nav_icon = s.carousel_nav_icon | default: 'arrow'
     else
       assign nav_icon = 'arrow'
   endcase
@@ -71,6 +73,7 @@
   {{ block_shopify_attributes }}
 >
 
+  <div class="product-media__frame">
   <div
     class="product-media__stage"
     data-ref="stage"
@@ -215,6 +218,20 @@
     {%- endfor -%}
   </div>
 
+  {%- if product.media.size > 1 -%}
+    {%- if nav_style == 'controls' or pagination == 'controls' -%}
+      <div class="product-media__controls">
+        {% render 'carousel-controls', settings: s, align: 'center' %}
+      </div>
+    {%- elsif nav_style != 'none' -%}
+      {% render 'carousel-nav',
+         settings: s,
+         icon: nav_icon,
+         position: 'inside' %}
+    {%- endif -%}
+  {%- endif -%}
+  </div>
+
   {%- if pagination == 'thumbnails' and product.media.size > 1 -%}
     <media-thumbnails
       class="product-media__thumbnails"
@@ -238,6 +255,10 @@
              sizes: '120px',
              widths: '120,240' %}
 
+          <span class="product-media__thumbnail-check" aria-hidden="true">
+            {%- render 'icon', icon: 'check', size: 10 -%}
+          </span>
+
           {%- unless item.media_type == 'image' -%}
 
             <span class="product-media__thumbnail-badge" aria-hidden="true">
@@ -247,19 +268,6 @@
         </button>
       {%- endfor -%}
     </media-thumbnails>
-  {%- endif -%}
-
-  {%- if product.media.size > 1 -%}
-    {%- if pagination == 'controls' -%}
-      {% render 'carousel-controls', settings: s, align: 'center' %}
-    {%- else -%}
-      {%- if nav_style != 'none' -%}
-        {% render 'carousel-nav',
-           settings: s,
-           icon: nav_icon,
-           position: 'inside' %}
-      {%- endif -%}
-    {%- endif -%}
   {%- endif -%}
 
   <p class="visually-hidden" data-ref="status" role="status"></p>

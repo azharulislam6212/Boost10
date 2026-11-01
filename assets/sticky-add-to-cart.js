@@ -7,7 +7,7 @@
 
 import { BaseComponent, defineComponent } from '@theme/component';
 import { EVENTS } from '@theme/events';
-import { themeString, formatMoney } from '@theme/utilities';
+import { themeString, formatMoney, labelTarget } from '@theme/utilities';
 
 /* ==========================================================================
    <sticky-add-to-cart>
@@ -114,12 +114,12 @@ export class StickyAddToCart extends BaseComponent {
 
     if (!variant) {
       button.disabled = true;
-      button.textContent = themeString('unavailable', '');
+      labelTarget(button).textContent = themeString('unavailable', '');
       return;
     }
 
     button.disabled = !variant.available;
-    button.textContent = variant.available ? themeString('addToCart', '') : themeString('soldOut', '');
+    labelTarget(button).textContent = variant.available ? themeString('addToCart', '') : themeString('soldOut', '');
   }
 
   /* ---------------------------------------------------------- internals -- ---- */

@@ -1,0 +1,110 @@
+{% comment %}
+  Fetched by `<pickup-availability>` (assets/variant-picker.js) at
+  `/variants/:id/?section_id=pickup-availability`. Only the children of
+  `[data-pickup-content]` are morphed into the product page.
+{% endcomment %}
+
+{%- liquid
+  assign pickups = product_variant.store_availabilities | where: 'pick_up_enabled', true
+  assign first_pickup = pickups.first
+-%}
+
+<div data-pickup-content>
+  {%- if pickups.size > 0 -%}
+    <button
+      type="button"
+      class="pickup-availability__card"
+      data-pickup-open
+      aria-haspopup="dialog"
+      aria-controls="PickupDrawer-{{ product_variant.id }}"
+    >
+      <span class="pickup-availability__icon" aria-hidden="true">
+        {%- render 'icon', icon: 'store', size: 16 -%}
+      </span>
+
+      <span class="pickup-availability__text">
+        {%- if first_pickup.available -%}
+          <span class="pickup-availability__status">
+            {{- 'products.pickup.available_at' | t: location: first_pickup.location.name -}}
+          </span>
+          <span class="pickup-availability__time">{{ first_pickup.pick_up_time }}</span>
+        {%- else -%}
+          <span class="pickup-availability__status">
+            {{- 'products.pickup.unavailable_at' | t: location: first_pickup.location.name -}}
+          </span>
+          <span class="pickup-availability__time">{{ 'products.pickup.check_stores' | t }}</span>
+        {%- endif -%}
+      </span>
+
+      <span class="pickup-availability__arrow" aria-hidden="true">
+        {%- render 'icon', icon: 'chevron-right', size: 14 -%}
+      </span>
+    </button>
+
+    <drawer-component
+      id="PickupDrawer-{{ product_variant.id }}"
+      class="pickup-drawer drawer"
+      data-placement="end"
+    >
+      <dialog class="drawer__dialog" data-ref="dialog" aria-label="{{ 'products.pickup.drawer_label' | t }}">
+        <div class="drawer__panel" data-ref="panel">
+          <header class="drawer__header pickup-drawer__header">
+            <div class="pickup-drawer__heading">
+              <h2 class="drawer__title pickup-drawer__title">{{ product_variant.product.title }}</h2>
+              {%- unless product_variant.product.has_only_default_variant -%}
+                <p class="pickup-drawer__variant">
+                  {%- for value in product_variant.options -%}
+                    {%- unless forloop.first -%}<span class="pickup-drawer__dot" aria-hidden="true"></span>{%- endunless -%}
+                    <span>{{ value }}</span>
+                  {%- endfor -%}
+                </p>
+              {%- endunless -%}
+            </div>
+
+            {%- liquid
+              assign pickup_close_label = 'accessibility.close' | t
+            -%}
+            {% render 'button',
+               label: pickup_close_label,
+               class: 'pickup-drawer__close',
+               icon: 'close',
+               variant: 'secondary',
+               size: 'small',
+               icon_only: true,
+               attributes: 'data-overlay-close' %}
+          </header>
+
+          <div class="drawer__body" data-ref="body" data-lenis-prevent>
+            <ul class="pickup-drawer__list" role="list">
+              {%- for pickup in pickups -%}
+                <li class="pickup-drawer__location">
+                  <h3 class="pickup-drawer__name">{{ pickup.location.name }}</h3>
+                  <address class="pickup-drawer__address">
+                    {{- pickup.location.address | format_address -}}
+                  </address>
+                  <p class="pickup-drawer__state pickup-drawer__state--{% if pickup.available %}in{% else %}out{% endif %}">
+                    {%- if pickup.available -%}
+                      {%- render 'icon', icon: 'check-circle', size: 16 -%}
+                      <span>{{ 'products.pickup.in_stock' | t: time: pickup.pick_up_time }}</span>
+                    {%- else -%}
+                      {%- render 'icon', icon: 'close', size: 16 -%}
+                      <span>{{ 'products.pickup.out_of_stock' | t }}</span>
+                    {%- endif -%}
+                  </p>
+                </li>
+              {%- endfor -%}
+            </ul>
+          </div>
+        </div>
+      </dialog>
+    </drawer-component>
+  {%- endif -%}
+</div>
+
+{% schema %}
+{
+  "name": "t:sections.pickup_availability.name",
+  "settings": []
+}
+{% endschema %}
+

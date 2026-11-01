@@ -8,6 +8,7 @@
   @param {string} [swatch_shape] - circle | round | portrait
   @param {string} [options_picker_type] - buttons | dropdowns
   @param {string} [size_options_picker_type] - buttons | dropdowns, applied to size-like options only
+  @param {string} [first_option_picker_type] - inherit | cards. Cards show the variant image and price
   @param {object} [current]
   @param {string} [form_id]
   @param {boolean} [is_size_option]
@@ -73,6 +74,8 @@
       endif
       if is_swatch
         assign this_picker = 'swatches'
+      elsif option.position == 1 and first_option_picker_type == 'cards'
+        assign this_picker = 'cards'
       endif
     -%}
 
@@ -98,6 +101,51 @@
            section: section,
            form_id: form_id,
            shape: resolved_shape %}
+
+      {%- elsif this_picker == 'cards' -%}
+
+        <div class="variant-picker__values variant-picker__values--cards">
+          {%- for value in option.values -%}
+            {%- liquid
+              assign input_id = section.id | append: '-' | append: option.position | append: '-' | append: forloop.index
+              assign card_variant = nil
+              for variant in product.variants
+                if variant.option1 == value
+                  assign card_variant = variant
+                  if variant.available
+                    break
+                  endif
+                endif
+              endfor
+              assign card_image = card_variant.featured_image | default: product.featured_image
+            -%}
+            <div class="variant-picker__value variant-picker__value--card">
+              <input
+                type="radio"
+                class="visually-hidden"
+                id="{{ input_id }}"
+                name="{{ option.name | escape }}"
+                value="{{ value | escape }}"
+                form="{{ form_id }}"
+                {% if option.selected_value == value %}checked{% endif %}
+              >
+              <label class="variant-picker__card" for="{{ input_id }}">
+                {%- if card_image != blank -%}
+                  <span class="variant-picker__card-media">
+                    {{ card_image | image_url: width: 120 | image_tag: loading: 'lazy', alt: '', width: 60, height: 60 }}
+                  </span>
+                {%- endif -%}
+                <span class="variant-picker__card-text">
+                  <span class="variant-picker__card-title">{{ value }}</span>
+                  {%- if card_variant -%}
+                    <span class="variant-picker__card-price">{{ card_variant.price | money }}</span>
+                  {%- endif -%}
+                </span>
+                <span class="variant-picker__card-radio" aria-hidden="true"></span>
+              </label>
+            </div>
+          {%- endfor -%}
+        </div>
 
       {%- elsif this_picker == 'dropdowns' -%}
 
@@ -135,6 +183,9 @@
               >
               <label class="variant-picker__swatch-label" for="{{ input_id }}">
                 <span>{{ value }}</span>
+                <span class="variant-picker__check" aria-hidden="true">
+                  {%- render 'icon', icon: 'check', size: 8 -%}
+                </span>
               </label>
             </div>
           {%- endfor -%}

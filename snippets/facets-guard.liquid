@@ -46,6 +46,41 @@
             data-min="0"
             data-max="{{ f.range_max }}"
           >
+            <div class="price-range__head">
+              <p class="price-range__max">
+                {{ 'products.facets.max_price_html' | t: price: range_max_display }}
+              </p>
+              <button type="button" class="price-range__reset link" data-price-reset>
+                {{- 'products.facets.reset' | t -}}
+              </button>
+            </div>
+
+            <div class="price-range__slider" aria-hidden="true">
+              <div class="price-range__track" data-ref="track">
+                <span class="price-range__fill" data-ref="fill"></span>
+              </div>
+              <input
+                class="price-range__thumb"
+                type="range"
+                data-ref="minThumb"
+                min="0"
+                max="{{ range_max }}"
+                step="1"
+                value="{{ f.min_value.value | default: 0 | money_without_currency | replace: ',', '' }}"
+                tabindex="-1"
+              >
+              <input
+                class="price-range__thumb"
+                type="range"
+                data-ref="maxThumb"
+                min="0"
+                max="{{ range_max }}"
+                step="1"
+                value="{{ f.max_value.value | default: f.range_max | money_without_currency | replace: ',', '' }}"
+                tabindex="-1"
+              >
+            </div>
+
             <div class="price-range__inputs">
               <label class="visually-hidden" for="{{ f.min_value.param_name }}-{{ layout }}">
                 {{ 'products.facets.price_from' | t }}
@@ -61,6 +96,7 @@
                 inputmode="decimal"
                 placeholder="0"
               >
+              <span class="price-range__currency" aria-hidden="true">{{ cart.currency.symbol }}</span>
 
               <label class="visually-hidden" for="{{ f.max_value.param_name }}-{{ layout }}">
                 {{ 'products.facets.price_to' | t }}
@@ -76,21 +112,29 @@
                 inputmode="decimal"
                 placeholder="{{ range_max }}"
               >
+              <span class="price-range__currency" aria-hidden="true">{{ cart.currency.symbol }}</span>
+
+              <button type="submit" class="price-range__apply" aria-label="{{ 'products.facets.apply' | t }}">
+                {%- render 'icon', icon: 'arrow-right', size: 16 -%}
+              </button>
             </div>
 
-            <div class="price-range__track" data-ref="track" aria-hidden="true">
-              <span class="price-range__fill" data-ref="fill"></span>
-            </div>
-
-            <output class="price-range__output" data-ref="output"></output>
-            <p class="price-range__max">
-              {{ 'products.facets.max_price_html' | t: price: range_max_display }}
-            </p>
+            <output class="price-range__output visually-hidden" data-ref="output"></output>
           </price-range>
 
         {%- else -%}
           {%- assign visible_values = 0 -%}
-          <ul class="facets__values facets__values--{{ f.presentation | default: 'text' }}" role="list">
+          {%- liquid
+            assign value_style = 'pills'
+            if f.param_name contains 'availability' or f.type == 'boolean'
+              assign value_style = 'rows'
+            elsif f.presentation == 'image'
+              assign value_style = 'image'
+            elsif f.presentation == 'swatch'
+              assign value_style = 'swatch'
+            endif
+          -%}
+          <ul class="facets__values facets__values--{{ f.presentation | default: 'text' }} facets__values--{{ value_style }}" role="list">
             {%- for value in f.values -%}
               {%- assign value_prefix = value.value | slice: 0, 2 -%}
               {%- if value_prefix == '__' -%}{%- continue -%}{%- endif -%}
@@ -123,6 +167,7 @@
                   {%- endcase -%}
 
                   <span class="facets__value-label">{{ value.label | escape }}</span>
+                  <span class="facets__value-check" aria-hidden="true">{% render 'icon', icon: 'check', size: 8 %}</span>
                   <span class="facets__value-count">({{ value.count }})</span>
                 </label>
               </li>
@@ -148,7 +193,7 @@
           {%- if f.active_values.size > 0 -%}
             <span class="facets__group-count">{{ f.active_values.size }}</span>
           {%- endif -%}
-          {% render 'icon', icon: 'chevron-down', size: 14 %}
+          <span class="facets__group-toggle" aria-hidden="true">{% render 'icon', icon: 'chevron-down', size: 12 %}</span>
         </summary>
 
         {{ group_content }}

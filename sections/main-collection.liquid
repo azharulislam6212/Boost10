@@ -29,6 +29,7 @@
 
   <div class="{% render 'container', width: section.settings.container_width %}">
     {% paginate collection.products by per_page %}
+    <div class="collection-layout">
       {%- if collection.all_products_count > 0 -%}
         {% content_for 'block',
           type: '_filters',
@@ -48,6 +49,8 @@
 
       <div class="product-grid-wrapper">
         <h2 class="visually-hidden">{{ 'products.facets.title' | t }}</h2>
+
+        {% render 'collection-toolbar', results: collection, paginate: paginate, total: collection.products_count, grid_id: grid_id, section: section %}
 
         {%- if paginate.previous and grid_mode != 'paginate' -%}
           <button
@@ -74,6 +77,7 @@
             class="product-grid__item"
             data-page="{{ paginate.current_page }}"
             data-product-id="{{ product.id }}"
+            style="order: {{ paginate.current_offset | plus: forloop.index | times: 2 }};"
           >
             {% content_for 'block',
               type: '_product-card',
@@ -85,6 +89,10 @@
             %}
           </li>
         {%- endfor -%}
+
+        {%- if paginate.current_page == 1 -%}
+          {% content_for 'blocks' %}
+        {%- endif -%}
 
         </ul>
 
@@ -103,11 +111,9 @@
         <p class="visually-hidden" data-ref="status" role="status"></p>
       </div>
 
-    {% endpaginate %}
-
-    <div class="collection-results__blocks">
-      {% content_for 'blocks' %}
     </div>
+
+    {% endpaginate %}
   </div>
 </results-list>
 
@@ -118,13 +124,7 @@
   "class": "section",
   "blocks": [
     {
-      "type": "_filters"
-    },
-    {
-      "type": "@theme"
-    },
-    {
-      "type": "@app"
+      "type": "grid-banner"
     }
   ],
   "settings": [

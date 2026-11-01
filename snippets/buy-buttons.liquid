@@ -111,22 +111,35 @@
         endif
       -%}
 
-      <button
-        type="submit"
-        id="AddToCart-{{ section.id }}"
-        class="button button--primary button--full buy-buttons__submit"
-        data-ref="submit"
-        {% if is_preorder %}data-preorder{% endif %}
-        {% unless variant.available %}disabled{% endunless %}
-      >
-        {%- if variant.available == false -%}
-          {{ 'products.product.sold_out' | t }}
-        {%- elsif is_preorder -%}
-          {{ 'products.product.preorder' | t }}
-        {%- else -%}
-          {{ 'products.product.add_to_cart' | t }}
-        {%- endif -%}
-      </button>
+      {%- liquid
+        if variant.available == false
+          assign submit_label = 'products.product.sold_out' | t
+        elsif is_preorder
+          assign submit_label = 'products.product.preorder' | t
+        else
+          assign submit_label = 'products.product.add_to_cart' | t
+        endif
+
+        assign submit_attributes = 'data-ref="submit"'
+        if is_preorder
+          assign submit_attributes = submit_attributes | append: ' data-preorder'
+        endif
+        assign submit_id = 'AddToCart-' | append: section.id
+        assign submit_disabled = true
+        if variant.available
+          assign submit_disabled = false
+        endif
+      -%}
+      {% render 'button',
+         label: submit_label,
+         type: 'submit',
+         id: submit_id,
+         variant: 'primary',
+         full: true,
+         effect: 'none',
+         disabled: submit_disabled,
+         class: 'buy-buttons__submit',
+         attributes: submit_attributes %}
     </div>
 
     <p class="buy-buttons__error" data-ref="error" role="alert" hidden></p>

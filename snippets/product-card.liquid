@@ -83,6 +83,35 @@
   endif
 
   assign card_id = 'card-' | append: product.id | append: '-' | append: index
+
+  # Supplement details from metafields, each optional: custom.flavor (or a
+  # Flavor option), custom.weight and custom.servings.
+  assign card_variant = product.selected_or_first_available_variant
+  assign flavor = product.metafields.custom.flavor.value
+  if flavor == blank
+    assign flavor_names = 'flavor,flavour,taste' | split: ','
+    for option in product.options_with_values
+      assign option_key = option.name | downcase | strip
+      for name in flavor_names
+        assign flavor_name = name | strip
+        if flavor_name == option_key
+          assign flavor = option.selected_value | default: option.values.first
+          break
+        endif
+      endfor
+      if flavor != blank
+        break
+      endif
+    endfor
+  endif
+
+  assign card_weight = product.metafields.custom.weight.value
+  assign card_servings = product.metafields.custom.servings.value | plus: 0
+  assign card_per_serving = blank
+  if card_servings > 0
+    assign card_per_serving = card_variant.price | divided_by: card_servings | money
+  endif
+  assign card_price_display = card_variant.price | money
 -%}
 
 <motion-effect
@@ -225,6 +254,13 @@
   </div>
 
   <div class="product-card__info">
+    {%- if flavor != blank -%}
+      <span class="product-card__flavor">
+        {%- render 'icon', icon: 'leaf', size: 10 -%}
+        {{- flavor | escape -}}
+      </span>
+    {%- endif -%}
+
     {%- if vendor_visible and product.vendor != blank -%}
       <p class="product-card__vendor">
         <span class="visually-hidden">{{ 'products.product.vendor' | t }}:</span>
@@ -238,13 +274,55 @@
       </a>
     </h3>
 
+    {%- if card_weight != blank or card_servings > 0 -%}
+      <p class="product-card__meta">
+        {%- if card_weight != blank -%}<span>{{ card_weight }}</span>{%- endif -%}
+        {%- if card_weight != blank and card_servings > 0 -%}<span class="product-card__meta-sep" aria-hidden="true">|</span>{%- endif -%}
+        {%- if card_servings > 0 -%}<span>{{ 'products.product.servings' | t: count: card_servings }}</span>{%- endif -%}
+        {%- if card_per_serving != blank -%}
+          <span class="product-card__serving">{{ 'products.product.per_serving_card' | t: price: card_per_serving }}</span>
+        {%- endif -%}
+      </p>
+    {%- endif -%}
+
     {%- if rating_visible -%}
       {% render 'rating', product: product %}
     {%- endif -%}
 
+    {%- if product.description != blank -%}
+      <p class="product-card__excerpt">{{ product.description | strip_html | truncatewords: 26 }}</p>
+    {%- endif -%}
+
     <div class="product-card__price{% if settings.show_second_line_price %} product-card__price--block{% endif %}">
-      {% render 'price', product: product, context: 'card' %}
+      {% render 'price', product: product, context: 'card', show_badges: true %}
     </div>
+
+    {%- if product.available -%}
+      <div class="product-card__list-actions">
+        <form action="{{ routes.cart_add_url }}" method="post" class="product-card__list-form" data-quick-add-form>
+          <input type="hidden" name="id" value="{{ card_variant.id }}">
+          <button type="submit" class="product-card__list-submit">
+            <span>{{ 'products.product.add_to_cart_price' | t: price: card_price_display }}</span>
+          </button>
+          <label class="visually-hidden" for="{{ card_id }}-qty">{{ 'products.product.quantity' | t }}</label>
+          <span class="product-card__list-qty">
+            <select id="{{ card_id }}-qty" name="quantity">
+              {%- for qty in (1..10) -%}
+                <option value="{{ qty }}">{% if qty < 10 %}0{% endif %}{{ qty }}</option>
+              {%- endfor -%}
+            </select>
+            {%- render 'icon', icon: 'chevron-down', size: 12 -%}
+          </span>
+        </form>
+
+        {%- unless product.has_only_default_variant -%}
+          <a class="product-card__list-options" href="{{ product.url }}">
+            <span>{{ 'products.product.choose_options' | t }}</span>
+            {%- render 'icon', icon: 'plus', size: 14 -%}
+          </a>
+        {%- endunless -%}
+      </div>
+    {%- endif -%}
 
     {%- if settings.enable_compare -%}
       <compare-trigger

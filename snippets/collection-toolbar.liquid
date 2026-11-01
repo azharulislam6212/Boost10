@@ -1,0 +1,117 @@
+{% doc %}
+  The row above a product grid: filter drawer trigger, grid/list toggle, the
+  "Showing 1–12 of 24 items" count, active filter pills and Clear all.
+  Pills and Clear all are handled by `<facet-filters>`, which listens on the
+  surrounding `<results-list>`.
+
+  @param {object} results - `collection` or `search`
+  @param {object} paginate - The `paginate` drop
+  @param {number} total - How many items matched
+  @param {string} grid_id - The product grid's id, for the view toggle
+  @param {object} section
+
+  @example
+    {% render 'collection-toolbar', results: collection, paginate: paginate, total: collection.products_count, grid_id: grid_id, section: section %}
+{% enddoc %}
+
+{%- liquid
+  assign range_start = 0
+  assign range_end = 0
+  if total > 0
+    assign range_start = paginate.current_offset | plus: 1
+    assign range_end = paginate.current_offset | plus: paginate.page_size
+    if range_end > total
+      assign range_end = total
+    endif
+  endif
+
+  assign active_count = 0
+  for filter in results.filters
+    assign active_count = active_count | plus: filter.active_values.size
+    if filter.min_value.value != blank or filter.max_value.value != blank
+      assign active_count = active_count | plus: 1
+    endif
+  endfor
+-%}
+
+<div class="collection-toolbar">
+  <button
+    type="button"
+    class="collection-toolbar__filter"
+    data-overlay-open="FacetDrawer-{{ section.id }}"
+    aria-expanded="false"
+    aria-controls="FacetDrawer-{{ section.id }}"
+  >
+    {%- render 'icon', icon: 'filter', size: 16 -%}
+    <span>{{ 'products.facets.filter' | t }}</span>
+    <span class="collection-toolbar__badge" data-facet-count {% if active_count == 0 %}hidden{% endif %}>
+      {%- if active_count > 0 %}{{ active_count }}{% endif -%}
+    </span>
+  </button>
+
+  <layout-toggle class="collection-toolbar__view facets__view" data-target="{{ grid_id }}">
+    <button
+      type="button"
+      data-view-option="list"
+      aria-pressed="false"
+      aria-label="{{ 'collections.view.list' | t }}"
+    >
+      {%- render 'icon', icon: 'list', size: 20 -%}
+    </button>
+    <button
+      type="button"
+      data-view-option="grid"
+      aria-pressed="true"
+      aria-label="{{ 'collections.view.grid' | t }}"
+    >
+      {%- render 'icon', icon: 'grid', size: 20 -%}
+    </button>
+  </layout-toggle>
+
+  <p class="collection-toolbar__count">
+    {{- 'products.facets.showing_range' | t: start: range_start, end: range_end, total: total -}}
+  </p>
+
+  {%- if active_count > 0 -%}
+    <div class="collection-toolbar__active">
+      {%- for filter in results.filters -%}
+        {%- if filter.type == 'price_range' -%}
+          {%- if filter.min_value.value != blank or filter.max_value.value != blank -%}
+            {%- assign price_min = filter.min_value.value | default: 0 | money -%}
+            {%- assign price_max = filter.max_value.value | default: filter.range_max | money -%}
+            <button
+              type="button"
+              class="collection-toolbar__pill"
+              data-remove-filter
+              data-filter-name="{{ filter.min_value.param_name }},{{ filter.max_value.param_name }}"
+            >
+              {{ price_min }}–{{ price_max }}
+              <span class="visually-hidden">{{ 'products.facets.remove_filter' | t: filter: filter.label }}</span>
+              {%- render 'icon', icon: 'close', size: 10 -%}
+            </button>
+          {%- endif -%}
+        {%- else -%}
+          {%- for value in filter.active_values -%}
+            {%- assign value_prefix = value.value | slice: 0, 2 -%}
+            {%- if value_prefix == '__' -%}{%- continue -%}{%- endif -%}
+            <button
+              type="button"
+              class="collection-toolbar__pill"
+              data-remove-filter
+              data-filter-name="{{ value.param_name }}"
+              data-filter-value="{{ value.value | escape }}"
+            >
+              {{ value.label | escape }}
+              <span class="visually-hidden">{{ 'products.facets.remove_filter' | t: filter: value.label }}</span>
+              {%- render 'icon', icon: 'close', size: 10 -%}
+            </button>
+          {%- endfor -%}
+        {%- endif -%}
+      {%- endfor -%}
+
+      <button type="button" class="collection-toolbar__clear link" data-clear-filters>
+        {{- 'products.facets.clear_all' | t -}}
+      </button>
+    </div>
+  {%- endif -%}
+</div>

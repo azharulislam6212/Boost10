@@ -3,7 +3,6 @@
   `_filters`, so it is theirs alone and no other section can pick it up.
 
   @param {object} [results] - The collection or search result set being filtered. Falls back to `collection`.
-  @param {number} [results_size] - How many products matched, for the count line.
 {% enddoc %}
 
 {%- liquid
@@ -16,95 +15,50 @@
 
 {%- if results_set -%}
   <div class="collection-filters collection-filters--{{ layout }}" {{ block.shopify_attributes }}>
-    <div class="collection-filters__bar">
-      {%- if block.settings.show_result_count -%}
-        <p class="collection-filters__count">
-          {{- 'products.facets.product_count' | t: count: results_size -}}
-        </p>
-      {%- endif -%}
-
-      {%- if layout == 'drawer' -%}
-        <button
-          type="button"
-          class="button button--secondary"
-          data-overlay-open="FacetDrawer-{{ section.id }}"
-          aria-expanded="false"
-          aria-controls="FacetDrawer-{{ section.id }}"
-        >
-          {% render 'icon', icon: 'filter', size: 16 %}
-          {{ 'products.facets.filter_and_sort' | t }}
-          <span class="collection-filters__badge" data-facet-count hidden></span>
-        </button>
-      {%- endif -%}
-
-      {%- if block.settings.enable_view_toggle -%}
-
-        <layout-toggle class="facets__view" data-target="ProductGrid-{{ section.id }}">
-          <button
-            type="button"
-            data-view-option="grid"
-            aria-pressed="true"
-            aria-label="{{ 'collections.view.grid' | t }}"
-          >
-            {% render 'icon', icon: 'grid', size: 16 %}
-          </button>
-
-          <button
-            type="button"
-            data-view-option="list"
-            aria-pressed="false"
-            aria-label="{{ 'collections.view.list' | t }}"
-          >
-            {% render 'icon', icon: 'list', size: 16 %}
-          </button>
-        </layout-toggle>
-      {%- endif -%}
-    </div>
-
     {%- if layout == 'sidebar' -%}
       <aside class="collection-filters__sidebar" aria-label="{{ 'products.facets.title' | t }}">
         {% render 'facets', results: results_set, section: section, context: 'sidebar' %}
       </aside>
-    {%- else -%}
-      <facet-drawer
-        id="FacetDrawer-{{ section.id }}"
-        class="facet-drawer drawer"
-        data-placement="start"
-      >
-        <dialog class="drawer__dialog" data-ref="dialog" aria-label="{{ 'products.facets.filter_and_sort' | t }}">
-          <div class="drawer__panel" data-ref="panel">
-            <header class="drawer__header">
-              <h2 class="drawer__title">{{ 'products.facets.filter_and_sort' | t }}</h2>
-              {%- liquid
-                assign filters_drawer_close_label = 'accessibility.close_filters' | t
-              -%}
-              {% render 'button',
-                 label: filters_drawer_close_label,
-                 id: 'FiltersDrawerClose',
-                 class: 'close-filters-drawer',
-                 icon: 'close',
-                 variant: 'primary',
-                 size: 'small',
-                 icon_only: true,
-                 attributes: 'data-overlay-close' %}
-            </header>
-
-            <div class="drawer__body" data-ref="body" data-lenis-prevent>
-              {% render 'facets', results: results_set, section: section, context: 'drawer' %}
-            </div>
-
-            <footer class="drawer__footer">
-              <button type="button" class="button button--secondary" data-clear-filters>
-                {{ 'products.facets.clear_all' | t }}
-              </button>
-              <button type="button" class="button button--primary" data-apply-filters>
-                {{ 'products.facets.show_results' | t }}
-              </button>
-            </footer>
-          </div>
-        </dialog>
-      </facet-drawer>
     {%- endif -%}
+
+    <facet-drawer
+      id="FacetDrawer-{{ section.id }}"
+      class="facet-drawer drawer"
+      data-placement="start"
+    >
+      <dialog class="drawer__dialog" data-ref="dialog" aria-label="{{ 'products.facets.filter_and_sort' | t }}">
+        <div class="drawer__panel" data-ref="panel">
+          <header class="drawer__header">
+            <h2 class="drawer__title visually-hidden">{{ 'products.facets.filter_and_sort' | t }}</h2>
+            {%- liquid
+              assign filters_drawer_close_label = 'accessibility.close_filters' | t
+            -%}
+            {% render 'button',
+               label: filters_drawer_close_label,
+               id: 'FiltersDrawerClose',
+               class: 'close-filters-drawer',
+               icon: 'close',
+               variant: 'primary',
+               size: 'small',
+               icon_only: true,
+               attributes: 'data-overlay-close' %}
+          </header>
+
+          <div class="drawer__body" data-ref="body" data-lenis-prevent>
+            {% render 'facets', results: results_set, section: section, context: 'drawer' %}
+          </div>
+
+          <footer class="drawer__footer">
+            <button type="button" class="button button--secondary" data-clear-filters>
+              {{ 'products.facets.clear_all' | t }}
+            </button>
+            <button type="button" class="button button--primary" data-apply-filters>
+              {{ 'products.facets.show_results' | t }}
+            </button>
+          </footer>
+        </div>
+      </dialog>
+    </facet-drawer>
   </div>
 {%- endif -%}
 
@@ -132,12 +86,6 @@
         }
       ],
       "default": "inherit"
-    },
-    {
-      "type": "checkbox",
-      "id": "show_result_count",
-      "label": "t:sections.main_collection.settings.show_result_count.label",
-      "default": true
     }
   ],
   "presets": [

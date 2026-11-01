@@ -34,7 +34,10 @@ export class FacetFilters extends BaseComponent {
 
     this.on(this.refs.form, 'change', this.#onChange);
 
-    this.on(this, 'click', this.#onClick);
+    // The toolbar above the grid (active pills, Clear all) sits outside this
+    // element, so listen on the whole results region and let #onClick decide
+    // which of the sidebar and drawer instances owns the click.
+    this.on(this.closest('results-list') || this, 'click', this.#onClick);
 
     this.on(window, 'popstate', () => this.apply({ url: window.location.href, push: false }));
 
@@ -147,13 +150,15 @@ export class FacetFilters extends BaseComponent {
   /**
    * Remove a single filter value.
    *
-   * @param {string} name
-   * @param {string} value
+   * @param {string} name - One input name, or several separated by commas
+   * @param {string} [value]
    * @returns {Promise<void>}
    */
   async remove(name, value) {
+    const names = String(name || '').split(',');
+
     for (const input of this.#selectedInputs()) {
-      if (input.name !== name) continue;
+      if (!names.includes(input.name)) continue;
       if (value !== undefined && input.value !== value) continue;
 
       if (input.type === 'checkbox' || input.type === 'radio') {
@@ -260,6 +265,10 @@ export class FacetFilters extends BaseComponent {
     const target = event.target instanceof Element ? event.target : null;
     if (!target) return;
 
+    const owner = target.closest('facet-filters');
+    if (owner && owner !== this) return;
+    if (!owner && this.closest('results-list')?.querySelector('facet-filters') !== this) return;
+
     const remove = target.closest('[data-remove-filter]');
     if (remove instanceof HTMLElement) {
       event.preventDefault();
@@ -353,6 +362,32 @@ export class PriceRange extends BaseComponent {
         this.commit();
       });
     }
+
+    // Optional slider thumbs. They carry no `name`, so the form never submits
+    // them; they only write into the number inputs.
+    for (const [thumb, input] of [
+      [this.refs.minThumb, this.refs.min],
+      [this.refs.maxThumb, this.refs.max]
+    ]) {
+      if (!(thumb instanceof HTMLInputElement)) continue;
+
+      this.on(thumb, 'input', () => {
+        input.value = thumb.value;
+        this.#clampAgainstEachOther(input);
+        this.#paint();
+      });
+
+      this.on(thumb, 'change', () => this.commit());
+    }
+
+    this.on(this, 'click', (event) => {
+      const reset = event.target instanceof Element ? event.target.closest('[data-price-reset]') : null;
+      if (!reset) return;
+
+      event.preventDefault();
+      this.reset();
+      this.commit();
+    });
 
     this.#paint();
   }
@@ -456,6 +491,13 @@ export class PriceRange extends BaseComponent {
 
     this.style.setProperty('--range-start', `${start}%`);
     this.style.setProperty('--range-end', `${end}%`);
+
+    if (this.refs.minThumb instanceof HTMLInputElement) {
+      this.refs.minThumb.value = String((min ?? this.floor) / 100);
+    }
+    if (this.refs.maxThumb instanceof HTMLInputElement) {
+      this.refs.maxThumb.value = String((max ?? this.ceiling) / 100);
+    }
 
     if (this.refs.output instanceof HTMLElement) {
       this.refs.output.textContent = themeString('facetsPriceRange', '', {

@@ -3,43 +3,26 @@
   `product-main-content`, which owns the markup.
 {% endcomment %}
 
-{%- liquid
-  assign media_column = '1fr'
-  if closest.product.media.size == 1
-    assign media_column = '0.9fr'
-  endif
--%}
+{%- capture media_gallery -%}
+  {%- content_for 'block', type: '_product-media-gallery', id: 'media-gallery', closest.product: closest.product -%}
+{%- endcapture -%}
 
-<div
-  class="main-product color-scheme-container color-{{ section.settings.color_scheme }}"
-  data-section-id="{{ section.id }}"
-  data-product-root
-  {% render 'spacing', section: section.settings %}
->
-  <div class="{% render 'container', width: section.settings.container_width %}">
-    <div class="main-product__layout" style="--media-column: {{ media_column }};">
-      <div class="main-product__media">
-        {%- content_for 'block',
-          type: '_product-media-gallery',
-          id: 'media-gallery',
-          closest.product: closest.product
-        -%}
-      </div>
+{%- capture product_details -%}
+  {%- content_for 'block', type: '_product-details', id: 'product-details', closest.product: closest.product -%}
+{%- endcapture -%}
 
-      <div class="main-product__info">
-        {%- content_for 'block',
-          type: '_product-details',
-          id: 'product-details',
-          closest.product: closest.product
-        -%}
-      </div>
-    </div>
+{%- capture additional_blocks -%}
+  {%- content_for 'blocks' -%}
+{%- endcapture -%}
+{%- assign additional_blocks = additional_blocks | strip -%}
 
-    <div class="main-product__blocks">
-      {%- content_for 'blocks' -%}
-    </div>
-  </div>
-</div>
+{% render 'product-main-content',
+   section_id: section.id,
+   section_settings: section.settings,
+   media_gallery: media_gallery,
+   product_details: product_details,
+   additional_blocks: additional_blocks,
+   media_count: closest.product.media.size %}
 
 {%- if section.settings.enable_sticky_atc -%}
   <sticky-add-to-cart
@@ -101,6 +84,12 @@
         }
       ],
       "default": "standard"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_breadcrumbs",
+      "label": "t:sections.collection_banner.settings.show_breadcrumbs.label",
+      "default": true
     },
     {
       "type": "paragraph",

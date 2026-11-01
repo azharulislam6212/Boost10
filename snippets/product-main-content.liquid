@@ -1,5 +1,6 @@
 {% doc %}
-  Lays out the product page.
+  Lays out the product page: breadcrumbs, then gallery and details side by side,
+  with the section's own blocks under the gallery on desktop.
 
   @param {string} section_id
   @param {object} section_settings - `section.settings`. Named this way because a parameter called `settings` would shadow the global theme settings inside this snippet
@@ -8,7 +9,6 @@
   @param {string} [additional_blocks] - Captured `{% content_for 'blocks' %}`
   @param {number} [media_count] - Used to pick a sensible gallery column width
   @param {string} [class]
-  @param {object} [section]
 
   @example
     {% render 'product-main-content',
@@ -17,9 +17,14 @@
 {% enddoc %}
 
 {%- liquid
-  assign media_column = '1fr'
+  assign media_column = '1.35fr'
   if media_count == 1
-    assign media_column = '0.9fr'
+    assign media_column = '1.2fr'
+  endif
+
+  assign has_blocks = false
+  if additional_blocks != blank
+    assign has_blocks = true
   endif
 -%}
 
@@ -29,8 +34,17 @@
   data-product-root
   {% render 'spacing', section: section_settings %}
 >
-  <div class="{% render 'container', width: section.settings.container_width %}">
-    <div class="main-product__layout" style="--media-column: {{ media_column }};">
+  <div class="{% render 'container', width: section_settings.container_width %}">
+    {%- if section_settings.show_breadcrumbs -%}
+      <div class="main-product__breadcrumbs">
+        {% render 'breadcrumbs', separator: 'chevron' %}
+      </div>
+    {%- endif -%}
+
+    <div
+      class="main-product__layout{% if has_blocks %} main-product__layout--has-blocks{% endif %}"
+      style="--media-column: {{ media_column }};"
+    >
       <div class="main-product__media">
         {{ media_gallery }}
       </div>
@@ -38,12 +52,12 @@
       <div class="main-product__info">
         {{ product_details }}
       </div>
-    </div>
 
-    {%- if additional_blocks != blank -%}
-      <div class="main-product__blocks">
-        {{ additional_blocks }}
-      </div>
-    {%- endif -%}
+      {%- if has_blocks -%}
+        <div class="main-product__blocks">
+          {{ additional_blocks }}
+        </div>
+      {%- endif -%}
+    </div>
   </div>
 </div>
