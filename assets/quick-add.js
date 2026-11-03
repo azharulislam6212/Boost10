@@ -9,7 +9,7 @@ import { BaseComponent, defineComponent } from '@theme/component';
 import { EVENTS } from '@theme/events';
 import { formatMoney, parseJSONScript, themeString, labelTarget } from '@theme/utilities';
 
-/** What joins the label, the price and the chosen option on the add button. */
+/** What joins the label and the price on the add button. */
 const SEPARATOR = ' · ';
 
 export class QuickAddSummary extends BaseComponent {
@@ -206,7 +206,7 @@ export class QuickAddSummary extends BaseComponent {
   }
 
   /**
-   * Append the total and the chosen option to whatever `product-form.js` last
+   * Append the total to whatever `product-form.js` last
    * wrote on the button.
    *
    * @private
@@ -229,11 +229,6 @@ export class QuickAddSummary extends BaseComponent {
 
     const unit = this.#unitPrice;
     if (Number.isFinite(unit)) parts.push(formatMoney(unit * this.#quantity));
-
-    const variant = this.#variant;
-    if (variant && this.#product?.has_only_default_variant === false && variant.title) {
-      parts.push(variant.title);
-    }
 
     label.textContent = parts.join(SEPARATOR);
   }
