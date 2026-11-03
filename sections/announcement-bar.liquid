@@ -1,5 +1,5 @@
 {% comment %}
-  Announcements as a slider or a marquee, with an optional close button.
+  Announcements as a slider or a dot-separated marquee, with an optional close button.
 {% endcomment %}
 
 {%- liquid
@@ -47,7 +47,7 @@
     {% if section_settings.show_close %}data-dismissible{% endif %}
     {% render 'spacing', section: section_settings %}
   >
-    <div class="container announcement-bar__inner">
+    <div class="{% render 'container', width: section_settings.container_width, classes: 'announcement-bar__inner' %}">
       {%- case mode -%}
         {%- when 'marquee' -%}
 
@@ -62,7 +62,12 @@
             aria-label="{{ 'sections.announcements.carousel_label' | t }}"
           >
             <div class="marquee__track" data-marquee-track>
-              {{ announcements }}
+              <div class="announcement-bar__group">{{ announcements }}</div>
+              {%- for i in (1..4) -%}
+                <div class="announcement-bar__group" data-marquee-clone aria-hidden="true" inert>
+                  {{- announcements -}}
+                </div>
+              {%- endfor -%}
             </div>
           </motion-effect>
 
@@ -107,29 +112,6 @@
                 {% render 'carousel-controls', settings: section_settings, size: 28 %}
               {%- elsif pagination != 'none' -%}
                 {% render 'carousel-pagination', style: pagination %}
-              {%- endif -%}
-
-              {%- if section_settings.carousel_autoplay -%}
-                <button
-                  type="button"
-                  class="carousel-shell__pause"
-                  data-ref="pause"
-                  aria-pressed="false"
-                  hidden
-                >
-                  <span class="carousel-shell__pause-glyph carousel-shell__pause-glyph--pause">
-                    {% render 'icon', icon: 'pause', size: 12 %}
-                  </span>
-                  <span class="carousel-shell__pause-glyph carousel-shell__pause-glyph--play">
-                    {% render 'icon', icon: 'play', size: 12 %}
-                  </span>
-                  <span class="visually-hidden carousel-shell__pause-glyph carousel-shell__pause-glyph--pause">
-                    {{ 'accessibility.pause_slideshow' | t }}
-                  </span>
-                  <span class="visually-hidden carousel-shell__pause-glyph carousel-shell__pause-glyph--play">
-                    {{ 'accessibility.play_slideshow' | t }}
-                  </span>
-                </button>
               {%- endif -%}
 
               <p class="visually-hidden" data-ref="status" role="status"></p>
@@ -186,6 +168,35 @@
         }
       ],
       "default": "slider"
+    },
+    {
+      "type": "select",
+      "id": "container_width",
+      "label": "t:shared.container.width.label",
+      "info": "t:shared.container.width.info",
+      "options": [
+        {
+          "value": "edge",
+          "label": "t:shared.container.width.options__1.label"
+        },
+        {
+          "value": "wide",
+          "label": "t:shared.container.width.options__2.label"
+        },
+        {
+          "value": "standard",
+          "label": "t:shared.container.width.options__3.label"
+        },
+        {
+          "value": "compact",
+          "label": "t:shared.container.width.options__4.label"
+        },
+        {
+          "value": "custom",
+          "label": "t:shared.container.width.options__5.label"
+        }
+      ],
+      "default": "edge"
     },
     {
       "type": "header",

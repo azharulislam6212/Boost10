@@ -1140,6 +1140,12 @@ export function marquee(track, { speed = 60, direction = 'left', pauseOnHover = 
   });
   observer.observe(container);
 
+  // The first measure can run on the fallback font; re-measure once web fonts land.
+  let destroyed = false;
+  document.fonts?.ready.then(() => {
+    if (!destroyed && document.fonts.status === 'loaded') start();
+  });
+
   return {
     play: () => {
       paused = false;
@@ -1150,6 +1156,7 @@ export function marquee(track, { speed = 60, direction = 'left', pauseOnHover = 
       animation?.pause();
     },
     destroy() {
+      destroyed = true;
       observer?.disconnect();
       observer = null;
       animation?.cancel();
