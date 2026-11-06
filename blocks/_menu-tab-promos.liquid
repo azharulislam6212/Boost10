@@ -34,59 +34,45 @@
     -%}
 
     {%- unless is_empty -%}
-      <div class="carousel-shell__item">
-      {%- if card_link != blank -%}
-        <a class="menu-promo menu-promo--{{ s.text_position }}" href="{{ card_link }}" style="--promo-radius: 16px;">
-      {%- else -%}
+      {%- liquid
+        assign promo_href = card_link | default: routes.all_products_collection_url
+        assign promo_label = card_label | escape
+      -%}
+      <div class="carousel-shell__item" data-panel-item>
         <div class="menu-promo menu-promo--{{ s.text_position }}" style="--promo-radius: 16px;">
-      {%- endif -%}
+          <a class="menu-promo__media" href="{{ promo_href }}" tabindex="-1" aria-hidden="true">
+            {%- if card_image != blank -%}
+              {% render 'image',
+                image: card_image,
+                alt: '',
+                ratio: image_ratio,
+                sizes: '(min-width: 990px) 30vw, 80vw',
+                wrapper_class: 'menu-promo__image',
+                class: 'menu-promo__img'
+              %}
+            {%- else -%}
+              <span class="menu-promo__image menu-promo__image--placeholder">
+                {%- assign placeholder_index = index | minus: 1 | modulo: 4 | plus: 1 -%}
+                {{ 'collection-apparel-' | append: placeholder_index | placeholder_svg_tag: 'placeholder-svg menu-promo__img' }}
+              </span>
+            {%- endif -%}
+          </a>
 
-        <span class="menu-promo__media">
-          {%- if card_image != blank -%}
-            {% render 'image',
-              image: card_image,
-              alt: card_heading,
-              ratio: image_ratio,
-              sizes: '(min-width: 990px) 30vw, 80vw',
-              wrapper_class: 'menu-promo__image',
-              class: 'menu-promo__img'
-            %}
-          {%- else -%}
-            <span class="menu-promo__image menu-promo__image--placeholder">
-              {{ 'product-' | append: index | placeholder_svg_tag: 'placeholder-svg' }}
-            </span>
-          {%- endif -%}
-
-          {%- if s.text_position == 'over' -%}
-            <span class="menu-promo__panel">
-              {%- if card_heading != blank -%}
-                <span class="menu-promo__heading">{{ card_heading | escape }}</span>
-              {%- endif -%}
-              {%- if card_label != blank -%}
-                <span class="menu-promo__cta">
-                  <span>{{ card_label | escape }}</span>
-                  {% render 'icon', icon: 'arrow-right', size: 16 %}
-                </span>
-              {%- endif -%}
-            </span>
-          {%- endif -%}
-        </span>
-
-        {%- if s.text_position != 'over' -%}
-          <span class="menu-promo__content">
+          <div class="{% if s.text_position == 'over' %}menu-promo__panel{% else %}menu-promo__content{% endif %}">
             {%- if card_heading != blank -%}
               <span class="menu-promo__heading">{{ card_heading | escape }}</span>
             {%- endif -%}
             {%- if card_label != blank -%}
-              <span class="menu-promo__cta">
-                <span>{{ card_label | escape }}</span>
-                {% render 'icon', icon: 'arrow-right', size: 16 %}
-              </span>
+              {% render 'button',
+                 label: promo_label,
+                 href: promo_href,
+                 variant: 'link',
+                 icon: 'arrow-right',
+                 width: 'auto',
+                 class: 'menu-promo__button' %}
             {%- endif -%}
-          </span>
-        {%- endif -%}
-
-      {%- if card_link != blank -%}</a>{%- else -%}</div>{%- endif -%}
+          </div>
+        </div>
       </div>
     {%- endunless -%}
   {%- endfor -%}

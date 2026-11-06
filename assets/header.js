@@ -14,6 +14,7 @@ import {
   prefersReducedMotion,
   rafThrottle
 } from '@theme/utilities';
+import { animate, getPreset, motionEnabled, EASING } from '@theme/motion-engine';
 
 /** Pointer must rest this long before a panel opens. */
 const HOVER_IN_DELAY = 70;
@@ -101,12 +102,15 @@ export class NavMenu extends BaseComponent {
 
   /** @param {HTMLDetailsElement} details */
   open(details) {
+    const wasOpen = details.dataset.state === 'open';
+
     for (const other of this.items) {
       if (other === details || other.contains(details) || details.contains(other)) continue;
       closeDisclosure(other);
     }
 
     openDisclosure(details);
+    if (!wasOpen) this.#playPanel(details);
   }
 
   /** @param {HTMLDetailsElement} details */
@@ -324,6 +328,51 @@ export class NavMenu extends BaseComponent {
     event.preventDefault();
     const step = event.key === 'ArrowRight' ? 1 : -1;
     stops[(current + step + stops.length) % stops.length]?.focus({ preventScroll: true });
+  }
+
+  /**
+   * Bring a panel's contents in one after another as it opens: dropdown rows
+   * and mega menu blocks rise, tab rows rise, and the open tab's cards slide in
+   * from the side as they do on a tab change. Only this panel's own rows, so a
+   * sub dropdown plays when it opens rather than with its parent.
+   *
+   * @param {HTMLDetailsElement} details
+   * @private
+   */
+  #playPanel(details) {
+    const panel = panelOf(details);
+    if (!panel || !motionEnabled()) return;
+
+    const inner = panel.querySelector(':scope > .nav__panel-inner');
+    if (!inner) return;
+
+    const rise = getPreset('fade-up');
+    const slide = getPreset('slide-left');
+    if (!rise || !slide) return;
+
+    const rows = /** @type {HTMLElement[]} */ ([
+      ...inner.querySelectorAll(
+        ':scope > .dropdown > .dropdown__item, :scope > .megamenu__grid > .megamenu__item:not(.megamenu__item--tabs), :scope > .megamenu__grid > .megamenu__item--tabs .tabs__tab'
+      )
+    ]);
+    const cards = /** @type {HTMLElement[]} */ ([
+      ...inner.querySelectorAll(':scope > .megamenu__grid > .megamenu__item--tabs .tabs__panel:not([hidden]) [data-panel-item]')
+    ]);
+
+    const play = (items, keyframes, start, step) => {
+      items.forEach((item, position) => {
+        item.getAnimations().forEach((running) => running.cancel());
+        const animation = animate(item, keyframes, {
+          duration: 650,
+          delay: start + position * step,
+          easing: EASING.outExpo
+        });
+        animation?.finished.then(() => animation.cancel()).catch(() => {});
+      });
+    };
+
+    play(rows, rise.keyframes({ distance: 14 }), 120, 45);
+    play(cards, slide.keyframes({ distance: 64, rtl: isRTL() }), 160, 90);
   }
 
   /**

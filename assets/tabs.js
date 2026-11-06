@@ -4,7 +4,8 @@
  * @module @theme/tabs
  */
 import { BaseComponent, defineComponent } from '@theme/component';
-import { rafThrottle, prefersReducedMotion, isDesignMode } from '@theme/utilities';
+import { rafThrottle, prefersReducedMotion, isDesignMode, isRTL } from '@theme/utilities';
+import { animate, getPreset, motionEnabled, EASING } from '@theme/motion-engine';
 
 /** How far the pointer travels before a press on the strip becomes a drag. */
 const DRAG_THRESHOLD = 5;
@@ -135,6 +136,7 @@ export class TabGroup extends BaseComponent {
     const tabs = this.tabs;
     if (index < 0 || index >= tabs.length) return;
 
+    const changed = index !== this.#index;
     this.#index = index;
 
     tabs.forEach((tab, position) => {
@@ -146,6 +148,8 @@ export class TabGroup extends BaseComponent {
     this.panels.forEach((panel, position) => {
       panel.toggleAttribute('hidden', position !== index);
     });
+
+    if (changed && options.animate !== false && !options.silent) this.#playPanel(this.panels[index]);
 
     this.#placeMarker(options.animate !== false);
 
@@ -299,6 +303,32 @@ export class TabGroup extends BaseComponent {
     }
 
     return { x, y, width: tab.offsetWidth, height: tab.offsetHeight };
+  }
+
+  /**
+   * Bring the chosen panel's items in one after another with the motion
+   * engine preset named in `data-panel-motion`. Opt-in per group.
+   *
+   * @param {HTMLElement|undefined} panel
+   */
+  #playPanel(panel) {
+    const preset = getPreset(this.dataset.panelMotion || '');
+    if (!panel || !preset || !motionEnabled()) return;
+
+    const items = /** @type {HTMLElement[]} */ ([...panel.querySelectorAll('[data-panel-item]')]);
+    const keyframes = preset.keyframes({ distance: 64, rtl: isRTL() });
+
+    items.forEach((item, position) => {
+      item.getAnimations().forEach((running) => running.cancel());
+
+      const animation = animate(item, keyframes, {
+        duration: 700,
+        delay: position * 90,
+        easing: EASING.outExpo
+      });
+
+      animation?.finished.then(() => animation.cancel()).catch(() => {});
+    });
   }
 
   /**
