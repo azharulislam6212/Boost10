@@ -74,6 +74,15 @@
 -%}
 
 {%- liquid
+  capture header_actions
+    content_for 'block', type: '_header-actions', id: 'header-actions'
+  endcapture
+
+  assign drawer_promo = ''
+  if header_actions contains '<!--drawer-promo-start-->'
+    assign drawer_promo = header_actions | split: '<!--drawer-promo-start-->' | last | split: '<!--drawer-promo-end-->' | first
+  endif
+
   assign slot_top_start = ''
   assign slot_top_center = ''
   assign slot_top_end = ''
@@ -90,11 +99,16 @@
   {% render 'header-nav', menu: menu, mega_menu_items: mega_menu_items %}
 {%- endcapture -%}
 
-{%- assign fragment_search = '' -%}
-
-{%- capture fragment_localization -%}
-  {% render 'header-localization', context: 'header' %}
-{%- endcapture -%}
+{%- liquid
+  assign fragment_search = ''
+  if st.show_search
+    if st.search_position == 'left' or st.search_row == 'bottom'
+      capture fragment_search
+        render 'header-search-button', modifier: 'site-header__action--search-placed'
+      endcapture
+    endif
+  endif
+-%}
 
 {%- liquid
   # Logo
@@ -139,20 +153,6 @@
     endcase
   endif
 
-  # Localization
-  if st.localization_row == 'bottom'
-    if st.localization_position == 'left'
-      assign slot_bottom_start = slot_bottom_start | append: fragment_localization
-    else
-      assign slot_bottom_end = slot_bottom_end | append: fragment_localization
-    endif
-  else
-    if st.localization_position == 'left'
-      assign slot_top_start = slot_top_start | append: fragment_localization
-    else
-      assign slot_top_end = slot_top_end | append: fragment_localization
-    endif
-  endif
 
   # Search
   if st.search_row == 'bottom'
@@ -273,6 +273,10 @@
             <span class="site-header__burger-bars" aria-hidden="true"><i></i><i></i></span>
           </button>
 
+          {%- if st.show_search and st.logo_position_mobile == 'center' -%}
+            {% render 'header-search-button', modifier: 'site-header__action--search-start' %}
+          {%- endif -%}
+
           {{ slot_top_start }}
         </div>
 
@@ -280,7 +284,7 @@
 
         <div class="site-header__slot site-header__slot--end">
           {{ slot_top_end }}
-          {% content_for 'block', type: '_header-actions', id: 'header-actions' %}
+          {{ header_actions }}
         </div>
       </div>
 
@@ -299,7 +303,12 @@
   </div>
 </sticky-header>
 
-{% content_for 'block', type: '_header-drawer', id: 'header-drawer' %}
+{%- liquid
+  capture header_drawer
+    content_for 'block', type: '_header-drawer', id: 'header-drawer'
+  endcapture
+  echo header_drawer | replace: '<!--drawer-promo-->', drawer_promo
+-%}
 
 {% schema %}
 {
@@ -571,19 +580,19 @@
       "type": "checkbox",
       "id": "show_country",
       "label": "t:sections.header.settings.show_country.label",
-      "default": false
+      "default": true
     },
     {
       "type": "checkbox",
       "id": "show_flag",
       "label": "t:sections.header.settings.show_flag.label",
-      "default": false
+      "default": true
     },
     {
       "type": "checkbox",
       "id": "show_language",
       "label": "t:sections.header.settings.show_language.label",
-      "default": false
+      "default": true
     },
     {
       "type": "select",
@@ -635,38 +644,6 @@
       "step": 1,
       "unit": "px",
       "default": 14
-    },
-    {
-      "type": "select",
-      "id": "localization_position",
-      "label": "t:shared.position.label",
-      "options": [
-        {
-          "value": "left",
-          "label": "t:shared.position.options__1.label"
-        },
-        {
-          "value": "right",
-          "label": "t:shared.position.options__3.label"
-        }
-      ],
-      "default": "right"
-    },
-    {
-      "type": "select",
-      "id": "localization_row",
-      "label": "t:shared.row.label",
-      "options": [
-        {
-          "value": "top",
-          "label": "t:shared.row.options__1.label"
-        },
-        {
-          "value": "bottom",
-          "label": "t:shared.row.options__2.label"
-        }
-      ],
-      "default": "top"
     },
     {
       "type": "header",

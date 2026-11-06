@@ -110,7 +110,25 @@ export class NavMenu extends BaseComponent {
     }
 
     openDisclosure(details);
+    if (details.dataset.kind === 'sub') this.#placeFlyout(details);
     if (!wasOpen) this.#playPanel(details);
+  }
+
+  /**
+   * Flip a nested flyout to the other side when it would leave the viewport.
+   *
+   * @param {HTMLDetailsElement} details
+   * @private
+   */
+  #placeFlyout(details) {
+    const panel = panelOf(details);
+    if (!panel || panel.classList.contains('nav__panel--end')) return;
+
+    const room = (details.closest('.nav__panel-inner') ?? details).getBoundingClientRect();
+    const width = panel.querySelector('.nav__panel-inner')?.offsetWidth ?? panel.offsetWidth;
+    const space = isRTL() ? room.left : window.innerWidth - room.right;
+
+    panel.toggleAttribute('data-flip', space < width + 8);
   }
 
   /** @param {HTMLDetailsElement} details */
