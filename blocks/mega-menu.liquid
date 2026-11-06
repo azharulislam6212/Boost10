@@ -5,6 +5,46 @@
 {%- liquid
   assign st = block.settings
   assign label = st.menu_item | strip
+
+  capture panel_blocks
+    content_for 'blocks'
+  endcapture
+
+  # With no blocks, the panel lays out the menu item's own submenu as columns.
+  assign has_blocks = true
+  assign fallback_links = blank
+  if panel_blocks == blank
+    assign has_blocks = false
+    assign label_key = label | downcase
+    for item in section.settings.menu.links
+      assign item_key = item.title | strip | downcase
+      if item_key == label_key
+        assign fallback_links = item.links
+        break
+      endif
+    endfor
+  endif
+
+  # Nested children are one column each (up to four); a flat list runs six links a column.
+  assign fallback_columns = 1
+  if fallback_links != blank
+    assign nested_count = 0
+    for child in fallback_links
+      if child.links.size > 0
+        assign nested_count = nested_count | plus: 1
+      endif
+    endfor
+
+    if nested_count > 0
+      assign fallback_columns = fallback_links.size
+    else
+      assign fallback_columns = fallback_links.size | plus: 5 | divided_by: 6
+    endif
+
+    if fallback_columns > 4
+      assign fallback_columns = 4
+    endif
+  endif
 -%}
 
 <div
@@ -27,7 +67,15 @@
     "
   >
     <div class="megamenu__grid">
-      {% content_for 'blocks' %}
+      {%- if has_blocks -%}
+        {{ panel_blocks }}
+      {%- elsif fallback_links.size > 0 -%}
+        <div class="megamenu__item megamenu__item--links" style="--span: {{ st.columns }};">
+          {% render 'megamenu-columns', links: fallback_links, columns: fallback_columns %}
+        </div>
+      {%- elsif request.design_mode -%}
+        <p class="megamenu__item megamenu__empty" style="--span: {{ st.columns }};">{{ 'blocks.mega_menu.empty_panel' | t }}</p>
+      {%- endif -%}
     </div>
   </div>
 </div>
@@ -171,6 +219,11 @@
     },
     {
       "type": "@app"
+    }
+  ],
+  "presets": [
+    {
+      "name": "t:blocks.mega_menu.name"
     }
   ]
 }

@@ -84,8 +84,19 @@
         class: 'menu-promo__img'
       %}
     {%- else -%}
-      <span class="menu-promo__image menu-promo__image--placeholder">
-        {{ 'lifestyle-1' | placeholder_svg_tag: 'placeholder-svg' }}
+      {%- liquid
+        # Four illustrations in turn, so neighbouring promos don't repeat one.
+        assign placeholder_index = block.id | slice: -1, 1 | plus: 0
+        if placeholder_index < 1 or placeholder_index > 4
+          assign placeholder_index = block.id | size | modulo: 4 | plus: 1
+        endif
+        capture placeholder_aspect
+          render 'aspect-ratio', ratio: st.image_ratio
+        endcapture
+        assign placeholder_svg = 'collection-apparel-' | append: placeholder_index | placeholder_svg_tag: 'placeholder-svg menu-promo__img'
+      -%}
+      <span class="menu-promo__image menu-promo__image--placeholder" style="--aspect-ratio: {{ placeholder_aspect }};">
+        {{ placeholder_svg | replace_first: '<svg', '<svg preserveAspectRatio="xMidYMid slice"' }}
       </span>
     {%- endif -%}
 
@@ -270,6 +281,11 @@
       "max": 12,
       "step": 1,
       "default": 4
+    }
+  ],
+  "presets": [
+    {
+      "name": "t:blocks.menu_promo.name"
     }
   ]
 }

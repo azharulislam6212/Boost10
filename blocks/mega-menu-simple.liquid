@@ -41,25 +41,7 @@
         {%- endif -%}
 
         {%- if menu != blank and menu.links.size > 0 -%}
-          <div class="megamenu__columns" style="--columns: {{ st.columns }};">
-            {%- for link in menu.links -%}
-              <div class="megamenu__column">
-                {%- if link.links.size > 0 -%}
-                  <a class="megamenu__column-heading" href="{{ link.url }}">{{ link.title }}</a>
-
-                  <ul class="megamenu__list" role="list">
-                    {%- for child in link.links -%}
-                      <li><a class="megamenu__link" href="{{ child.url }}">{{ child.title }}</a></li>
-                    {%- endfor -%}
-                  </ul>
-                {%- else -%}
-                  <a class="megamenu__link megamenu__link--standalone" href="{{ link.url }}">
-                    {{- link.title -}}
-                  </a>
-                {%- endif -%}
-              </div>
-            {%- endfor -%}
-          </div>
+          {% render 'megamenu-columns', links: menu.links, columns: st.columns %}
         {%- else -%}
           <p class="megamenu__empty">{{ 'blocks.mega_menu.empty_menu' | t }}</p>
         {%- endif -%}
@@ -102,8 +84,14 @@
                     class: 'menu-promo__img'
                   %}
                 {%- else -%}
-                  <span class="menu-promo__image menu-promo__image--placeholder">
-                    {{ 'lifestyle-' | append: index | placeholder_svg_tag: 'placeholder-svg' }}
+                  {%- liquid
+                    capture placeholder_aspect
+                      render 'aspect-ratio', ratio: st.banner_ratio
+                    endcapture
+                    assign placeholder_svg = 'collection-apparel-' | append: index | placeholder_svg_tag: 'placeholder-svg menu-promo__img'
+                  -%}
+                  <span class="menu-promo__image menu-promo__image--placeholder" style="--aspect-ratio: {{ placeholder_aspect }};">
+                    {{ placeholder_svg | replace_first: '<svg', '<svg preserveAspectRatio="xMidYMid slice"' }}
                   </span>
                 {%- endif -%}
 
@@ -395,6 +383,11 @@
       "label": "t:blocks.mega_menu.settings.show_on_mobile.label",
       "info": "t:blocks.mega_menu.settings.show_on_mobile.info",
       "default": true
+    }
+  ],
+  "presets": [
+    {
+      "name": "t:blocks.mega_menu_simple.name"
     }
   ]
 }

@@ -185,6 +185,14 @@
     min-block-size: 1px;
   }
 
+  /* A centred menu or logo sits on the row's true centre: the logo and icon
+     slots share the leftover space equally instead of each taking its own width. */
+  @media screen and (min-width: 990px) {
+    .site-header:is([data-menu-position='center'], [data-logo-position='center']) .site-header__row {
+      grid-template-columns: minmax(max-content, 1fr) auto minmax(max-content, 1fr);
+    }
+  }
+
   /* --------------------------------------------------------------------------
      4. Transparent over a banner
      --------------------------------------------------------------------------
@@ -677,7 +685,7 @@
     font-size: var(--font-size-xs);
     letter-spacing: 0.12em;
     text-transform: uppercase;
-    color: var(--color-muted-text, var(--color-text));
+    color: var(--color-heading);
   }
 
   .megamenu__eyebrow--link {
@@ -708,13 +716,20 @@
     margin-block-end: 0;
   }
 
+  /* Column headings and top-level links share one size and weight. Body font,
+     so the weight can be raised without touching the heading font's. */
+  .megamenu__column-heading,
+  .megamenu__link.megamenu__link--standalone {
+    font-family: var(--font-body-family);
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--color-heading);
+  }
+
   .megamenu__column-heading {
     display: block;
     margin-block-end: var(--space-3);
-    font-family: var(--font-heading-family);
-    font-size: var(--font-size-md);
-    font-weight: var(--font-heading-weight);
-    color: var(--color-heading);
     text-decoration: none;
   }
 
@@ -732,26 +747,17 @@
     display: inline-block;
     padding-block: 5px;
     font-size: var(--font-size-sm);
-    color: var(--color-muted-text, var(--color-text));
+    color: var(--color-heading);
     text-decoration: none;
     transition:
       color var(--header-speed) var(--header-ease),
       background-size var(--duration-slow) var(--ease-out-expo);
   }
 
-  .megamenu__link:hover {
-    color: var(--color-heading);
-  }
-
   @media (prefers-reduced-motion: reduce) {
     .megamenu__link {
       transition: none;
     }
-  }
-
-  .megamenu__link--standalone {
-    font-weight: 500;
-    color: var(--color-heading);
   }
 
   .megamenu__empty {
@@ -887,12 +893,12 @@
     background-color: color-mix(in srgb, currentColor 4%, transparent);
   }
 
+  /* Shopify's coloured illustrations, sliced to fill the block's ratio. */
   .menu-promo__image--placeholder .placeholder-svg {
     display: block;
     inline-size: 100%;
-    aspect-ratio: 1;
-    fill: currentColor;
-    opacity: 0.25;
+    block-size: auto;
+    aspect-ratio: var(--aspect-ratio, 1);
   }
 
   .menu-promo__media {
@@ -903,7 +909,13 @@
 
   /* The zoom the theme's image blocks use, on the same curve. */
   .menu-promo__img {
-    transition: transform var(--duration-slow, 450ms) var(--ease-out-expo, ease);
+    transition:
+      opacity var(--transition-base),
+      transform var(--duration-slow, 450ms) var(--ease-out-expo, ease);
+  }
+
+  .menu-promo:is(:focus-visible, :active) .menu-promo__img {
+    transform: scale(1.06);
   }
 
   @media (hover: hover) {
@@ -923,6 +935,7 @@
     flex-direction: column;
     gap: var(--space-2);
     padding-block-start: var(--space-4);
+    color: var(--color-heading);
   }
 
   .menu-promo__heading {
@@ -940,8 +953,36 @@
     inline-size: 100%;
     min-inline-size: 0;
     padding-block-end: var(--space-2);
-    border-block-end: 1px solid currentColor;
     font-size: var(--font-size-sm);
+
+    /* A faint rule at rest; the full-colour line wipes across it on hover,
+       the same draw-and-retract the menu links use. */
+    background-image:
+      linear-gradient(currentColor, currentColor),
+      linear-gradient(color-mix(in srgb, currentColor 25%, transparent), color-mix(in srgb, currentColor 25%, transparent));
+    background-size: 0% 1px, 100% 1px;
+    background-position: right bottom, left bottom;
+    background-repeat: no-repeat;
+    transition: background-size var(--duration-slow, 450ms) var(--ease-out-expo, ease);
+  }
+
+  .menu-promo:is(:hover, :focus-visible) .menu-promo__cta {
+    background-size: 100% 1px, 100% 1px;
+    background-position: left bottom, left bottom;
+  }
+
+  [dir='rtl'] .menu-promo__cta {
+    background-position: left bottom, right bottom;
+  }
+
+  [dir='rtl'] .menu-promo:is(:hover, :focus-visible) .menu-promo__cta {
+    background-position: right bottom, right bottom;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .menu-promo__cta {
+      transition: none;
+    }
   }
 
   .menu-promo__cta > span:first-child {
