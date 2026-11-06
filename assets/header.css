@@ -530,62 +530,68 @@
     color: inherit;
     text-decoration: none;
     white-space: nowrap;
-    transition:
-      background-color var(--header-speed) var(--header-ease),
-      background-size var(--duration-slow) var(--ease-out-expo);
+    transition: background-color var(--header-speed) var(--header-ease);
   }
 
-  .dropdown__link:hover {
+  .dropdown__link:hover,
+  [data-open] > .dropdown__link--parent {
     background-color: color-mix(in srgb, currentColor 6%, transparent);
   }
 
   /* ==========================================================================
      The underline
      --------------------------------------------------------------------------
-     The same line the footer menus draw, on the same curve, so a customer moving
-     from the header to the footer sees one behaviour rather than two. The
-     canonical version and the reasoning behind the origin swap are in
-     footer.css; the short version is that the origin is the end edge at rest and
-     the start edge on hover, which draws the line out from the left and retracts
-     it the way it came. Drawn as a background on the content box, so the line
-     sits inside the link's padding with no pseudo-element.
+     The same line the footer menus draw, on the same curve. It is a background
+     on the label text, not on the link, so it runs the width of the words rather
+     than the row, and there is no pseudo-element. The origin is the end edge at
+     rest and the start edge on hover: drawn out from the left, retracted the way
+     it came.
      ========================================================================== */
 
-  .dropdown__link,
+  .dropdown__label,
   .megamenu__link {
     background-image: linear-gradient(90deg, currentColor, currentColor);
-    background-origin: content-box;
     background-size: 0% 0.1rem;
     background-repeat: no-repeat;
     background-position: right bottom;
+    transition: background-size var(--duration-slow, 600ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
   }
 
-  [dir='rtl'] .dropdown__link,
-  [dir='rtl'] .megamenu__link {
+  .dropdown__label {
+    padding-block-end: 2px;
+  }
+
+  .megamenu__link {
+    background-origin: content-box;
+    transition:
+      color var(--header-speed) var(--header-ease),
+      background-size var(--duration-slow, 600ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+  }
+
+  [dir=rtl] :is(.dropdown__label, .megamenu__link) {
     background-position: left bottom;
   }
 
-  .dropdown__link:hover,
-  .dropdown__link:focus-visible,
-  .megamenu__link:hover,
-  .megamenu__link:focus-visible {
+  .dropdown__link:is(:hover, :focus-visible) > .dropdown__label,
+  .megamenu__link:is(:hover, :focus-visible) {
     background-size: 100% 0.1rem;
     background-position: left bottom;
   }
 
-  [dir='rtl'] .dropdown__link:hover,
-  [dir='rtl'] .dropdown__link:focus-visible,
-  [dir='rtl'] .megamenu__link:hover,
-  [dir='rtl'] .megamenu__link:focus-visible {
+  [dir=rtl] .dropdown__link:is(:hover, :focus-visible) > .dropdown__label,
+  [dir=rtl] .megamenu__link:is(:hover, :focus-visible) {
     background-position: right bottom;
   }
 
-  .dropdown__link--parent {
-    background-image: none;
+  [data-open] > .dropdown__link--parent > .dropdown__label {
+    background-size: 100% 0.1rem;
+    background-position: left bottom;
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .dropdown__link {
+    .dropdown__link,
+    .dropdown__label,
+    .megamenu__link {
       transition: none;
     }
   }
@@ -603,10 +609,6 @@
     display: none;
   }
 
-  [data-open] > .dropdown__link--parent {
-    background-color: color-mix(in srgb, currentColor 6%, transparent);
-  }
-
   .dropdown__chevron {
     flex-shrink: 0;
     opacity: 0.6;
@@ -620,8 +622,6 @@
 
   .dropdown__link--all {
     font-weight: 500;
-    text-decoration: underline;
-    text-underline-offset: 3px;
   }
 
   .dropdown__details {
@@ -774,11 +774,11 @@
   .menu-card {
     display: flex;
     align-items: center;
-    gap: var(--space-4);
-    padding: var(--space-3);
-    border: 1px dashed color-mix(in srgb, var(--color-border) 90%, transparent);
-    border-radius: var(--card-radius, 20px);
-    color: inherit;
+    gap: 1rem;
+    padding: 3px;
+    border: 1px dashed color-mix(in srgb, var(--color-primary-button-hover-background, var(--color-heading)) 60%, transparent);
+    border-radius: var(--card-radius, 24px);
+    color: var(--color-heading, inherit);
     text-decoration: none;
     transition:
       background-color var(--header-speed) var(--header-ease),
@@ -787,51 +787,62 @@
   }
 
   a.menu-card:hover,
-  .menu-card--emphasis {
-    background-color: var(--color-primary-button-background, var(--color-heading));
-    border-color: transparent;
+  a.menu-card:focus-visible,
+  a.menu-card[aria-current='page'] {
+    background-color: var(--color-primary-button-hover-background, var(--color-heading));
     border-style: solid;
-    color: var(--color-primary-button-text, var(--color-background));
+    border-color: var(--color-primary-button-hover-background, var(--color-heading));
+    color: var(--color-primary-button-hover-text, var(--color-background));
   }
 
   .menu-card__media {
     flex-shrink: 0;
-    inline-size: 84px;
+    inline-size: 80px;
   }
 
   .menu-card__image {
     display: block;
-    border-radius: calc(var(--card-radius, 20px) - 6px);
+    aspect-ratio: 1;
+    border-radius: calc(var(--card-radius, 24px) - 3px);
     overflow: hidden;
     background-color: color-mix(in srgb, currentColor 4%, transparent);
+  }
+
+  .menu-card__image--placeholder {
+    background-color: color-mix(in srgb, var(--color-primary-button-hover-background, currentColor) 8%, var(--color-background));
   }
 
   .menu-card__image--placeholder .placeholder-svg {
     display: block;
     inline-size: 100%;
-    aspect-ratio: 1;
-    fill: currentColor;
-    opacity: 0.25;
+    block-size: 100%;
+    object-fit: cover;
   }
 
   .menu-card__text {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 0.6rem;
     min-inline-size: 0;
+    padding-inline-end: var(--space-3);
   }
 
   .menu-card__title {
     font-family: var(--font-heading-family);
-    font-size: var(--font-size-lg);
+    font-size: 1.8rem;
     font-weight: var(--font-heading-weight);
     line-height: 1.2;
   }
 
   .menu-card__description {
-    font-size: var(--font-size-sm);
+    font-size: 1.2rem;
     line-height: 1.4;
     opacity: 0.75;
+    transition: opacity var(--header-speed) var(--header-ease);
+  }
+
+  a.menu-card:is(:hover, :focus-visible, [aria-current='page']) .menu-card__description {
+    opacity: 0.85;
   }
 
   /* --------------------------------------------------------------------------
@@ -3197,5 +3208,46 @@
   /* Over the banner the round controls are a 20% veil of the text colour. */
   .site-header--transparent[data-transparent] .site-header__shell:not(:hover):not(:has([open])) .site-header__action:not(.site-header__action--account) {
     background-color: color-mix(in srgb, currentColor 20%, transparent);
+  }
+
+  /* ==========================================================================
+     49. Dropdowns wear the mega menu panel
+     --------------------------------------------------------------------------
+     Same surface, radius and reveal as the mega menu, so a dropdown and a sub
+     dropdown read as smaller versions of it.
+     ========================================================================== */
+
+  .nav__panel--dropdown > .nav__panel-inner,
+  .nav__panel--sub > .nav__panel-inner {
+    border-radius: 24px;
+  }
+
+  .nav__panel--dropdown .dropdown,
+  .nav__panel--sub .dropdown {
+    gap: 2px;
+    padding: var(--space-2);
+  }
+
+  .nav__panel--dropdown .dropdown__link,
+  .nav__panel--sub .dropdown__link {
+    padding: 10px var(--space-3);
+    color: var(--color-heading, inherit);
+  }
+
+  /* A panel of cards takes its full set width, as drawn, rather than shrinking
+     to the longest description. */
+  .nav__panel--compact > .nav__panel-inner:has(.menu-card) {
+    inline-size: var(--mega-max-width, 460px);
+    border: 0;
+  }
+
+  /* Compact panels and dropdowns hang from the menu pill; drop them to the
+     header edge so every panel opens the same distance below the bar. The
+     gap is padding, so the pointer never crosses dead space on the way down. */
+  @media screen and (min-width: 990px) {
+    .site-header__row--top .nav__panel--compact,
+    .site-header__row--top .nav__panel--dropdown {
+      padding-block-start: calc(var(--space-2) + (var(--header-row-height) - 12px - var(--nav-size, 15px) * 1.2) / 2);
+    }
   }
 }

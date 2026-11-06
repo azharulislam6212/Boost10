@@ -5,8 +5,17 @@
 {%- liquid
   assign st = block.settings
   assign has_link = false
+  assign is_current = false
   if st.link != blank
     assign has_link = true
+
+    # The card is active on the page it links to, whether the link was saved as
+    # a path or a full URL, and with or without a query string.
+    assign link_path = st.link | split: "?" | first | split: "#" | first
+    assign full_path = shop.url | append: request.path
+    if link_path == request.path or link_path == full_path
+      assign is_current = true
+    endif
   endif
 -%}
 
@@ -23,8 +32,17 @@
         class: 'menu-card__img'
       %}
     {%- else -%}
+      {%- liquid
+        # Six illustrations in turn, so neighbouring cards don't repeat one.
+        assign placeholder_names = 'hero-apparel-1,hero-apparel-2,hero-apparel-3,blog-apparel-1,blog-apparel-2,blog-apparel-3' | split: ','
+        assign placeholder_index = block.id | slice: -1, 1 | plus: 0
+        if placeholder_index < 1 or placeholder_index > 6
+          assign placeholder_index = block.id | size | modulo: 6 | plus: 1
+        endif
+        assign placeholder_index = placeholder_index | minus: 1
+      -%}
       <span class="menu-card__image menu-card__image--placeholder">
-        {{ 'product-1' | placeholder_svg_tag: 'placeholder-svg' }}
+        {{ placeholder_names[placeholder_index] | placeholder_svg_tag: 'placeholder-svg' }}
       </span>
     {%- endif -%}
   </span>
@@ -41,8 +59,9 @@
 
 {%- if has_link -%}
   <a
-    class="megamenu__item menu-card{% if st.emphasis %} menu-card--emphasis{% endif %}"
+    class="megamenu__item menu-card"
     href="{{ st.link }}"
+    {% if is_current %}aria-current="page"{% endif %}
     style="--span: {{ st.column_span }}; --card-radius: {{ st.corner_radius }}px;"
     {{ block.shopify_attributes }}
   >
@@ -50,7 +69,7 @@
   </a>
 {%- else -%}
   <div
-    class="megamenu__item menu-card{% if st.emphasis %} menu-card--emphasis{% endif %}"
+    class="megamenu__item menu-card"
     style="--span: {{ st.column_span }}; --card-radius: {{ st.corner_radius }}px;"
     {{ block.shopify_attributes }}
   >
@@ -134,13 +153,6 @@
       "label": "t:shared.link.label"
     },
     {
-      "type": "checkbox",
-      "id": "emphasis",
-      "label": "t:blocks.menu_card.settings.emphasis.label",
-      "info": "t:blocks.menu_card.settings.emphasis.info",
-      "default": false
-    },
-    {
       "type": "range",
       "id": "corner_radius",
       "label": "t:shared.corner_radius.label",
@@ -148,7 +160,7 @@
       "max": 40,
       "step": 2,
       "unit": "px",
-      "default": 20
+      "default": 24
     },
     {
       "type": "range",
