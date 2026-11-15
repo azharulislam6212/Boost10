@@ -9,22 +9,10 @@
   assign tabs_id = 'bundle-tabs-' | append: block.id
 
   assign strip_style = s.strip_style | default: 'plain'
-  assign orientation = s.direction | default: 'horizontal'
-  if strip_style == 'segmented'
-    assign orientation = 'horizontal'
-  endif
 
-  assign classes = 'product-bundle__tabs product-bundle__tabs--' | append: orientation
+  assign classes = 'product-bundle__tabs'
   if strip_style == 'segmented'
     assign classes = classes | append: ' product-bundle__tabs--segmented'
-  endif
-
-  if s.width == 'fit'
-    assign width_flex = '0 0 auto'
-    assign width_size = 'fit-content'
-  else
-    assign width_flex = '1 1 0%'
-    assign width_size = '100%'
   endif
 
   assign tab_border_style = s.tab_border_style | default: 'solid'
@@ -33,20 +21,7 @@
     assign tab_border_width = s.tab_border_width | default: 1 | plus: 0
   endif
 
-  assign strip_label = s.label
-  if strip_label == blank
-    assign strip_label = 'products.bundle.categories' | t
-  endif
-
-  assign underline_applies = true
-  if orientation != 'horizontal' or strip_style == 'segmented'
-    assign underline_applies = false
-  endif
-
-  assign underline_style = s.strip_underline | default: 'none'
-  unless underline_applies
-    assign underline_style = 'none'
-  endunless
+  assign strip_label = 'products.bundle.categories' | t
 
   assign tab_motion = s.tab_animation | default: 'fill'
   assign panel_motion = s.panel_animation | default: 'rise'
@@ -57,42 +32,13 @@
   unless panel_motion == 'none'
     assign panel_keyframes = 'bundle-panel-' | append: panel_motion
   endunless
-
-  assign motion_speed = s.motion_speed | default: 420 | plus: 0
-
-  assign tab_speed_source = motion_speed
-  if tab_motion == 'none'
-    assign tab_speed_source = 0
-  endif
 -%}
 
 {%- capture tabs_style -%}
   {%- render 'spacing', block: s, declarations: true -%}
 
   --bundle-tabs-gap: {{ s.gap | default: 24 | plus: 0 }}px;
-  --bundle-tabs-rail-width: {{ s.rail_width | default: 260 | plus: 0 }}px;
-
-  --bundle-motion-speed: {{ motion_speed }}ms;
-  --bundle-tab-speed: calc({{ tab_speed_source }}ms * 0.7);
   --bundle-panel-animation: {{ panel_keyframes }};
-
-  {%- if underline_applies -%}
-    {%- liquid
-      assign underline_gap = s.strip_underline_gap | default: 16 | plus: 0
-      assign underline_gap_half = underline_gap | divided_by: 2
-      assign underline_gap_mobile = s.strip_underline_gap_mobile | default: underline_gap_half | plus: 0
-    -%}
-    --bundle-strip-underline-gap: {{ underline_gap }}px;
-    --bundle-strip-underline-gap-mobile: {{ underline_gap_mobile }}px;
-
-    {%- if underline_style != 'none' -%}
-      --bundle-strip-border-width: {{ s.strip_underline_width | default: 1 | plus: 0 }}px;
-      --bundle-strip-border-style: {{ underline_style }};
-      {%- if s.strip_underline_color != blank -%}
-        --bundle-strip-border-color: {{ s.strip_underline_color }};
-      {%- endif -%}
-    {%- endif -%}
-  {%- endif -%}
 
   {%- if strip_style == 'segmented' -%}
     --bundle-tabs-track-radius: {{ s.track_radius | default: 50 | plus: 0 }}px;
@@ -101,12 +47,7 @@
     {%- endif -%}
   {%- endif -%}
 
-  --bundle-tab-height: {{ s.tab_height | default: 37 | plus: 0 }}px;
   --bundle-tab-radius: {{ s.tab_radius | default: 50 | plus: 0 }}px;
-  --bundle-tab-padding-inline: {{ s.tab_padding_inline | default: 16 | plus: 0 }}px;
-  --bundle-tab-gap: {{ s.tab_gap | default: 10 | plus: 0 }}px;
-
-  --bundle-tab-icon-gap: {{ s.tab_icon_gap | default: 6 | plus: 0 }}px;
   --bundle-tab-font-size: {{ s.tab_font_size | default: 14 | plus: 0 }}px;
   --bundle-tab-font-weight: {{ s.tab_font_weight | default: '500' }};
 
@@ -134,7 +75,6 @@
 
 <motion-effect
   class="product-bundle__tabs-motion"
-  style="--bundle-tabs-flex: {{ width_flex }}; --bundle-tabs-width: {{ width_size }};"
   {% render 'motion-attrs',
      kind: 'text',
      block: s,
@@ -241,36 +181,6 @@
       "info": "t:blocks.product_bundle_tabs.settings.tab_active_color.info"
     },
     {
-      "type": "select",
-      "id": "direction",
-      "label": "t:blocks.tabs.settings.direction.label",
-      "info": "t:blocks.tabs.settings.direction.info",
-      "options": [
-        {
-          "value": "horizontal",
-          "label": "t:blocks.tabs.settings.direction.options__2.label"
-        },
-        {
-          "value": "vertical",
-          "label": "t:blocks.tabs.settings.direction.options__1.label"
-        }
-      ],
-      "default": "horizontal",
-      "visible_if": "{{ block.settings.strip_style != 'segmented' }}"
-    },
-    {
-      "type": "range",
-      "id": "rail_width",
-      "label": "t:blocks.tabs.settings.rail_width.label",
-      "info": "t:blocks.tabs.settings.rail_width.info",
-      "min": 140,
-      "max": 400,
-      "step": 10,
-      "unit": "px",
-      "default": 260,
-      "visible_if": "{{ block.settings.direction == 'vertical' and block.settings.strip_style != 'segmented' }}"
-    },
-    {
       "type": "range",
       "id": "gap",
       "label": "t:blocks.tabs.settings.gap.label",
@@ -279,29 +189,6 @@
       "step": 2,
       "unit": "px",
       "default": 24
-    },
-    {
-      "type": "select",
-      "id": "width",
-      "label": "t:blocks.group.settings.width.label",
-      "info": "t:blocks.group.settings.width.info",
-      "options": [
-        {
-          "value": "fill",
-          "label": "t:blocks.group.settings.width.options__2.label"
-        },
-        {
-          "value": "fit",
-          "label": "t:blocks.group.settings.width.options__1.label"
-        }
-      ],
-      "default": "fill"
-    },
-    {
-      "type": "text",
-      "id": "label",
-      "label": "t:blocks.tabs.settings.label.label",
-      "info": "t:blocks.tabs.settings.label.info"
     },
     {
       "type": "header",
@@ -356,132 +243,8 @@
       "default": 50
     },
     {
-      "type": "range",
-      "id": "tab_height",
-      "label": "t:sections.product_bundle.settings.tab_height.label",
-      "info": "t:sections.product_bundle.settings.tab_height.info",
-      "min": 24,
-      "max": 64,
-      "step": 1,
-      "unit": "px",
-      "default": 37
-    },
-    {
-      "type": "range",
-      "id": "tab_padding_inline",
-      "label": "t:sections.product_bundle.settings.tab_padding_inline.label",
-      "min": 0,
-      "max": 40,
-      "step": 1,
-      "unit": "px",
-      "default": 16
-    },
-    {
-      "type": "range",
-      "id": "tab_gap",
-      "label": "t:blocks.product_bundle_tabs.settings.tab_gap.label",
-      "min": 0,
-      "max": 40,
-      "step": 1,
-      "unit": "px",
-      "default": 10
-    },
-    {
-      "type": "range",
-      "id": "tab_icon_gap",
-      "label": "t:blocks.product_bundle_tabs.settings.tab_icon_gap.label",
-      "info": "t:blocks.product_bundle_tabs.settings.tab_icon_gap.info",
-      "min": 0,
-      "max": 24,
-      "step": 1,
-      "unit": "px",
-      "default": 6
-    },
-    {
       "type": "header",
-      "content": "t:blocks.product_bundle_tabs.headers.underline"
-    },
-    {
-      "type": "paragraph",
-      "content": "t:blocks.product_bundle_tabs.paragraphs.underline"
-    },
-    {
-      "type": "select",
-      "id": "strip_underline",
-      "label": "t:blocks.product_bundle_tabs.settings.strip_underline.label",
-      "options": [
-        {
-          "value": "none",
-          "label": "t:shared.options.none"
-        },
-        {
-          "value": "solid",
-          "label": "t:shared.options.solid"
-        },
-        {
-          "value": "dashed",
-          "label": "t:shared.border.style.options__2.label"
-        }
-      ],
-      "default": "solid",
-      "visible_if": "{{ block.settings.strip_style != 'segmented' and block.settings.direction != 'vertical' }}"
-    },
-    {
-      "type": "range",
-      "id": "strip_underline_width",
-      "label": "t:shared.border.thickness.label",
-      "min": 1,
-      "max": 6,
-      "step": 1,
-      "unit": "px",
-      "default": 1,
-      "visible_if": "{{ block.settings.strip_underline != 'none' and block.settings.strip_style != 'segmented' and block.settings.direction != 'vertical' }}"
-    },
-    {
-      "type": "color",
-      "id": "strip_underline_color",
-      "label": "t:shared.border.color.label",
-      "visible_if": "{{ block.settings.strip_underline != 'none' and block.settings.strip_style != 'segmented' and block.settings.direction != 'vertical' }}"
-    },
-    {
-      "type": "select",
-      "id": "strip_underline_device",
-      "label": "t:shared.spacing.devices.label",
-      "options": [
-        {
-          "value": "desktop",
-          "label": "t:shared.spacing.devices.options__1.label"
-        },
-        {
-          "value": "mobile",
-          "label": "t:shared.spacing.devices.options__2.label"
-        }
-      ],
-      "default": "desktop"
-    },
-    {
-      "type": "range",
-      "id": "strip_underline_gap",
-      "label": "t:blocks.product_bundle_tabs.settings.strip_underline_gap.label",
-      "info": "t:blocks.product_bundle_tabs.settings.strip_underline_gap.info",
-      "min": 0,
-      "max": 64,
-      "step": 2,
-      "unit": "px",
-      "default": 16,
-      "visible_if": "{{ block.settings.strip_underline_device == 'desktop' }}"
-    },
-    {
-      "type": "range",
-      "id": "strip_underline_gap_mobile",
-      "label": "t:blocks.product_bundle_tabs.settings.strip_underline_gap.label",
-      "info": "t:blocks.product_bundle_tabs.settings.strip_underline_gap.info",
-      "min": 0,
-      "max": 64,
-      "step": 2,
-      "unit": "px",
-      "default": 8,
-      "visible_if": "{{ block.settings.strip_underline_device == 'mobile' }}"
+      "content": "t:shared.typography.header"
     },
     {
       "type": "range",
@@ -570,17 +333,6 @@
         }
       ],
       "default": "rise"
-    },
-    {
-      "type": "range",
-      "id": "motion_speed",
-      "label": "t:blocks.product_bundle_tabs.settings.motion_speed.label",
-      "min": 0,
-      "max": 1200,
-      "step": 20,
-      "unit": "ms",
-      "default": 420,
-      "visible_if": "{{ block.settings.tab_animation != 'none' or block.settings.panel_animation != 'none' }}"
     },
     {
       "type": "header",

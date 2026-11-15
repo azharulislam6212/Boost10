@@ -1,46 +1,426 @@
 {% doc %}
-  blocks/_product-bundle-summary.liquid — "Build your own bundle".
+  The bundle summary panel: heading, slots, total and the add to cart button,
+  plus the discount the bundle unlocks once enough items are in it. Child
+  blocks (an Icon with text note by default) sit under the button.
 {% enddoc %}
 
 {%- liquid
-  assign s = section.settings
+  assign s = block.settings
+
+  assign slots = s.max_items | default: 6 | plus: 0 | at_least: 1
+  assign min_items = s.min_items | default: 1 | plus: 0 | at_least: 1 | at_most: slots
+  assign columns = s.slot_columns | default: 3 | plus: 0
+
+  assign discount_type = s.discount_type | default: 'percentage'
+  assign discount_value = 0
+  if discount_type == 'amount'
+    assign discount_value = s.discount_amount | default: 0 | at_least: 0 | times: 100 | round
+  else
+    assign discount_value = s.discount_percentage | default: 0 | at_least: 0 | at_most: 100
+  endif
+  assign discount_code = s.discount_code | default: '' | strip
+
+  assign heading = s.heading
+  assign icon = s.icon | default: 'package'
+
+  assign progress_icon = s.progress_icon | default: 'tag'
+
+  assign scheme_classes = ''
+  if s.inherit_color_scheme == false and s.color_scheme != blank
+    assign scheme_classes = ' color-scheme-container color-' | append: s.color_scheme
+  endif
+
+  assign width = s.width | default: 39 | plus: 0
+  assign radius = s.border_radius | default: 24 | plus: 0
 -%}
 
-<div
-  class="bundle-tray__summary"
-  {% render 'spacing', block: block.settings %}
+{%- capture summary_style -%}
+  {%- render 'spacing', block: s, declarations: true -%}
+  --bundle-summary-width: {{ width }}%;
+  --bundle-summary-radius: {{ radius }}px;
+  --bundle-summary-columns: {{ columns }};
+  {%- if s.background != blank -%}
+    --bundle-summary-background: {{ s.background }};
+  {%- endif -%}
+{%- endcapture -%}
+
+<motion-effect
+  class="bundle-summary{{ scheme_classes }}{% if s.sticky_desktop %} bundle-summary--sticky{% endif %}"
+  data-ref="summary"
+  data-max-items="{{ slots }}"
+  data-min-items="{{ min_items }}"
+  data-discount-type="{{ discount_type }}"
+  data-discount-value="{{ discount_value }}"
+  data-discount-code="{{ discount_code | escape }}"
+  data-bundle-label="{{ heading | escape }}"
+  data-block-spacing
+  style="{{ summary_style | strip_newlines | strip }}"
+  {% render 'motion-attrs',
+     kind: 'text',
+     block: s,
+     section: section.settings,
+     block_level: true,
+     target: '[data-bundle-reveal]',
+     duration: 800,
+     stagger: 70
+  %}
   {{ block.shopify_attributes }}
 >
-  {%- if s.tray_icon != 'none' -%}
-    <span class="bundle-tray__mark" aria-hidden="true">
-      {% render 'icon', icon: s.tray_icon, size: 24 %}
-    </span>
-  {%- endif -%}
+  <div class="bundle-summary__head" data-bundle-reveal>
+    {%- if icon != 'none' -%}
+      <span class="bundle-summary__mark" aria-hidden="true">
+        <svg class="bundle-summary__ring" viewBox="0 0 72 72" fill="none" focusable="false">
+          <circle cx="36" cy="36" r="35.5" stroke="currentColor" stroke-dasharray="2 8" />
+        </svg>
+        {% render 'icon', icon: icon, size: 24 %}
+      </span>
+    {%- endif -%}
 
-  <h2 class="bundle-tray__title">{{ s.tray_heading }}</h2>
+    {%- if heading != blank -%}
+      <h2 class="bundle-summary__title">{{ heading }}</h2>
+    {%- endif -%}
 
-  {%- if s.tray_subheading != blank -%}
-    <p class="bundle-tray__subtitle">{{ s.tray_subheading }}</p>
-  {%- endif -%}
+    {%- if s.subheading != blank -%}
+      <p class="bundle-summary__subtitle">{{ s.subheading }}</p>
+    {%- endif -%}
+  </div>
 
-  {%- if s.tray_note != blank -%}
-    <p class="bundle-tray__note" data-ref="note" role="status">
-      {%- if s.tray_note_icon != 'none' -%}
-        {% render 'icon', icon: s.tray_note_icon, size: 16 %}
+  {%- if s.progress_text != blank -%}
+    <p class="bundle-summary__progress" data-ref="progress" data-bundle-reveal>
+      {%- if progress_icon != 'none' -%}
+        {% render 'icon', icon: progress_icon, size: 16 %}
       {%- endif -%}
-      <span data-ref="noteText">{{ s.tray_note }}</span>
+      <span data-ref="progressText" data-default="{{ s.progress_text | escape }}">{{ s.progress_text }}</span>
     </p>
   {%- endif -%}
-</div>
+
+  <ol class="bundle-summary__slots" data-ref="slots" role="list" data-bundle-reveal>
+    {%- for i in (1..slots) -%}
+      <li class="bundle-slot" data-bundle-slot data-index="{{ i }}" data-state="empty">
+        <button
+          type="button"
+          class="bundle-slot__fill"
+          data-slot-fill
+          aria-label="{{ 'products.bundle.slot_empty' | t: index: i | escape }}"
+        >
+          {% render 'icon', icon: 'plus', size: 24 %}
+        </button>
+
+        <div class="bundle-slot__filled" data-slot-filled>
+          <div class="bundle-slot__media">
+            <img class="bundle-slot__image" data-slot-image alt="" width="80" height="80" loading="lazy">
+
+            <button
+              type="button"
+              class="bundle-slot__remove"
+              data-slot-remove
+              aria-label="{{ 'products.bundle.remove' | t | escape }}"
+            >
+              {% render 'icon', icon: 'close', size: 12 %}
+            </button>
+          </div>
+
+          <span class="visually-hidden" data-slot-title></span>
+
+          <div class="bundle-slot__quantity">
+            <button
+              type="button"
+              class="bundle-slot__step"
+              data-slot-decrease
+              aria-label="{{ 'products.product.quantity_decrease' | t: product: '' | strip | escape }}"
+            >
+              {% render 'icon', icon: 'minus', size: 10 %}
+            </button>
+
+            <span class="bundle-slot__count" data-slot-count aria-live="polite">01</span>
+
+            <button
+              type="button"
+              class="bundle-slot__step"
+              data-slot-increase
+              aria-label="{{ 'products.product.quantity_increase' | t: product: '' | strip | escape }}"
+            >
+              {% render 'icon', icon: 'plus', size: 10 %}
+            </button>
+          </div>
+        </div>
+      </li>
+    {%- endfor -%}
+  </ol>
+
+  <div class="bundle-summary__foot" data-bundle-reveal>
+    <p class="bundle-summary__total">
+      <span class="bundle-summary__total-label">{{ 'products.bundle.total' | t }}</span>
+      <span class="bundle-summary__amounts">
+        <s class="bundle-summary__original" data-ref="originalTotal" hidden></s>
+        <span class="bundle-summary__price" data-ref="total">{{ 0 | money }}</span>
+      </span>
+    </p>
+
+    {%- assign submit_label = 'products.bundle.add_to_cart' | t -%}
+    {% render 'button',
+       label: submit_label,
+       full: true,
+       disabled: true,
+       class: 'bundle-summary__submit',
+       attributes: 'data-ref="submit"' %}
+
+    <p class="bundle-summary__error" data-ref="error" role="alert" hidden></p>
+
+    {%- capture summary_blocks -%}{% content_for 'blocks' %}{%- endcapture -%}
+    {%- if summary_blocks != blank -%}
+      <div class="bundle-summary__blocks">{{ summary_blocks }}</div>
+    {%- endif -%}
+  </div>
+</motion-effect>
 
 {% schema %}
 {
   "name": "t:blocks.product_bundle_summary.name",
   "tag": null,
+  "blocks": [
+    {
+      "type": "@theme"
+    },
+    {
+      "type": "@app"
+    }
+  ],
   "settings": [
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "t:shared.heading.label",
+      "default": "Build your own bundle"
+    },
+    {
+      "type": "text",
+      "id": "subheading",
+      "label": "t:sections.bundle_builder.settings.subheading.label",
+      "default": "Mix and match products"
+    },
+    {
+      "type": "select",
+      "id": "icon",
+      "label": "t:sections.product_bundle.settings.tray_icon.label",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.options.none"
+        },
+        {
+          "value": "package",
+          "label": "t:shared.icons.package"
+        },
+        {
+          "value": "bag",
+          "label": "t:shared.icons.bag"
+        },
+        {
+          "value": "gift",
+          "label": "t:shared.icons.gift"
+        },
+        {
+          "value": "tag",
+          "label": "t:shared.icons.tag"
+        },
+        {
+          "value": "heart",
+          "label": "t:shared.icons.heart"
+        },
+        {
+          "value": "star",
+          "label": "t:shared.icons.star"
+        }
+      ],
+      "default": "package"
+    },
+    {
+      "type": "text",
+      "id": "progress_text",
+      "label": "t:blocks.product_bundle_summary.settings.progress_text.label",
+      "info": "t:blocks.product_bundle_summary.settings.progress_text.info",
+      "default": "Add products to build your bundle"
+    },
+    {
+      "type": "select",
+      "id": "progress_icon",
+      "label": "t:blocks.product_bundle_summary.settings.progress_icon.label",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.options.none"
+        },
+        {
+          "value": "tag",
+          "label": "t:shared.icons.tag"
+        },
+        {
+          "value": "gift",
+          "label": "t:shared.icons.gift"
+        },
+        {
+          "value": "star",
+          "label": "t:shared.icons.star"
+        },
+        {
+          "value": "info",
+          "label": "t:shared.icons.info"
+        },
+        {
+          "value": "check-circle",
+          "label": "t:shared.icons.check_circle"
+        }
+      ],
+      "default": "tag"
+    },
+    {
+      "type": "range",
+      "id": "slot_columns",
+      "label": "t:sections.product_bundle.settings.slot_columns.label",
+      "min": 2,
+      "max": 4,
+      "step": 1,
+      "default": 3
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.product_bundle_summary.headers.discount"
+    },
     {
       "type": "paragraph",
       "content": "t:blocks.product_bundle_summary.paragraph"
+    },
+    {
+      "type": "text",
+      "id": "discount_code",
+      "label": "t:sections.product_bundle.settings.slot_code.label",
+      "info": "t:sections.product_bundle.settings.slot_code.info"
+    },
+    {
+      "type": "select",
+      "id": "discount_type",
+      "label": "t:sections.product_bundle.settings.slot_value_type.label",
+      "options": [
+        {
+          "value": "percentage",
+          "label": "t:sections.product_bundle.settings.slot_value_type.options__1.label"
+        },
+        {
+          "value": "amount",
+          "label": "t:sections.product_bundle.settings.slot_value_type.options__2.label"
+        }
+      ],
+      "default": "percentage"
+    },
+    {
+      "type": "number",
+      "id": "discount_percentage",
+      "label": "t:sections.product_bundle.settings.slot_percent.label",
+      "placeholder": "%",
+      "visible_if": "{{ block.settings.discount_type == 'percentage' }}"
+    },
+    {
+      "type": "number",
+      "id": "discount_amount",
+      "label": "t:sections.product_bundle.settings.slot_amount.label",
+      "info": "t:sections.product_bundle.settings.slot_amount.info",
+      "visible_if": "{{ block.settings.discount_type == 'amount' }}"
+    },
+    {
+      "type": "range",
+      "id": "min_items",
+      "label": "t:sections.product_bundle.settings.min_items.label",
+      "min": 1,
+      "max": 8,
+      "step": 1,
+      "default": 2
+    },
+    {
+      "type": "range",
+      "id": "max_items",
+      "label": "t:sections.product_bundle.settings.max_items.label",
+      "info": "t:sections.product_bundle.settings.max_items.info",
+      "min": 2,
+      "max": 8,
+      "step": 1,
+      "default": 6
+    },
+    {
+      "type": "header",
+      "content": "t:shared.appearance.header"
+    },
+    {
+      "type": "checkbox",
+      "id": "inherit_color_scheme",
+      "label": "t:blocks.group.settings.inherit_color_scheme.label",
+      "default": true
+    },
+    {
+      "type": "color_scheme",
+      "id": "color_scheme",
+      "label": "t:shared.color_scheme.label",
+      "visible_if": "{{ block.settings.inherit_color_scheme == false }}"
+    },
+    {
+      "type": "color_background",
+      "id": "background",
+      "label": "t:shared.background.color.label",
+      "info": "t:blocks.product_bundle_summary.background_info"
+    },
+    {
+      "type": "range",
+      "id": "width",
+      "label": "t:blocks.group.settings.width_custom.label",
+      "min": 30,
+      "max": 60,
+      "step": 1,
+      "unit": "%",
+      "default": 39
+    },
+    {
+      "type": "range",
+      "id": "border_radius",
+      "label": "t:blocks.group.settings.border_radius.label",
+      "min": 0,
+      "max": 40,
+      "step": 2,
+      "unit": "px",
+      "default": 24
+    },
+    {
+      "type": "checkbox",
+      "id": "sticky_desktop",
+      "label": "t:blocks.group.settings.sticky_desktop.label",
+      "default": true
+    },
+    {
+      "type": "select",
+      "id": "animation_text",
+      "label": "t:shared.animation.animation_text.label",
+      "options": [
+        {
+          "value": "inherit",
+          "label": "t:shared.animation.animation_text.options__1.label"
+        },
+        {
+          "value": "none",
+          "label": "t:shared.animation.animation_text.options__2.label"
+        },
+        {
+          "value": "fade-in",
+          "label": "t:shared.animation.animation_text.options__3.label"
+        },
+        {
+          "value": "fade-up",
+          "label": "t:shared.animation.animation_text.options__4.label"
+        },
+        {
+          "value": "slide-up",
+          "label": "t:shared.animation.animation_text.options__5.label"
+        }
+      ],
+      "default": "inherit"
     },
     {
       "type": "header",
@@ -70,7 +450,7 @@
       "max": 120,
       "step": 2,
       "unit": "px",
-      "default": 0,
+      "default": 24,
       "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
     },
     {
@@ -81,7 +461,7 @@
       "max": 120,
       "step": 2,
       "unit": "px",
-      "default": 0,
+      "default": 40,
       "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
     },
     {
@@ -92,7 +472,7 @@
       "max": 120,
       "step": 2,
       "unit": "px",
-      "default": 0,
+      "default": 56,
       "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
     },
     {
@@ -103,7 +483,7 @@
       "max": 120,
       "step": 2,
       "unit": "px",
-      "default": 0,
+      "default": 56,
       "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
     },
     {
@@ -114,7 +494,7 @@
       "max": 120,
       "step": 2,
       "unit": "px",
-      "default": 0,
+      "default": 24,
       "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
     },
     {
@@ -125,7 +505,7 @@
       "max": 120,
       "step": 2,
       "unit": "px",
-      "default": 0,
+      "default": 24,
       "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
     },
     {
@@ -136,7 +516,7 @@
       "max": 120,
       "step": 2,
       "unit": "px",
-      "default": 0,
+      "default": 16,
       "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
     },
     {
@@ -147,14 +527,26 @@
       "max": 120,
       "step": 2,
       "unit": "px",
-      "default": 0,
+      "default": 16,
       "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
     }
   ],
   "presets": [
     {
       "name": "t:blocks.product_bundle_summary.name",
-      "category": "t:categories.products"
+      "category": "t:categories.products",
+      "blocks": [
+        {
+          "type": "icon-with-text",
+          "settings": {
+            "icon": "truck",
+            "icon_size": "custom",
+            "icon_size_custom": 16,
+            "heading": "Add a shipping or returns note",
+            "gap": 8
+          }
+        }
+      ]
     }
   ]
 }

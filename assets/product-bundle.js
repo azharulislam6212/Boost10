@@ -1,5 +1,6 @@
 /**
- * `<product-bundle>` — the tray in `sections/product-bundle.liquid`.
+ * `<product-bundle>` — the picker and the Summary panel in
+ * `sections/product-bundle.liquid`.
  *
  * @module @theme/product-bundle
  */
@@ -7,13 +8,25 @@
 import { BaseComponent, defineComponent } from '@theme/component';
 import { EVENTS } from '@theme/events';
 import { cart } from '@theme/cart-drawer';
-import { announce, announceUrgent, clamp, formatMoney, parseJSONScript, themeString, wait } from '@theme/utilities';
+import {
+  announce,
+  announceUrgent,
+  clamp,
+  formatMoney,
+  parseJSONScript,
+  prefersReducedMotion,
+  themeString,
+  wait
+} from '@theme/utilities';
 
 /** How long a row's spinner turns for at minimum, in milliseconds. */
 const MIN_SPIN = 420;
 
+/** The theme's ease-out-expo, for the few animations started from script. */
+const EASE_OUT = 'cubic-bezier(0.16, 1, 0.3, 1)';
+
 /**
- * One entry in the tray.
+ * One entry in the bundle.
  *
  * @typedef {Object} BundleItem
  * @property {number} productId
@@ -26,25 +39,12 @@ const MIN_SPIN = 420;
  */
 
 /**
- * What one slot's discount is, as the merchant configured it.
+ * The discount the Summary block configures.
  *
- * @typedef {Object} SlotDiscount
- * @property {number} slot One-based slot position.
- * @property {string} code Discount code, or an empty string.
+ * @typedef {Object} BundleDiscount
  * @property {'percentage'|'amount'} type
- * @property {number} value Percent, or cents per item when `type` is `amount`.
- */
-
-/**
- * A slot, resolved: what is in it and what it costs.
- *
- * @typedef {Object} BundleSlot
- * @property {number} index One-based slot position.
- * @property {BundleItem} item
- * @property {SlotDiscount|null} discount
- * @property {number} subtotal Cents, before any discount.
- * @property {number} total Cents, after it.
- * @property {number} percent The percentage that produced `total`, for the line property.
+ * @property {number} value Percent, or cents off the bundle when `type` is `amount`.
+ * @property {string} code Discount code, or an empty string.
  */
 
 /**
@@ -66,22 +66,32 @@ function quantityOf(row) {
   return clamp(value, min, max);
 }
 
-export class ProductBundle extends BaseComponent {
-  static requiredRefs = ['slots', 'submit', 'total'];
+/**
+ * Play a short entrance on an element, unless the customer asked for less motion.
+ *
+ * @param {Element|null} element
+ * @param {Keyframe[]} keyframes
+ * @param {number} [duration=420]
+ */
+function play(element, keyframes, duration = 420) {
+  if (!(element instanceof HTMLElement) || prefersReducedMotion()) return;
+  if (typeof element.animate !== 'function') return;
 
+  element.getAnimations?.().forEach((animation) => animation.cancel());
+  element.animate(keyframes, { duration, easing: EASE_OUT });
+}
+
+export class ProductBundle extends BaseComponent {
   /** @type {BundleItem[]} */
   #items = [];
 
-  /**
-   * The merchant's per-slot discounts, keyed by one-based slot position.
-   *
-   * @type {Map<number, SlotDiscount>}
-   */
-  #discounts = new Map();
+  /** @type {boolean} True while a bundle is on its way to the cart. */
+  #submitting = false;
+
+  /** @type {HTMLElement|null} */
+  #pendingRow = null;
 
   setup() {
-    this.#readDiscounts();
-
     this.delegate('click', '[data-bundle-add]', (event, target) => {
       event.preventDefault();
       this.#onRowToggle(target);
@@ -89,7 +99,7 @@ export class ProductBundle extends BaseComponent {
 
     this.delegate('click', '[data-slot-remove]', (event, target) => {
       event.preventDefault();
-      this.#removeAt(this.#slotIndexOf(target));
+      this.#removeAt(this.#slotIndexOf(target), { refocus: true });
     });
 
     this.delegate('click', '[data-slot-increase]', (event, target) => {
@@ -107,7 +117,10 @@ export class ProductBundle extends BaseComponent {
       this.#focusPicker();
     });
 
-    this.on(this.refs.submit, 'click', () => this.addToCart());
+    this.delegate('click', '[data-ref~="submit"]', (event) => {
+      event.preventDefault();
+      this.addToCart();
+    });
 
     this.#bindQuickAdd();
     this.render();
@@ -119,42 +132,70 @@ export class ProductBundle extends BaseComponent {
 
   /* --------------------------------------------------------- public API -- ---- */
 
-  /** @returns {number} How many slots the tray has. */
-  get size() {
-    return Number(this.dataset.size) || 0;
+  /** @returns {HTMLElement|null} The Summary block, when the merchant has one. */
+  get summary() {
+    return this.#part('summary');
   }
 
-  /** @returns {BundleItem[]} A copy — the tray's own array is never handed out. */
+  /** @returns {number} How many slots — and items — the bundle holds. */
+  get size() {
+    const configured = Number(this.summary?.dataset.maxItems);
+    if (Number.isFinite(configured) && configured > 0) return configured;
+
+    return this.summary?.querySelectorAll('[data-bundle-slot]').length || Infinity;
+  }
+
+  /** @returns {number} The fewest items the bundle can be added to the cart with. */
+  get minimum() {
+    const configured = Math.round(Number(this.summary?.dataset.minItems));
+    if (!Number.isFinite(configured) || configured < 1) return 1;
+
+    return Math.min(configured, this.size);
+  }
+
+  /** @returns {number} The most of any one product. */
+  get maxPerProduct() {
+    return Number(this.dataset.maxPerProduct) || Infinity;
+  }
+
+  /** @returns {BundleItem[]} A copy — the bundle's own array is never handed out. */
   get items() {
     return this.#items.map((item) => ({ ...item }));
   }
 
-  /** @returns {number} Total units in the tray, not distinct products. */
+  /** @returns {number} Total units in the bundle, not distinct products. */
   get count() {
     return this.#items.reduce((total, item) => total + item.quantity, 0);
   }
 
-  /** @returns {boolean} */
+  /** @returns {boolean} No room for another item. */
   get isFull() {
-    return this.#items.length >= this.size;
+    return this.count >= this.size || this.#items.length >= this.size;
   }
 
-  /**
-   * Discount tiers, ascending, parsed from `quantity:percent,…`.
-   *
-   * @returns {{ quantity: number, percent: number }[]}
-   */
-  get tiers() {
-    return (this.dataset.tiers || '')
-      .split(',')
-      .map((part) => part.trim())
-      .filter(Boolean)
-      .map((part) => {
-        const [quantity, percent] = part.split(':');
-        return { quantity: Number(quantity), percent: Number(percent) };
-      })
-      .filter((tier) => Number.isFinite(tier.quantity) && Number.isFinite(tier.percent))
-      .sort((a, b) => a.quantity - b.quantity);
+  /** @returns {boolean} Enough items to add the bundle to the cart. */
+  get isReady() {
+    return this.#items.length > 0 && this.count >= this.minimum;
+  }
+
+  /** @returns {BundleDiscount|null} */
+  get discount() {
+    const summary = this.summary;
+    if (!summary) return null;
+
+    const value = Number(summary.dataset.discountValue);
+    const code = (summary.dataset.discountCode || '').trim();
+    const type = summary.dataset.discountType === 'amount' ? 'amount' : 'percentage';
+
+    if (!Number.isFinite(value) || value <= 0) return code ? { type, value: 0, code } : null;
+
+    return { type, value: type === 'percentage' ? Math.min(value, 100) : value, code };
+  }
+
+  /** @returns {boolean} Whether the discount applies to the bundle as it stands. */
+  get discountActive() {
+    const discount = this.discount;
+    return Boolean(discount && discount.value > 0 && this.isReady);
   }
 
   /** @returns {number} Subtotal in cents, before any discount. */
@@ -162,102 +203,55 @@ export class ProductBundle extends BaseComponent {
     return this.#items.reduce((total, item) => total + item.price * item.quantity, 0);
   }
 
-  /**
-   * The discount configured for a slot, if it has one of its own.
-   *
-   * @param {number} index Zero-based index into the tray.
-   * @returns {SlotDiscount|null}
-   */
-  discountFor(index) {
-    return this.#discounts.get(index + 1) || null;
-  }
-
-  /**
-   * Every filled slot, with what it costs and why.
-   *
-   * @returns {BundleSlot[]}
-   */
-  get slots() {
-    const ladder = this.percent;
-
-    return this.#items.map((item, index) => {
-      const subtotal = item.price * item.quantity;
-      const discount = this.discountFor(index);
-
-      const prices = discount !== null && discount.value > 0;
-
-      const total = prices
-        ? discount.type === 'amount'
-          ? Math.max(0, subtotal - discount.value * item.quantity)
-          : Math.round(subtotal * (1 - discount.value / 100))
-        : Math.round(subtotal * (1 - ladder / 100));
-
-      return {
-        index: index + 1,
-        item,
-        discount,
-        subtotal,
-        total,
-        percent: prices ? (discount.type === 'percentage' ? discount.value : 0) : ladder
-      };
-    });
-  }
-
-  /** @returns {boolean} Whether any filled slot is priced by its own discount. */
-  get hasSlotDiscounts() {
-    return this.slots.some((slot) => slot.discount !== null && slot.discount.value > 0);
-  }
-
-  /**
-   * The best tier the tray has reached.
-   *
-   * @returns {number} Percent, 0 when no tier is reached.
-   */
-  get percent() {
-    let earned = 0;
-    for (const tier of this.tiers) {
-      if (this.count >= tier.quantity) earned = tier.percent;
-    }
-    return earned;
-  }
-
-  /** @returns {number} What the tray is expected to cost after the discounts. */
+  /** @returns {number} What the bundle is expected to cost after its discount. */
   get total() {
-    return this.slots.reduce((total, slot) => total + slot.total, 0);
+    const subtotal = this.subtotal;
+    const discount = this.discount;
+
+    if (!discount || !this.discountActive) return subtotal;
+
+    if (discount.type === 'amount') return Math.max(0, subtotal - discount.value);
+
+    return Math.round(subtotal * (1 - discount.value / 100));
   }
 
-  /** @returns {number} Cents the tray expects to save at checkout. */
+  /** @returns {number} Cents the bundle expects to save at checkout. */
   get savings() {
     return Math.max(0, this.subtotal - this.total);
   }
 
-  /** @returns {{ quantity: number, percent: number }|null} The next tier, if any. */
-  get nextTier() {
-    return this.tiers.find((tier) => this.count < tier.quantity) || null;
+  /** @returns {number} Percent off, for the line property. Zero for amount discounts. */
+  get percent() {
+    const discount = this.discount;
+    return this.discountActive && discount?.type === 'percentage' ? discount.value : 0;
   }
 
   /**
    * Put a product in the first free slot.
    *
    * @param {BundleItem} item
-   * @returns {boolean} False when the tray is full or the product is already in it.
+   * @returns {boolean} False when the bundle is full or the product is already in it.
    */
   add(item) {
     if (this.#indexOfProduct(item.productId) !== -1) return false;
 
     if (this.isFull) {
-      this.#error(themeString('bundleFull', ''));
+      this.#full();
       return false;
     }
 
-    this.#items.push({ ...item, quantity: Math.max(1, Number(item.quantity) || 1) });
+    const room = this.size - this.count;
+    const wanted = Math.max(1, Math.round(Number(item.quantity) || 1));
+    const quantity = Math.max(1, Math.min(wanted, room, this.maxPerProduct));
+
+    this.#items.push({ ...item, quantity });
     this.#error('');
     this.render();
 
     announce(
       themeString('bundleAdded', '', {
         product: item.title,
-        count: this.#items.length,
+        count: this.count,
         total: this.size
       })
     );
@@ -276,7 +270,7 @@ export class ProductBundle extends BaseComponent {
     return this.#removeAt(this.#indexOfProduct(productId));
   }
 
-  /** Empty the tray, all the way back to how it arrived. */
+  /** Empty the bundle, all the way back to how it arrived. */
   clear() {
     this.#items = [];
     this.#error('');
@@ -286,61 +280,50 @@ export class ProductBundle extends BaseComponent {
   }
 
   /**
-   * Add every slot to the cart in one request.
+   * Add every item to the cart in one request, then apply the discount code.
    *
    * @returns {Promise<Object|null>}
    */
   async addToCart() {
-    if (this.#items.length === 0) return null;
+    if (this.#submitting || this.#items.length === 0) return null;
 
-    if (this.#submitting) return null;
-
-    if (this.dataset.requireFull === 'true' && !this.isFull) {
-      this.#error(themeString('bundleIncomplete', '', { count: this.size - this.#items.length }));
+    if (!this.isReady) {
+      const message = themeString('bundleAddMore', '', { count: this.minimum - this.count });
+      this.#error(message);
+      announceUrgent(message);
       return null;
     }
 
     this.#submitting = true;
-    this.setLoading(true);
+    this.#setBusy(true);
     this.#error('');
 
     try {
       const bundleId = this.dataset.bundleId || 'bundle';
-      const label = this.dataset.bundleLabel || '';
+      const label = this.summary?.dataset.bundleLabel || '';
+      const percent = this.percent;
 
-      const lines = this.slots.map((slot) => ({
-        id: slot.item.variantId,
-        quantity: slot.item.quantity,
+      const lines = this.#items.map((item, index) => ({
+        id: item.variantId,
+        quantity: item.quantity,
         properties: {
           _bundle: bundleId,
           _bundle_size: String(this.size),
           _bundle_count: String(this.count),
-          _bundle_slot: String(slot.index),
-          _bundle_discount: String(slot.percent),
-          ...(slot.discount?.type === 'amount' ? { _bundle_discount_amount: String(slot.discount.value) } : {}),
-          ...(slot.discount?.code ? { _bundle_discount_code: slot.discount.code } : {}),
+          _bundle_slot: String(index + 1),
+          _bundle_discount: String(percent),
           ...(label ? { [themeString('bundleProperty', 'Bundle')]: label } : {})
         }
       }));
 
-      const codes = this.#codes;
+      const code = this.discountActive ? this.discount?.code || '' : '';
       const result = await cart.addItem(lines);
 
       this.toggleAttribute('data-added', true);
       announce(themeString('bundleAddedToCart', ''));
 
-      const existing = (cart.state?.attributes?.discount_code || '')
-        .split(',')
-        .map((entry) => entry.trim())
-        .filter(Boolean);
-
-      const wanted = [...new Set([...existing, ...codes])];
-
-      if (wanted.length > 0 && wanted.join(',') !== existing.join(',')) {
-        await cart.applyDiscount(wanted.join(',')).catch((error) => {
-          console.warn('[Boost10] The bundle was added but its discount could not be applied.', error);
-        });
-      }
+      // The items are in; the code is priced in the background so the button frees up at once.
+      if (code) this.#applyCode(code);
 
       return result;
     } catch (error) {
@@ -350,29 +333,21 @@ export class ProductBundle extends BaseComponent {
       return null;
     } finally {
       this.#submitting = false;
-      this.setLoading(false);
+      this.#setBusy(false);
+      this.#renderSubmit();
     }
   }
 
-  /** @type {boolean} True while a bundle is on its way to the cart. */
-  #submitting = false;
-
-  /** Redraw every slot, the totals, the message and every row's pressed state. */
+  /** Redraw every slot, the totals, the button and every row's pressed state. */
   render() {
     this.#renderSlots();
     this.#renderTotals();
     this.#renderProgress();
-    this.#renderNote();
+    this.#renderSubmit();
     this.#syncRows();
-
-    if (this.refs.submit instanceof HTMLButtonElement) {
-      const needsMore = this.dataset.requireFull === 'true' && !this.isFull;
-      this.refs.submit.disabled = this.#items.length === 0 || needsMore;
-    }
 
     this.dataset.count = String(this.count);
     this.toggleAttribute('data-full', this.isFull);
-
     this.removeAttribute('data-added');
 
     this.dispatch(EVENTS.BUNDLE_CHANGE, {
@@ -386,11 +361,8 @@ export class ProductBundle extends BaseComponent {
 
   /* ------------------------------------------------------ the modal -- ---- */
 
-  /** @type {HTMLElement|null} */
-  #pendingRow = null;
-
   /**
-   * Listen to the quick add modal for a variant chosen on this tray's behalf.
+   * Listen to the quick add modal for a variant chosen on this bundle's behalf.
    *
    * @private
    */
@@ -407,7 +379,7 @@ export class ProductBundle extends BaseComponent {
   }
 
   /**
-   * Claim a quick add that was opened on a product this tray sells.
+   * Claim a quick add that was opened on a product this bundle sells.
    *
    * @param {Object} [options]
    * @param {boolean} [options.redraw=false] Ask the summary to rewrite the
@@ -566,9 +538,7 @@ export class ProductBundle extends BaseComponent {
   }
 
   /**
-   * Both halves. This is the dismissal path — closing without choosing — and
-   * `teardown()`, where nothing is going to run afterwards that could care
-   * about either flag.
+   * Both halves: the dismissal path and `teardown()`.
    *
    * @private
    */
@@ -580,44 +550,62 @@ export class ProductBundle extends BaseComponent {
   /* ---------------------------------------------------------- internals -- ---- */
 
   /**
-   * Read the merchant's per-slot discounts, once.
+   * A named part of the bundle, looked up fresh so an editor re-render of the
+   * Summary block never leaves a stale reference behind.
    *
+   * @param {string} name
+   * @returns {HTMLElement|null}
    * @private
    */
-  #readDiscounts() {
-    const entries = parseJSONScript(this.querySelector('[data-bundle-discounts]')) || [];
-    this.#discounts = new Map();
-
-    if (!Array.isArray(entries)) return;
-
-    for (const entry of entries) {
-      const slot = Number(entry?.slot);
-      const value = Number(entry?.value);
-      const code = String(entry?.code || '').trim();
-      const type = entry?.type === 'amount' ? 'amount' : 'percentage';
-
-      if (!Number.isFinite(slot) || slot < 1) continue;
-      if (!Number.isFinite(value) || value < 0) continue;
-
-      if (value === 0 && code === '') continue;
-
-      this.#discounts.set(slot, { slot, code, type, value });
-    }
+  #part(name) {
+    const node = this.querySelector(`[data-ref~="${name}"]`);
+    return node instanceof HTMLElement ? node : null;
   }
 
   /**
-   * The distinct discount codes the filled slots name, in slot order.
+   * Merge the bundle's code into whatever codes the cart already carries.
    *
-   * @returns {string[]}
+   * @param {string} code
    * @private
    */
-  get #codes() {
-    return [...new Set(this.slots.map((slot) => slot.discount?.code || '').filter(Boolean))];
+  async #applyCode(code) {
+    const existing = (cart.state?.attributes?.discount_code || '')
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+
+    if (existing.includes(code)) return;
+
+    await cart.applyDiscount([...existing, code].join(',')).catch((error) => {
+      console.warn('[Boost10] The bundle was added but its discount could not be applied.', error);
+    });
+  }
+
+  /**
+   * @param {boolean} busy
+   * @private
+   */
+  #setBusy(busy) {
+    this.setLoading(busy);
+
+    const submit = this.#part('submit');
+    if (!(submit instanceof HTMLButtonElement)) return;
+
+    submit.classList.toggle('button--loading', busy);
+    submit.setAttribute('aria-busy', String(busy));
+    if (busy) submit.disabled = true;
+  }
+
+  /** @private */
+  #full() {
+    const message = themeString('bundleFull', '');
+    this.#error(message);
+    announceUrgent(message);
   }
 
   /**
    * @param {number} productId
-   * @returns {HTMLElement|null} The picker row for a product, if this tray has one.
+   * @returns {HTMLElement|null} The picker row for a product, if this bundle has one.
    * @private
    */
   #rowFor(productId) {
@@ -654,6 +642,7 @@ export class ProductBundle extends BaseComponent {
   #onRowToggle(button) {
     const row = button.closest('[data-bundle-row]');
     if (!(row instanceof HTMLElement)) return;
+    if (button.dataset.loading !== undefined) return;
 
     const productId = Number(row.dataset.productId);
 
@@ -663,12 +652,9 @@ export class ProductBundle extends BaseComponent {
     }
 
     if (this.isFull) {
-      this.#error(themeString('bundleFull', ''));
-      announceUrgent(themeString('bundleFull', ''));
+      this.#full();
       return;
     }
-
-    if (button.dataset.loading !== undefined) return;
 
     if (row.dataset.needsOptions === 'true') {
       this.#openQuickAddFor(row);
@@ -692,7 +678,7 @@ export class ProductBundle extends BaseComponent {
    * Spin a row's control for a beat, then hand over.
    *
    * @param {HTMLElement} button
-   * @param {() => void} then Run once the spinner has come off, in the same task.
+   * @param {() => void} then
    * @private
    */
   #hold(button, then) {
@@ -700,14 +686,13 @@ export class ProductBundle extends BaseComponent {
 
     wait(MIN_SPIN).then(() => {
       delete button.dataset.loading;
-
       then();
     });
   }
 
   /**
    * @param {number} productId
-   * @returns {number} Index in the tray, or -1.
+   * @returns {number} Index in the bundle, or -1.
    * @private
    */
   #indexOfProduct(productId) {
@@ -715,7 +700,7 @@ export class ProductBundle extends BaseComponent {
   }
 
   /**
-   * Which slot a control inside the tray belongs to.
+   * Which slot a control inside the Summary belongs to.
    *
    * @param {HTMLElement} target
    * @returns {number} Index into `#items`, or -1.
@@ -731,20 +716,41 @@ export class ProductBundle extends BaseComponent {
 
   /**
    * @param {number} index
+   * @param {Object} [options]
+   * @param {boolean} [options.refocus=false] Keep keyboard focus inside the slots.
    * @returns {boolean}
    * @private
    */
-  #removeAt(index) {
+  #removeAt(index, { refocus = false } = {}) {
     if (index < 0 || index >= this.#items.length) return false;
 
     const [removed] = this.#items.splice(index, 1);
     this.#error('');
     this.render();
 
+    if (refocus) this.#focusSlot(index);
+
     announce(themeString('bundleRemoved', '', { product: removed.title }));
     this.dispatch(EVENTS.BUNDLE_ITEM_TOGGLE, { productId: removed.productId, added: false });
 
     return true;
+  }
+
+  /**
+   * After a removal, focus the control that took the removed one's place.
+   *
+   * @param {number} index
+   * @private
+   */
+  #focusSlot(index) {
+    const slots = this.#part('slots')?.querySelectorAll('[data-bundle-slot]') ?? [];
+    const slot = slots[Math.min(index, this.#items.length)] || slots[0];
+    if (!slot) return;
+
+    const target = slot.querySelector(
+      slot.getAttribute('data-state') === 'filled' ? '[data-slot-remove]' : '[data-slot-fill]'
+    );
+    if (target instanceof HTMLElement) target.focus({ preventScroll: true });
   }
 
   /**
@@ -755,17 +761,22 @@ export class ProductBundle extends BaseComponent {
   #step(index, delta) {
     if (index < 0 || index >= this.#items.length) return;
 
-    const max = Number(this.dataset.maxPerProduct) || 4;
     const next = this.#items[index].quantity + delta;
 
     if (next < 1) {
-      this.#removeAt(index);
+      this.#removeAt(index, { refocus: true });
       return;
     }
 
-    if (next > max) return;
+    if (delta > 0 && this.isFull) {
+      this.#full();
+      return;
+    }
+
+    if (next > this.maxPerProduct) return;
 
     this.#items[index].quantity = next;
+    this.#error('');
     this.render();
   }
 
@@ -776,197 +787,187 @@ export class ProductBundle extends BaseComponent {
    */
   #focusPicker() {
     const candidates = this.querySelectorAll(
-      '[data-bundle-panel] [data-bundle-row]:not([data-in-bundle]) [data-bundle-add]'
+      '[data-bundle-panel] [data-bundle-row]:not([data-in-bundle]) [data-bundle-add]:not(:disabled)'
     );
 
     for (const candidate of candidates) {
       if (!(candidate instanceof HTMLElement)) continue;
       const rendered = candidate.checkVisibility?.() ?? candidate.offsetParent !== null;
       if (!rendered) continue;
-      candidate.focus();
+
+      candidate.focus({ preventScroll: true });
+      candidate.closest('[data-bundle-row]')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
       return;
     }
   }
 
   /**
-   * Fill the slots the tray has, and empty the ones it does not.
+   * Fill the slots the bundle has, and empty the ones it does not.
    *
    * @private
    */
   #renderSlots() {
-    const slots = this.refs.slots?.querySelectorAll('[data-bundle-slot]') ?? [];
-    const priced = this.slots;
+    const slots = this.#part('slots')?.querySelectorAll('[data-bundle-slot]') ?? [];
+    const full = this.isFull;
 
     for (const [index, slot] of [...slots].entries()) {
+      if (!(slot instanceof HTMLElement)) continue;
+
       const item = this.#items[index];
-      const pricing = priced[index] || null;
+      const previous = slot.dataset.productId || '';
+      const current = item ? String(item.productId) : '';
 
       slot.dataset.state = item ? 'filled' : 'empty';
+      if (current) slot.dataset.productId = current;
+      else delete slot.dataset.productId;
 
       const filled = slot.querySelector('[data-slot-filled]');
       const fill = slot.querySelector('[data-slot-fill]');
 
-      if (filled instanceof HTMLElement) filled.hidden = !item;
       if (fill instanceof HTMLElement) fill.hidden = Boolean(item);
 
-      if (item) {
-        const image = slot.querySelector('[data-slot-image]');
-        if (image instanceof HTMLImageElement && image.src !== item.image) image.src = item.image;
+      if (!item) continue;
 
-        const title = slot.querySelector('[data-slot-title]');
-        if (title instanceof HTMLElement) {
-          title.textContent = item.variantTitle ? `${item.title} — ${item.variantTitle}` : item.title;
-        }
+      const image = slot.querySelector('[data-slot-image]');
+      if (image instanceof HTMLImageElement && item.image && image.getAttribute('src') !== item.image) {
+        image.src = item.image;
+      }
 
-        const count = slot.querySelector('[data-slot-count]');
-        if (count instanceof HTMLElement) count.textContent = String(item.quantity).padStart(2, '0');
+      const title = slot.querySelector('[data-slot-title]');
+      if (title instanceof HTMLElement) {
+        title.textContent = item.variantTitle ? `${item.title} — ${item.variantTitle}` : item.title;
+      }
 
-        const remove = slot.querySelector('[data-slot-remove]');
-        if (remove instanceof HTMLElement) {
-          remove.setAttribute(
-            'aria-label',
-            themeString('bundleRemoveLabel', '', { product: item.title, index: index + 1 })
-          );
+      const count = slot.querySelector('[data-slot-count]');
+      if (count instanceof HTMLElement) {
+        const text = String(item.quantity).padStart(2, '0');
+        if (count.textContent !== text) {
+          count.textContent = text;
+          if (previous === current) play(count, [{ transform: 'translateY(40%)', opacity: 0 }, { transform: 'none', opacity: 1 }], 260);
         }
       }
 
-      this.#renderSlotPricing(slot, pricing);
-
-      const tier = slot.querySelector('[data-slot-tier]');
-      if (tier instanceof HTMLElement) {
-        tier.toggleAttribute('data-reached', this.count >= index + 1);
+      const increase = slot.querySelector('[data-slot-increase]');
+      if (increase instanceof HTMLButtonElement) {
+        increase.disabled = full || item.quantity >= this.maxPerProduct;
       }
-    }
-  }
 
-  /**
-   * What one filled slot costs, and the code that made it so.
-   *
-   * @param {Element} slot
-   * @param {BundleSlot|null} pricing
-   * @private
-   */
-  #renderSlotPricing(slot, pricing) {
-    const container = slot.querySelector('[data-slot-pricing]');
-    if (!(container instanceof HTMLElement)) return;
+      const remove = slot.querySelector('[data-slot-remove]');
+      if (remove instanceof HTMLElement) {
+        remove.setAttribute(
+          'aria-label',
+          themeString('bundleRemoveLabel', '', { product: item.title, index: index + 1 })
+        );
+      }
 
-    const own = pricing?.discount || null;
-
-    if (!own) {
-      container.hidden = true;
-      return;
-    }
-
-    container.hidden = false;
-
-    const saved = pricing.subtotal - pricing.total;
-    const priced = own.value > 0;
-
-    const price = slot.querySelector('[data-slot-price]');
-    if (price instanceof HTMLElement) price.textContent = formatMoney(pricing.total);
-
-    const original = slot.querySelector('[data-slot-original]');
-    if (original instanceof HTMLElement) {
-      const show = priced && saved > 0;
-      original.textContent = show ? formatMoney(pricing.subtotal) : '';
-      original.hidden = !show;
-    }
-
-    const discount = slot.querySelector('[data-slot-discount]');
-    if (discount instanceof HTMLElement) {
-      const code = own.code;
-
-      const text = priced
-        ? code
-          ? themeString('bundleSlotDiscount', '', { code, amount: formatMoney(saved) })
-          : themeString('bundleSlotSaving', '', { amount: formatMoney(saved) })
-        : code;
-
-      discount.textContent = text;
-      discount.hidden = text === '';
-      discount.title = code;
+      if (previous !== current && filled instanceof HTMLElement) {
+        play(filled, [{ opacity: 0, transform: 'scale(0.9)' }, { opacity: 1, transform: 'none' }]);
+      }
     }
   }
 
   /** @private */
   #renderTotals() {
-    const total = this.refs.total;
-    if (total instanceof HTMLElement) total.textContent = formatMoney(this.total);
+    const total = this.#part('total');
+    if (total instanceof HTMLElement) {
+      const text = formatMoney(this.total);
+      if (total.textContent !== text) {
+        total.textContent = text;
+        play(total, [{ opacity: 0.2, transform: 'translateY(30%)' }, { opacity: 1, transform: 'none' }], 320);
+      }
+    }
 
-    const saved = this.savings;
-
-    const original = this.refs.originalTotal;
+    const original = this.#part('originalTotal');
     if (original instanceof HTMLElement) {
-      const discounted = saved > 0 && this.subtotal > 0;
+      const discounted = this.savings > 0;
       original.textContent = discounted ? formatMoney(this.subtotal) : '';
       original.hidden = !discounted;
     }
-
-    const discount = this.refs.discount;
-    if (discount instanceof HTMLElement) {
-      const active = saved > 0;
-
-      discount.textContent = active
-        ? this.hasSlotDiscounts
-          ? themeString('bundleSaved', '', { amount: formatMoney(saved) })
-          : themeString('bundleSavedWithPercent', '', {
-              amount: formatMoney(saved),
-              percent: this.percent
-            })
-        : '';
-      discount.hidden = !active;
-    }
-  }
-
-  /** @private */
-  #renderProgress() {
-    const track = this.refs.progressTrack;
-    if (!(track instanceof HTMLElement)) return;
-
-    const filled = Math.min(this.#items.length, this.size);
-
-    track.setAttribute('aria-valuenow', String(filled));
-    track.style.setProperty('--bundle-progress', this.size > 0 ? String(filled / this.size) : '0');
   }
 
   /**
-   * The one line that says what happens next.
+   * The discount, written for a sentence: "10%" or "$5.00".
+   *
+   * @returns {string} Empty when there is no discount value.
+   * @private
+   */
+  get #discountLabel() {
+    const discount = this.discount;
+    if (!discount || discount.value <= 0) return '';
+
+    return discount.type === 'amount' ? formatMoney(discount.value) : `${Math.round(discount.value * 100) / 100}%`;
+  }
+
+  /**
+   * The pill under the heading: the merchant's message until something is
+   * added, then how far the bundle is from its discount. Its border fills as
+   * the bundle approaches the minimum.
    *
    * @private
    */
-  #renderNote() {
-    const target = this.refs.noteText;
-    if (!(target instanceof HTMLElement)) return;
+  #renderProgress() {
+    const pill = this.#part('progress');
+    const text = this.#part('progressText');
+    if (!pill || !text) return;
 
-    if (!this.#defaultNote) this.#defaultNote = target.textContent || '';
+    const count = this.count;
+    const minimum = this.minimum;
+    const discount = this.#discountLabel;
+    const missing = Math.max(0, minimum - count);
 
-    const next = this.nextTier;
+    let message = text.dataset.default || '';
 
-    if (next && next.percent > 0) {
-      target.textContent = themeString('bundleProgress', this.#defaultNote, {
-        count: next.quantity - this.count,
-        percent: next.percent
-      });
-      return;
+    if (count > 0 && missing > 0) {
+      message = discount
+        ? themeString('bundleProgress', message, { count: missing, discount })
+        : themeString('bundleProgressPlain', message, { count: missing });
+    } else if (count > 0) {
+      message = discount ? themeString('bundleUnlocked', message, { discount }) : themeString('bundleReady', message);
     }
 
-    if (this.percent > 0) {
-      target.textContent = themeString('bundleUnlocked', this.#defaultNote, { percent: this.percent });
-      return;
-    }
+    const ratio = count > 0 ? Math.min(count / minimum, 1) : 0;
+    pill.style.setProperty('--bundle-progress', `${Math.round(ratio * 1000) / 10}%`);
+    pill.toggleAttribute('data-complete', ratio >= 1);
 
-    target.textContent = this.#defaultNote;
+    if (text.textContent !== message) {
+      text.textContent = message;
+      play(text, [{ opacity: 0, transform: 'translateY(35%)' }, { opacity: 1, transform: 'none' }], 360);
+    }
   }
 
-  /** @type {string} */
-  #defaultNote = '';
+  /**
+   * The button says what happens next: how many more items, or the price.
+   *
+   * @private
+   */
+  #renderSubmit() {
+    const submit = this.#part('submit');
+    if (!(submit instanceof HTMLButtonElement)) return;
+
+    const ready = this.isReady;
+
+    if (!this.#submitting) submit.disabled = !ready;
+
+    const label = submit.querySelector('[data-button-label]');
+    if (!(label instanceof HTMLElement)) return;
+
+    const text = ready
+      ? themeString('bundleAddToCartTotal', '', { total: formatMoney(this.total) })
+      : this.#items.length === 0
+        ? themeString('bundleAddToCart', label.textContent || '')
+        : themeString('bundleAddMore', '', { count: this.minimum - this.count });
+
+    if (text && label.textContent !== text) label.textContent = text;
+  }
 
   /**
-   * Put every row's control into the state the tray says it is in.
+   * Put every row's control into the state the bundle says it is in.
    *
    * @private
    */
   #syncRows() {
+    const full = this.isFull;
+
     for (const row of this.querySelectorAll('[data-bundle-row]')) {
       if (!(row instanceof HTMLElement)) continue;
 
@@ -984,7 +985,7 @@ export class ProductBundle extends BaseComponent {
       );
 
       const unavailable = row.hasAttribute('data-unavailable');
-      button.disabled = unavailable || (this.isFull && !inBundle);
+      button.disabled = unavailable || (full && !inBundle);
     }
   }
 
@@ -993,7 +994,7 @@ export class ProductBundle extends BaseComponent {
    * @private
    */
   #error(message) {
-    const target = this.refs.error;
+    const target = this.#part('error');
     if (!(target instanceof HTMLElement)) return;
 
     target.textContent = message;
