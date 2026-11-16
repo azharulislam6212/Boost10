@@ -253,24 +253,6 @@ export class TestimonialShowcase extends BaseComponent {
 
     const overlay = /** @type {any} */ (modal);
     if (typeof overlay.open === 'function') overlay.open();
-
-    if (this.dataset.modalAutoplay === 'true') this.#play(stage);
-  }
-
-  /**
-   * Start the cloned media without waiting for a second press.
-   *
-   * @param {HTMLElement} stage
-   * @private
-   */
-  #play(stage) {
-    const media = stage.querySelector('deferred-media');
-    if (!media) return;
-
-    requestAnimationFrame(() => {
-      const deferred = /** @type {any} */ (media);
-      if (typeof deferred.load === 'function') deferred.load();
-    });
   }
 
   /**
@@ -286,8 +268,6 @@ export class TestimonialShowcase extends BaseComponent {
 
   /** @private */
   #watchPointer() {
-    if (this.dataset.pauseOnHover === 'false') return;
-
     for (const lane of this.#lanes) {
       this.on(lane.element, 'pointerenter', () => lane.hold('pointer'));
       this.on(lane.element, 'pointerleave', () => lane.release('pointer'));

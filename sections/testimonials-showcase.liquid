@@ -85,24 +85,6 @@
     assign overlap_mobile = r_tl_m
   endif
 
-  assign gap_x = s.gap_horizontal | default: 56 | plus: 0
-  assign gap_y = s.gap_vertical | default: 40 | plus: 0
-
-  assign gap_x_mobile = s.gap_horizontal_mobile | plus: 0
-  if s.gap_horizontal_mobile == nil
-    assign gap_x_mobile = 28
-  endif
-  assign gap_y_mobile = s.gap_vertical_mobile | plus: 0
-  if s.gap_vertical_mobile == nil
-    assign gap_y_mobile = 20
-  endif
-
-  assign lane_gap = s.lane_gap | default: 32 | plus: 0
-  assign lane_gap_mobile = s.lane_gap_mobile | plus: 0
-  if s.lane_gap_mobile == nil
-    assign lane_gap_mobile = 16
-  endif
-
   assign content_pt = s.content_padding_top | default: 80 | plus: 0
   assign content_pb = s.content_padding_bottom | default: 80 | plus: 0
   assign content_pl = s.content_padding_left | default: 0 | plus: 0
@@ -128,29 +110,7 @@
   assign media_position = s.media_position | default: 'end'
   assign align_items = s.align_items | default: 'center'
 
-  assign intro_width = s.intro_width | default: 0 | plus: 0
-
-  assign show_intro = s.show_intro
-  if show_intro == nil
-    assign show_intro = true
-  endif
-
-  assign show_stats = s.show_stats
-  if show_stats == nil
-    assign show_stats = true
-  endif
-
-  assign modal_autoplay = s.modal_autoplay
-  if modal_autoplay == nil
-    assign modal_autoplay = false
-  endif
-
   assign modal_id = 'showcase-video-' | append: section.id
-
-  assign pause_on_hover = s.pause_on_hover
-  if pause_on_hover == nil
-    assign pause_on_hover = true
-  endif
 
   assign accent = s.accent_color | default: ''
 
@@ -159,12 +119,6 @@
 
 {%- capture section_style -%}
   {%- render 'spacing', section: s, declarations: true -%}
-  --sv-gap-x: {{ gap_x }}px;
-  --sv-gap-y: {{ gap_y }}px;
-  --sv-gap-x-mobile: {{ gap_x_mobile }}px;
-  --sv-gap-y-mobile: {{ gap_y_mobile }}px;
-  --sv-lanes-gap: {{ lane_gap }}px;
-  --sv-lanes-gap-mobile: {{ lane_gap_mobile }}px;
   --sv-content-pt: {{ content_pt }}px;
   --sv-content-pb: {{ content_pb }}px;
   --sv-content-pl: {{ content_pl }}px;
@@ -174,9 +128,6 @@
   --sv-content-pl-mobile: {{ content_pl_mobile }}px;
   --sv-content-pr-mobile: {{ content_pr_mobile }}px;
   --sv-align: {{ align_items }};
-  {%- if intro_width > 0 -%}
-    --sv-intro-col: {{ intro_width }}px;
-  {%- endif -%}
   --showcase-radius: {{ r_tl }}px {{ r_tr }}px {{ r_br }}px {{ r_bl }}px;
   --showcase-radius-mobile: {{ r_tl_m }}px {{ r_tr_m }}px {{ r_br_m }}px {{ r_bl_m }}px;
   --section-overlap: {{ overlap }}px;
@@ -206,22 +157,14 @@
   {%- endif -%}
 
   <div class="{% render 'container', width: s.container_width %}">
-    <div class="showcase__layout showcase__layout--media-{{ media_position }}{% if show_intro or show_stats %} showcase__layout--split{% endif %}">
-      {%- if show_intro or show_stats -%}
-
-        <motion-effect
-          class="showcase__intro"
-          {% render 'motion-attrs', kind: 'text', section: s, children: true, duration: 900, stagger: lane_stagger %}
-        >
-          {%- if show_intro -%}
-            {% content_for 'block', type: '_showcase-intro', id: 'showcase-intro' %}
-          {%- endif -%}
-
-          {%- if show_stats -%}
-            {% content_for 'block', type: '_showcase-stats', id: 'showcase-stats' %}
-          {%- endif -%}
-        </motion-effect>
-      {%- endif -%}
+    <div class="showcase__layout showcase__layout--media-{{ media_position }}">
+      <motion-effect
+        class="showcase__intro"
+        {% render 'motion-attrs', kind: 'text', section: s, children: true, duration: 900, stagger: lane_stagger %}
+      >
+        {%- content_for 'block', type: '_showcase-intro', id: 'showcase-intro' -%}
+        {%- content_for 'block', type: '_showcase-stats', id: 'showcase-stats' -%}
+      </motion-effect>
 
       <motion-effect
         class="showcase__media"
@@ -235,8 +178,6 @@
         <testimonial-showcase
           class="showcase__lanes"
           data-modal="{{ modal_id }}"
-          data-pause-on-hover="{{ pause_on_hover }}"
-          data-modal-autoplay="{{ modal_autoplay }}"
         >
           {% content_for 'blocks' %}
         </testimonial-showcase>
@@ -245,7 +186,7 @@
   </div>
 </div>
 
-{% content_for 'block', type: '_showcase-modal', id: 'showcase-modal' %}
+{% render 'showcase-video-modal', id: modal_id %}
 
 {% schema %}
 {
@@ -262,14 +203,6 @@
   ],
   "settings": [
     {
-      "type": "header",
-      "content": "t:sections.testimonials_showcase.headers.layout"
-    },
-    {
-      "type": "paragraph",
-      "content": "t:sections.testimonials_showcase.paragraphs.layout"
-    },
-    {
       "type": "select",
       "id": "media_position",
       "label": "t:sections.testimonials_showcase.settings.media_position.label",
@@ -285,20 +218,6 @@
         }
       ],
       "default": "end"
-    },
-    {
-      "type": "checkbox",
-      "id": "show_intro",
-      "label": "t:sections.testimonials_showcase.settings.show_intro.label",
-      "info": "t:sections.testimonials_showcase.settings.show_intro.info",
-      "default": true
-    },
-    {
-      "type": "checkbox",
-      "id": "show_stats",
-      "label": "t:sections.testimonials_showcase.settings.show_stats.label",
-      "info": "t:sections.testimonials_showcase.settings.show_stats.info",
-      "default": true
     },
     {
       "type": "select",
@@ -324,127 +243,6 @@
         }
       ],
       "default": "center"
-    },
-    {
-      "type": "range",
-      "id": "intro_width",
-      "label": "t:sections.testimonials_showcase.settings.intro_width.label",
-      "info": "t:sections.testimonials_showcase.settings.intro_width.info",
-      "min": 0,
-      "max": 800,
-      "step": 10,
-      "unit": "px",
-      "default": 0
-    },
-    {
-      "type": "select",
-      "id": "gap_device",
-      "label": "t:shared.gap.label",
-      "options": [
-        {
-          "value": "desktop",
-          "label": "t:shared.spacing.devices.options__1.label"
-        },
-        {
-          "value": "mobile",
-          "label": "t:shared.spacing.devices.options__2.label"
-        }
-      ],
-      "default": "desktop"
-    },
-    {
-      "type": "range",
-      "id": "gap_horizontal",
-      "label": "t:sections.testimonials_showcase.settings.gap_horizontal.label",
-      "info": "t:sections.testimonials_showcase.settings.gap_horizontal.info",
-      "min": 0,
-      "max": 160,
-      "step": 4,
-      "unit": "px",
-      "default": 56,
-      "visible_if": "{{ section.settings.gap_device == 'desktop' }}"
-    },
-    {
-      "type": "range",
-      "id": "gap_vertical",
-      "label": "t:sections.testimonials_showcase.settings.gap_vertical.label",
-      "info": "t:sections.testimonials_showcase.settings.gap_vertical.info",
-      "min": 0,
-      "max": 160,
-      "step": 4,
-      "unit": "px",
-      "default": 40,
-      "visible_if": "{{ section.settings.gap_device == 'desktop' }}"
-    },
-    {
-      "type": "range",
-      "id": "lane_gap",
-      "label": "t:sections.testimonials_showcase.settings.lane_gap.label",
-      "min": 0,
-      "max": 80,
-      "step": 2,
-      "unit": "px",
-      "default": 32,
-      "visible_if": "{{ section.settings.gap_device == 'desktop' }}"
-    },
-    {
-      "type": "range",
-      "id": "gap_horizontal_mobile",
-      "label": "t:sections.testimonials_showcase.settings.gap_horizontal.label",
-      "min": 0,
-      "max": 120,
-      "step": 4,
-      "unit": "px",
-      "default": 28,
-      "visible_if": "{{ section.settings.gap_device == 'mobile' }}"
-    },
-    {
-      "type": "range",
-      "id": "gap_vertical_mobile",
-      "label": "t:sections.testimonials_showcase.settings.gap_vertical.label",
-      "min": 0,
-      "max": 120,
-      "step": 4,
-      "unit": "px",
-      "default": 20,
-      "visible_if": "{{ section.settings.gap_device == 'mobile' }}"
-    },
-    {
-      "type": "range",
-      "id": "lane_gap_mobile",
-      "label": "t:sections.testimonials_showcase.settings.lane_gap.label",
-      "min": 0,
-      "max": 60,
-      "step": 2,
-      "unit": "px",
-      "default": 16,
-      "visible_if": "{{ section.settings.gap_device == 'mobile' }}"
-    },
-    {
-      "type": "header",
-      "content": "t:sections.testimonials_showcase.headers.scroll"
-    },
-    {
-      "type": "paragraph",
-      "content": "t:sections.testimonials_showcase.paragraphs.scroll"
-    },
-    {
-      "type": "checkbox",
-      "id": "pause_on_hover",
-      "label": "t:sections.testimonials_showcase.settings.pause_on_hover.label",
-      "info": "t:sections.testimonials_showcase.settings.pause_on_hover.info",
-      "default": true
-    },
-    {
-      "type": "header",
-      "content": "t:sections.testimonials_showcase.headers.modal"
-    },
-    {
-      "type": "checkbox",
-      "id": "modal_autoplay",
-      "label": "t:sections.testimonials_showcase.settings.modal_autoplay.label",
-      "info": "t:sections.testimonials_showcase.settings.modal_autoplay.info",
-      "default": false
     },
     {
       "type": "header",
@@ -920,17 +718,7 @@
       "category": "t:categories.text",
       "settings": {
         "media_position": "end",
-        "show_intro": true,
-        "show_stats": true,
         "align_items": "center",
-        "intro_width": 0,
-        "gap_horizontal": 56,
-        "gap_vertical": 40,
-        "lane_gap": 32,
-        "gap_horizontal_mobile": 28,
-        "gap_vertical_mobile": 20,
-        "lane_gap_mobile": 16,
-        "pause_on_hover": true,
         "container_width": "standard",
         "color_scheme": "scheme-4",
         "accent_color": "#03D26F",
@@ -946,31 +734,9 @@
         "padding_top": 0,
         "padding_bottom": 0,
         "padding_top_mobile": 0,
-        "padding_bottom_mobile": 0,
-        "modal_autoplay": false
+        "padding_bottom_mobile": 0
       },
       "blocks": [
-        {
-          "type": "_showcase-modal",
-          "id": "showcase-modal",
-          "static": true,
-          "settings": {
-            "modal_width": 880,
-            "modal_ratio": "16-9",
-            "modal_radius": 24,
-            "modal_ring_width": 14,
-            "modal_ring_color": "#FFFFFF",
-            "modal_ring_opacity": 28,
-            "modal_backdrop_color": "rgba(15, 46, 47, 0.55)",
-            "modal_backdrop_blur": 8,
-            "modal_animation": "zoom-out",
-            "modal_animation_duration": 360,
-            "badge_size": 112,
-            "badge_background": "#03D26F",
-            "badge_text_color": "#0F2E2F",
-            "badge_spin": 12
-          }
-        },
         {
           "type": "_showcase-intro",
           "static": true,
@@ -1155,13 +921,7 @@
             "direction_mobile": "left",
             "speed": 40,
             "speed_mobile": 30,
-            "offset": 0,
-            "height": 940,
-            "width": 0,
-            "card_width_mobile": 260,
-            "gap": 48,
-            "gap_mobile": 24,
-            "fade": 120
+            "offset": 0
           },
           "blocks": [
             {
@@ -1203,13 +963,7 @@
             "direction_mobile": "right",
             "speed": 40,
             "speed_mobile": 30,
-            "offset": 35,
-            "height": 940,
-            "width": 0,
-            "card_width_mobile": 260,
-            "gap": 48,
-            "gap_mobile": 24,
-            "fade": 120
+            "offset": 35
           },
           "blocks": [
             {

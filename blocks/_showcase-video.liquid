@@ -5,12 +5,17 @@
 {%- liquid
   assign s = block.settings
 
-  assign hosted = false
-  if s.video
-    assign hosted = true
-  endif
+  assign video_source = s.video_source | default: 'external'
 
-  assign external = s.video_url | default: ''
+  assign hosted = false
+  assign external = ''
+  if video_source == 'upload'
+    if s.video
+      assign hosted = true
+    endif
+  elsif s.video_url != blank
+    assign external = s.video_url
+  endif
 
   assign has_video = false
   if hosted or external != ''
@@ -297,20 +302,39 @@
       "content": "t:blocks.showcase_video.paragraph"
     },
     {
+      "type": "select",
+      "id": "video_source",
+      "label": "t:blocks.showcase_video.settings.video_source.label",
+      "options": [
+        {
+          "value": "upload",
+          "label": "t:blocks.showcase_video.settings.video_source.options__1.label"
+        },
+        {
+          "value": "external",
+          "label": "t:blocks.showcase_video.settings.video_source.options__2.label"
+        }
+      ],
+      "default": "external"
+    },
+    {
       "type": "video",
       "id": "video",
       "label": "t:shared.background.video.label",
-      "info": "t:blocks.showcase_video.settings.video.info"
+      "info": "t:blocks.showcase_video.settings.video.info",
+      "visible_if": "{{ block.settings.video_source == 'upload' }}"
     },
     {
       "type": "video_url",
       "id": "video_url",
-      "label": "t:shared.background.video_url.label",
-      "info": "t:shared.background.video_url.info",
+      "label": "t:blocks.showcase_video.settings.video_url.label",
+      "info": "t:blocks.showcase_video.settings.video_url.info",
       "accept": [
         "youtube",
         "vimeo"
-      ]
+      ],
+      "default": "https://www.youtube.com/watch?v=_9VUPq3SxOc",
+      "visible_if": "{{ block.settings.video_source == 'external' }}"
     },
     {
       "type": "image_picker",
