@@ -8,17 +8,22 @@
   assign video_source = s.video_source | default: 'external'
 
   assign hosted = false
-  assign external = ''
+  assign embed_src = ''
   if video_source == 'upload'
     if s.video
       assign hosted = true
     endif
   elsif s.video_url != blank
-    assign external = s.video_url
+    case s.video_url.type
+      when 'youtube'
+        assign embed_src = 'https://www.youtube.com/embed/' | append: s.video_url.id | append: '?autoplay=1&rel=0&modestbranding=1&playsinline=1'
+      when 'vimeo'
+        assign embed_src = 'https://player.vimeo.com/video/' | append: s.video_url.id | append: '?autoplay=1&playsinline=1&dnt=1'
+    endcase
   endif
 
   assign has_video = false
-  if hosted or external != ''
+  if hosted or embed_src != ''
     assign has_video = true
   endif
 
@@ -40,117 +45,20 @@
     assign play_label = 'sections.testimonials_showcase.play_video_by' | t: name: author
   endif
 
-  assign border_line = s.border_style | default: 'gradient'
-  assign border_width = 0
-  assign border_paint = ''
-
-  if border_line != 'none'
-    assign border_width = s.border_width | default: 1 | plus: 0
-
-    assign border_percent = s.border_opacity | default: 100 | plus: 0
-    if s.border_color == blank
-      assign border_paint = 'color-mix(in srgb, currentColor ' | append: border_percent | append: '%, transparent)'
-    else
-      assign border_alpha = border_percent | divided_by: 100.0
-      assign border_paint = s.border_color | color_modify: 'alpha', border_alpha
-    endif
-  endif
-
-  assign gradient_paint = ''
-  if border_line == 'gradient'
-    assign gradient_angle = s.border_gradient_angle | default: 200 | plus: 0
-    assign gradient_end = s.border_color_end | default: 'rgba(255,255,255,0)'
-    assign gradient_paint = 'linear-gradient(' | append: gradient_angle | append: 'deg, ' | append: border_paint | append: ', ' | append: gradient_end | append: ')'
-  endif
-
-  assign radius = s.border_radius | default: 20 | plus: 0
-  assign radius_mobile = s.border_radius_mobile | default: radius | plus: 0
-
-  assign scrim_paint = ''
-  if s.scrim_color != blank
-    assign scrim_alpha = s.scrim_opacity | default: 90 | plus: 0
-    assign scrim_alpha = scrim_alpha | divided_by: 100.0
-    assign scrim_paint = s.scrim_color | color_modify: 'alpha', scrim_alpha
-  endif
-
-  assign scrim_height = s.scrim_height | default: 62 | plus: 0
-
-  assign star_size = s.star_size | default: 11 | plus: 0
-
-  assign play_size = s.play_size | default: 48 | plus: 0
-  assign play_glyph = play_size | times: 0.36 | round
-  if play_glyph < 8
-    assign play_glyph = 8
-  endif
-
-  assign card_ratio = s.card_ratio | default: '3-4'
-
   assign card_sizes = '(min-width: 990px) 360px, (min-width: 750px) 320px, 80vw'
-
-  assign card_classes = 'showcase-card'
-  if border_line == 'gradient'
-    assign card_classes = card_classes | append: ' showcase-card--gradient-border'
-  endif
-  unless has_video
-    assign card_classes = card_classes | append: ' showcase-card--still'
-  endunless
 -%}
 
-{%- capture card_style -%}
-  {%- render 'spacing', block: s, declarations: true -%}
-  --sv-card-radius: {{ radius }}px;
-  --sv-card-radius-mobile: {{ radius_mobile }}px;
-  --sv-card-gap: {{ s.gap | default: 8 | plus: 0 }}px;
-  --sv-card-ratio: {% render 'aspect-ratio', ratio: card_ratio, image: poster %};
-  --sv-scrim-height: {{ scrim_height }}%;
-  --sv-play-size: {{ play_size }}px;
-  --sv-name-size: {{ s.name_size | default: 18 | plus: 0 }}px;
-  --sv-headline-size: {{ s.headline_size | default: 15 | plus: 0 }}px;
-  --sv-quote-size: {{ s.quote_size | default: 15 | plus: 0 }}px;
-  {%- if border_width > 0 -%}
-    --sv-card-border-width: {{ border_width }}px;
-    {%- if border_line == 'gradient' -%}
-      --sv-card-border-image: {{ gradient_paint }};
-    {%- else -%}
-      --sv-card-border-style: {{ border_line }};
-      --sv-card-border-color: {{ border_paint }};
-    {%- endif -%}
-  {%- endif -%}
-  {%- if s.glow_size > 0 and s.glow_color != blank -%}
-    --sv-card-glow: 0 0 {{ s.glow_size | plus: 0 }}px {{ s.glow_color }};
-  {%- endif -%}
-  {%- if scrim_paint != '' -%}
-    --sv-scrim: {{ scrim_paint }};
-  {%- endif -%}
-  {%- if s.text_color != blank -%}
-    --sv-card-text: {{ s.text_color }};
-  {%- endif -%}
-  {%- if s.star_color != blank -%}
-    --sv-star-color: {{ s.star_color }};
-  {%- endif -%}
-  {%- if s.verified_color != blank -%}
-    --sv-verified: {{ s.verified_color }};
-  {%- endif -%}
-  {%- if s.play_background != blank -%}
-    --sv-play-background: {{ s.play_background }};
-  {%- endif -%}
-  {%- if s.play_icon_color != blank -%}
-    --sv-play-icon: {{ s.play_icon_color }};
-  {%- endif -%}
-{%- endcapture -%}
-
 <article
-  class="{{ card_classes }}"
+  class="showcase-card{% unless has_video %} showcase-card--still{% endunless %}"
   data-showcase-card
   {%- if author != blank %} data-showcase-label="{{ author | escape }}"{% endif %}
-  style="{{ card_style | strip_newlines | strip }}"
   {{ block.shopify_attributes }}
 >
   <div class="showcase-card__media">
     {% render 'image',
        image: poster,
        alt: '',
-       ratio: card_ratio,
+       ratio: '3-4',
        class: 'showcase-card__image',
        wrapper_class: 'showcase-card__frame',
        placeholder: 'hero-apparel-2',
@@ -167,12 +75,12 @@
       aria-label="{{ play_label | escape }}"
     >
       <span class="showcase-card__play-glyph" aria-hidden="true">
-        {% render 'icon', icon: 'play', size: play_glyph %}
+        {% render 'icon', icon: 'play', size: 17 %}
       </span>
     </button>
   {%- endif -%}
 
-  <div class="showcase-card__body" data-block-spacing>
+  <div class="showcase-card__body">
     {%- if author != blank or rating > 0 -%}
       <div class="showcase-card__head">
         {%- if author != blank -%}
@@ -205,7 +113,7 @@
 
         {%- if rating > 0 -%}
           <span class="showcase-card__rating">
-            {% render 'rating-stars', rating: rating, size: star_size %}
+            {% render 'rating-stars', rating: rating, size: 11 %}
           </span>
         {%- endif -%}
       </div>
@@ -235,6 +143,7 @@
              alt: '',
              ratio: '16-9',
              class: 'showcase-media__image',
+             priority: true,
              placeholder: 'hero-apparel-2',
              sizes: '(min-width: 990px) 880px, 100vw' %}
 
@@ -272,19 +181,13 @@
                    image_size: '1280x',
                    class: 'showcase-media__player' }}
           {%- else -%}
-
-            {{ external
-               | external_video_url:
-                   autoplay: true,
-                   loop: false,
-                   controls: true,
-                   playsinline: true,
-                   modestbranding: true,
-                   rel: 0
-               | external_video_tag:
-                   class: 'showcase-media__player',
-                   loading: 'lazy',
-                   title: play_label }}
+            <iframe
+              class="showcase-media__player"
+              src="{{ embed_src }}"
+              title="{{ play_label | escape }}"
+              allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+              allowfullscreen
+            ></iframe>
           {%- endif -%}
         </template>
       </deferred-media>
@@ -376,398 +279,11 @@
       "id": "quote",
       "label": "t:blocks.testimonial.settings.quote.label",
       "default": "<p>Share positive thoughts and feedback from your customer.</p>"
-    },
+    }
+  ],
+  "presets": [
     {
-      "type": "header",
-      "content": "t:blocks.showcase_video.headers.shape"
-    },
-    {
-      "type": "select",
-      "id": "card_ratio",
-      "label": "t:shared.image_ratio.label",
-      "info": "t:blocks.showcase_video.settings.card_ratio.info",
-      "options": [
-        {
-          "value": "9-16",
-          "label": "t:shared.image_ratio.options__1.label"
-        },
-        {
-          "value": "2-3",
-          "label": "t:shared.image_ratio.options__2.label"
-        },
-        {
-          "value": "3-4",
-          "label": "t:shared.image_ratio.options__3.label"
-        },
-        {
-          "value": "portrait",
-          "label": "t:shared.image_ratio.options__4.label"
-        },
-        {
-          "value": "1-1",
-          "label": "t:shared.image_ratio.options__5.label"
-        },
-        {
-          "value": "4-3",
-          "label": "t:shared.image_ratio.options__6.label"
-        },
-        {
-          "value": "16-9",
-          "label": "t:shared.image_ratio.options__7.label"
-        }
-      ],
-      "default": "3-4"
-    },
-    {
-      "type": "range",
-      "id": "border_radius",
-      "label": "t:shared.corner_radius.label",
-      "min": 0,
-      "max": 48,
-      "step": 2,
-      "unit": "px",
-      "default": 20
-    },
-    {
-      "type": "range",
-      "id": "border_radius_mobile",
-      "label": "t:blocks.showcase_video.settings.border_radius_mobile.label",
-      "min": 0,
-      "max": 48,
-      "step": 2,
-      "unit": "px",
-      "default": 16
-    },
-    {
-      "type": "range",
-      "id": "gap",
-      "label": "t:shared.gap.label",
-      "info": "t:blocks.showcase_video.settings.gap.info",
-      "min": 0,
-      "max": 32,
-      "step": 1,
-      "unit": "px",
-      "default": 8
-    },
-    {
-      "type": "select",
-      "id": "border_style",
-      "label": "t:blocks.group.settings.border_style.label",
-      "info": "t:blocks.showcase_video.settings.border_style.info",
-      "options": [
-        {
-          "value": "none",
-          "label": "t:shared.options.none"
-        },
-        {
-          "value": "solid",
-          "label": "t:shared.options.solid"
-        },
-        {
-          "value": "dashed",
-          "label": "t:shared.options.dashed"
-        },
-        {
-          "value": "gradient",
-          "label": "t:blocks.showcase_video.settings.border_style.options__4.label"
-        }
-      ],
-      "default": "gradient"
-    },
-    {
-      "type": "range",
-      "id": "border_width",
-      "label": "t:shared.border.thickness.label",
-      "min": 0,
-      "max": 6,
-      "step": 1,
-      "unit": "px",
-      "default": 1,
-      "visible_if": "{{ block.settings.border_style != 'none' }}"
-    },
-    {
-      "type": "range",
-      "id": "border_opacity",
-      "label": "t:shared.border.opacity.label",
-      "min": 0,
-      "max": 100,
-      "step": 5,
-      "unit": "%",
-      "default": 100,
-      "visible_if": "{{ block.settings.border_style != 'none' }}"
-    },
-    {
-      "type": "color",
-      "id": "border_color",
-      "label": "t:blocks.group.settings.border_color.label",
-      "default": "#03D26F",
-      "visible_if": "{{ block.settings.border_style != 'none' }}"
-    },
-    {
-      "type": "color",
-      "id": "border_color_end",
-      "label": "t:blocks.showcase_video.settings.border_color_end.label",
-      "info": "t:blocks.showcase_video.settings.border_color_end.info",
-      "default": "#0F2E2F",
-      "visible_if": "{{ block.settings.border_style == 'gradient' }}"
-    },
-    {
-      "type": "range",
-      "id": "border_gradient_angle",
-      "label": "t:blocks.showcase_video.settings.border_gradient_angle.label",
-      "min": 0,
-      "max": 360,
-      "step": 5,
-      "unit": "deg",
-      "default": 200,
-      "visible_if": "{{ block.settings.border_style == 'gradient' }}"
-    },
-    {
-      "type": "color",
-      "id": "glow_color",
-      "label": "t:blocks.showcase_video.settings.glow_color.label",
-      "info": "t:blocks.showcase_video.settings.glow_color.info",
-      "default": "rgba(3, 210, 111, 0.25)"
-    },
-    {
-      "type": "range",
-      "id": "glow_size",
-      "label": "t:blocks.showcase_video.settings.glow_size.label",
-      "min": 0,
-      "max": 60,
-      "step": 2,
-      "unit": "px",
-      "default": 24
-    },
-    {
-      "type": "header",
-      "content": "t:blocks.showcase_video.headers.overlay"
-    },
-    {
-      "type": "color",
-      "id": "scrim_color",
-      "label": "t:blocks.showcase_video.settings.scrim_color.label",
-      "info": "t:blocks.showcase_video.settings.scrim_color.info",
-      "default": "#0F2E2F"
-    },
-    {
-      "type": "range",
-      "id": "scrim_opacity",
-      "label": "t:blocks.showcase_video.settings.scrim_opacity.label",
-      "min": 0,
-      "max": 100,
-      "step": 5,
-      "unit": "%",
-      "default": 90
-    },
-    {
-      "type": "range",
-      "id": "scrim_height",
-      "label": "t:blocks.showcase_video.settings.scrim_height.label",
-      "info": "t:blocks.showcase_video.settings.scrim_height.info",
-      "min": 20,
-      "max": 100,
-      "step": 2,
-      "unit": "%",
-      "default": 62
-    },
-    {
-      "type": "color",
-      "id": "text_color",
-      "label": "t:blocks.showcase_video.settings.text_color.label",
-      "default": "#FFFFFF"
-    },
-    {
-      "type": "range",
-      "id": "name_size",
-      "label": "t:blocks.showcase_video.settings.name_size.label",
-      "min": 12,
-      "max": 30,
-      "step": 1,
-      "unit": "px",
-      "default": 18
-    },
-    {
-      "type": "range",
-      "id": "headline_size",
-      "label": "t:blocks.showcase_video.settings.headline_size.label",
-      "min": 11,
-      "max": 26,
-      "step": 1,
-      "unit": "px",
-      "default": 15
-    },
-    {
-      "type": "range",
-      "id": "quote_size",
-      "label": "t:blocks.showcase_video.settings.quote_size.label",
-      "min": 11,
-      "max": 24,
-      "step": 1,
-      "unit": "px",
-      "default": 15
-    },
-    {
-      "type": "color",
-      "id": "star_color",
-      "label": "t:blocks.showcase_video.settings.star_color.label",
-      "default": "#F9F871"
-    },
-    {
-      "type": "range",
-      "id": "star_size",
-      "label": "t:blocks.testimonial_card.settings.star_size.label",
-      "min": 8,
-      "max": 20,
-      "step": 1,
-      "unit": "px",
-      "default": 11
-    },
-    {
-      "type": "color",
-      "id": "verified_color",
-      "label": "t:blocks.showcase_video.settings.verified_color.label",
-      "default": "#F9F871",
-      "visible_if": "{{ block.settings.show_verified }}"
-    },
-    {
-      "type": "header",
-      "content": "t:blocks.showcase_video.headers.play"
-    },
-    {
-      "type": "range",
-      "id": "play_size",
-      "label": "t:blocks.showcase_video.settings.play_size.label",
-      "info": "t:blocks.showcase_video.settings.play_size.info",
-      "min": 32,
-      "max": 96,
-      "step": 2,
-      "unit": "px",
-      "default": 48
-    },
-    {
-      "type": "color",
-      "id": "play_background",
-      "label": "t:blocks.showcase_video.settings.play_background.label",
-      "default": "rgba(255, 255, 255, 0.82)"
-    },
-    {
-      "type": "color",
-      "id": "play_icon_color",
-      "label": "t:blocks.showcase_video.settings.play_icon_color.label",
-      "default": "#0F2E2F"
-    },
-    {
-      "type": "header",
-      "content": "t:shared.spacing.block_header"
-    },
-    {
-      "type": "paragraph",
-      "content": "t:blocks.showcase_video.paragraphs.padding"
-    },
-    {
-      "type": "select",
-      "id": "padding_device",
-      "label": "t:shared.spacing.devices.label",
-      "options": [
-        {
-          "value": "desktop",
-          "label": "t:shared.spacing.devices.options__1.label"
-        },
-        {
-          "value": "mobile",
-          "label": "t:shared.spacing.devices.options__2.label"
-        }
-      ],
-      "default": "desktop"
-    },
-    {
-      "type": "range",
-      "id": "padding_top",
-      "label": "t:shared.spacing.padding_top.label",
-      "min": 0,
-      "max": 100,
-      "step": 2,
-      "unit": "px",
-      "default": 20,
-      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
-    },
-    {
-      "type": "range",
-      "id": "padding_bottom",
-      "label": "t:shared.spacing.padding_bottom.label",
-      "min": 0,
-      "max": 100,
-      "step": 2,
-      "unit": "px",
-      "default": 20,
-      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
-    },
-    {
-      "type": "range",
-      "id": "padding_left",
-      "label": "t:shared.spacing.padding_left.label",
-      "min": 0,
-      "max": 100,
-      "step": 2,
-      "unit": "px",
-      "default": 18,
-      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
-    },
-    {
-      "type": "range",
-      "id": "padding_right",
-      "label": "t:shared.spacing.padding_right.label",
-      "min": 0,
-      "max": 100,
-      "step": 2,
-      "unit": "px",
-      "default": 18,
-      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
-    },
-    {
-      "type": "range",
-      "id": "padding_top_mobile",
-      "label": "t:shared.spacing.padding_top.label",
-      "min": 0,
-      "max": 100,
-      "step": 2,
-      "unit": "px",
-      "default": 16,
-      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
-    },
-    {
-      "type": "range",
-      "id": "padding_bottom_mobile",
-      "label": "t:shared.spacing.padding_bottom.label",
-      "min": 0,
-      "max": 100,
-      "step": 2,
-      "unit": "px",
-      "default": 16,
-      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
-    },
-    {
-      "type": "range",
-      "id": "padding_left_mobile",
-      "label": "t:shared.spacing.padding_left.label",
-      "min": 0,
-      "max": 100,
-      "step": 2,
-      "unit": "px",
-      "default": 14,
-      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
-    },
-    {
-      "type": "range",
-      "id": "padding_right_mobile",
-      "label": "t:shared.spacing.padding_right.label",
-      "min": 0,
-      "max": 100,
-      "step": 2,
-      "unit": "px",
-      "default": 14,
-      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+      "name": "t:blocks.showcase_video.name"
     }
   ]
 }

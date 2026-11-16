@@ -12,6 +12,9 @@ import { prefersReducedMotion } from '@theme/utilities';
 /** Below this width a lane is a row rather than a column. */
 const ROW_QUERY = '(max-width: 749px)';
 
+/** Longest wait for the modal poster to decode before opening anyway, in milliseconds. */
+const POSTER_WAIT = 600;
+
 /** Speed below which the movement is not movement, and above which it is unreadable. */
 const SPEED_MIN = 2;
 const SPEED_MAX = 400;
@@ -66,8 +69,7 @@ class Lane {
 
   /** @returns {number} Pixels per second, clamped. */
   get speed() {
-    const raw = this.isRow ? this.element.dataset.speedMobile : this.element.dataset.speed;
-    const value = Number(raw);
+    const value = Number(this.element.dataset.speed);
     if (!Number.isFinite(value)) return 40;
     return Math.min(Math.max(value, SPEED_MIN), SPEED_MAX);
   }
@@ -217,6 +219,11 @@ export class TestimonialShowcase extends BaseComponent {
       event.preventDefault();
       this.openVideo(trigger.closest('[data-showcase-card]'));
     });
+
+    this.on(document, EVENTS.OVERLAY_CLOSE, (event) => {
+      if (event.target !== this.#modal) return;
+      for (const lane of this.#lanes) lane.release('modal');
+    });
   }
 
   teardown() {
@@ -236,14 +243,16 @@ export class TestimonialShowcase extends BaseComponent {
    *
    * @param {Element|null} card
    */
-  openVideo(card) {
+  async openVideo(card) {
     const modal = this.#modal;
     const stage = modal?.querySelector('[data-showcase-stage]');
     const template = card?.querySelector('template[data-showcase-video]');
+    const overlay = /** @type {any} */ (modal);
 
     if (!modal || !(stage instanceof HTMLElement) || !(template instanceof HTMLTemplateElement)) {
       return;
     }
+    if (overlay.isOpen || typeof overlay.open !== 'function') return;
 
     stage.replaceChildren(template.content.cloneNode(true));
 
@@ -251,8 +260,29 @@ export class TestimonialShowcase extends BaseComponent {
     const dialog = modal.querySelector('dialog');
     if (dialog && label) dialog.setAttribute('aria-label', label);
 
-    const overlay = /** @type {any} */ (modal);
-    if (typeof overlay.open === 'function') overlay.open();
+    await this.#posterReady(stage);
+
+    for (const lane of this.#lanes) lane.hold('modal');
+    overlay.open();
+  }
+
+  /**
+   * Wait for the poster to decode so it is already painted when the panel
+   * animates in, instead of popping in halfway through.
+   *
+   * @param {HTMLElement} stage
+   * @returns {Promise<void>}
+   * @private
+   */
+  #posterReady(stage) {
+    const image = stage.querySelector('img');
+    if (!(image instanceof HTMLImageElement) || typeof image.decode !== 'function') {
+      return Promise.resolve();
+    }
+
+    const decoded = image.decode().catch(() => {});
+    const timeout = new Promise((resolve) => setTimeout(resolve, POSTER_WAIT));
+    return Promise.race([decoded, timeout]).then(() => {});
   }
 
   /**

@@ -7,30 +7,43 @@
 
   assign columns = s.columns | default: 3 | plus: 0
   assign columns_mobile = s.columns_mobile | default: 1 | plus: 0
-
-  assign gap = s.gap | default: 10 | plus: 0
-  assign gap_mobile = s.gap_mobile | plus: 0
-  if s.gap_mobile == nil
-    assign gap_mobile = 8
-  endif
 -%}
 
 {%- capture stats_style -%}
   {%- render 'spacing', block: s, declarations: true -%}
   --sv-stats-columns: {{ columns }};
   --sv-stats-columns-mobile: {{ columns_mobile }};
-  --sv-stats-gap: {{ gap }}px;
-  --sv-stats-gap-mobile: {{ gap_mobile }}px;
+  --sv-stat-radius: {{ s.stat_radius | default: 24 | plus: 0 }}px;
+  {%- if s.stat_icon_color != blank -%}
+    --sv-stat-icon-color: {{ s.stat_icon_color }};
+  {%- endif -%}
+  {%- if s.stat_value_color != blank -%}
+    --sv-stat-value-color: {{ s.stat_value_color }};
+  {%- endif -%}
+  {%- if s.stat_label_color != blank -%}
+    --sv-stat-label-color: {{ s.stat_label_color }};
+  {%- endif -%}
+  {%- if s.stat_background != blank -%}
+    --sv-stat-background: {{ s.stat_background }};
+  {%- endif -%}
+  {%- if s.stat_border_start != blank -%}
+    --sv-stat-border-start: {{ s.stat_border_start }};
+  {%- endif -%}
+  {%- if s.stat_border_end != blank -%}
+    --sv-stat-border-end: {{ s.stat_border_end }};
+  {%- endif -%}
 {%- endcapture -%}
 
-<div
+<motion-effect
   class="showcase-stats"
   data-block-spacing
+  data-easing="outQuint"
   style="{{ stats_style | strip_newlines | strip }}"
+  {% render 'motion-attrs', kind: 'image', section: section.settings, target: '.showcase-stat', duration: 1000, stagger: 120 %}
   {{ block.shopify_attributes }}
 >
   {% content_for 'blocks' %}
-</div>
+</motion-effect>
 
 {% schema %}
 {
@@ -39,12 +52,6 @@
   "blocks": [
     {
       "type": "_showcase-stat"
-    },
-    {
-      "type": "@theme"
-    },
-    {
-      "type": "@app"
     }
   ],
   "settings": [
@@ -75,24 +82,55 @@
       "default": 1
     },
     {
-      "type": "range",
-      "id": "gap",
-      "label": "t:shared.gap.label",
-      "min": 0,
-      "max": 48,
-      "step": 2,
-      "unit": "px",
-      "default": 10
+      "type": "header",
+      "content": "t:blocks.showcase_stats.headers.stats"
+    },
+    {
+      "type": "color",
+      "id": "stat_icon_color",
+      "label": "t:blocks.showcase_stat.settings.icon_color.label",
+      "default": "#03D26F"
+    },
+    {
+      "type": "color",
+      "id": "stat_value_color",
+      "label": "t:blocks.testimonial_stat.settings.value_color.label",
+      "default": "#FFFFFF"
+    },
+    {
+      "type": "color",
+      "id": "stat_label_color",
+      "label": "t:blocks.testimonial_stat.settings.label_color.label",
+      "default": "rgba(255, 255, 255, 0.72)"
+    },
+    {
+      "type": "color",
+      "id": "stat_background",
+      "label": "t:shared.background.color.label",
+      "default": "rgba(255, 255, 255, 0.04)"
+    },
+    {
+      "type": "color",
+      "id": "stat_border_start",
+      "label": "t:blocks.showcase_stat.settings.border_gradient_start.label",
+      "info": "t:blocks.showcase_stat.settings.border_gradient_start.info",
+      "default": "rgba(3, 210, 111, 0.4)"
+    },
+    {
+      "type": "color",
+      "id": "stat_border_end",
+      "label": "t:blocks.showcase_stat.settings.border_gradient_end.label",
+      "default": "rgba(255, 255, 255, 0.1)"
     },
     {
       "type": "range",
-      "id": "gap_mobile",
-      "label": "t:blocks.showcase_stats.settings.gap_mobile.label",
+      "id": "stat_radius",
+      "label": "t:shared.corner_radius.label",
       "min": 0,
       "max": 40,
       "step": 2,
       "unit": "px",
-      "default": 8
+      "default": 24
     },
     {
       "type": "header",

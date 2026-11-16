@@ -5,16 +5,7 @@
 {%- liquid
   assign s = section.settings
 
-  assign background_media = s.background_media | default: 'none'
-  assign has_background_media = false
-  if background_media != 'none'
-    assign has_background_media = true
-  endif
-
-  assign background_paint = ''
-  if has_background_media == false
-    assign background_paint = s.background_color | default: ''
-  endif
+  assign background_paint = s.background_color | default: ''
 
   assign border_line = s.border_style | default: 'none'
 
@@ -112,9 +103,7 @@
 
   assign modal_id = 'showcase-video-' | append: section.id
 
-  assign accent = s.accent_color | default: ''
-
-  assign lane_stagger = 140
+  assign stagger = 120
 -%}
 
 {%- capture section_style -%}
@@ -140,27 +129,21 @@
   {%- if background_paint != '' -%}
     background: {{ background_paint }};
   {%- endif -%}
-  {%- if accent != '' -%}
-    --sv-accent: {{ accent }};
-  {%- endif -%}
 {%- endcapture -%}
 
 <div
-  class="testimonial-showcase color-scheme-container color-{{ s.color_scheme | default: 'scheme-1' }}{% if has_background_media %} has-background-media{% endif %}"
+  class="testimonial-showcase color-scheme-container color-{{ s.color_scheme | default: 'scheme-1' }}"
   data-section-spacing
   {%- if s.stack_layer != blank and s.stack_layer != 'default' %} data-section-layer="{{ s.stack_layer }}"{% endif %}
   data-section-id="{{ section.id }}"
   style="{{ section_style | strip_newlines | strip }}"
 >
-  {%- if has_background_media -%}
-    {% render 'background-media', settings: s %}
-  {%- endif -%}
-
   <div class="{% render 'container', width: s.container_width %}">
     <div class="showcase__layout showcase__layout--media-{{ media_position }}">
       <motion-effect
         class="showcase__intro"
-        {% render 'motion-attrs', kind: 'text', section: s, children: true, duration: 900, stagger: lane_stagger %}
+        data-easing="outQuint"
+        {% render 'motion-attrs', kind: 'text', section: s, target: '.showcase-intro', duration: 1000 %}
       >
         {%- content_for 'block', type: '_showcase-intro', id: 'showcase-intro' -%}
         {%- content_for 'block', type: '_showcase-stats', id: 'showcase-stats' -%}
@@ -168,18 +151,20 @@
 
       <motion-effect
         class="showcase__media"
+        data-easing="outQuint"
         {% render 'motion-attrs',
            kind: 'image',
            section: s,
            target: '.showcase-lane',
-           duration: 900,
-           stagger: lane_stagger %}
+           duration: 1000,
+           stagger: stagger %}
       >
         <testimonial-showcase
           class="showcase__lanes"
           data-modal="{{ modal_id }}"
         >
-          {% content_for 'blocks' %}
+          {% content_for 'block', type: '_showcase-column', id: 'review-lane-1' %}
+          {% content_for 'block', type: '_showcase-column', id: 'review-lane-2' %}
         </testimonial-showcase>
       </motion-effect>
     </div>
@@ -193,14 +178,6 @@
   "name": "t:sections.testimonials_showcase.name",
   "tag": "section",
   "class": "section",
-  "blocks": [
-    {
-      "type": "_showcase-column"
-    },
-    {
-      "type": "@app"
-    }
-  ],
   "settings": [
     {
       "type": "select",
@@ -288,44 +265,9 @@
       "default": "scheme-1"
     },
     {
-      "type": "color",
-      "id": "accent_color",
-      "label": "t:sections.testimonials_showcase.settings.accent_color.label",
-      "info": "t:sections.testimonials_showcase.settings.accent_color.info",
-      "default": "#03D26F"
-    },
-    {
-      "type": "select",
-      "id": "background_media",
-      "label": "t:shared.background.media.label",
-      "options": [
-        {
-          "value": "none",
-          "label": "t:shared.background.media.options__1.label"
-        },
-        {
-          "value": "image",
-          "label": "t:shared.background.media.options__2.label"
-        }
-      ],
-      "default": "none"
-    },
-    {
       "type": "color_background",
       "id": "background_color",
       "label": "t:shared.background.color.label"
-    },
-    {
-      "type": "image_picker",
-      "id": "image",
-      "label": "t:shared.background.image.label",
-      "visible_if": "{{ section.settings.background_media == 'image' }}"
-    },
-    {
-      "type": "image_picker",
-      "id": "image_mobile",
-      "label": "t:shared.background.image_mobile.label",
-      "visible_if": "{{ section.settings.background_media == 'image' }}"
     },
     {
       "type": "header",
@@ -477,12 +419,16 @@
           "label": "t:shared.animation.animation_text.options__2.label"
         },
         {
+          "value": "fade-in",
+          "label": "t:shared.animation.animation_text.options__3.label"
+        },
+        {
           "value": "fade-up",
           "label": "t:shared.animation.animation_text.options__4.label"
         },
         {
-          "value": "words-slide-up",
-          "label": "t:shared.animation.animation_text.options__9.label"
+          "value": "slide-up",
+          "label": "t:shared.animation.animation_text.options__5.label"
         }
       ],
       "default": "inherit"
@@ -508,9 +454,13 @@
         {
           "value": "fade-up",
           "label": "t:shared.animation.animation_text.options__4.label"
+        },
+        {
+          "value": "slide-up",
+          "label": "t:shared.animation.animation_text.options__5.label"
         }
       ],
-      "default": "inherit"
+      "default": "fade-up"
     },
     {
       "type": "header",
@@ -721,8 +671,6 @@
         "align_items": "center",
         "container_width": "standard",
         "color_scheme": "scheme-4",
-        "accent_color": "#03D26F",
-        "animation_image": "fade-up",
         "content_padding_top": 80,
         "content_padding_bottom": 80,
         "content_padding_left": 0,
@@ -739,39 +687,47 @@
       "blocks": [
         {
           "type": "_showcase-intro",
-          "static": true,
           "id": "showcase-intro",
+          "static": true,
           "settings": {
-            "show_rating": true,
-            "rating_max": 5,
-            "rating_filled": 5,
-            "score": "4.9/5.00",
-            "caption": "Add a caption",
-            "heading": "Testimonials",
-            "text": "<p>Share what your customers are saying about your products.</p>",
             "alignment": "center",
-            "alignment_mobile": "center",
-            "width": 0,
             "gap": 16,
-            "actions_space": 36,
-            "actions_gap": 12,
-            "chip_size": 19,
-            "chip_radius": 2,
-            "chip_gap": 8,
-            "chip_color": "#F9F871",
-            "chip_star_color": "#0F2E2F",
-            "score_size": 18,
-            "score_color": "#FFFFFF",
-            "caption_size": 15,
-            "caption_color": "rgba(255, 255, 255, 0.72)",
-            "heading_size": 44,
-            "heading_size_mobile": 30,
-            "heading_color": "#FFFFFF",
-            "text_size": 16,
-            "text_color": "rgba(255, 255, 255, 0.72)",
             "padding_device": "desktop"
           },
           "blocks": [
+            {
+              "type": "_showcase-rating",
+              "settings": {
+                "rating_max": 5,
+                "rating_filled": 5,
+                "score": "4.9/5.00"
+              }
+            },
+            {
+              "type": "text",
+              "settings": {
+                "text": "<p>Add a caption</p>",
+                "preset": "paragraph",
+                "color": "muted"
+              }
+            },
+            {
+              "type": "text",
+              "name": "t:blocks.text.presets.heading.name",
+              "settings": {
+                "text": "<p>Testimonials</p>",
+                "preset": "h2"
+              }
+            },
+            {
+              "type": "text",
+              "settings": {
+                "text": "<p>Share what your customers are saying about your products.</p>",
+                "preset": "paragraph",
+                "color": "muted",
+                "max_width": "normal"
+              }
+            },
             {
               "type": "buttons",
               "settings": {
@@ -788,20 +744,19 @@
                 "border_style": "dashed",
                 "border_thickness": 1,
                 "corner_radius": 50,
-                "width": "auto"
+                "width": "auto",
+                "padding_top": 20
               }
             }
           ]
         },
         {
           "type": "_showcase-stats",
-          "static": true,
           "id": "showcase-stats",
+          "static": true,
           "settings": {
             "columns": 3,
             "columns_mobile": 1,
-            "gap": 12,
-            "gap_mobile": 8,
             "padding_device": "desktop",
             "padding_top": 24,
             "padding_top_mobile": 20
@@ -813,33 +768,7 @@
                 "value": "300K+",
                 "label": "Stat label",
                 "icon_source": "icon",
-                "icon": "account",
-                "icon_size": 28,
-                "icon_color": "#03D26F",
-                "icon_gap": 16,
-                "gap": 16,
-                "background_color": "rgba(255, 255, 255, 0.04)",
-                "background_opacity": 100,
-                "value_color": "#FFFFFF",
-                "label_color": "rgba(255, 255, 255, 0.72)",
-                "border_style": "solid",
-                "border_width": 1,
-                "border_fill": "gradient",
-                "border_gradient_start": "rgba(3, 210, 111, 0.4)",
-                "border_gradient_end": "rgba(255, 255, 255, 0.1)",
-                "border_gradient_midpoint": 48,
-                "border_gradient_angle": 135,
-                "border_radius": 24,
-                "border_radius_mobile": 20,
-                "padding_device": "desktop",
-                "padding_top": 20,
-                "padding_bottom": 20,
-                "padding_left": 21,
-                "padding_right": 21,
-                "padding_top_mobile": 18,
-                "padding_bottom_mobile": 18,
-                "padding_left_mobile": 18,
-                "padding_right_mobile": 18
+                "icon": "account"
               }
             },
             {
@@ -848,33 +777,7 @@
                 "value": "30 Days",
                 "label": "Stat label",
                 "icon_source": "icon",
-                "icon": "refresh",
-                "icon_size": 28,
-                "icon_color": "#03D26F",
-                "icon_gap": 16,
-                "gap": 16,
-                "background_color": "rgba(255, 255, 255, 0.04)",
-                "background_opacity": 100,
-                "value_color": "#FFFFFF",
-                "label_color": "rgba(255, 255, 255, 0.72)",
-                "border_style": "solid",
-                "border_width": 1,
-                "border_fill": "gradient",
-                "border_gradient_start": "rgba(3, 210, 111, 0.4)",
-                "border_gradient_end": "rgba(255, 255, 255, 0.1)",
-                "border_gradient_midpoint": 48,
-                "border_gradient_angle": 135,
-                "border_radius": 24,
-                "border_radius_mobile": 20,
-                "padding_device": "desktop",
-                "padding_top": 20,
-                "padding_bottom": 20,
-                "padding_left": 21,
-                "padding_right": 21,
-                "padding_top_mobile": 18,
-                "padding_bottom_mobile": 18,
-                "padding_left_mobile": 18,
-                "padding_right_mobile": 18
+                "icon": "refresh"
               }
             },
             {
@@ -883,44 +786,19 @@
                 "value": "4.9/5",
                 "label": "Stat label",
                 "icon_source": "icon",
-                "icon": "star",
-                "icon_size": 28,
-                "icon_color": "#03D26F",
-                "icon_gap": 16,
-                "gap": 16,
-                "background_color": "rgba(255, 255, 255, 0.04)",
-                "background_opacity": 100,
-                "value_color": "#FFFFFF",
-                "label_color": "rgba(255, 255, 255, 0.72)",
-                "border_style": "solid",
-                "border_width": 1,
-                "border_fill": "gradient",
-                "border_gradient_start": "rgba(3, 210, 111, 0.4)",
-                "border_gradient_end": "rgba(255, 255, 255, 0.1)",
-                "border_gradient_midpoint": 48,
-                "border_gradient_angle": 135,
-                "border_radius": 24,
-                "border_radius_mobile": 20,
-                "padding_device": "desktop",
-                "padding_top": 20,
-                "padding_bottom": 20,
-                "padding_left": 21,
-                "padding_right": 21,
-                "padding_top_mobile": 18,
-                "padding_bottom_mobile": 18,
-                "padding_left_mobile": 18,
-                "padding_right_mobile": 18
+                "icon": "star"
               }
             }
           ]
         },
         {
           "type": "_showcase-column",
+          "id": "review-lane-1",
+          "static": true,
           "settings": {
             "direction": "up",
             "direction_mobile": "left",
             "speed": 40,
-            "speed_mobile": 30,
             "offset": 0
           },
           "blocks": [
@@ -958,11 +836,12 @@
         },
         {
           "type": "_showcase-column",
+          "id": "review-lane-2",
+          "static": true,
           "settings": {
             "direction": "down",
             "direction_mobile": "right",
             "speed": 40,
-            "speed_mobile": 30,
             "offset": 35
           },
           "blocks": [
