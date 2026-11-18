@@ -165,10 +165,12 @@
 
   assign product_limit = s.products_to_show | default: 4
   assign product_source = s.collection.products
-  if s.collection == blank
-    assign product_source = collections.all.products
-  endif
+  assign show_placeholder = false
   assign cs_count = product_source | size
+  if s.collection == blank or cs_count == 0
+    assign show_placeholder = true
+    assign cs_count = product_limit
+  endif
   if cs_count > product_limit
     assign cs_count = product_limit
   endif
@@ -244,9 +246,25 @@
             data-ref="track"
             {% if cs_is_carousel %}aria-label="{{ cs_label | escape }}"{% endif %}
           >
-            {%- for product in product_source limit: product_limit -%}
-              {% render 'product-card', product: product, index: forloop.index0, section: s %}
-            {%- endfor -%}
+            {%- if show_placeholder -%}
+              {%- for i in (1..cs_count) -%}
+                {% content_for 'block',
+                  type: '_product-card',
+                  id: 'product-card',
+                  placeholder: true,
+                  index: forloop.index0
+                %}
+              {%- endfor -%}
+            {%- else -%}
+              {%- for product in product_source limit: product_limit -%}
+                {% content_for 'block',
+                  type: '_product-card',
+                  id: 'product-card',
+                  product: product,
+                  index: forloop.index0
+                %}
+              {%- endfor -%}
+            {%- endif -%}
           </div>
 
           {% render 'carousel-shell-tail', settings: s, layout: cs_layout, layout_mobile: cs_layout_mobile %}
@@ -1116,14 +1134,27 @@
               "type": "subheading",
               "settings": {
                 "text": "<p>Most Popular</p>",
-                "icon": "capsule"
+                "preset": "subheading",
+                "width": "fit",
+                "icon_source": "icon",
+                "icon": "capsule",
+                "icon_style": "solid",
+                "icon_size": "small",
+                "icon_width": 22,
+                "icon_border_radius": 50,
+                "gap": 8,
+                "border_style": "dashed",
+                "border_radius": 40,
+                "icon_color": "#FFFFFF",
+                "icon_background": "#0F2E2F"
               }
             },
             {
               "type": "text",
               "settings": {
                 "text": "<p>Find Your Supple<em>ment</em></p>",
-                "preset": "h2"
+                "preset": "h2",
+                "color": "gradient"
               }
             },
             {
@@ -1188,6 +1219,12 @@
               }
             }
           ]
+        },
+        {
+          "type": "_product-card",
+          "id": "product-card",
+          "static": true,
+          "settings": {}
         }
       ]
     }

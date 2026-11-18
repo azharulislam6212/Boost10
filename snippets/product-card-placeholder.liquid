@@ -1,0 +1,55 @@
+{% doc %}
+  One product card with no product behind it, for a collection that is not picked yet.
+
+  @param {number} [index] - Position in the grid. Picks the placeholder picture and the reveal delay.
+  @param {string} [sizes] - The `sizes` attribute for the picture.
+  @param {string} [ratio] - Image ratio. Default: the theme card ratio.
+  @param {object} [section] - `section.settings`, for the animation cascade.
+  @param {object} [block] - `block.settings`, for the animation cascade.
+  @param {string} [attributes] - Raw attributes for the card's root, e.g. `data-panel-item`
+
+  @example
+    {% render 'product-card-placeholder', index: forloop.index0, sizes: card_sizes %}
+{% enddoc %}
+
+{%- liquid
+  assign position = index | default: 0 | plus: 0
+  assign art = position | modulo: 4 | plus: 1
+  assign placeholder_image = 'product-apparel-' | append: art
+
+  assign ratio = ratio | default: settings.card_image_ratio | default: '3-4'
+  assign alignment = settings.card_text_alignment | default: 'left'
+  assign card_delay = position | modulo: 4 | times: 70
+
+  assign card_scheme_classes = ''
+  if settings.card_inherit_color_scheme == false and settings.card_color_scheme != blank
+    assign card_scheme_classes = ' color-scheme-container color-' | append: settings.card_color_scheme
+  endif
+-%}
+
+<motion-effect
+  {% render 'motion-attrs',
+     kind: 'image',
+     section: section,
+     block: block,
+     target: '.product-card__media',
+     delay: card_delay %}
+  class="product-card product-card--{{ alignment }} product-card--placeholder{{ card_scheme_classes }}"
+  {{ attributes }}
+>
+  <div class="product-card__media-wrapper">
+    <div class="product-card__media" data-ratio="{{ ratio }}">
+      {% render 'image', ratio: ratio, sizes: sizes, placeholder: placeholder_image %}
+    </div>
+  </div>
+
+  <div class="product-card__info">
+    <h3 class="product-card__title">{{ 'onboarding.product_title' | t }}</h3>
+
+    <div class="product-card__price">
+      <div class="price price--card">
+        <span class="price__regular">{{ 1999 | money }}</span>
+      </div>
+    </div>
+  </div>
+</motion-effect>

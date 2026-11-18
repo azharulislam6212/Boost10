@@ -12,6 +12,8 @@
   @param {string} [quick_add]
   @param {string} [ratio]
   @param {boolean} [show_rating]
+  @param {boolean} [show_swatches] - Overrides the theme swatch setting
+  @param {string} [attributes] - Raw attributes for the card's root, e.g. `data-panel-item`
 
   @example
     {%- for product in collection.products -%}
@@ -126,6 +128,7 @@
   data-quick-add-position="{{ quick_add_position }}"
   data-product-id="{{ product.id }}"
   data-morph-key="{{ card_id }}"
+  {{ attributes }}
 >
   <div class="product-card__media-wrapper">
     {%- liquid
@@ -219,7 +222,7 @@
       </a>
     {%- endif -%}
 
-    {% render 'badge', product: product %}
+    {% render 'badge', product: product, sale_text: true %}
 
     {%- if quick_add_style != 'none' and product.available -%}
       <div class="product-card__actions" data-quick-add-position="{{ quick_add_position }}">
@@ -256,7 +259,7 @@
   <div class="product-card__info">
     {%- if flavor != blank -%}
       <span class="product-card__flavor">
-        {%- render 'icon', icon: 'leaf', size: 10 -%}
+        {%- render 'icon', icon: 'leaf', size: 12 -%}
         {{- flavor | escape -}}
       </span>
     {%- endif -%}
@@ -286,7 +289,7 @@
     {%- endif -%}
 
     {%- if rating_visible -%}
-      {% render 'rating', product: product %}
+      {% render 'rating', product: product, count_words: true %}
     {%- endif -%}
 
     {%- if product.description != blank -%}
@@ -337,8 +340,17 @@
       </compare-trigger>
     {%- endif -%}
 
-    {%- assign card_swatch_type = settings.swatches_type | default: 'theme' -%}
-    {%- if card_swatch_type != 'none' and swatch_option != blank -%}
+    {%- liquid
+      assign card_swatch_type = settings.swatches_type | default: 'theme'
+      assign card_swatches_on = true
+      if card_swatch_type == 'none'
+        assign card_swatches_on = false
+      endif
+      unless show_swatches == nil
+        assign card_swatches_on = show_swatches
+      endunless
+    -%}
+    {%- if card_swatches_on and swatch_option != blank -%}
 
       <variant-swatch data-product-url="{{ product.url }}">
         <script type="application/json" data-variants>

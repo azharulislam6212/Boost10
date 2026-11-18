@@ -1,0 +1,391 @@
+{% doc %}
+  blocks/_featured-collection-pill.liquid — private to `sections/featured-collection-pills.liquid`.
+  One pill, and the panel of that collection's products it opens.
+  Cards come from the static `product-card` block, one per pill.
+{% enddoc %}
+
+{%- liquid
+  assign s = block.settings
+  assign ss = section.settings
+
+  assign label = s.label | default: s.collection.title
+  if label == blank
+    assign label = 'collections.category.featured' | t
+  endif
+
+  assign desktop = ss.columns_desktop | default: 4 | plus: 0
+  assign cols_tablet = ss.columns_tablet | default: 2 | plus: 0
+  assign cols_mobile = ss.columns_mobile | default: 1 | plus: 0
+
+  assign cs_layout = 'grid'
+  if ss.layout == 'carousel'
+    assign cs_layout = 'carousel'
+  endif
+
+  assign carousel_on_mobile = ss.carousel_on_mobile
+  if carousel_on_mobile == nil
+    assign carousel_on_mobile = true
+  endif
+
+  assign cs_layout_mobile = 'grid'
+  if cs_layout == 'carousel' or carousel_on_mobile
+    assign cs_layout_mobile = 'carousel'
+  endif
+
+  assign cs_is_carousel = false
+  if cs_layout == 'carousel' or cs_layout_mobile == 'carousel'
+    assign cs_is_carousel = true
+  endif
+
+  assign product_limit = ss.products_to_show | default: 4
+  assign product_source = s.collection.products
+  assign show_placeholder = false
+  assign cs_count = product_source | size
+  if s.collection == blank or cs_count == 0
+    assign show_placeholder = true
+    assign cs_count = product_limit
+  endif
+  if cs_count > product_limit
+    assign cs_count = product_limit
+  endif
+
+  if cs_layout == 'carousel' and cs_count <= desktop
+    assign cs_layout = 'grid'
+  endif
+
+  assign panel_id = 'FeaturedCollectionPill-' | append: block.id
+  assign carousel_id = panel_id | append: '-carousel'
+  assign track_label = label
+
+  assign vw_desktop = 100 | divided_by: desktop
+  assign vw_tablet = 100 | divided_by: cols_tablet
+  assign vw_mobile = 100 | divided_by: cols_mobile
+  assign card_sizes = '(min-width: 990px) ' | append: vw_desktop | append: 'vw, (min-width: 750px) ' | append: vw_tablet | append: 'vw, ' | append: vw_mobile | append: 'vw'
+-%}
+
+{%- capture tab_content -%}
+  {%- if s.icon != blank and s.icon != 'none' -%}
+    <span class="featured-collection-pills__icon">{% render 'icon', icon: s.icon, size: 14 %}</span>
+  {%- endif -%}
+  <span class="tabs__tab-label">{{ label | escape }}</span>
+{%- endcapture -%}
+
+{%- render 'tab-button', panel_id: panel_id, content: tab_content, selected: s.selected -%}
+<div
+  class="tabs__panel featured-collection-pills__panel"
+  role="tabpanel"
+  id="{{ panel_id }}"
+  aria-labelledby="{{ panel_id }}-tab"
+  data-tab-panel
+  tabindex="0"
+  {{ block.shopify_attributes }}
+>
+  <carousel-slider
+    {% render 'carousel-shell-attrs',
+       settings: ss,
+       id: carousel_id,
+       layout: cs_layout,
+       layout_mobile: cs_layout_mobile,
+       classes: 'featured-collection-pills__carousel',
+       columns_desktop: desktop,
+       columns_tablet: cols_tablet,
+       columns_mobile: cols_mobile,
+       count: cs_count %}
+  >
+    <div
+      class="carousel-shell__track featured-collection-pills__grid"
+      data-ref="track"
+      {% if cs_is_carousel %}aria-label="{{ track_label | escape }}"{% endif %}
+    >
+      {%- if show_placeholder -%}
+        {%- for i in (1..cs_count) -%}
+          {% content_for 'block',
+            type: '_product-card',
+            id: 'product-card',
+            placeholder: true,
+            index: forloop.index0,
+            sizes: card_sizes,
+            card_attributes: 'data-panel-item'
+          %}
+        {%- endfor -%}
+      {%- else -%}
+        {%- for product in product_source limit: product_limit -%}
+          {% content_for 'block',
+            type: '_product-card',
+            id: 'product-card',
+            product: product,
+            index: forloop.index0,
+            sizes: card_sizes,
+            card_attributes: 'data-panel-item'
+          %}
+        {%- endfor -%}
+      {%- endif -%}
+    </div>
+
+    {% render 'carousel-shell-tail', settings: ss, layout: cs_layout, layout_mobile: cs_layout_mobile %}
+  </carousel-slider>
+</div>
+
+{% schema %}
+{
+  "name": "t:blocks.featured_collection_pill.name",
+  "tag": null,
+  "settings": [
+    {
+      "type": "text",
+      "id": "label",
+      "label": "t:blocks.tab.settings.label.label",
+      "default": "Collection"
+    },
+    {
+      "type": "select",
+      "id": "icon",
+      "label": "t:blocks.subheading.settings.icon.label",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.options.none"
+        },
+        {
+          "value": "star",
+          "label": "t:blocks.subheading.settings.icon.options__1.label"
+        },
+        {
+          "value": "check",
+          "label": "t:blocks.subheading.settings.icon.options__2.label"
+        },
+        {
+          "value": "heart",
+          "label": "t:blocks.subheading.settings.icon.options__3.label"
+        },
+        {
+          "value": "tag",
+          "label": "t:blocks.subheading.settings.icon.options__4.label"
+        },
+        {
+          "value": "truck",
+          "label": "t:blocks.subheading.settings.icon.options__5.label"
+        },
+        {
+          "value": "refresh",
+          "label": "t:blocks.subheading.settings.icon.options__6.label"
+        },
+        {
+          "value": "lock",
+          "label": "t:blocks.subheading.settings.icon.options__7.label"
+        },
+        {
+          "value": "clock",
+          "label": "t:blocks.subheading.settings.icon.options__8.label"
+        },
+        {
+          "value": "location",
+          "label": "t:blocks.subheading.settings.icon.options__9.label"
+        },
+        {
+          "value": "mail",
+          "label": "t:blocks.subheading.settings.icon.options__10.label"
+        },
+        {
+          "value": "note",
+          "label": "t:blocks.subheading.settings.icon.options__11.label"
+        },
+        {
+          "value": "info",
+          "label": "t:blocks.subheading.settings.icon.options__12.label"
+        },
+        {
+          "value": "leaf",
+          "label": "t:shared.icons.leaf"
+        },
+        {
+          "value": "droplet",
+          "label": "t:shared.icons.droplet"
+        },
+        {
+          "value": "bolt",
+          "label": "t:shared.icons.bolt"
+        },
+        {
+          "value": "brain",
+          "label": "t:shared.icons.brain"
+        },
+        {
+          "value": "pulse",
+          "label": "t:shared.icons.pulse"
+        },
+        {
+          "value": "sparkle",
+          "label": "t:shared.icons.sparkle"
+        },
+        {
+          "value": "capsule",
+          "label": "t:shared.icons.capsule"
+        },
+        {
+          "value": "sun",
+          "label": "t:shared.icons.sun"
+        },
+        {
+          "value": "moon",
+          "label": "t:shared.icons.moon"
+        },
+        {
+          "value": "molecule",
+          "label": "t:shared.icons.molecule"
+        },
+        {
+          "value": "cells",
+          "label": "t:shared.icons.cells"
+        },
+        {
+          "value": "atom",
+          "label": "t:shared.icons.atom"
+        },
+        {
+          "value": "shield",
+          "label": "t:shared.icons.shield"
+        },
+        {
+          "value": "check-circle",
+          "label": "t:shared.icons.check_circle"
+        },
+        {
+          "value": "phone",
+          "label": "t:shared.icons.phone"
+        },
+        {
+          "value": "chat",
+          "label": "t:shared.icons.chat"
+        },
+        {
+          "value": "flask",
+          "label": "t:shared.icons.flask"
+        },
+        {
+          "value": "microscope",
+          "label": "t:shared.icons.microscope"
+        },
+        {
+          "value": "recycle",
+          "label": "t:shared.icons.recycle"
+        },
+        {
+          "value": "award",
+          "label": "t:shared.icons.award"
+        },
+        {
+          "value": "gauge",
+          "label": "t:shared.icons.gauge"
+        },
+        {
+          "value": "infinity",
+          "label": "t:shared.icons.infinity"
+        },
+        {
+          "value": "trend-up",
+          "label": "t:shared.icons.trend_up"
+        },
+        {
+          "value": "book",
+          "label": "t:shared.icons.book"
+        },
+        {
+          "value": "medical",
+          "label": "t:shared.icons.medical"
+        },
+        {
+          "value": "user",
+          "label": "t:shared.icons.user"
+        },
+        {
+          "value": "globe",
+          "label": "t:shared.icons.globe"
+        },
+        {
+          "value": "gift",
+          "label": "t:shared.icons.gift"
+        },
+        {
+          "value": "apple",
+          "label": "t:shared.icons.apple"
+        },
+        {
+          "value": "sprout",
+          "label": "t:shared.icons.sprout"
+        },
+        {
+          "value": "no-dairy",
+          "label": "t:shared.icons.no_dairy"
+        },
+        {
+          "value": "no-gluten",
+          "label": "t:shared.icons.no_gluten"
+        },
+        {
+          "value": "scale",
+          "label": "t:shared.icons.scale"
+        },
+        {
+          "value": "sliders",
+          "label": "t:shared.icons.sliders"
+        },
+        {
+          "value": "calendar",
+          "label": "t:shared.icons.calendar"
+        },
+        {
+          "value": "play",
+          "label": "t:shared.icons.play"
+        },
+        {
+          "value": "arrow-down",
+          "label": "t:shared.icons.arrow_down"
+        },
+        {
+          "value": "thumbs-up",
+          "label": "t:shared.icons.thumbs_up"
+        },
+        {
+          "value": "document",
+          "label": "t:shared.icons.document"
+        },
+        {
+          "value": "store",
+          "label": "t:shared.icons.store"
+        },
+        {
+          "value": "navigation",
+          "label": "t:shared.icons.navigation"
+        },
+        {
+          "value": "eye-off",
+          "label": "t:shared.icons.eye_off"
+        },
+        {
+          "value": "grid",
+          "label": "t:shared.icons.grid"
+        }
+      ],
+      "default": "none"
+    },
+    {
+      "type": "collection",
+      "id": "collection",
+      "label": "t:sections.featured_collection.settings.collection.label"
+    },
+    {
+      "type": "checkbox",
+      "id": "selected",
+      "label": "t:blocks.tab.settings.selected.label",
+      "info": "t:blocks.tab.settings.selected.info",
+      "default": false
+    }
+  ],
+  "presets": [
+    {
+      "name": "t:blocks.featured_collection_pill.name"
+    }
+  ]
+}
+{% endschema %}

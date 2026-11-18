@@ -5,10 +5,15 @@
   @param {boolean} [priority] - Eager-load this card's image. The first row only.
   @param {string} [sizes] - `sizes` attribute for the card image.
   @param [product] - Passed by existing callers; accepted for compatibility.
+  @param {string} [card_attributes] - Raw attributes for the card's root, e.g. `data-panel-item`.
+  @param {boolean} [placeholder] - Render a placeholder card instead of a product.
 {% enddoc %}
 
 {%- liquid
   assign card_product = product | default: closest.product
+  if placeholder
+    assign card_product = nil
+  endif
   assign s = block.settings
 
   assign ratio = s.image_ratio
@@ -32,6 +37,14 @@
       assign show_rating = false
   endcase
 
+  assign show_swatches = nil
+  case s.show_swatches
+    when 'show'
+      assign show_swatches = true
+    when 'hide'
+      assign show_swatches = false
+  endcase
+
   assign quick_add = s.quick_add_style
   if quick_add == 'inherit' or quick_add == blank
     assign quick_add = settings.quick_add_style
@@ -48,6 +61,16 @@
      show_vendor: show_vendor,
      show_rating: show_rating,
      quick_add: quick_add,
+     show_swatches: show_swatches,
+     attributes: card_attributes,
+     section: section.settings,
+     block: block.settings %}
+{%- elsif placeholder -%}
+  {% render 'product-card-placeholder',
+     index: index,
+     sizes: sizes,
+     ratio: ratio,
+     attributes: card_attributes,
      section: section.settings,
      block: block.settings %}
 {%- endif -%}
@@ -137,6 +160,26 @@
       "type": "select",
       "id": "show_rating",
       "label": "t:settings_schema.product_cards.settings.show_rating.label",
+      "options": [
+        {
+          "value": "inherit",
+          "label": "t:shared.inherit.label"
+        },
+        {
+          "value": "show",
+          "label": "t:shared.show.label"
+        },
+        {
+          "value": "hide",
+          "label": "t:shared.hide.label"
+        }
+      ],
+      "default": "inherit"
+    },
+    {
+      "type": "select",
+      "id": "show_swatches",
+      "label": "t:settings_schema.swatches.name",
       "options": [
         {
           "value": "inherit",
