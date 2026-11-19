@@ -10,6 +10,11 @@
   @param {string} [styles] - Declarations appended to the wrapper's own `style`, because a second `style` attribute on the same tag is dropped by the browser
   @param {boolean} [priority] - Eager-load the background image. Above the fold only
   @param {string} [placeholder] - Placeholder to draw when the background image is not uploaded yet. Off unless a caller asks for it
+  @param {string} [mobile_width] - Mobile width when the settings have no `width_mobile`: fit | fill | custom. Default fit
+  @param {number} [gap_mobile_max] - Cap in px for the mobile gaps when they fall back to the desktop gap
+  @param {boolean} [animate] - Animate with the theme's text animation when the settings have no `animation_text`
+  @param {boolean} [overlay_without_media] - Draw the overlay over the background colour when Background media is None
+  @param {number} [overlay_opacity] - Overlay opacity when the settings have no `overlay_opacity`
   @param {string} [shopify_attributes] - Editor attributes
 
   @example
@@ -67,6 +72,12 @@
   # See `--group-align` below for what reads it.
   assign alignment_axis = inline_axis
 
+  # The Group block folds distribution into Alignment as a row-only option. Its
+  # children still inherit `start`, as `case` above already resolved it.
+  if is_row and settings.alignment == 'space-between'
+    assign inline_axis = 'space-between'
+  endif
+
   assign distribution = settings.distribution | default: 'none'
   if is_row and distribution != 'none'
     assign inline_axis = distribution
@@ -100,7 +111,8 @@
       assign width_size = 'fit-content'
   endcase
 
-  case settings.width_mobile
+  assign width_mobile_choice = settings.width_mobile | default: mobile_width
+  case width_mobile_choice
     when 'fill'
       assign width_mobile_value = '1 1 0%'
       assign width_mobile_size = '100%'
@@ -112,7 +124,22 @@
       assign width_mobile_size = 'fit-content'
   endcase
 
+  # Adapt sizes the group to the shape of its background image or uploaded
+  # video. `aspect-ratio` only sets a minimum here, so content can still grow it.
+  assign media_ratio = ''
   case settings.height
+    when 'adapt'
+      assign height_value = 'auto'
+      case settings.background_media
+        when 'image'
+          if settings.image
+            assign media_ratio = settings.image.aspect_ratio
+          endif
+        when 'video'
+          if settings.video
+            assign media_ratio = settings.video.aspect_ratio
+          endif
+      endcase
     when 'fill'
       assign height_value = '100%'
     when 'custom'
@@ -163,6 +190,10 @@
   assign gap_y = settings.gap_vertical | default: gap_base | plus: 0
   assign gap_x_mobile = settings.gap_horizontal_mobile | default: gap_x | plus: 0
   assign gap_y_mobile = settings.gap_vertical_mobile | default: gap_y | plus: 0
+  if gap_mobile_max
+    assign gap_x_mobile = gap_x_mobile | at_most: gap_mobile_max
+    assign gap_y_mobile = gap_y_mobile | at_most: gap_mobile_max
+  endif
 
   # ---- mobile layout ----------------------------------------------------
   #
@@ -175,6 +206,7 @@
   assign swipe_on_mobile = settings.swipe_on_mobile | default: false
   assign custom_column_width_mobile = settings.custom_column_width_mobile | default: false
   assign column_width_mobile = settings.column_width_mobile | default: 76 | plus: 0
+  assign mobile_columns = settings.mobile_columns | default: 1 | plus: 0
   assign column_order = settings.column_order | default: 0 | plus: 0
 
   assign sticky_desktop = settings.sticky_desktop | default: false
@@ -208,6 +240,9 @@
   if swipe_on_mobile
     assign classes = classes | append: ' block-group--swipe-mobile'
   endif
+  if media_ratio != ''
+    assign classes = classes | append: ' block-group--adapt'
+  endif
   if sticky_desktop
     assign classes = classes | append: ' block-group--sticky'
   endif
@@ -234,7 +269,7 @@
   # image, not as text — passes them through `attributes` and has no
   # `animation_text` setting, so nothing is emitted twice.
   capture motion_attrs
-    if settings.animation_text
+    if settings.animation_text or animate
       render 'motion-attrs', kind: 'text', block: settings, children: true, duration: 1000
     endif
   endcapture
@@ -259,6 +294,9 @@
   --group-order: {{ column_order }};
   {%- if swipe_on_mobile and custom_column_width_mobile -%}
     --group-swipe-width: {{ column_width_mobile }}%;
+  {%- elsif swipe_on_mobile and mobile_columns > 1 -%}
+    {%- assign swipe_gaps = mobile_columns | minus: 1 | times: gap_x_mobile -%}
+    --group-swipe-width: calc((100% - {{ swipe_gaps }}px) / {{ mobile_columns }});
   {%- endif -%}
   --group-inline: {{ inline_axis }};
 
@@ -269,6 +307,9 @@
   --group-width-mobile: {{ width_mobile_value }};
   --group-width-mobile-size: {{ width_mobile_size }};
   --group-height: {{ height_value }};
+  {%- if media_ratio != '' -%}
+    --group-aspect-ratio: {{ media_ratio }};
+  {%- endif -%}
   --group-radius: {{ radius }}px;
   {%- if border_width > 0 -%}
     --group-border-width: {{ border_width }}px;
@@ -305,8 +346,13 @@
   {{ attributes }}
   {{ shopify_attributes }}
 >
-  {%- if has_media -%}
-    {% render 'background-media', settings: settings, priority: priority, placeholder: placeholder %}
+  {%- if has_media or overlay_without_media and settings.overlay_enabled -%}
+    {% render 'background-media',
+       settings: settings,
+       priority: priority,
+       placeholder: placeholder,
+       overlay_without_media: overlay_without_media,
+       overlay_opacity: overlay_opacity %}
   {%- endif -%}
 
   <div class="block-group__content">

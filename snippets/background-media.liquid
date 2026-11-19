@@ -7,6 +7,8 @@
   @param {string} [placeholder] - Draw this placeholder when Image is chosen and none is uploaded. Opt-in
   @param {string} [classes] - Extra classes on the wrapper.
   @param {string} [attributes] - Extra attributes on the wrapper, such as a block's `shopify_attributes`.
+  @param {boolean} [overlay_without_media] - Also draw the overlay when Background media is None
+  @param {number} [overlay_opacity] - Overlay opacity when the settings have no `overlay_opacity`
 
   @example
     {% render 'background-media', settings: block.settings %}
@@ -18,13 +20,16 @@
 {%- liquid
   assign media = settings.background_media | default: 'none'
 
-  # An overlay with no media underneath is a flat tint over the section's own
-  # background colour, which the colour scheme already does better. So the
-  # overlay is tied to the media rather than offered independently.
+  # The overlay is tied to the media, unless the caller opts in to a plain tint
+  # over its own background with `overlay_without_media`.
   assign show_overlay = false
   if media != 'none' and settings.overlay_enabled
     assign show_overlay = true
   endif
+  if media == 'none' and overlay_without_media and settings.overlay_enabled
+    assign show_overlay = true
+  endif
+  assign overlay_alpha = settings.overlay_opacity | default: overlay_opacity
 
   # Objects are tested for truthiness, strings against `''`. Neither uses
   # `!= blank`: an unset setting is nil in Shopify and Undefined in other Liquid
@@ -46,6 +51,10 @@
     when 'video'
       assign video_url = settings.video_url | default: ''
       if settings.video or video_url != ''
+        assign has_layer = true
+      endif
+    when 'none'
+      if show_overlay
         assign has_layer = true
       endif
   endcase
@@ -72,7 +81,8 @@
         {% render 'background-video',
            video: settings.video,
            video_url: settings.video_url,
-           image: settings.video_poster %}
+           image: settings.video_poster,
+           position: settings.video_position %}
     {%- endcase -%}
 
     {%- if show_overlay -%}
@@ -80,7 +90,8 @@
          style: settings.overlay_style,
          color: settings.overlay_color,
          gradient: settings.overlay_gradient,
-         opacity: settings.overlay_opacity %}
+         direction: settings.overlay_direction,
+         opacity: overlay_alpha %}
     {%- endif -%}
   </div>
 {%- endif -%}
