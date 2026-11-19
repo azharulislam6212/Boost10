@@ -84,55 +84,18 @@
     assign overlap_mobile = r_tl_m
   endif
 
-  assign direction = s.direction | default: 'column'
-  assign is_row = false
-  if direction == 'row'
-    assign is_row = true
-  endif
-
-  assign alignment_setting = s.alignment | default: 'start'
-
-  case alignment_setting
-    when 'center'
-      assign alignment_axis = 'center'
-    when 'end'
-      assign alignment_axis = 'end'
-    else
-      assign alignment_axis = 'start'
-  endcase
+  # The blocks always stack in one centred column.
+  assign alignment_axis = 'center'
 
   assign inline_axis = alignment_axis
-  if is_row
-    case alignment_setting
-      when 'space-between', 'space-around', 'space-evenly'
-        assign inline_axis = alignment_setting
-    endcase
-  endif
-
-  case s.position
-    when 'center'
-      assign block_axis = 'center'
-    when 'end'
-      assign block_axis = 'end'
-    when 'stretch'
-      assign block_axis = 'stretch'
-    else
-      assign block_axis = 'start'
-  endcase
+  assign block_axis = 'start'
 
   assign gap_x = s.gap_horizontal | default: 24 | plus: 0
   assign gap_y = s.gap_vertical | default: 24 | plus: 0
   assign gap_x_mobile = s.gap_horizontal_mobile | default: gap_x | plus: 0
   assign gap_y_mobile = s.gap_vertical_mobile | default: gap_y | plus: 0
 
-  assign content_classes = 'custom-section__content custom-section__content--' | append: direction
-  if is_row and s.stack_on_mobile != false
-    assign content_classes = content_classes | append: ' custom-section__content--stack-mobile'
-  endif
-
-  if is_row and s.reverse
-    assign content_classes = content_classes | append: ' custom-section__content--reverse'
-  endif
+  assign content_classes = 'custom-section__content custom-section__content--column'
 -%}
 
 {%- liquid
@@ -263,7 +226,6 @@
       "type": "select",
       "id": "container_width",
       "label": "t:shared.container.width.label",
-      "info": "t:shared.container.width.info",
       "options": [
         {
           "value": "edge",
@@ -291,82 +253,6 @@
     {
       "type": "header",
       "content": "t:blocks.group.headers.layout"
-    },
-    {
-      "type": "select",
-      "id": "direction",
-      "label": "t:blocks.group.settings.direction.label",
-      "options": [
-        {
-          "value": "column",
-          "label": "t:blocks.group.settings.direction.options__1.label"
-        },
-        {
-          "value": "row",
-          "label": "t:blocks.group.settings.direction.options__2.label"
-        }
-      ],
-      "default": "column"
-    },
-    {
-      "type": "checkbox",
-      "id": "reverse",
-      "label": "t:sections.faq.settings.reverse.label",
-      "default": false,
-      "visible_if": "{{ section.settings.direction == 'row' }}"
-    },
-    {
-      "type": "select",
-      "id": "alignment",
-      "label": "t:blocks.group.settings.alignment.label",
-      "options": [
-        {
-          "value": "start",
-          "label": "t:blocks.group.settings.alignment.options__1.label"
-        },
-        {
-          "value": "center",
-          "label": "t:blocks.group.settings.alignment.options__2.label"
-        },
-        {
-          "value": "end",
-          "label": "t:blocks.group.settings.alignment.options__3.label"
-        },
-        {
-          "value": "space-between",
-          "label": "t:blocks.group.settings.distribution.options__2.label"
-        },
-        {
-          "value": "space-around",
-          "label": "t:blocks.group.settings.distribution.options__3.label"
-        },
-        {
-          "value": "space-evenly",
-          "label": "t:blocks.group.settings.distribution.options__4.label"
-        }
-      ],
-      "default": "start"
-    },
-    {
-      "type": "select",
-      "id": "position",
-      "label": "t:blocks.group.settings.position.label",
-      "options": [
-        {
-          "value": "start",
-          "label": "t:blocks.group.settings.position.options__1.label"
-        },
-        {
-          "value": "center",
-          "label": "t:blocks.group.settings.position.options__2.label"
-        },
-        {
-          "value": "end",
-          "label": "t:blocks.group.settings.position.options__3.label"
-        }
-      ],
-      "default": "start",
-      "visible_if": "{{ section.settings.direction == 'row' }}"
     },
     {
       "type": "select",
@@ -436,7 +322,6 @@
       "type": "select",
       "id": "layout",
       "label": "t:shared.carousel.layout_type.label",
-      "info": "t:shared.carousel.layout_type.info",
       "options": [
         {
           "value": "grid",
@@ -453,7 +338,6 @@
       "type": "checkbox",
       "id": "carousel_on_mobile",
       "label": "t:shared.carousel.carousel_on_mobile.label",
-      "info": "t:shared.carousel.carousel_on_mobile.info",
       "default": true,
       "visible_if": "{{ section.settings.layout != 'carousel' }}"
     },
@@ -508,8 +392,7 @@
     {
       "type": "color_background",
       "id": "background_color",
-      "label": "t:shared.background.color.label",
-      "info": "t:shared.background.color.info"
+      "label": "t:shared.background.color.label"
     },
     {
       "type": "header",
@@ -885,10 +768,6 @@
       "content": "t:shared.spacing.section_header"
     },
     {
-      "type": "paragraph",
-      "content": "t:shared.spacing.section_paragraph"
-    },
-    {
       "type": "select",
       "id": "padding_device",
       "label": "t:shared.spacing.devices.label",
@@ -952,7 +831,6 @@
       "type": "select",
       "id": "stack_layer",
       "label": "t:shared.spacing.stack_layer.label",
-      "info": "t:shared.spacing.stack_layer.info",
       "options": [
         {
           "value": "under",
@@ -984,7 +862,6 @@
         "border_radius": 40,
         "border_radius_mobile": 24,
         "layout": "carousel",
-        "alignment": "center",
         "gap_vertical": 48,
         "gap_vertical_mobile": 24
       },
