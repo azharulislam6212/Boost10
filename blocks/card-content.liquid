@@ -6,17 +6,6 @@
 {%- liquid
   assign s = block.settings
 
-  assign background_style = s.background_style | default: 'solid'
-  assign background_paint = ''
-
-  if background_style == 'gradient'
-    assign background_paint = s.background_gradient | default: ''
-  elsif s.background_color != blank
-    assign background_alpha = s.background_opacity | default: 100 | plus: 0
-    assign background_alpha = background_alpha | divided_by: 100.0
-    assign background_paint = s.background_color | color_modify: 'alpha', background_alpha
-  endif
-
   assign card_classes = 'card-content'
   assign border_gradient = ''
   if s.border_style == 'solid' and s.border_gradient != blank
@@ -28,9 +17,6 @@
 {%- capture card_style -%}
   {%- if border_gradient != '' -%}
     --card-border-paint: {{ border_gradient }};
-  {%- endif -%}
-  {%- if background_paint != '' -%}
-    --group-background: {{ background_paint }};
   {%- endif -%}
   {%- if s.text_color != blank -%}
     color: {{ s.text_color }};
@@ -49,6 +35,8 @@
    settings: s,
    extra_classes: card_classes,
    styles: card_style,
+   animate: true,
+   gap_mobile_max: 20,
    shopify_attributes: block.shopify_attributes %}
 
 {% schema %}
@@ -107,6 +95,10 @@
         {
           "value": "end",
           "label": "t:blocks.group.settings.alignment.options__3.label"
+        },
+        {
+          "value": "space-between",
+          "label": "t:blocks.group.settings.distribution.options__2.label"
         }
       ],
       "default": "start"
@@ -129,75 +121,18 @@
           "label": "t:blocks.group.settings.position.options__3.label"
         }
       ],
-      "default": "start"
-    },
-    {
-      "type": "select",
-      "id": "distribution",
-      "label": "t:blocks.group.settings.distribution.label",
-      "info": "t:blocks.group.settings.distribution.info",
-      "options": [
-        {
-          "value": "none",
-          "label": "t:blocks.group.settings.distribution.options__1.label"
-        },
-        {
-          "value": "space-between",
-          "label": "t:blocks.group.settings.distribution.options__2.label"
-        },
-        {
-          "value": "space-around",
-          "label": "t:blocks.group.settings.distribution.options__3.label"
-        },
-        {
-          "value": "space-evenly",
-          "label": "t:blocks.group.settings.distribution.options__4.label"
-        }
-      ],
-      "default": "none",
+      "default": "start",
       "visible_if": "{{ block.settings.direction == 'row' }}"
     },
     {
       "type": "range",
-      "id": "gap_horizontal",
-      "label": "t:blocks.group.settings.gap_horizontal.label",
+      "id": "gap",
+      "label": "t:shared.gap.label",
       "min": 0,
-      "max": 60,
-      "step": 2,
-      "unit": "px",
-      "default": 12,
-      "visible_if": "{{ block.settings.direction == 'row' }}"
-    },
-    {
-      "type": "range",
-      "id": "gap_vertical",
-      "label": "t:blocks.group.settings.gap_vertical.label",
-      "min": 0,
-      "max": 60,
+      "max": 80,
       "step": 2,
       "unit": "px",
       "default": 12
-    },
-    {
-      "type": "range",
-      "id": "gap_horizontal_mobile",
-      "label": "t:blocks.featured_pills_tabs.settings.gap_mobile.label",
-      "min": 0,
-      "max": 60,
-      "step": 2,
-      "unit": "px",
-      "default": 10,
-      "visible_if": "{{ block.settings.direction == 'row' }}"
-    },
-    {
-      "type": "range",
-      "id": "gap_vertical_mobile",
-      "label": "t:blocks.image_card.settings.gap_vertical_mobile.label",
-      "min": 0,
-      "max": 60,
-      "step": 2,
-      "unit": "px",
-      "default": 10
     },
     {
       "type": "header",
@@ -207,7 +142,6 @@
       "type": "select",
       "id": "width",
       "label": "t:blocks.group.settings.width.label",
-      "info": "t:blocks.group.settings.width.info",
       "options": [
         {
           "value": "fit",
@@ -271,47 +205,10 @@
       "content": "t:shared.appearance.header"
     },
     {
-      "type": "select",
-      "id": "background_style",
-      "label": "t:blocks.card_content.settings.background_style.label",
-      "info": "t:blocks.card_content.settings.background_style.info",
-      "options": [
-        {
-          "value": "solid",
-          "label": "t:blocks.card_content.settings.background_style.options__1.label"
-        },
-        {
-          "value": "gradient",
-          "label": "t:blocks.card_content.settings.background_style.options__2.label"
-        }
-      ],
-      "default": "solid"
-    },
-    {
       "type": "color_background",
-      "id": "background_gradient",
-      "label": "t:blocks.card_content.settings.background_gradient.label",
-      "info": "t:blocks.card_content.settings.background_gradient.info",
-      "visible_if": "{{ block.settings.background_style == 'gradient' }}"
-    },
-    {
-      "type": "color",
       "id": "background_color",
       "label": "t:shared.background.color.label",
-      "info": "t:blocks.card_content.settings.background_color.info",
-      "default": "#000000",
-      "visible_if": "{{ block.settings.background_style == 'solid' }}"
-    },
-    {
-      "type": "range",
-      "id": "background_opacity",
-      "label": "t:blocks.card_content.settings.background_opacity.label",
-      "visible_if": "{{ block.settings.background_style == 'solid' }}",
-      "min": 0,
-      "max": 100,
-      "step": 5,
-      "unit": "%",
-      "default": 30
+      "default": "rgba(0,0,0,0.3)"
     },
     {
       "type": "range",
@@ -337,11 +234,11 @@
       "options": [
         {
           "value": "none",
-          "label": "t:shared.options.none"
+          "label": "t:blocks.group.settings.border_style.options__1.label"
         },
         {
           "value": "solid",
-          "label": "t:shared.options.solid"
+          "label": "t:blocks.group.settings.border_style.options__2.label"
         },
         {
           "value": "dashed",
@@ -376,7 +273,6 @@
       "type": "color",
       "id": "border_color",
       "label": "t:shared.border.color.label",
-      "info": "t:shared.border.color.info",
       "visible_if": "{{ block.settings.border_style != 'none' }}"
     },
     {
@@ -388,44 +284,12 @@
     {
       "type": "range",
       "id": "border_radius",
-      "label": "t:shared.corner_radius.label",
+      "label": "t:blocks.group.settings.border_radius.label",
       "min": 0,
       "max": 60,
       "step": 2,
       "unit": "px",
       "default": 20
-    },
-    {
-      "type": "header",
-      "content": "t:shared.animation.header"
-    },
-    {
-      "type": "select",
-      "id": "animation_text",
-      "label": "t:shared.animation.animation_text.label",
-      "options": [
-        {
-          "value": "inherit",
-          "label": "t:shared.animation.animation_text.options__1.label"
-        },
-        {
-          "value": "none",
-          "label": "t:shared.animation.animation_text.options__2.label"
-        },
-        {
-          "value": "fade-in",
-          "label": "t:shared.animation.animation_text.options__3.label"
-        },
-        {
-          "value": "fade-up",
-          "label": "t:shared.animation.animation_text.options__4.label"
-        },
-        {
-          "value": "slide-up",
-          "label": "t:shared.animation.animation_text.options__5.label"
-        }
-      ],
-      "default": "inherit"
     },
     {
       "type": "header",
@@ -438,19 +302,19 @@
       "options": [
         {
           "value": "desktop",
-          "label": "t:shared.spacing.devices.options__1.label"
+          "label": "t:blocks.group.settings.padding_device.options__1.label"
         },
         {
           "value": "mobile",
-          "label": "t:shared.spacing.devices.options__2.label"
+          "label": "t:blocks.group.settings.padding_device.options__2.label"
         }
       ],
       "default": "desktop"
     },
     {
       "type": "range",
-      "id": "padding_top",
-      "label": "t:shared.spacing.padding_top.label",
+      "id": "padding_inline",
+      "label": "t:shared.spacing.padding_inline.label",
       "min": 0,
       "max": 100,
       "step": 2,
@@ -460,8 +324,8 @@
     },
     {
       "type": "range",
-      "id": "padding_bottom",
-      "label": "t:shared.spacing.padding_bottom.label",
+      "id": "padding_block",
+      "label": "t:shared.spacing.padding_block.label",
       "min": 0,
       "max": 100,
       "step": 2,
@@ -471,30 +335,8 @@
     },
     {
       "type": "range",
-      "id": "padding_left",
-      "label": "t:shared.spacing.padding_left.label",
-      "min": 0,
-      "max": 100,
-      "step": 2,
-      "unit": "px",
-      "default": 24,
-      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
-    },
-    {
-      "type": "range",
-      "id": "padding_right",
-      "label": "t:shared.spacing.padding_right.label",
-      "min": 0,
-      "max": 100,
-      "step": 2,
-      "unit": "px",
-      "default": 24,
-      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
-    },
-    {
-      "type": "range",
-      "id": "padding_top_mobile",
-      "label": "t:shared.spacing.padding_top.label",
+      "id": "padding_inline_mobile",
+      "label": "t:shared.spacing.padding_inline.label",
       "min": 0,
       "max": 100,
       "step": 2,
@@ -504,30 +346,8 @@
     },
     {
       "type": "range",
-      "id": "padding_bottom_mobile",
-      "label": "t:shared.spacing.padding_bottom.label",
-      "min": 0,
-      "max": 100,
-      "step": 2,
-      "unit": "px",
-      "default": 18,
-      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
-    },
-    {
-      "type": "range",
-      "id": "padding_left_mobile",
-      "label": "t:shared.spacing.padding_left.label",
-      "min": 0,
-      "max": 100,
-      "step": 2,
-      "unit": "px",
-      "default": 18,
-      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
-    },
-    {
-      "type": "range",
-      "id": "padding_right_mobile",
-      "label": "t:shared.spacing.padding_right.label",
+      "id": "padding_block_mobile",
+      "label": "t:shared.spacing.padding_block.label",
       "min": 0,
       "max": 100,
       "step": 2,
