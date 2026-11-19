@@ -88,15 +88,8 @@
   assign min_height = s.min_height | default: 0 | plus: 0
   assign min_height_mobile = s.min_height_mobile | default: min_height | plus: 0
 
-  assign direction = s.direction | default: 'row'
-  assign is_row = false
-  if direction == 'row'
-    assign is_row = true
-  endif
-
-  assign alignment_setting = s.alignment | default: 'start'
-
-  case alignment_setting
+  # The blocks always stack in one column; Alignment places them across it.
+  case s.alignment
     when 'center'
       assign alignment_axis = 'center'
     when 'end'
@@ -106,37 +99,14 @@
   endcase
 
   assign inline_axis = alignment_axis
-  if is_row
-    case alignment_setting
-      when 'space-between', 'space-around', 'space-evenly'
-        assign inline_axis = alignment_setting
-    endcase
-  endif
-
-  case s.position
-    when 'center'
-      assign block_axis = 'center'
-    when 'end'
-      assign block_axis = 'end'
-    when 'stretch'
-      assign block_axis = 'stretch'
-    else
-      assign block_axis = 'start'
-  endcase
+  assign block_axis = 'start'
 
   assign gap_x = s.gap_horizontal | default: 24 | plus: 0
   assign gap_y = s.gap_vertical | default: 24 | plus: 0
   assign gap_x_mobile = s.gap_horizontal_mobile | default: gap_x | plus: 0
   assign gap_y_mobile = s.gap_vertical_mobile | default: gap_y | plus: 0
 
-  assign content_classes = 'featured-offer__content featured-offer__content--' | append: direction
-  if is_row and s.stack_on_mobile
-    assign content_classes = content_classes | append: ' featured-offer__content--stack-mobile'
-  endif
-
-  if is_row and s.reverse
-    assign content_classes = content_classes | append: ' featured-offer__content--reverse'
-  endif
+  assign content_classes = 'featured-offer__content featured-offer__content--column'
 -%}
 
 {%- capture content_style -%}
@@ -246,36 +216,6 @@
     },
     {
       "type": "select",
-      "id": "direction",
-      "label": "t:blocks.group.settings.direction.label",
-      "options": [
-        {
-          "value": "column",
-          "label": "t:blocks.group.settings.direction.options__1.label"
-        },
-        {
-          "value": "row",
-          "label": "t:blocks.group.settings.direction.options__2.label"
-        }
-      ],
-      "default": "row"
-    },
-    {
-      "type": "checkbox",
-      "id": "reverse",
-      "label": "t:sections.featured_offer.settings.reverse.label",
-      "default": false,
-      "visible_if": "{{ section.settings.direction == 'row' }}"
-    },
-    {
-      "type": "checkbox",
-      "id": "stack_on_mobile",
-      "label": "t:blocks.group.settings.stack_on_mobile.label",
-      "default": true,
-      "visible_if": "{{ section.settings.direction == 'row' }}"
-    },
-    {
-      "type": "select",
       "id": "alignment",
       "label": "t:blocks.group.settings.alignment.label",
       "options": [
@@ -290,46 +230,9 @@
         {
           "value": "end",
           "label": "t:blocks.group.settings.alignment.options__3.label"
-        },
-        {
-          "value": "space-between",
-          "label": "t:blocks.group.settings.distribution.options__2.label"
-        },
-        {
-          "value": "space-around",
-          "label": "t:blocks.group.settings.distribution.options__3.label"
-        },
-        {
-          "value": "space-evenly",
-          "label": "t:blocks.group.settings.distribution.options__4.label"
         }
       ],
       "default": "start"
-    },
-    {
-      "type": "select",
-      "id": "position",
-      "label": "t:blocks.group.settings.position.label",
-      "options": [
-        {
-          "value": "start",
-          "label": "t:blocks.group.settings.position.options__1.label"
-        },
-        {
-          "value": "center",
-          "label": "t:blocks.group.settings.position.options__2.label"
-        },
-        {
-          "value": "end",
-          "label": "t:blocks.group.settings.position.options__3.label"
-        },
-        {
-          "value": "stretch",
-          "label": "t:sections.featured_offer.settings.position.options__4.label"
-        }
-      ],
-      "default": "start",
-      "visible_if": "{{ section.settings.direction == 'row' }}"
     },
     {
       "type": "range",
@@ -795,10 +698,7 @@
       "category": "t:categories.products",
       "settings": {
         "container_width": "standard",
-        "direction": "column",
         "alignment": "start",
-        "position": "start",
-        "stack_on_mobile": true,
         "gap_horizontal": 24,
         "gap_vertical": 80,
         "gap_horizontal_mobile": 12,
