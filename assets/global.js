@@ -82,6 +82,7 @@ const LAZY_MODULES = [
   { specifier: '@theme/button-element', tags: ['button-swap'] },
 
   { specifier: '@theme/background-video', tags: ['background-video'] },
+  { specifier: '@theme/shoppable-video', tags: ['shoppable-video'] },
 
   { specifier: '@theme/collection-tabs', tags: ['collection-tabs'] },
 

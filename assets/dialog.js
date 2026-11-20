@@ -461,9 +461,10 @@ export class QuickAddModal extends ModalDialog {
    */
   async beforeOpen() {
     const url = this.dataset.pendingUrl;
-    if (!url || url === this.#loadedUrl) return;
+    const sectionId = this.dataset.pendingSection || 'quick-add';
+    if (!url || `${sectionId}:${url}` === this.#loadedUrl) return;
 
-    await this.load(url, this.dataset.pendingSection || 'quick-add');
+    await this.load(url, sectionId);
   }
 
   /**
@@ -487,14 +488,14 @@ export class QuickAddModal extends ModalDialog {
       const { fetchSection, applyHTML } = await import('@theme/section-renderer');
       const html = await fetchSection(sectionId, { url, signal: this.#request.signal });
 
-      if (this.#loadedUrl !== url) body.replaceChildren();
+      if (this.#loadedUrl !== `${sectionId}:${url}`) body.replaceChildren();
 
       applyHTML(html, body, {
         selector: '[data-quick-add-content]',
         sectionId,
         morphOptions: { childrenOnly: true }
       });
-      this.#loadedUrl = url;
+      this.#loadedUrl = `${sectionId}:${url}`;
     } catch (error) {
       if (error?.name === 'AbortError') return;
 
@@ -519,7 +520,8 @@ export class QuickAddModal extends ModalDialog {
   open(trigger) {
     if (trigger?.dataset.productUrl) {
       this.dataset.pendingUrl = trigger.dataset.productUrl;
-      if (trigger.dataset.sectionId) this.dataset.pendingSection = trigger.dataset.sectionId;
+      // Quick add and quick view share this modal; each trigger names its own section.
+      this.dataset.pendingSection = trigger.dataset.sectionId || 'quick-add';
     }
 
     return super.open(trigger);

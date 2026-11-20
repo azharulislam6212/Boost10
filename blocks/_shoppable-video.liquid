@@ -1,0 +1,303 @@
+{% doc %}
+  One slide of the Shoppable video section: an uploaded or YouTube/Vimeo video
+  (or a still) with a play/pause toggle and, over its foot, the product it
+  sells. The product card opens quick view.
+{% enddoc %}
+
+{%- liquid
+  assign s = block.settings
+  assign product = s.product
+
+  assign source = s.video_source | default: 'uploaded'
+  assign hosted = false
+  assign external = false
+  if source == 'uploaded' and s.video
+    assign hosted = true
+  elsif source == 'url' and s.video_url != blank
+    assign external = true
+  endif
+
+  assign has_video = false
+  if hosted or external
+    assign has_video = true
+  endif
+
+  assign poster = s.image
+  if poster == blank and hosted
+    assign poster = s.video.preview_image
+  endif
+
+  assign loop = s.loop
+  if loop == nil
+    assign loop = true
+  endif
+
+  case s.aspect_ratio
+    when '9-16'
+      assign ratio = '0.5625'
+    when '4-5'
+      assign ratio = '0.8'
+    when '1-1'
+      assign ratio = '1'
+    when '16-9'
+      assign ratio = '1.7778'
+    else
+      assign ratio = '0.6'
+  endcase
+
+  assign media_sizes = '(min-width: 750px) 300px, 250px'
+-%}
+
+<div
+  class="shoppable-video__slide"
+  data-slide
+  role="group"
+  aria-roledescription="{{ 'sections.shoppable_video.slide' | t }}"
+  style="--sv-ratio: {{ ratio }};"
+  {%- if s.autoplay %} data-autoplay{% endif %}
+  {{ block.shopify_attributes }}
+>
+  <div class="shoppable-video__media">
+    {% render 'image',
+       image: poster,
+       alt: '',
+       class: 'shoppable-video__poster',
+       wrapper_class: 'shoppable-video__still',
+       placeholder: 'hero-apparel-1',
+       sizes: media_sizes %}
+
+    {%- if hosted -%}
+      {{
+        s.video
+        | video_tag:
+          class: 'shoppable-video__video',
+          muted: true,
+          loop: loop,
+          playsinline: true,
+          controls: false,
+          preload: 'none',
+          image_size: '600x'
+      }}
+    {%- elsif external -%}
+      {%- liquid
+        assign playlist = ''
+        if loop and s.video_url.type == 'youtube'
+          assign playlist = s.video_url.id
+        endif
+      -%}
+      <template data-video-template>
+        {{
+          s.video_url
+          | external_video_url:
+            autoplay: true,
+            loop: loop,
+            playlist: playlist,
+            muted: true,
+            controls: false,
+            playsinline: true,
+            modestbranding: true,
+            rel: 0
+          | external_video_tag: class: 'shoppable-video__video', loading: 'lazy', title: ''
+        }}
+      </template>
+    {%- endif -%}
+  </div>
+
+  {%- if has_video -%}
+    <button
+      type="button"
+      class="shoppable-video__toggle"
+      data-video-toggle
+      aria-pressed="false"
+      aria-label="{{ 'accessibility.play_video' | t | escape }}"
+      data-label-play="{{ 'accessibility.play_video' | t | escape }}"
+      data-label-pause="{{ 'accessibility.pause_video' | t | escape }}"
+    >
+      <span class="shoppable-video__toggle-glyph" aria-hidden="true">
+        <span class="shoppable-video__icon shoppable-video__icon--play">{% render 'icon', icon: 'play', size: 12 %}</span>
+        <span class="shoppable-video__icon shoppable-video__icon--pause">{% render 'icon', icon: 'pause', size: 12 %}</span>
+      </span>
+    </button>
+  {%- endif -%}
+
+  {%- if product != blank -%}
+    {%- liquid
+      assign variant = product.selected_or_first_available_variant
+      assign compare_price = variant.compare_at_price | default: product.compare_at_price
+      assign current_price = variant.price | default: product.price
+      assign saved_percent = 0
+      if compare_price != blank and compare_price > current_price
+        assign saved_percent = compare_price | minus: current_price | times: 100.0 | divided_by: compare_price | round
+      endif
+      assign card_label = 'sections.shoppable_video.quick_view' | t: product: product.title
+    -%}
+
+    <div class="shoppable-video__product">
+      <div class="shoppable-video__product-image">
+        {% render 'image',
+           image: product.featured_image,
+           alt: '',
+           class: 'shoppable-video__product-img',
+           placeholder: 'product-1',
+           sizes: '64px' %}
+      </div>
+
+      <div class="shoppable-video__product-body">
+        <div class="shoppable-video__product-head">
+          <span class="shoppable-video__product-title">{{ product.title | escape }}</span>
+          {%- if saved_percent > 0 -%}
+            <span class="shoppable-video__product-badge">
+              {{- 'sections.shoppable_video.discount' | t: percent: saved_percent -}}
+            </span>
+          {%- endif -%}
+        </div>
+
+        {% render 'rating', product: product, count_words: true, class: 'shoppable-video__product-rating' %}
+        {% render 'price', product: product, price_class: 'shoppable-video__product-price' %}
+      </div>
+
+      <span class="shoppable-video__product-cart" aria-hidden="true">
+        {% render 'icon', icon: 'cart', size: 16 %}
+      </span>
+
+      {%- if settings.enable_quick_add -%}
+        <button
+          type="button"
+          class="shoppable-video__product-hit"
+          data-overlay-open="QuickAdd"
+          data-product-url="{{ product.url }}"
+          data-section-id="quick-view"
+          aria-label="{{ card_label | escape }}"
+        ></button>
+      {%- else -%}
+        <a class="shoppable-video__product-hit" href="{{ product.url }}" aria-label="{{ product.title | escape }}"></a>
+      {%- endif -%}
+    </div>
+  {%- else -%}
+    {%- comment -%} Until a product is chosen, a placeholder shows where it will sit. {%- endcomment -%}
+    <div class="shoppable-video__product shoppable-video__product--placeholder">
+      <div class="shoppable-video__product-image">
+        {% render 'image', placeholder: 'product-apparel-1', class: 'shoppable-video__product-img' %}
+      </div>
+
+      <div class="shoppable-video__product-body">
+        <div class="shoppable-video__product-head">
+          <span class="shoppable-video__product-title">{{ 'onboarding.product_title' | t }}</span>
+        </div>
+
+        <div class="rating shoppable-video__product-rating">
+          {% render 'rating-stars', rating: 5, size: 11, announce: false, class: 'rating__stars' %}
+        </div>
+
+        <div class="price shoppable-video__product-price">
+          <span class="price__regular">{{ 1999 | money }}</span>
+        </div>
+      </div>
+
+      <span class="shoppable-video__product-cart" aria-hidden="true">
+        {% render 'icon', icon: 'cart', size: 16 %}
+      </span>
+    </div>
+  {%- endif -%}
+</div>
+
+{% schema %}
+{
+  "name": "t:blocks.shoppable_video.name",
+  "tag": null,
+  "settings": [
+    {
+      "type": "select",
+      "id": "video_source",
+      "label": "t:blocks.showcase_video.settings.video_source.label",
+      "options": [
+        {
+          "value": "uploaded",
+          "label": "t:blocks.shoppable_video.settings.video_source.options__1.label"
+        },
+        {
+          "value": "url",
+          "label": "t:blocks.showcase_video.settings.video_source.options__2.label"
+        }
+      ],
+      "default": "uploaded"
+    },
+    {
+      "type": "video",
+      "id": "video",
+      "label": "t:shared.background.video.label",
+      "visible_if": "{{ block.settings.video_source == 'uploaded' }}"
+    },
+    {
+      "type": "video_url",
+      "id": "video_url",
+      "label": "t:blocks.showcase_video.settings.video_url.label",
+      "info": "t:blocks.showcase_video.settings.video_url.info",
+      "accept": [
+        "youtube",
+        "vimeo"
+      ],
+      "visible_if": "{{ block.settings.video_source == 'url' }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "autoplay",
+      "label": "t:blocks.shoppable_video.settings.autoplay.label",
+      "info": "t:blocks.shoppable_video.settings.autoplay.info",
+      "default": false
+    },
+    {
+      "type": "checkbox",
+      "id": "loop",
+      "label": "t:blocks.shoppable_video.settings.loop.label",
+      "default": true
+    },
+    {
+      "type": "image_picker",
+      "id": "image",
+      "label": "t:blocks.showcase_video.settings.image.label"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.group.headers.size"
+    },
+    {
+      "type": "select",
+      "id": "aspect_ratio",
+      "label": "t:blocks.shoppable_video.settings.aspect_ratio.label",
+      "options": [
+        {
+          "value": "3-5",
+          "label": "t:blocks.shoppable_video.settings.aspect_ratio.options__1.label"
+        },
+        {
+          "value": "9-16",
+          "label": "t:blocks.shoppable_video.settings.aspect_ratio.options__2.label"
+        },
+        {
+          "value": "4-5",
+          "label": "t:blocks.shoppable_video.settings.aspect_ratio.options__3.label"
+        },
+        {
+          "value": "1-1",
+          "label": "t:blocks.shoppable_video.settings.aspect_ratio.options__4.label"
+        },
+        {
+          "value": "16-9",
+          "label": "t:blocks.shoppable_video.settings.aspect_ratio.options__5.label"
+        }
+      ],
+      "default": "3-5"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.testimonial_card.headers.product"
+    },
+    {
+      "type": "product",
+      "id": "product",
+      "label": "t:blocks.testimonial_card.settings.product.label"
+    }
+  ]
+}
+{% endschema %}

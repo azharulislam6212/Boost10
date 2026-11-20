@@ -1,5 +1,6 @@
 {% comment %}
-  A heading cluster over a grid of theme blocks that can run as a carousel.
+  Shoppable video: a heading over a centre-focused carousel of portrait videos,
+  each with the product it sells.
 {% endcomment %}
 
 {%- liquid
@@ -99,39 +100,61 @@
 -%}
 
 {%- liquid
-  assign desktop = s.columns_desktop | default: 4 | plus: 0
-  assign cols_tablet = s.columns_tablet | default: 2 | plus: 0
-  assign cols_mobile = s.columns_mobile | default: 1 | plus: 0
+  assign play_position = s.play_position | default: 'top-right'
+  assign play_size = s.play_icon_size | default: 44 | plus: 0
 
-  assign cs_layout = 'grid'
-  if s.layout == 'carousel'
-    assign cs_layout = 'carousel'
+  assign slide_label = 'accessibility.of_count' | t: index: '__index__', count: '__count__'
+
+  # The header may be listed with the videos; only a video has a source.
+  assign video_count = 0
+  for block in section.blocks
+    if block.settings.video_source != blank
+      assign video_count = video_count | plus: 1
+    endif
+  endfor
+
+  assign loop = s.carousel_loop
+  if loop == nil
+    assign loop = true
   endif
 
-  assign carousel_on_mobile = s.carousel_on_mobile
-  if carousel_on_mobile == nil
-    assign carousel_on_mobile = true
+  assign autoplay_delay = 0
+  if s.carousel_autoplay
+    assign autoplay_delay = s.carousel_autoplay_delay | default: 5 | times: 1000
   endif
 
-  assign cs_layout_mobile = 'grid'
-  if cs_layout == 'carousel' or carousel_on_mobile
-    assign cs_layout_mobile = 'carousel'
-  endif
-
-  assign cs_is_carousel = false
-  if cs_layout == 'carousel' or cs_layout_mobile == 'carousel'
-    assign cs_is_carousel = true
-  endif
-
-  assign cs_label = 'accessibility.carousel' | t
-  assign carousel_id = 'video-carousel-' | append: section.id
-
-  assign cs_count = section.blocks.size
-
-  if cs_layout == 'carousel' and cs_count <= desktop
-    assign cs_layout = 'grid'
+  assign pagination = s.carousel_pagination | default: 'dots'
+  assign pagination_align = s.carousel_pagination_align | default: 'center'
+  if video_count < 2
+    assign pagination = 'none'
   endif
 -%}
+
+{%- capture sv_pagination -%}
+  {%- case pagination -%}
+    {%- when 'dots' -%}
+      <div class="carousel-shell__dots carousel-pagination--{{ pagination_align }}" data-carousel-active>
+        {%- for i in (1..video_count) -%}
+          <button
+            type="button"
+            class="carousel-shell__dot"
+            data-dot="{{ forloop.index0 }}"
+            aria-label="{{ 'accessibility.of_count' | t: index: i, count: video_count | escape }}"
+          ></button>
+        {%- endfor -%}
+      </div>
+    {%- when 'numbers' -%}
+      <div class="carousel-shell__counter carousel-pagination--{{ pagination_align }}" data-carousel-active aria-hidden="true">
+        <span class="carousel-shell__fraction-current" data-ref="current">01</span>
+        /
+        <span class="carousel-shell__fraction-total">{% if video_count < 10 %}0{% endif %}{{ video_count }}</span>
+      </div>
+    {%- when 'progress' -%}
+      <div class="carousel-shell__progress carousel-pagination--{{ pagination_align }}" data-carousel-active aria-hidden="true">
+        <span class="carousel-shell__progress-fill" data-ref="fill"></span>
+      </div>
+  {%- endcase -%}
+{%- endcapture -%}
 
 {%- capture content_style -%}
   --custom-section-gap-x: {{ gap_x }}px;
@@ -161,7 +184,7 @@
 
 
 <div
-  class="custom-section video-carousel-section color-scheme-container color-{{ s.color_scheme | default: 'scheme-1' }}{% if has_background_media %} has-background-media{% endif %}"
+  class="custom-section shoppable-video-section color-scheme-container color-{{ s.color_scheme | default: 'scheme-1' }}{% if has_background_media %} has-background-media{% endif %}"
   data-section-spacing
   {%- if s.stack_layer != blank and s.stack_layer != 'default' %} data-section-layer="{{ s.stack_layer }}"{% endif %}
   data-section-id="{{ section.id }}"
@@ -178,47 +201,57 @@
       style="{{ content_style | strip_newlines | strip }}"
       {% render 'motion-attrs', kind: 'text', section: s, children: true, duration: 1000 %}
     >
-      {% content_for 'block', type: 'section-header', id: 'video-carousel-header' %}
+      {% content_for 'block', type: 'section-header', id: 'shoppable-video-header' %}
 
-      {%- if cs_count > 0 -%}
-        <carousel-slider
-          {% render 'carousel-shell-attrs',
-             settings: s,
-             id: carousel_id,
-             layout: cs_layout,
-             layout_mobile: cs_layout_mobile,
-             classes: 'video-carousel-section__carousel',
-             columns_desktop: desktop,
-             columns_tablet: cols_tablet,
-             columns_mobile: cols_mobile,
-             count: cs_count %}
+      <shoppable-video
+        class="shoppable-video shoppable-video--play-{{ play_position }}"
+        style="--sv-play-size: {{ play_size }}px;
+          {%- if s.play_button_color != blank %} --sv-play-fill: {{ s.play_button_color }};{% endif -%}
+          {%- if s.play_icon_color != blank %} --sv-play-ink: {{ s.play_icon_color }};{% endif -%}
+          {%- render 'carousel-style', settings: s -%}"
+        data-slide-label="{{ slide_label | escape }}"
+        data-loop="{{ loop }}"
+        {%- if autoplay_delay > 0 %} data-autoplay-delay="{{ autoplay_delay }}"{% endif %}
+      >
+        <div
+          class="shoppable-video__stage"
+          data-ref="stage"
+          tabindex="0"
+          role="region"
+          aria-roledescription="{{ 'accessibility.carousel' | t | escape }}"
+          aria-label="{{ 'sections.shoppable_video.carousel_label' | t | escape }}"
         >
-          <div
-            class="carousel-shell__track video-carousel-section__grid"
-            data-ref="track"
-            {% if cs_is_carousel %}aria-label="{{ cs_label | escape }}"{% endif %}
-          >
-            {% content_for 'blocks' %}
-          </div>
+          <span class="shoppable-video__frame" aria-hidden="true">
+            <svg focusable="false"><rect x="0.5" y="0.5" rx="31.5" ry="31.5" /></svg>
+          </span>
 
-          {% render 'carousel-shell-tail', settings: s, layout: cs_layout, layout_mobile: cs_layout_mobile %}
-        </carousel-slider>
-      {%- endif -%}
+          {% content_for 'blocks' %}
+        </div>
+
+        {%- if video_count > 1 -%}
+          {%- if s.carousel_navigation -%}
+            <div class="shoppable-video__controls shoppable-video__controls--{{ pagination_align }}">
+              {% render 'carousel-nav', settings: s, position: 'inline', between: sv_pagination %}
+            </div>
+          {%- elsif sv_pagination != blank -%}
+            <div class="shoppable-video__controls shoppable-video__controls--{{ pagination_align }}">
+              {{ sv_pagination }}
+            </div>
+          {%- endif -%}
+        {%- endif -%}
+      </shoppable-video>
     </motion-effect>
   </div>
 </div>
 
 {% schema %}
 {
-  "name": "t:sections.video_carousel.name",
+  "name": "t:sections.shoppable_video.name",
   "tag": "section",
   "class": "section",
   "blocks": [
     {
-      "type": "@theme"
-    },
-    {
-      "type": "@app"
+      "type": "_shoppable-video"
     }
   ],
   "settings": [
@@ -272,17 +305,6 @@
     },
     {
       "type": "range",
-      "id": "gap_horizontal",
-      "label": "t:shared.gap.horizontal.label",
-      "min": 0,
-      "max": 100,
-      "step": 2,
-      "unit": "px",
-      "default": 24,
-      "visible_if": "{{ section.settings.gap_device == 'desktop' }}"
-    },
-    {
-      "type": "range",
       "id": "gap_vertical",
       "label": "t:shared.gap.vertical.label",
       "min": 0,
@@ -294,17 +316,6 @@
     },
     {
       "type": "range",
-      "id": "gap_horizontal_mobile",
-      "label": "t:shared.gap.horizontal.label",
-      "min": 0,
-      "max": 100,
-      "step": 2,
-      "unit": "px",
-      "default": 12,
-      "visible_if": "{{ section.settings.gap_device == 'mobile' }}"
-    },
-    {
-      "type": "range",
       "id": "gap_vertical_mobile",
       "label": "t:shared.gap.vertical.label",
       "min": 0,
@@ -313,71 +324,6 @@
       "unit": "px",
       "default": 12,
       "visible_if": "{{ section.settings.gap_device == 'mobile' }}"
-    },
-    {
-      "type": "header",
-      "content": "t:sections.featured_blog.headers.cards"
-    },
-    {
-      "type": "select",
-      "id": "layout",
-      "label": "t:shared.carousel.layout_type.label",
-      "options": [
-        {
-          "value": "grid",
-          "label": "t:shared.carousel.layout_type.options__1.label"
-        },
-        {
-          "value": "carousel",
-          "label": "t:shared.carousel.layout_type.options__2.label"
-        }
-      ],
-      "default": "grid"
-    },
-    {
-      "type": "checkbox",
-      "id": "carousel_on_mobile",
-      "label": "t:shared.carousel.carousel_on_mobile.label",
-      "default": true,
-      "visible_if": "{{ section.settings.layout != 'carousel' }}"
-    },
-    {
-      "type": "header",
-      "content": "t:shared.columns.header"
-    },
-    {
-      "type": "range",
-      "id": "columns_desktop",
-      "label": "t:shared.columns.desktop.label",
-      "min": 2,
-      "max": 6,
-      "step": 1,
-      "default": 4
-    },
-    {
-      "type": "range",
-      "id": "columns_tablet",
-      "label": "t:shared.columns.tablet.label",
-      "min": 1,
-      "max": 4,
-      "step": 1,
-      "default": 2
-    },
-    {
-      "type": "select",
-      "id": "columns_mobile",
-      "label": "t:shared.columns.mobile.label",
-      "options": [
-        {
-          "value": "1",
-          "label": "1"
-        },
-        {
-          "value": "2",
-          "label": "2"
-        }
-      ],
-      "default": "1"
     },
     {
       "type": "header",
@@ -524,22 +470,71 @@
     },
     {
       "type": "header",
-      "content": "t:sections.featured_blog.headers.carousel",
-      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+      "content": "t:sections.shoppable_video.headers.play_button"
+    },
+    {
+      "type": "range",
+      "id": "play_icon_size",
+      "label": "t:blocks.button.settings.icon_size.label",
+      "min": 28,
+      "max": 72,
+      "step": 2,
+      "unit": "px",
+      "default": 44
+    },
+    {
+      "type": "color",
+      "id": "play_button_color",
+      "label": "t:sections.shoppable_video.settings.play_button_color.label"
+    },
+    {
+      "type": "color",
+      "id": "play_icon_color",
+      "label": "t:blocks.subheading.settings.icon_color.label"
+    },
+    {
+      "type": "select",
+      "id": "play_position",
+      "label": "t:blocks.group.settings.position.label",
+      "options": [
+        {
+          "value": "top-right",
+          "label": "t:shared.corners.top_right.label"
+        },
+        {
+          "value": "top-left",
+          "label": "t:shared.corners.top_left.label"
+        },
+        {
+          "value": "bottom-right",
+          "label": "t:shared.corners.bottom_right.label"
+        },
+        {
+          "value": "bottom-left",
+          "label": "t:shared.corners.bottom_left.label"
+        },
+        {
+          "value": "center",
+          "label": "t:blocks.group.settings.alignment.options__2.label"
+        }
+      ],
+      "default": "top-right"
+    },
+    {
+      "type": "header",
+      "content": "t:sections.featured_blog.headers.carousel"
     },
     {
       "type": "checkbox",
       "id": "carousel_loop",
       "label": "t:shared.carousel.loop.label",
-      "default": false,
-      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+      "default": true
     },
     {
       "type": "checkbox",
       "id": "carousel_autoplay",
       "label": "t:shared.carousel.autoplay.label",
-      "default": false,
-      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+      "default": false
     },
     {
       "type": "range",
@@ -550,19 +545,17 @@
       "step": 1,
       "unit": "s",
       "default": 5,
-      "visible_if": "{{ section.settings.carousel_autoplay and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+      "visible_if": "{{ section.settings.carousel_autoplay }}"
     },
     {
       "type": "header",
-      "content": "t:shared.carousel.headers.navigation",
-      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+      "content": "t:shared.carousel.headers.navigation"
     },
     {
       "type": "checkbox",
       "id": "carousel_navigation",
       "label": "t:shared.carousel.navigation.label",
-      "default": false,
-      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+      "default": false
     },
     {
       "type": "select",
@@ -591,7 +584,7 @@
         }
       ],
       "default": "arrow",
-      "visible_if": "{{ section.settings.carousel_navigation and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+      "visible_if": "{{ section.settings.carousel_navigation }}"
     },
     {
       "type": "select",
@@ -612,7 +605,7 @@
         }
       ],
       "default": "circle",
-      "visible_if": "{{ section.settings.carousel_navigation and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+      "visible_if": "{{ section.settings.carousel_navigation }}"
     },
     {
       "type": "select",
@@ -633,7 +626,7 @@
         }
       ],
       "default": "dashed",
-      "visible_if": "{{ section.settings.carousel_navigation and section.settings.carousel_nav_shape != 'none' and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+      "visible_if": "{{ section.settings.carousel_navigation and section.settings.carousel_nav_shape != 'none' }}"
     },
     {
       "type": "select",
@@ -654,12 +647,11 @@
         }
       ],
       "default": "ghost",
-      "visible_if": "{{ section.settings.carousel_navigation and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+      "visible_if": "{{ section.settings.carousel_navigation }}"
     },
     {
       "type": "header",
-      "content": "t:shared.carousel.headers.pagination",
-      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+      "content": "t:shared.carousel.headers.pagination"
     },
     {
       "type": "select",
@@ -681,14 +673,9 @@
         {
           "value": "progress",
           "label": "t:shared.carousel.pagination.options__4.label"
-        },
-        {
-          "value": "controls",
-          "label": "t:shared.carousel.pagination.options__5.label"
         }
       ],
-      "default": "dots",
-      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+      "default": "dots"
     },
     {
       "type": "select",
@@ -709,19 +696,17 @@
         }
       ],
       "default": "center",
-      "visible_if": "{{ section.settings.carousel_pagination != 'none' and section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+      "visible_if": "{{ section.settings.carousel_pagination != 'none' }}"
     },
     {
       "type": "header",
-      "content": "t:shared.carousel.headers.controls",
-      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+      "content": "t:shared.carousel.headers.controls"
     },
     {
       "type": "checkbox",
       "id": "carousel_inherit_scheme",
       "label": "t:shared.carousel.inherit_scheme.label",
-      "default": true,
-      "visible_if": "{{ section.settings.layout == 'carousel' or section.settings.carousel_on_mobile }}"
+      "default": true
     },
     {
       "type": "color_scheme",
@@ -850,7 +835,7 @@
   ],
   "presets": [
     {
-      "name": "t:sections.video_carousel.name",
+      "name": "t:sections.shoppable_video.name",
       "category": "t:categories.text",
       "settings": {
         "container_width": "wide",
@@ -861,7 +846,6 @@
         "background_color": "linear-gradient(90deg, #e5f1ee 0%, #fbfdfc 38%, #fbfdfc 62%, #e5f1ee 100%)",
         "border_radius": 40,
         "border_radius_mobile": 24,
-        "layout": "carousel",
         "gap_vertical": 48,
         "gap_vertical_mobile": 24
       },
@@ -872,7 +856,7 @@
             "alignment": "center"
           },
           "static": true,
-          "id": "video-carousel-header",
+          "id": "shoppable-video-header",
           "blocks": [
             {
               "type": "subheading",
@@ -899,109 +883,25 @@
           ]
         },
         {
-          "type": "group",
-          "settings": {
-            "background_color": "linear-gradient(180deg, #0f2e2f 0%, #001a1a 100%)",
-            "height": "custom",
-            "height_custom": 480,
-            "position": "end",
-            "border_radius": 24,
-            "inherit_color_scheme": false,
-            "color_scheme": "scheme-4",
-            "padding_block": 24,
-            "padding_inline": 20,
-            "width": "fill"
-          }
+          "type": "_shoppable-video"
         },
         {
-          "type": "group",
-          "settings": {
-            "background_color": "linear-gradient(180deg, #0f2e2f 0%, #001a1a 100%)",
-            "height": "custom",
-            "height_custom": 480,
-            "position": "end",
-            "border_radius": 24,
-            "inherit_color_scheme": false,
-            "color_scheme": "scheme-4",
-            "padding_block": 24,
-            "padding_inline": 20,
-            "width": "fill"
-          }
+          "type": "_shoppable-video"
         },
         {
-          "type": "group",
-          "settings": {
-            "background_color": "linear-gradient(180deg, #0f2e2f 0%, #001a1a 100%)",
-            "height": "custom",
-            "height_custom": 480,
-            "position": "end",
-            "border_radius": 24,
-            "inherit_color_scheme": false,
-            "color_scheme": "scheme-4",
-            "padding_block": 24,
-            "padding_inline": 20,
-            "width": "fill"
-          }
+          "type": "_shoppable-video"
         },
         {
-          "type": "group",
-          "settings": {
-            "background_color": "linear-gradient(180deg, #0f2e2f 0%, #001a1a 100%)",
-            "height": "custom",
-            "height_custom": 480,
-            "position": "end",
-            "border_radius": 24,
-            "inherit_color_scheme": false,
-            "color_scheme": "scheme-4",
-            "padding_block": 24,
-            "padding_inline": 20,
-            "width": "fill"
-          }
+          "type": "_shoppable-video"
         },
         {
-          "type": "group",
-          "settings": {
-            "background_color": "linear-gradient(180deg, #0f2e2f 0%, #001a1a 100%)",
-            "height": "custom",
-            "height_custom": 480,
-            "position": "end",
-            "border_radius": 24,
-            "inherit_color_scheme": false,
-            "color_scheme": "scheme-4",
-            "padding_block": 24,
-            "padding_inline": 20,
-            "width": "fill"
-          }
+          "type": "_shoppable-video"
         },
         {
-          "type": "group",
-          "settings": {
-            "background_color": "linear-gradient(180deg, #0f2e2f 0%, #001a1a 100%)",
-            "height": "custom",
-            "height_custom": 480,
-            "position": "end",
-            "border_radius": 24,
-            "inherit_color_scheme": false,
-            "color_scheme": "scheme-4",
-            "padding_block": 24,
-            "padding_inline": 20,
-            "width": "fill"
-          }
+          "type": "_shoppable-video"
         },
         {
-          "type": "group",
-          "settings": {
-            "background_color": "linear-gradient(180deg, #0f2e2f 0%, #001a1a 100%)",
-            "height": "custom",
-            "height_custom": 480,
-            "position": "end",
-            "border_radius": 24,
-            "inherit_color_scheme": false,
-            "color_scheme": "scheme-4",
-            "padding_block": 24,
-            "padding_inline": 20,
-            "width": "fill"
-          }
+          "type": "_shoppable-video"
         }
       ]
     }
