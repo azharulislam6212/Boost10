@@ -8,12 +8,34 @@
   assign s = block.settings
   assign product = s.product
 
+  assign loop = s.loop
+  if loop == nil
+    assign loop = true
+  endif
+
   assign source = s.video_source | default: 'url'
   assign hosted = false
-  assign external = false
+  assign embed_src = ''
   if source == 'uploaded' and s.video
     assign hosted = true
   elsif source == 'url' and s.video_url != blank
+    assign video_id = s.video_url.id
+    case s.video_url.type
+      when 'youtube'
+        assign embed_src = 'https://www.youtube.com/embed/' | append: video_id | append: '?autoplay=1&playsinline=1&controls=0&rel=0&modestbranding=1&enablejsapi=1'
+        if loop
+          assign embed_src = embed_src | append: '&loop=1&playlist=' | append: video_id
+        endif
+      when 'vimeo'
+        assign embed_src = 'https://player.vimeo.com/video/' | append: video_id | append: '?autoplay=1&playsinline=1&controls=0&dnt=1'
+        if loop
+          assign embed_src = embed_src | append: '&loop=1'
+        endif
+    endcase
+  endif
+
+  assign external = false
+  if embed_src != ''
     assign external = true
   endif
 
@@ -25,11 +47,6 @@
   assign poster = s.image
   if poster == blank and hosted
     assign poster = s.video.preview_image
-  endif
-
-  assign loop = s.loop
-  if loop == nil
-    assign loop = true
   endif
 
   case s.aspect_ratio
@@ -79,26 +96,14 @@
           image_size: '600x'
       }}
     {%- elsif external -%}
-      {%- liquid
-        assign playlist = ''
-        if loop and s.video_url.type == 'youtube'
-          assign playlist = s.video_url.id
-        endif
-      -%}
       <template data-video-template>
-        {{
-          s.video_url
-          | external_video_url:
-            autoplay: true,
-            loop: loop,
-            playlist: playlist,
-            muted: true,
-            controls: false,
-            playsinline: true,
-            modestbranding: true,
-            rel: 0
-          | external_video_tag: class: 'shoppable-video__video', loading: 'lazy', title: ''
-        }}
+        <iframe
+          class="shoppable-video__video"
+          src="{{ embed_src }}"
+          title="{{ 'accessibility.play_video' | t | escape }}"
+          allow="autoplay; encrypted-media; picture-in-picture"
+          allowfullscreen
+        ></iframe>
       </template>
     {%- endif -%}
   </div>

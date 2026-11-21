@@ -397,7 +397,10 @@ export class ShoppableVideo extends BaseComponent {
     if (!(slide instanceof HTMLElement)) return;
 
     const index = this.#slides.indexOf(slide);
-    const toggle = target.closest('[data-video-toggle]');
+
+    // On the centre slide the whole video is the play control; the product card keeps its own.
+    const onCentreVideo = index === this.#index && !target.closest('.shoppable-video__product, a, button');
+    const toggle = target.closest('[data-video-toggle]') || (onCentreVideo && slide.querySelector('[data-video-toggle]'));
 
     if (toggle) {
       this.#stopAutoplay();
@@ -407,7 +410,7 @@ export class ShoppableVideo extends BaseComponent {
         this.#pause(slide);
       } else {
         slide.removeAttribute('data-held');
-        this.#play(slide);
+        this.#play(slide, { sound: true });
       }
       if (index !== this.#index) this.go(index);
       return;
@@ -671,32 +674,60 @@ export class ShoppableVideo extends BaseComponent {
     return slide.hasAttribute('data-playing');
   }
 
-  /** @param {HTMLElement} slide */
-  #play(slide) {
+  /**
+   * Start or resume a slide's video. A press plays it with sound; autoplay
+   * stays muted, because browsers block sound nobody asked for.
+   *
+   * @param {HTMLElement} slide
+   * @param {{ sound?: boolean }} [options]
+   */
+  #play(slide, { sound = false } = {}) {
     const video = slide.querySelector('video');
     if (video) {
-      video.muted = true;
-      video.play().catch(() => this.#setPlaying(slide, false));
+      if (sound) video.muted = false;
+      else if (!slide.hasAttribute('data-started')) video.muted = true;
+
+      slide.setAttribute('data-started', '');
+      video.play().catch(() => {
+        // Sound refused after all: play muted rather than not at all.
+        if (!video.muted) {
+          video.muted = true;
+          video.play().catch(() => this.#setPlaying(slide, false));
+        } else {
+          this.#setPlaying(slide, false);
+        }
+      });
       return;
     }
 
-    // An embed: insert it on first play, restore its address after a pause.
+    // An embed: inserted on first play, then driven through its player API.
     let frame = slide.querySelector('iframe');
     if (!frame) {
       const template = slide.querySelector('template[data-video-template]');
       const media = slide.querySelector('.shoppable-video__media');
       if (!(template instanceof HTMLTemplateElement) || !media) return;
-      media.appendChild(template.content.cloneNode(true));
-      frame = slide.querySelector('iframe');
-      frame?.setAttribute('tabindex', '-1');
-    } else if (frame.dataset.src) {
-      frame.setAttribute('src', frame.dataset.src);
+
+      const content = /** @type {DocumentFragment} */ (template.content.cloneNode(true));
+      frame = content.querySelector('iframe');
+      if (!frame) return;
+
+      frame.setAttribute('src', this.#embedUrl(frame.getAttribute('src') || '', { muted: !sound }));
+      frame.setAttribute('tabindex', '-1');
+      media.appendChild(content);
+    } else {
+      this.#command(frame, 'play');
+      if (sound) this.#command(frame, 'unmute');
     }
 
-    if (frame) this.#setPlaying(slide, true);
+    slide.setAttribute('data-started', '');
+    this.#setPlaying(slide, true);
   }
 
-  /** @param {HTMLElement} slide */
+  /**
+   * Pause where it is: the frame stays on screen and resumes from there.
+   *
+   * @param {HTMLElement} slide
+   */
   #pause(slide) {
     const video = slide.querySelector('video');
     if (video) {
@@ -705,19 +736,98 @@ export class ShoppableVideo extends BaseComponent {
     }
 
     const frame = slide.querySelector('iframe');
-    if (frame && frame.getAttribute('src') !== 'about:blank') {
-      frame.dataset.src = frame.getAttribute('src') || frame.dataset.src || '';
-      frame.setAttribute('src', 'about:blank');
-    }
+    if (frame) this.#command(frame, 'pause');
     this.#setPlaying(slide, false);
   }
 
-  /** Pause what left the centre; start the centre one when it may play itself. */
+  /**
+   * @param {string} src The embed address Liquid wrote.
+   * @param {{ muted: boolean }} options
+   * @returns {string} The address with the player API on and sound set.
+   */
+  #embedUrl(src, { muted }) {
+    let url;
+    try {
+      url = new URL(src, window.location.href);
+    } catch {
+      return src;
+    }
+
+    if (url.hostname.includes('youtube')) {
+      url.searchParams.set('enablejsapi', '1');
+      url.searchParams.set('origin', window.location.origin);
+      url.searchParams.set('mute', muted ? '1' : '0');
+    } else if (url.hostname.includes('vimeo')) {
+      url.searchParams.set('muted', muted ? '1' : '0');
+    }
+
+    return url.toString();
+  }
+
+  /**
+   * Send play, pause or unmute to a YouTube or Vimeo player.
+   *
+   * @param {HTMLIFrameElement} frame
+   * @param {'play'|'pause'|'unmute'} action
+   */
+  #command(frame, action) {
+    const target = frame.contentWindow;
+    if (!target) return;
+
+    let host = '';
+    try {
+      host = new URL(frame.src).hostname;
+    } catch {
+      return;
+    }
+
+    if (host.includes('youtube')) {
+      const func = { play: 'playVideo', pause: 'pauseVideo', unmute: 'unMute' }[action];
+      target.postMessage(JSON.stringify({ event: 'command', func, args: [] }), '*');
+      return;
+    }
+
+    if (host.includes('vimeo')) {
+      const messages =
+        action === 'unmute'
+          ? [{ method: 'setMuted', value: false }, { method: 'setVolume', value: 1 }]
+          : [{ method: action }];
+      for (const message of messages) target.postMessage(JSON.stringify(message), 'https://player.vimeo.com');
+    }
+  }
+
+  /**
+   * Put a slide back as it was before anything played: video at the start,
+   * cover image showing.
+   *
+   * @param {HTMLElement} slide
+   */
+  #reset(slide) {
+    const video = slide.querySelector('video');
+    if (video) {
+      if (!video.paused) video.pause();
+      video.currentTime = 0;
+    }
+
+    // An embed is dropped; the next play inserts it fresh from the template.
+    slide.querySelector('.shoppable-video__media > iframe')?.remove();
+
+    slide.removeAttribute('data-started');
+    slide.removeAttribute('data-held');
+    this.#setPlaying(slide, false);
+  }
+
+  /** Reset what left the centre, pause the centre while off screen, start it when it may play itself. */
   #syncPlayback() {
     this.#slides.forEach((slide, index) => {
       if (!slide.querySelector('[data-video-toggle]')) return;
 
-      if (index !== this.#index || !this.#inView) {
+      if (index !== this.#index) {
+        if (slide.hasAttribute('data-started')) this.#reset(slide);
+        return;
+      }
+
+      if (!this.#inView) {
         if (this.#isPlaying(slide)) this.#pause(slide);
         return;
       }
