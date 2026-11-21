@@ -9,7 +9,7 @@ import { DrawerComponent } from '@theme/dialog';
 import { EVENTS, filterUpdateDetail } from '@theme/events';
 import { fetchSection } from '@theme/section-renderer';
 import { morph } from '@theme/morph';
-import { announce, announceUrgent, clamp, debounce, formatMoney, storage, themeString } from '@theme/utilities';
+import { announce, announceUrgent, clamp, debounce, formatMoney, themeString } from '@theme/utilities';
 
 /* ==========================================================================
    <facet-filters>
@@ -569,15 +569,8 @@ export class LayoutToggle extends BaseComponent {
       this.select(button.dataset.viewOption);
     });
 
-    this.select(this.stored, { announce: false });
-  }
-
-  /**
-   * @returns {'grid'|'list'}
-   */
-  get stored() {
-    const value = storage.get('collection-view', 'grid');
-    return value === 'list' ? 'list' : 'grid';
+    // Every visit opens on the product grid; list view lasts for this page only.
+    this.select('grid', { announce: false });
   }
 
   /**
@@ -601,10 +594,6 @@ export class LayoutToggle extends BaseComponent {
     for (const button of this.querySelectorAll('[data-view-option]')) {
       button.setAttribute('aria-pressed', String(button.dataset.viewOption === next));
     }
-
-    try {
-      storage.set('collection-view', next);
-    } catch {}
 
     if (shouldAnnounce) announce(themeString(next === 'list' ? 'viewList' : 'viewGrid', ''));
   }

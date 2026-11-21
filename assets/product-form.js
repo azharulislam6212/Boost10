@@ -185,7 +185,7 @@ export class ProductForm extends BaseComponent {
    */
   #isPreorder(variant) {
     if (window.Theme?.settings?.preorderEnabled !== true) return false;
-    return variant.inventory_policy === 'continue' && Number(variant.inventory_quantity) <= 0;
+    return Boolean(variant.inventory_management) && variant.inventory_policy === 'continue' && Number(variant.inventory_quantity) <= 0;
   }
 
   /**

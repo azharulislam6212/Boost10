@@ -1,18 +1,17 @@
 {% doc %}
-  Renders a product card.
+  Renders a product card. Theme settings > Product cards picks the Card or Standard style.
 
-  @param {product} product - [ratio]     (product, optional)
-  @param {number} [index] - Position in the grid. Drives the reveal delay
+  @param {product} product
+  @param {number} [index] - Position in the grid. Picks the placeholder art
   @param {string} [sizes] - Passed to snippets/image.liquid
   @param {boolean} [priority] - Eager-load the image. First row only
   @param {boolean} [show_vendor] - Overrides the theme setting
   @param {string} [class]
   @param {object} [section] - `section.settings`, for the animation cascade
   @param {object} [block] - `block.settings`, for the animation cascade
-  @param {string} [quick_add]
+  @param {string} [quick_add] - none | icon | button. Overrides the theme setting
   @param {string} [ratio]
   @param {boolean} [show_rating]
-  @param {boolean} [show_swatches] - Overrides the theme swatch setting
   @param {string} [attributes] - Raw attributes for the card's root, e.g. `data-panel-item`
 
   @example
@@ -25,6 +24,7 @@
   assign ratio = ratio | default: settings.card_image_ratio | default: '3-4'
   assign alignment = settings.card_text_alignment | default: 'left'
   assign hover_effect = settings.card_hover_effect | default: 'image-swap'
+  assign card_style = settings.card_style | default: 'card'
 
   assign vendor_visible = settings.show_vendor
   unless show_vendor == nil
@@ -37,16 +37,18 @@
   endunless
 
   assign quick_add_style = quick_add | default: settings.quick_add_style
-
-  assign quick_add_position = settings.quick_add_position | default: 'bar'
+  assign quick_add_position = 'bar'
+  assign quick_add_bar = true
   assign quick_add_icon_only = false
-  if quick_add_style == 'icon' or quick_add_position == 'corner'
+  if quick_add_style == 'icon'
+    assign quick_add_position = 'corner'
+    assign quick_add_bar = false
     assign quick_add_icon_only = true
   endif
 
-  assign quick_add_full = true
-  if quick_add_position == 'corner'
-    assign quick_add_full = false
+  assign needs_options = true
+  if product.has_only_default_variant or product.variants.size == 1
+    assign needs_options = false
   endif
 
   assign card_scheme_classes = ''
@@ -54,42 +56,29 @@
     assign card_scheme_classes = ' color-scheme color-' | append: settings.card_color_scheme
   endif
 
-  assign swatch_names = settings.swatch_option_names | default: 'Colour, Color' | downcase | split: ','
-  assign swatch_option = blank
-
-  for option in product.options_with_values
-    assign option_key = option.name | downcase | strip
-    assign option_key = option.name | downcase | strip
-
-  for name in swatch_names
-    assign swatch_name = name | downcase | strip
-
-    if swatch_name == option_key
-      assign swatch_option = option
-      break
-    endif
-  endfor
-    if swatch_option != blank
-      break
-    endif
-  endfor
-
-  assign second_image = product.media[1].preview_image
-  if hover_effect != 'image-swap'
-    assign second_image = blank
-  endif
-
-  assign card_delay = 0
-  if index != blank
-    assign card_delay = index | modulo: 4 | times: 70
-  endif
+  assign position = index | default: 0 | plus: 0
 
   assign card_id = 'card-' | append: product.id | append: '-' | append: index
 
-  # Supplement details from metafields, each optional: custom.flavor (or a
-  # Flavor option), custom.weight and custom.servings.
+  assign featured_image = product.featured_media.preview_image
+  assign placeholder_art = position | modulo: 4 | plus: 1
+  assign placeholder_image = 'product-apparel-' | append: placeholder_art
+
+  assign card_video = nil
+  for media in product.media
+    if media.media_type == 'video'
+      assign card_video = media
+      break
+    endif
+  endfor
+
+  assign second_image = blank
+  if hover_effect != 'none' and hover_effect != 'zoom' and card_video == nil
+    assign second_image = product.media[1].preview_image
+  endif
+
   assign card_variant = product.selected_or_first_available_variant
-  assign flavor = product.metafields.custom.flavor.value
+  assign flavor = product.metafields.custom.flavor.value | default: product.metafields.theme.flavor.value
   if flavor == blank
     assign flavor_names = 'flavor,flavour,taste' | split: ','
     for option in product.options_with_values
@@ -107,173 +96,211 @@
     endfor
   endif
 
-  assign card_weight = product.metafields.custom.weight.value
-  assign card_servings = product.metafields.custom.servings.value | plus: 0
+  assign card_weight = product.metafields.custom.weight.value | default: product.metafields.theme.weight.value
+  assign card_servings = product.metafields.custom.servings.value | default: product.metafields.theme.servings.value | plus: 0
   assign card_per_serving = blank
   if card_servings > 0
     assign card_per_serving = card_variant.price | divided_by: card_servings | money
   endif
+
   assign card_price_display = card_variant.price | money
+  assign add_to_cart_parts = 'products.product.add_to_cart_price' | t: price: '[[price]]' | split: '[[price]]'
 -%}
+
+{%- capture buy_form -%}
+  <form
+    action="{{ routes.cart_add_url }}"
+    method="post"
+    class="product-card__buy"
+    data-quick-add-form
+    {% unless card_variant.available %}data-sold-out{% endunless %}
+  >
+    <input type="hidden" name="id" value="{{ card_variant.id }}" data-card-variant-id>
+    {%- capture buy_labels -%}
+      <span class="product-card__buy-label">
+        {{- add_to_cart_parts[0] -}}
+        <span data-card-price>{{ card_price_display }}</span>
+        {{- add_to_cart_parts[1] -}}
+      </span>
+      <span class="product-card__buy-label product-card__buy-label--short">{{ 'products.product.add_to_cart' | t }}</span>
+      <span class="product-card__buy-label product-card__buy-label--sold-out">{{ 'products.product.sold_out' | t }}</span>
+    {%- endcapture -%}
+    <button type="submit" class="product-card__buy-submit"{% unless card_variant.available %} disabled{% endunless %}>
+      <span class="product-card__fx">
+        <span class="product-card__fx-copy">{{ buy_labels }}</span>
+        <span class="product-card__fx-copy" aria-hidden="true">{{ buy_labels | remove: ' data-card-price' }}</span>
+      </span>
+    </button>
+    <label class="visually-hidden" for="[[qty-id]]">{{ 'products.product.quantity' | t }}</label>
+    <span class="product-card__buy-qty">
+      <select id="[[qty-id]]" name="quantity">
+        {%- for qty in (1..10) -%}
+          <option value="{{ qty }}">{% if qty < 10 %}0{% endif %}{{ qty }}</option>
+        {%- endfor -%}
+      </select>
+      {%- render 'icon', icon: 'chevron-down', size: 14 -%}
+    </span>
+  </form>
+{%- endcapture -%}
+
+{%- assign choose_options_label = 'products.product.choose_options' | t -%}
+{%- capture options_button -%}
+  <button
+    type="button"
+    class="product-card__options"
+    data-overlay-open="QuickAdd"
+    data-product-url="{{ product.url }}"
+    data-section-id="quick-add"
+  >
+    <span class="product-card__fx">
+      <span class="product-card__fx-copy">{{ choose_options_label }}</span>
+      <span class="product-card__fx-copy" aria-hidden="true">{{ choose_options_label }}</span>
+    </span>
+    {%- render 'icon', icon: 'plus-circle', size: 12 -%}
+  </button>
+{%- endcapture -%}
 
 <motion-effect
   {% render 'motion-attrs',
      kind: 'image',
+     effect: 'none',
      block: block,
-     section: section,
-     target: '.product-card__media',
-     delay: card_delay %}
-  class="product-card product-card--{{ alignment }} product-card--hover-{{ hover_effect }}{{ card_scheme_classes }} {{ class }}"
-
+     section: section %}
+  class="product-card product-card--{{ card_style }} product-card--{{ alignment }} product-card--hover-{{ hover_effect }}{{ card_scheme_classes }} {{ class }}"
+  data-product-card
   data-quick-add-position="{{ quick_add_position }}"
   data-product-id="{{ product.id }}"
   data-morph-key="{{ card_id }}"
   {{ attributes }}
 >
   <div class="product-card__media-wrapper">
-    {%- liquid
-      assign card_images = product.images | slice: 0, settings.card_slider_count | default: 4
-      assign use_slider = false
-      if settings.enable_card_slider and card_images.size > 1
-        assign use_slider = true
-      endif
-    -%}
+    <a
+      class="product-card__media-link"
+      href="{{ product.url }}"
+      tabindex="-1"
+      aria-hidden="true"
+    >
+      <div class="product-card__media" data-ratio="{{ ratio }}">
+        {% render 'image',
+           image: featured_image,
+           ratio: ratio,
+           sizes: sizes,
+           priority: priority,
+           placeholder: placeholder_image,
+           wrapper_class: 'product-card__layer product-card__layer--primary',
+           class: 'product-card__image product-card__image--primary' %}
 
-    {%- if use_slider -%}
-
-      <carousel-slider
-        class="product-card__slider carousel-shell"
-        data-layout="carousel"
-        data-layout-mobile="carousel"
-        data-ratio="{{ ratio }}"
-        data-options="{%- render 'carousel-options',
-          settings: settings,
-          count: card_images.size,
-          columns_desktop: 1,
-          columns_tablet: 1,
-          columns_mobile: 1,
-          autoplay: false,
-          loop: false,
-          pagination: 'none',
-          space_between: 0 -%}"
-        style="{% render 'carousel-vars',
-          settings: settings,
-          columns_desktop: 1,
-          columns_tablet: 1,
-          columns_mobile: 1,
-          peek_mobile: 0,
-          peek_desktop: 0,
-          space_between: 0 %}"
-      >
-        <ul
-          class="product-card__slides"
-          data-ref="track"
-          role="list"
-          aria-label="{{ product.title | escape }}"
-        >
-
-          {%- for card_image in card_images -%}
-            <li class="product-card__slide">
-              <a
-                class="product-card__slide-link"
-                href="{{ product.url }}"
-                tabindex="-1"
-                aria-hidden="true"
-              >
-                {% render 'image', image: card_image, ratio: ratio, sizes: sizes, priority: priority, class: 'product-card__image' %}
-              </a>
-            </li>
-          {%- endfor -%}
-        </ul>
-
-        <button type="button" class="product-card__slider-arrow" data-ref="previous" aria-label="{{ 'accessibility.previous_slide' | t }}">
-          {% render 'icon', icon: 'chevron-left', size: 14 %}
-        </button>
-
-        <button type="button" class="product-card__slider-arrow product-card__slider-arrow--next" data-ref="next" aria-label="{{ 'accessibility.next_slide' | t }}">
-          {% render 'icon', icon: 'chevron-right', size: 14 %}
-        </button>
-
-        <p class="visually-hidden" data-ref="status" role="status"></p>
-      </carousel-slider>
-    {%- else -%}
-      <a
-        class="product-card__media-link"
-        href="{{ product.url }}"
-        tabindex="-1"
-        aria-hidden="true"
-      >
-        <div class="product-card__media" data-ratio="{{ ratio }}">
+        {%- if second_image != blank -%}
           {% render 'image',
-             image: product.featured_media.preview_image,
+             image: second_image,
              ratio: ratio,
              sizes: sizes,
-             priority: priority,
-             class: 'product-card__image product-card__image--primary' %}
+             alt: '',
+             wrapper_class: 'product-card__layer product-card__layer--secondary',
+             class: 'product-card__image' %}
+        {%- endif -%}
 
-          {%- if second_image != blank -%}
-            {% render 'image',
-               image: second_image,
-               ratio: ratio,
-               sizes: sizes,
-               class: 'product-card__image product-card__image--secondary' %}
-          {%- endif -%}
-        </div>
-      </a>
-    {%- endif -%}
-
-    {% render 'badge', product: product, sale_text: true %}
-
-    {%- if quick_add_style != 'none' and product.available -%}
-      <div class="product-card__actions" data-quick-add-position="{{ quick_add_position }}">
-        {%- liquid
-          assign needs_options = true
-          if product.has_only_default_variant or product.variants.size == 1
-            assign needs_options = false
-          endif
-        -%}
-
-        {%- if needs_options == false -%}
-
-          <form action="{{ routes.cart_add_url }}" method="post" data-quick-add-form>
-            <input type="hidden" name="id" value="{{ product.selected_or_first_available_variant.id }}">
-            <input type="hidden" name="quantity" value="1">
-            {%- assign add_to_cart_label = 'products.product.add_to_cart' | t -%}
-            {% render 'button', label: add_to_cart_label, type: 'submit', variant: 'primary', size: 'small', full: quick_add_full, icon_only: quick_add_icon_only, icon: 'plus' %}
-          </form>
-        {%- else -%}
-
-          {%- assign choose_options_label = 'products.product.choose_options' | t -%}
-
-          {%- if settings.enable_quick_add -%}
-            {%- assign quick_add_attributes = 'data-overlay-open="QuickAdd" data-product-url="' | append: product.url | append: '" data-section-id="quick-add"' -%}
-            {% render 'button', label: choose_options_label, variant: 'primary', size: 'small', full: quick_add_full, icon_only: quick_add_icon_only, icon: 'plus', attributes: quick_add_attributes %}
-          {%- else -%}
-            {% render 'button', label: choose_options_label, href: product.url, variant: 'primary', size: 'small', full: quick_add_full, icon_only: quick_add_icon_only, icon: 'plus' %}
-          {%- endif -%}
+        {%- if card_video -%}
+          <background-video
+            class="background-media__layer background-media__layer--cover background-media__video product-card__video"
+            data-fit="cover"
+          >
+            <template data-ref="template">
+              {{ card_video
+                 | video_tag:
+                   autoplay: true,
+                   loop: true,
+                   muted: true,
+                   controls: false,
+                   playsinline: true,
+                   preload: 'none',
+                   image_size: '640x',
+                   class: 'background-media__el' }}
+            </template>
+          </background-video>
         {%- endif -%}
       </div>
+    </a>
+
+    {% render 'badge', product: product %}
+
+    {%- if settings.enable_quick_view -%}
+      {%- liquid
+        assign quick_view_scheme = ''
+        if settings.quick_view_color_scheme != blank
+          assign quick_view_scheme = ' color-scheme color-' | append: settings.quick_view_color_scheme
+        endif
+      -%}
+      <button
+        type="button"
+        class="product-card__quick-view{{ quick_view_scheme }}"
+        data-position="{{ settings.quick_view_position | default: 'top-right' }}"
+        data-display="{{ settings.quick_view_display | default: 'hover-mobile-always' }}"
+        data-overlay-open="QuickAdd"
+        data-product-url="{{ product.url }}"
+        data-section-id="quick-view"
+        aria-label="{{ 'sections.shoppable_video.quick_view' | t: product: product.title | escape }}"
+      >
+        {%- render 'icon', icon: 'eye', size: 18 -%}
+      </button>
+    {%- endif -%}
+
+    {%- if settings.enable_quick_add and quick_add_style != 'none' -%}
+
+      {%- if quick_add_bar -%}
+        <div class="product-card__actions" data-quick-add-position="bar">
+          {%- if needs_options and product.available -%}
+            {{ options_button }}
+          {%- else -%}
+            {%- assign qty_id = card_id | append: '-qty' -%}
+            {{ buy_form | replace: '[[qty-id]]', qty_id }}
+          {%- endif -%}
+        </div>
+      {%- elsif product.available -%}
+        <div class="product-card__actions" data-quick-add-position="{{ quick_add_position }}">
+          {%- if needs_options == false -%}
+            <form action="{{ routes.cart_add_url }}" method="post" data-quick-add-form>
+              <input type="hidden" name="id" value="{{ card_variant.id }}">
+              <input type="hidden" name="quantity" value="1">
+              {%- assign add_to_cart_label = 'products.product.add_to_cart' | t -%}
+              {% render 'button', label: add_to_cart_label, type: 'submit', variant: 'primary', size: 'small', full: false, icon_only: quick_add_icon_only, icon: 'plus' %}
+            </form>
+          {%- else -%}
+            {%- assign quick_add_attributes = 'data-overlay-open="QuickAdd" data-product-url="' | append: product.url | append: '" data-section-id="quick-add"' -%}
+            {% render 'button', label: choose_options_label, variant: 'primary', size: 'small', full: false, icon_only: quick_add_icon_only, icon: 'plus', attributes: quick_add_attributes %}
+          {%- endif -%}
+        </div>
+      {%- endif -%}
     {%- endif -%}
   </div>
 
   <div class="product-card__info">
-    {%- if flavor != blank -%}
-      <span class="product-card__flavor">
-        {%- render 'icon', icon: 'leaf', size: 12 -%}
-        {{- flavor | escape -}}
-      </span>
+    {%- assign show_vendor_chip = false -%}
+    {%- if vendor_visible and product.vendor != blank -%}
+      {%- assign show_vendor_chip = true -%}
     {%- endif -%}
 
-    {%- if vendor_visible and product.vendor != blank -%}
-      <p class="product-card__vendor">
-        <span class="visually-hidden">{{ 'products.product.vendor' | t }}:</span>
-        {{ product.vendor }}
-      </p>
+    {%- if flavor != blank or show_vendor_chip -%}
+      <div class="product-card__chips">
+        {%- if flavor != blank -%}
+          <span class="product-card__flavor">
+            {%- render 'icon', icon: 'leaf', size: 12 -%}
+            {{- flavor | escape -}}
+          </span>
+        {%- endif -%}
+
+        {%- if show_vendor_chip -%}
+          <p class="product-card__flavor product-card__vendor">
+            <span class="visually-hidden">{{ 'products.product.vendor' | t }}:</span>
+            {{- product.vendor | escape -}}
+          </p>
+        {%- endif -%}
+      </div>
     {%- endif -%}
 
     <h3 class="product-card__title">
       <a class="product-card__link" href="{{ product.url }}" id="{{ card_id }}-title">
-        {{ product.title | escape }}
+        <span class="product-card__title-text">{{ product.title | escape }}</span>
       </a>
     </h3>
 
@@ -297,35 +324,8 @@
     {%- endif -%}
 
     <div class="product-card__price{% if settings.show_second_line_price %} product-card__price--block{% endif %}">
-      {% render 'price', product: product, context: 'card', show_badges: true %}
+      {% render 'price', product: product, context: 'card', show_badges: false %}
     </div>
-
-    {%- if product.available -%}
-      <div class="product-card__list-actions">
-        <form action="{{ routes.cart_add_url }}" method="post" class="product-card__list-form" data-quick-add-form>
-          <input type="hidden" name="id" value="{{ card_variant.id }}">
-          <button type="submit" class="product-card__list-submit">
-            <span>{{ 'products.product.add_to_cart_price' | t: price: card_price_display }}</span>
-          </button>
-          <label class="visually-hidden" for="{{ card_id }}-qty">{{ 'products.product.quantity' | t }}</label>
-          <span class="product-card__list-qty">
-            <select id="{{ card_id }}-qty" name="quantity">
-              {%- for qty in (1..10) -%}
-                <option value="{{ qty }}">{% if qty < 10 %}0{% endif %}{{ qty }}</option>
-              {%- endfor -%}
-            </select>
-            {%- render 'icon', icon: 'chevron-down', size: 12 -%}
-          </span>
-        </form>
-
-        {%- unless product.has_only_default_variant -%}
-          <a class="product-card__list-options" href="{{ product.url }}">
-            <span>{{ 'products.product.choose_options' | t }}</span>
-            {%- render 'icon', icon: 'plus', size: 14 -%}
-          </a>
-        {%- endunless -%}
-      </div>
-    {%- endif -%}
 
     {%- if settings.enable_compare -%}
       <compare-trigger
@@ -340,55 +340,15 @@
       </compare-trigger>
     {%- endif -%}
 
-    {%- liquid
-      assign card_swatch_type = settings.swatches_type | default: 'theme'
-      assign card_swatches_on = true
-      if card_swatch_type == 'none'
-        assign card_swatches_on = false
-      endif
-      unless show_swatches == nil
-        assign card_swatches_on = show_swatches
-      endunless
-    -%}
-    {%- if card_swatches_on and swatch_option != blank -%}
-
-      <variant-swatch data-product-url="{{ product.url }}">
-        <script type="application/json" data-variants>
-          {{- product.variants | json -}}
-        </script>
-
-        <div class="swatch-group" role="group" aria-label="{{ 'accessibility.swatch_group' | t: option: swatch_option.name | escape }}">
-          {%- for value in swatch_option.values limit: settings.swatch_max_visible -%}
-
-            {%- assign value_variant = nil -%}
-            {%- for variant in product.variants -%}
-              {%- if variant.options contains value -%}
-                {%- assign value_variant = variant -%}
-                {%- if variant.available -%}{%- break -%}{%- endif -%}
-              {%- endif -%}
-            {%- endfor -%}
-            <button
-              type="button"
-              data-swatch-option
-              data-value="{{ value | escape }}"
-              aria-pressed="false"
-            >
-              {% render 'swatch',
-                 value: value,
-                 option_name: swatch_option.name,
-                 option_value: value,
-                 variant: value_variant,
-                 shape: settings.swatch_shape %}
-              <span class="visually-hidden">{{ value }}</span>
-            </button>
-          {%- endfor -%}
-
-          {%- if swatch_option.values.size > settings.swatch_max_visible -%}
-            {%- assign remaining = swatch_option.values.size | minus: settings.swatch_max_visible -%}
-            <span class="swatch-count">{{ 'products.variants.show_more_swatches' | t: count: remaining }}</span>
-          {%- endif -%}
-        </div>
-      </variant-swatch>
+    {%- if settings.enable_quick_add -%}
+      <div class="product-card__list-actions">
+        {%- if needs_options and product.available -%}
+          {{ options_button }}
+        {%- else -%}
+          {%- assign list_qty_id = card_id | append: '-list-qty' -%}
+          {{ buy_form | replace: '[[qty-id]]', list_qty_id }}
+        {%- endif -%}
+      </div>
     {%- endif -%}
-</div>
+  </div>
 </motion-effect>
