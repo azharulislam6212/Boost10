@@ -5,7 +5,7 @@
  * @module @theme/cart-drawer
  */
 
-import { DrawerComponent } from '@theme/dialog';
+import { DrawerComponent, Overlay } from '@theme/dialog';
 import { BaseComponent, defineComponent } from '@theme/component';
 import { EVENTS, cartUpdatedDetail, cartErrorDetail } from '@theme/events';
 import { CartError, announce, announceUrgent, fetchConfig, formatMoney, getRoute, parseResponse, themeString } from '@theme/utilities';
@@ -459,13 +459,29 @@ export const cart = {
       return;
     }
 
+    const drawer = behaviour === 'notification' ? null : document.querySelector('cart-drawer');
+
+    // Quick add sits in a modal; once it has done its job it gets out of the way.
+    const covering = [...document.querySelectorAll('[data-state="open"], [data-state="opening"]')].filter(
+      (overlay) => overlay !== drawer && overlay instanceof Overlay && overlay.overlayType !== 'cart'
+    );
+    await Promise.all(covering.map((overlay) => overlay.close()));
+
     if (behaviour === 'notification') {
-      const { toast } = await import('@theme/dialog');
-      toast(themeString('itemAdded', ''), 'success');
+      const { toast } = await import('@theme/toast');
+      toast(themeString('addedToCart', ''), {
+        type: 'success',
+        action: { label: themeString('viewCart', ''), href: getRoute('cartUrl') }
+      });
       return;
     }
 
-    document.querySelector('cart-drawer')?.open?.();
+    if (!drawer?.open) {
+      window.location.href = getRoute('cart');
+      return;
+    }
+
+    drawer.open();
     void added;
   }
 };
@@ -588,8 +604,8 @@ export class CartDrawer extends DrawerComponent {
    * @private
    */
   #onCartError = async (event) => {
-    const { toast } = await import('@theme/dialog');
-    toast(event.detail?.message || themeString('cartError', ''), 'error');
+    const { toast } = await import('@theme/toast');
+    toast(event.detail?.message || themeString('cartError', ''), { type: 'error' });
   };
 }
 

@@ -6,9 +6,8 @@
 
 import { BaseComponent, defineComponent } from '@theme/component';
 import { EVENTS } from '@theme/events';
-import { toast } from '@theme/toast';
 import { cart } from '@theme/cart-drawer';
-import { themeString, announceUrgent, getRoute, labelTarget } from '@theme/utilities';
+import { themeString, announceUrgent, labelTarget } from '@theme/utilities';
 
 /* ==========================================================================
    <product-form>
@@ -155,13 +154,6 @@ export class ProductForm extends BaseComponent {
       const result = await cart.addItem(line);
 
       giftCard?.reset?.();
-
-      if (!this.hasAttribute('data-silent')) {
-        toast(themeString('addedToCart', ''), {
-          type: 'success',
-          action: { label: themeString('viewCart', ''), href: getRoute('cartUrl') }
-        });
-      }
 
       this.dispatch(EVENTS.PRODUCT_FORM_SUBMIT, { variantId: id, quantity: line.quantity });
       return result;
