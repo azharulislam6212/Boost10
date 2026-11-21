@@ -7,7 +7,7 @@
 import { defineComponent } from '@theme/component';
 import { ModalDialog } from '@theme/dialog';
 import { cart } from '@theme/cart-drawer';
-import { storage, themeString, announce, announceUrgent, isTouchDevice, debounce } from '@theme/utilities';
+import { storage, themeString, announce, announceUrgent, isTouchDevice, debounce, isDesignMode } from '@theme/utilities';
 
 /** Storage key, namespaced per shop by `storage`. */
 const SEEN_KEY = 'promo-popup-seen';
@@ -96,7 +96,8 @@ export class PromoPopup extends ModalDialog {
    * @returns {boolean}
    */
   get shouldShow() {
-    if (window.Theme?.designMode) return false;
+    // Never on its own timer in the theme editor; selecting the section shows it.
+    if (isDesignMode()) return false;
 
     if (this.#pageViews() < MIN_PAGE_VIEWS) return false;
 
@@ -119,6 +120,15 @@ export class PromoPopup extends ModalDialog {
 
     this.#remember();
     await this.open();
+  }
+
+  /** The theme editor: selecting the popup's section opens it for editing. */
+  sectionSelected() {
+    this.open();
+  }
+
+  sectionDeselected() {
+    this.close();
   }
 
   /** Dismiss and do not show again for `frequency` days. */

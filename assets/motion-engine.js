@@ -75,6 +75,23 @@ export const PRESETS = {
     keyframes: () => [{ opacity: 0 }, { opacity: 1 }]
   },
 
+  /**
+   * The theme default. Each element rises 30% of its own height while it fades
+   * in — 500ms, a long soft ease-out, 75ms between neighbours — so a heading,
+   * its subheading and its text arrive one after another in a single smooth
+   * wave. Durations here are scaled by PRESET_PACE (0.8), hence 625 and 94.
+   */
+  rise: {
+    group: 'both',
+    duration: 625,
+    stagger: 94,
+    easing: 'cubic-bezier(0, 0, 0.3, 1)',
+    keyframes: () => [
+      { opacity: 0, transform: 'translate3d(0, 30%, 0)' },
+      { opacity: 1, transform: 'translate3d(0, 0, 0)' }
+    ]
+  },
+
   'fade-up': {
     group: 'both',
     keyframes: ({ distance = DEFAULTS.distance }) => [

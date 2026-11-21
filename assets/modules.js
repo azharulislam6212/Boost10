@@ -54,6 +54,17 @@ export class AccordionElement extends BaseComponent {
     this.#watchBreakpoint();
   }
 
+  /**
+   * The theme editor: selecting a row opens it, so its content can be edited.
+   *
+   * @param {CustomEvent} event
+   */
+  blockSelected(event) {
+    const target = /** @type {Node} */ (event.target);
+    const item = this.#items().find((details) => details === target || details.contains(target));
+    if (item && !item.open) this.open(item);
+  }
+
   teardown() {
     this.#query = null;
   }

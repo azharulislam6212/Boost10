@@ -334,7 +334,10 @@ export class BaseComponent extends HTMLElement {
 
       this.on(document, eventName, (event) => {
         const target = /** @type {CustomEvent} */ (event).target;
-        if (target instanceof Node && !target.contains(this)) return;
+        // A section event targets the section around this component; a block
+        // event targets the block, which is usually inside it — a slide in a
+        // carousel. Either way round is this component's business.
+        if (target instanceof Node && !target.contains(this) && !this.contains(target)) return;
         method.call(this, event);
       });
     }

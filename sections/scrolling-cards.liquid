@@ -1,5 +1,8 @@
 {% comment %}
-  A heading cluster and the theme blocks under it, on the shared section frame.
+  A photograph held in place while a heading and a zigzag of glass cards scroll
+  over it. The heading's lines slide in from either side and each card grows
+  into place as it rises (assets/scrolling-cards.js); the entrance itself is the
+  theme's text and image animation.
 {% endcomment %}
 
 {%- liquid
@@ -11,10 +14,7 @@
     assign has_background_media = true
   endif
 
-  assign background_paint = ''
-  if has_background_media == false
-    assign background_paint = s.background_color | default: ''
-  endif
+  assign background_paint = s.background_color | default: ''
 
   assign border_line = s.border_style | default: 'none'
 
@@ -84,67 +84,20 @@
     assign overlap_mobile = r_tl_m
   endif
 
-  assign direction = s.direction | default: 'column'
-  assign is_row = false
-  if direction == 'row'
-    assign is_row = true
-  endif
+  assign card_width = s.card_width | default: 312 | plus: 0
+  assign space = s.space_between | default: 24 | plus: 0
+  assign space_mobile = s.space_between_mobile | default: 12 | plus: 0
 
-  assign alignment_setting = s.alignment | default: 'start'
+  assign glass_alpha = s.glass_opacity | default: 10 | plus: 0 | divided_by: 100.0
+  assign glass_blur = s.glass_blur | default: 16 | plus: 0
+  assign glass_border = s.glass_border_opacity | default: 20 | plus: 0
+  assign card_radius = s.card_radius | default: 24 | plus: 0
 
-  case alignment_setting
-    when 'center'
-      assign alignment_axis = 'center'
-    when 'end'
-      assign alignment_axis = 'end'
-    else
-      assign alignment_axis = 'start'
-  endcase
-
-  assign inline_axis = alignment_axis
-  if is_row
-    case alignment_setting
-      when 'space-between', 'space-around', 'space-evenly'
-        assign inline_axis = alignment_setting
-    endcase
-  endif
-
-  case s.position
-    when 'center'
-      assign block_axis = 'center'
-    when 'end'
-      assign block_axis = 'end'
-    when 'stretch'
-      assign block_axis = 'stretch'
-    else
-      assign block_axis = 'start'
-  endcase
-
-  assign gap_x = s.gap_horizontal | default: 24 | plus: 0
-  assign gap_y = s.gap_vertical | default: 24 | plus: 0
-  assign gap_x_mobile = s.gap_horizontal_mobile | default: gap_x | plus: 0
-  assign gap_y_mobile = s.gap_vertical_mobile | default: gap_y | plus: 0
-
-  assign content_classes = 'section-content section-content--' | append: direction
-  if is_row and s.stack_on_mobile != false
-    assign content_classes = content_classes | append: ' section-content--stack-mobile'
-  endif
-
-  if is_row and s.reverse
-    assign content_classes = content_classes | append: ' section-content--reverse'
+  assign animate = true
+  if s.scroll_animation == false
+    assign animate = false
   endif
 -%}
-
-
-{%- capture content_style -%}
-  --section-gap-x: {{ gap_x }}px;
-  --section-gap-y: {{ gap_y }}px;
-  --section-gap-x-mobile: {{ gap_x_mobile }}px;
-  --section-gap-y-mobile: {{ gap_y_mobile }}px;
-  --section-inline: {{ inline_axis }};
-  --section-align: {{ alignment_axis }};
-  --section-block: {{ block_axis }};
-{%- endcapture -%}
 
 {%- capture section_style -%}
   {%- render 'spacing', section: s, declarations: true -%}
@@ -152,6 +105,13 @@
   --section-radius-mobile: {{ r_tl_m }}px {{ r_tr_m }}px {{ r_br_m }}px {{ r_bl_m }}px;
   --section-overlap: {{ overlap }}px;
   --section-overlap-mobile: {{ overlap_mobile }}px;
+  --sc-card-width: {{ card_width }}px;
+  --sc-space: {{ space }}px;
+  --sc-space-mobile: {{ space_mobile }}px;
+  --sc-glass: {{ glass_alpha }};
+  --sc-blur: {{ glass_blur }}px;
+  --sc-border: {{ glass_border }}%;
+  --sc-card-radius: {{ card_radius }}px;
   {%- if border_any > 0 -%}
     --section-border-width: {{ bw_top }}px {{ bw_right }}px {{ bw_bottom }}px {{ bw_left }}px;
     --section-border-style: {{ border_line }};
@@ -162,29 +122,37 @@
   {%- endif -%}
 {%- endcapture -%}
 
-
 <div
-  class="section scrolling-cards-section color-scheme color-{{ s.color_scheme | default: 'scheme-1' }}{% if has_background_media %} has-background-media{% endif %}"
+  class="section scrolling-cards color-scheme color-{{ s.color_scheme | default: 'scheme-4' }}"
   data-section-spacing
   {%- if s.stack_layer != blank and s.stack_layer != 'default' %} data-section-layer="{{ s.stack_layer }}"{% endif %}
   data-section-id="{{ section.id }}"
   style="{{ section_style | strip_newlines | strip }}"
 >
-  {%- if has_background_media -%}
-    {% render 'background-media', settings: s, placeholder: 'hero-apparel-1' %}
-  {%- endif -%}
+  <scrolling-cards class="scrolling-cards__stage" data-animate="{{ animate }}">
+    {%- if has_background_media -%}
+      <div class="scrolling-cards__backdrop">
+        {% render 'background-media', settings: s, placeholder: 'hero-apparel-1' %}
+      </div>
+    {%- endif -%}
 
-  <div class="section-inner {% render 'container', width: s.container_width %}">
-    <motion-effect
-      class="{{ content_classes }}"
-      data-easing="outQuint"
-      style="{{ content_style | strip_newlines | strip }}"
-      {% render 'motion-attrs', kind: 'text', section: s, children: true, duration: 1000 %}
-    >
-      {% content_for 'block', type: 'section-header', id: 'scrolling-cards-header' %}
-      {% content_for 'blocks' %}
-    </motion-effect>
-  </div>
+    <div class="scrolling-cards__inner {% render 'container', width: s.container_width %}">
+      <motion-effect
+        class="scrolling-cards__heading"
+        data-easing="outQuint"
+        {% render 'motion-attrs', kind: 'text', section: s, children: true %}
+      >
+        {% content_for 'block', type: 'section-header', id: 'scrolling-cards-header' %}
+      </motion-effect>
+
+      <motion-effect
+        class="scrolling-cards__cards"
+        {% render 'motion-attrs', kind: 'image', section: s, target: '.scrolling-card', stagger: 90 %}
+      >
+        {% content_for 'blocks' %}
+      </motion-effect>
+    </div>
+  </scrolling-cards>
 </div>
 
 {% schema %}
@@ -194,7 +162,7 @@
   "class": "section",
   "blocks": [
     {
-      "type": "@theme"
+      "type": "_scrolling-card"
     },
     {
       "type": "@app"
@@ -231,83 +199,17 @@
     },
     {
       "type": "header",
-      "content": "t:blocks.group.headers.layout"
+      "content": "t:sections.featured_blog.headers.cards"
     },
     {
-      "type": "select",
-      "id": "direction",
-      "label": "t:blocks.group.settings.direction.label",
-      "options": [
-        {
-          "value": "column",
-          "label": "t:blocks.group.settings.direction.options__1.label"
-        },
-        {
-          "value": "row",
-          "label": "t:blocks.group.settings.direction.options__2.label"
-        }
-      ],
-      "default": "column"
-    },
-    {
-      "type": "checkbox",
-      "id": "reverse",
-      "label": "t:sections.faq.settings.reverse.label",
-      "default": false,
-      "visible_if": "{{ section.settings.direction == 'row' }}"
-    },
-    {
-      "type": "select",
-      "id": "alignment",
-      "label": "t:blocks.group.settings.alignment.label",
-      "options": [
-        {
-          "value": "start",
-          "label": "t:blocks.group.settings.alignment.options__1.label"
-        },
-        {
-          "value": "center",
-          "label": "t:blocks.group.settings.alignment.options__2.label"
-        },
-        {
-          "value": "end",
-          "label": "t:blocks.group.settings.alignment.options__3.label"
-        },
-        {
-          "value": "space-between",
-          "label": "t:blocks.group.settings.distribution.options__2.label"
-        },
-        {
-          "value": "space-around",
-          "label": "t:blocks.group.settings.distribution.options__3.label"
-        },
-        {
-          "value": "space-evenly",
-          "label": "t:blocks.group.settings.distribution.options__4.label"
-        }
-      ],
-      "default": "start"
-    },
-    {
-      "type": "select",
-      "id": "position",
-      "label": "t:blocks.group.settings.position.label",
-      "options": [
-        {
-          "value": "start",
-          "label": "t:blocks.group.settings.position.options__1.label"
-        },
-        {
-          "value": "center",
-          "label": "t:blocks.group.settings.position.options__2.label"
-        },
-        {
-          "value": "end",
-          "label": "t:blocks.group.settings.position.options__3.label"
-        }
-      ],
-      "default": "start",
-      "visible_if": "{{ section.settings.direction == 'row' }}"
+      "type": "range",
+      "id": "card_width",
+      "label": "t:blocks.badge_highlight.settings.width.label",
+      "min": 240,
+      "max": 420,
+      "step": 4,
+      "unit": "px",
+      "default": 312
     },
     {
       "type": "select",
@@ -327,8 +229,8 @@
     },
     {
       "type": "range",
-      "id": "gap_horizontal",
-      "label": "t:shared.gap.horizontal.label",
+      "id": "space_between",
+      "label": "t:blocks.group.settings.distribution.options__2.label",
       "min": 0,
       "max": 100,
       "step": 2,
@@ -338,19 +240,8 @@
     },
     {
       "type": "range",
-      "id": "gap_vertical",
-      "label": "t:shared.gap.vertical.label",
-      "min": 0,
-      "max": 100,
-      "step": 2,
-      "unit": "px",
-      "default": 24,
-      "visible_if": "{{ section.settings.gap_device == 'desktop' }}"
-    },
-    {
-      "type": "range",
-      "id": "gap_horizontal_mobile",
-      "label": "t:shared.gap.horizontal.label",
+      "id": "space_between_mobile",
+      "label": "t:blocks.group.settings.distribution.options__2.label",
       "min": 0,
       "max": 100,
       "step": 2,
@@ -360,14 +251,49 @@
     },
     {
       "type": "range",
-      "id": "gap_vertical_mobile",
-      "label": "t:shared.gap.vertical.label",
+      "id": "glass_opacity",
+      "label": "t:blocks.card_content.settings.background_opacity.label",
       "min": 0,
-      "max": 100,
+      "max": 40,
+      "step": 2,
+      "unit": "%",
+      "default": 10
+    },
+    {
+      "type": "range",
+      "id": "glass_blur",
+      "label": "t:blocks.card_content.settings.backdrop_blur.label",
+      "min": 0,
+      "max": 40,
       "step": 2,
       "unit": "px",
-      "default": 12,
-      "visible_if": "{{ section.settings.gap_device == 'mobile' }}"
+      "default": 16
+    },
+    {
+      "type": "range",
+      "id": "glass_border_opacity",
+      "label": "t:blocks.image.settings.border_opacity.label",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 20
+    },
+    {
+      "type": "range",
+      "id": "card_radius",
+      "label": "t:blocks.testimonial_card.settings.frame_radius.label",
+      "min": 0,
+      "max": 40,
+      "step": 2,
+      "unit": "px",
+      "default": 24
+    },
+    {
+      "type": "checkbox",
+      "id": "scroll_animation",
+      "label": "t:sections.scrolling_cards.settings.scroll_animation.label",
+      "default": true
     },
     {
       "type": "header",
@@ -377,12 +303,132 @@
       "type": "color_scheme",
       "id": "color_scheme",
       "label": "t:shared.color_scheme.label",
-      "default": "scheme-1"
+      "default": "scheme-4"
+    },
+    {
+      "type": "select",
+      "id": "background_media",
+      "label": "t:shared.background.media.label",
+      "options": [
+        {
+          "value": "none",
+          "label": "t:shared.background.media.options__1.label"
+        },
+        {
+          "value": "image",
+          "label": "t:shared.background.media.options__2.label"
+        },
+        {
+          "value": "video",
+          "label": "t:shared.background.media.options__3.label"
+        }
+      ],
+      "default": "image"
     },
     {
       "type": "color_background",
       "id": "background_color",
       "label": "t:shared.background.color.label"
+    },
+    {
+      "type": "image_picker",
+      "id": "image",
+      "label": "t:shared.background.image.label",
+      "visible_if": "{{ section.settings.background_media == 'image' }}"
+    },
+    {
+      "type": "image_picker",
+      "id": "image_mobile",
+      "label": "t:shared.background.image_mobile.label",
+      "visible_if": "{{ section.settings.background_media == 'image' }}"
+    },
+    {
+      "type": "select",
+      "id": "image_position",
+      "label": "t:shared.background.image_position.label",
+      "options": [
+        {
+          "value": "cover",
+          "label": "t:shared.background.image_position.options__1.label"
+        },
+        {
+          "value": "fit",
+          "label": "t:shared.background.image_position.options__2.label"
+        }
+      ],
+      "default": "cover",
+      "visible_if": "{{ section.settings.background_media == 'image' }}"
+    },
+    {
+      "type": "video",
+      "id": "video",
+      "label": "t:shared.background.video.label",
+      "visible_if": "{{ section.settings.background_media == 'video' }}"
+    },
+    {
+      "type": "video_url",
+      "id": "video_url",
+      "label": "t:shared.background.video_url.label",
+      "accept": [
+        "youtube",
+        "vimeo"
+      ],
+      "visible_if": "{{ section.settings.background_media == 'video' }}"
+    },
+    {
+      "type": "image_picker",
+      "id": "video_poster",
+      "label": "t:shared.background.video_poster.label",
+      "visible_if": "{{ section.settings.background_media == 'video' }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "overlay_enabled",
+      "label": "t:shared.background.overlay_enabled.label",
+      "default": true,
+      "visible_if": "{{ section.settings.background_media != 'none' }}"
+    },
+    {
+      "type": "select",
+      "id": "overlay_style",
+      "label": "t:shared.background.overlay_style.label",
+      "options": [
+        {
+          "value": "solid",
+          "label": "t:shared.background.overlay_style.options__1.label"
+        },
+        {
+          "value": "gradient",
+          "label": "t:shared.background.overlay_style.options__2.label"
+        }
+      ],
+      "default": "solid",
+      "visible_if": "{{ section.settings.background_media != 'none' and section.settings.overlay_enabled }}"
+    },
+    {
+      "type": "color",
+      "id": "overlay_color",
+      "label": "t:shared.background.overlay_color.label",
+      "default": "#000000",
+      "visible_if": "{{ section.settings.background_media != 'none' and section.settings.overlay_enabled and section.settings.overlay_style == 'solid' }}"
+    },
+    {
+      "type": "color_background",
+      "id": "overlay_gradient",
+      "label": "t:shared.background.overlay_gradient.label",
+      "default": "linear-gradient(180deg, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 1) 100%)",
+      "visible_if": "{{ section.settings.background_media != 'none' and section.settings.overlay_enabled and section.settings.overlay_style == 'gradient' }}"
+    },
+    {
+      "type": "range",
+      "id": "overlay_opacity",
+      "label": "t:shared.background.overlay_opacity.label",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 40,
+      "visible_if": "{{ section.settings.background_media != 'none' and section.settings.overlay_enabled }}"
     },
     {
       "type": "header",
@@ -632,224 +678,73 @@
   "presets": [
     {
       "name": "t:sections.scrolling_cards.name",
-      "category": "t:categories.banners",
       "settings": {
-        "container_width": "wide",
-        "color_scheme": "scheme-4",
+        "container_width": "standard",
+        "corner_position": "top",
+        "border_radius": 40,
+        "border_radius_mobile": 24,
+        "stack_layer": "default",
         "padding_top": 96,
-        "padding_bottom": 96,
+        "padding_bottom": 120,
         "padding_top_mobile": 56,
-        "padding_bottom_mobile": 56,
-        "direction": "row",
-        "gap_horizontal": 48,
-        "gap_horizontal_mobile": 24
+        "padding_bottom_mobile": 72
       },
       "blocks": [
         {
           "type": "section-header",
-          "settings": {
-            "width": "custom",
-            "width_custom": 45
-          },
-          "static": true,
           "id": "scrolling-cards-header",
+          "static": true,
+          "settings": {
+            "width": "fill"
+          },
           "blocks": [
             {
               "type": "text",
               "settings": {
-                "text": "<p>Pure, third-party tested ingredients formulated</p>",
+                "text": "<p>Write a short headline</p>",
                 "preset": "h2"
               }
             },
             {
-              "type": "image",
+              "type": "text",
               "settings": {
-                "ratio": "4-3",
-                "border_radius": 24
+                "text": "<p>that finishes on this line</p>",
+                "preset": "h2"
               }
             }
           ]
         },
         {
-          "type": "group",
+          "type": "_scrolling-card",
           "settings": {
-            "gap": 24,
-            "width": "fill"
-          },
-          "blocks": [
-            {
-              "type": "group",
-              "settings": {
-                "border_style": "solid",
-                "border_opacity": 20,
-                "border_radius": 24,
-                "padding_block": 32,
-                "padding_inline": 28,
-                "padding_block_mobile": 24,
-                "padding_inline_mobile": 20,
-                "background_color": "rgba(255,255,255,0.08)",
-                "backdrop_blur": 12,
-                "width": "fill"
-              },
-              "blocks": [
-                {
-                  "type": "subheading",
-                  "settings": {
-                    "text": "<p>100% Pure</p>",
-                    "icon_source": "none"
-                  }
-                },
-                {
-                  "type": "icon-with-text",
-                  "settings": {
-                    "icon": "leaf",
-                    "shape": "circle",
-                    "ring_style": "dashed",
-                    "shape_size": 48,
-                    "shape_size_mobile": 40,
-                    "heading": "Clean Ingredients",
-                    "alignment": "column"
-                  }
-                },
-                {
-                  "type": "text",
-                  "settings": {
-                    "text": "<p>Formulated with quality nutrients and zero cheap fillers.</p>",
-                    "preset": "paragraph"
-                  }
-                }
-              ]
-            },
-            {
-              "type": "group",
-              "settings": {
-                "border_style": "solid",
-                "border_opacity": 20,
-                "border_radius": 24,
-                "padding_block": 32,
-                "padding_inline": 28,
-                "padding_block_mobile": 24,
-                "padding_inline_mobile": 20,
-                "background_color": "rgba(255,255,255,0.08)",
-                "backdrop_blur": 12,
-                "width": "fill"
-              },
-              "blocks": [
-                {
-                  "type": "subheading",
-                  "settings": {
-                    "text": "<p>Expert Approved</p>",
-                    "icon_source": "none"
-                  }
-                },
-                {
-                  "type": "icon-with-text",
-                  "settings": {
-                    "icon": "microscope",
-                    "shape": "circle",
-                    "ring_style": "dashed",
-                    "shape_size": 48,
-                    "shape_size_mobile": 40,
-                    "heading": "Science Backed",
-                    "alignment": "column"
-                  }
-                },
-                {
-                  "type": "text",
-                  "settings": {
-                    "text": "<p>Developed alongside nutrition professionals.</p>",
-                    "preset": "paragraph"
-                  }
-                }
-              ]
-            },
-            {
-              "type": "group",
-              "settings": {
-                "border_style": "solid",
-                "border_opacity": 20,
-                "border_radius": 24,
-                "padding_block": 32,
-                "padding_inline": 28,
-                "padding_block_mobile": 24,
-                "padding_inline_mobile": 20,
-                "background_color": "rgba(255,255,255,0.08)",
-                "backdrop_blur": 12,
-                "width": "fill"
-              },
-              "blocks": [
-                {
-                  "type": "subheading",
-                  "settings": {
-                    "text": "<p>Lab Verified</p>",
-                    "icon_source": "none"
-                  }
-                },
-                {
-                  "type": "icon-with-text",
-                  "settings": {
-                    "icon": "check",
-                    "shape": "circle",
-                    "ring_style": "dashed",
-                    "shape_size": 48,
-                    "shape_size_mobile": 40,
-                    "heading": "Third-Party Tested",
-                    "alignment": "column"
-                  }
-                },
-                {
-                  "type": "text",
-                  "settings": {
-                    "text": "<p>Screened for purity and formula transparency.</p>",
-                    "preset": "paragraph"
-                  }
-                }
-              ]
-            },
-            {
-              "type": "group",
-              "settings": {
-                "border_style": "solid",
-                "border_opacity": 20,
-                "border_radius": 24,
-                "padding_block": 32,
-                "padding_inline": 28,
-                "padding_block_mobile": 24,
-                "padding_inline_mobile": 20,
-                "background_color": "rgba(255,255,255,0.08)",
-                "backdrop_blur": 12,
-                "width": "fill"
-              },
-              "blocks": [
-                {
-                  "type": "subheading",
-                  "settings": {
-                    "text": "<p>Maximum Power</p>",
-                    "icon_source": "none"
-                  }
-                },
-                {
-                  "type": "icon-with-text",
-                  "settings": {
-                    "icon": "sparkle",
-                    "shape": "circle",
-                    "ring_style": "dashed",
-                    "shape_size": 48,
-                    "shape_size_mobile": 40,
-                    "heading": "Optimal Dosage",
-                    "alignment": "column"
-                  }
-                },
-                {
-                  "type": "text",
-                  "settings": {
-                    "text": "<p>Measured servings for an easy daily routine.</p>",
-                    "preset": "paragraph"
-                  }
-                }
-              ]
-            }
-          ]
+            "label": "Label",
+            "title": "First benefit",
+            "icon": "leaf"
+          }
+        },
+        {
+          "type": "_scrolling-card",
+          "settings": {
+            "label": "Label",
+            "title": "Second benefit",
+            "icon": "microscope"
+          }
+        },
+        {
+          "type": "_scrolling-card",
+          "settings": {
+            "label": "Label",
+            "title": "Third benefit",
+            "icon": "check"
+          }
+        },
+        {
+          "type": "_scrolling-card",
+          "settings": {
+            "label": "Label",
+            "title": "Fourth benefit",
+            "icon": "sparkle"
+          }
         }
       ]
     }

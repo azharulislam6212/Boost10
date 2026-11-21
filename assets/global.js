@@ -76,6 +76,7 @@ const LAZY_MODULES = [
 
   { specifier: '@theme/testimonial-showcase', tags: ['testimonial-showcase'] },
   { specifier: '@theme/highlight-points', tags: ['highlight-points'] },
+  { specifier: '@theme/scrolling-cards', tags: ['scrolling-cards'] },
 
   { specifier: '@theme/comparison-table', tags: ['comparison-table'] },
 

@@ -20,6 +20,18 @@ const CONTINUOUS = new Set(['parallax', 'marquee']);
  */
 let editorReady = false;
 
+/**
+ * What each motion element last ran in the editor, keyed by where it sits. A
+ * re-render whose animation settings differ from last time is the merchant
+ * trying a new effect, so that one plays; any other edit still just appears.
+ *
+ * @type {Map<string, string>}
+ */
+const editorSignatures = new Map();
+
+/** The data attributes that describe an animation. */
+const SIGNATURE_KEYS = ['effect', 'duration', 'delay', 'stagger', 'distance', 'easing', 'target', 'children', 'speed', 'direction'];
+
 if (isDesignMode()) {
   if (document.readyState === 'complete') {
     editorReady = true;
@@ -66,8 +78,10 @@ export class MotionEffect extends BaseComponent {
 
     // The editor re-renders a section on every setting change. Replaying its
     // entrance from invisible each time made every edit feel like a slow reload,
-    // so content that arrives after the preview has loaded simply appears.
-    if (editorReady && !this.#replaying) {
+    // so content that arrives after the preview has loaded simply appears —
+    // unless the animation itself is what changed, which plays so it can be seen.
+    const changed = this.#recordSignature();
+    if (editorReady && !this.#replaying && !changed) {
       this.removeAttribute('data-motion-pending');
       this.setAttribute('data-motion-revealed', '');
       return;
@@ -175,6 +189,37 @@ export class MotionEffect extends BaseComponent {
   }
 
   /* ------------------------------------------------------------ helpers -- ---- */
+
+  /**
+   * Remember this element's animation settings in the editor.
+   *
+   * @returns {boolean} True when they differ from what this spot ran last time.
+   * @private
+   */
+  #recordSignature() {
+    if (!isDesignMode()) return false;
+
+    const section = this.closest('.shopify-section')?.id || '';
+    const owner = this.closest('[data-shopify-editor-block]');
+    let blockId = '';
+    if (owner) {
+      try {
+        blockId = JSON.parse(owner.getAttribute('data-shopify-editor-block') || '{}').id || '';
+      } catch {
+        blockId = owner.getAttribute('data-shopify-editor-block') || '';
+      }
+    }
+
+    const scope = owner || this.closest('.shopify-section') || document;
+    const position = Array.from(scope.querySelectorAll('motion-effect')).indexOf(this);
+
+    const key = `${section}|${blockId}|${position}`;
+    const signature = SIGNATURE_KEYS.map((name) => this.dataset[name] ?? '').join('|');
+    const previous = editorSignatures.get(key);
+    editorSignatures.set(key, signature);
+
+    return previous !== undefined && previous !== signature;
+  }
 
   /**
    * Resolve which elements the effect applies to.

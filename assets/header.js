@@ -7,6 +7,7 @@ import { BaseComponent, defineComponent } from '@theme/component';
 import { EVENTS } from '@theme/events';
 import {
   closeDisclosure,
+  isDesignMode,
   isRTL,
   matchesQuery,
   openDisclosure,
@@ -39,6 +40,20 @@ export class NavMenu extends BaseComponent {
 
   setup() {
     this.#relocatePanels();
+
+    // The theme editor: selecting a mega menu block opens its dropdown. Listened
+    // for directly, because the block's own wrapper can sit outside this menu
+    // once its panel has been moved into the matching item.
+    if (isDesignMode()) {
+      this.on(document, 'shopify:block:select', (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        const panel = target.closest('[data-mega-panel]') || target.querySelector('[data-mega-panel]');
+        const details = this.items.find((item) => item.contains(target) || (panel && item.contains(panel)));
+        if (details) this.open(details);
+      });
+      this.on(document, 'shopify:block:deselect', () => this.closeAll());
+    }
 
     if (document.readyState === 'loading') {
       this.on(document, 'DOMContentLoaded', () => this.#relocatePanels());
