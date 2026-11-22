@@ -1,0 +1,386 @@
+{% doc %}
+  A statement with small pictures set into the line, at `[image1]` and
+  `[image2]`. The text plays the theme's text animation and each picture grows
+  in from a tenth of its size when the letters reach it.
+{% enddoc %}
+
+{%- liquid
+  assign s = block.settings
+  assign preset = s.preset | default: 'h3'
+  assign alignment = s.alignment | default: 'inherit'
+  assign alignment_mobile = s.alignment_mobile | default: 'inherit'
+
+  assign text_kind = 'text'
+  if preset != 'paragraph'
+    assign text_kind = 'heading'
+  endif
+
+  capture pic_1
+    echo '<motion-effect class="highlight-text__media" data-motion-inline '
+    render 'motion-attrs', kind: 'image', effect: 'grow-in'
+    echo '>'
+    if s.image_1 != blank
+      render 'image', image: s.image_1, alt: '', ratio: '1-1', sizes: '96px'
+    else
+      echo 'product-apparel-1' | placeholder_svg_tag: 'highlight-text__placeholder'
+    endif
+    echo '</motion-effect>'
+  endcapture
+
+  capture pic_2
+    echo '<motion-effect class="highlight-text__media" data-motion-inline '
+    render 'motion-attrs', kind: 'image', effect: 'grow-in'
+    echo '>'
+    if s.image_2 != blank
+      render 'image', image: s.image_2, alt: '', ratio: '1-1', sizes: '96px'
+    else
+      echo 'product-apparel-2' | placeholder_svg_tag: 'highlight-text__placeholder'
+    endif
+    echo '</motion-effect>'
+  endcapture
+
+  assign statement = s.text | replace: '[image1]', pic_1 | replace: '[image2]', pic_2
+
+  assign classes = 'highlight-text block-text block-text--' | append: preset
+  assign classes = classes | append: ' block-text--align-' | append: alignment
+  assign classes = classes | append: ' block-text--align-mobile-' | append: alignment_mobile
+  case s.max_width
+    when 'narrow'
+      assign classes = classes | append: ' block-text--measure-narrow'
+    when 'normal'
+      assign classes = classes | append: ' block-text--measure-normal'
+  endcase
+-%}
+
+{%- capture block_style -%}
+  {%- render 'spacing', block: s, declarations: true -%}
+  --block-text-flex: 1 1 100%;
+  --block-text-width: 100%;
+{%- endcapture -%}
+
+{%- if s.text != blank -%}
+  <motion-effect
+    class="{{ classes }}"
+    data-block-spacing
+    style="{{ block_style | strip_newlines | strip }}"
+    {% render 'motion-attrs', kind: text_kind, block: s %}
+    {{ block.shopify_attributes }}
+  >
+    <p class="highlight-text__text">{{ statement }}</p>
+  </motion-effect>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "t:blocks.highlight_text.name",
+  "tag": null,
+  "settings": [
+    {
+      "type": "inline_richtext",
+      "id": "text",
+      "label": "t:sections.highlight_text_image.settings.text.label",
+      "default": "Share a short statement [image1] with small pictures set [image2] into the line."
+    },
+    {
+      "type": "image_picker",
+      "id": "image_1",
+      "label": "t:sections.highlight_text_image.settings.image_1.label"
+    },
+    {
+      "type": "image_picker",
+      "id": "image_2",
+      "label": "t:sections.highlight_text_image.settings.image_2.label"
+    },
+    {
+      "type": "select",
+      "id": "preset",
+      "label": "t:shared.typography.preset.label",
+      "options": [
+        {
+          "value": "paragraph",
+          "label": "t:shared.typography.preset.options__2.label"
+        },
+        {
+          "value": "h1",
+          "label": "t:shared.typography.preset.options__4.label"
+        },
+        {
+          "value": "h2",
+          "label": "t:shared.typography.preset.options__5.label"
+        },
+        {
+          "value": "h3",
+          "label": "t:shared.typography.preset.options__6.label"
+        },
+        {
+          "value": "h4",
+          "label": "t:shared.typography.preset.options__7.label"
+        },
+        {
+          "value": "h5",
+          "label": "t:shared.typography.preset.options__8.label"
+        },
+        {
+          "value": "h6",
+          "label": "t:shared.typography.preset.options__9.label"
+        }
+      ],
+      "default": "h3"
+    },
+    {
+      "type": "select",
+      "id": "max_width",
+      "label": "t:shared.layout.max_width.label",
+      "options": [
+        {
+          "value": "narrow",
+          "label": "t:shared.layout.max_width.options__1.label"
+        },
+        {
+          "value": "normal",
+          "label": "t:shared.layout.max_width.options__2.label"
+        },
+        {
+          "value": "none",
+          "label": "t:shared.layout.max_width.options__3.label"
+        }
+      ],
+      "default": "none"
+    },
+    {
+      "type": "select",
+      "id": "alignment",
+      "label": "t:blocks.group.settings.alignment.label",
+      "options": [
+        {
+          "value": "inherit",
+          "label": "t:shared.typography.preset.options__1.label"
+        },
+        {
+          "value": "start",
+          "label": "t:blocks.group.settings.alignment.options__1.label"
+        },
+        {
+          "value": "center",
+          "label": "t:blocks.group.settings.alignment.options__2.label"
+        },
+        {
+          "value": "end",
+          "label": "t:blocks.group.settings.alignment.options__3.label"
+        }
+      ],
+      "default": "inherit"
+    },
+    {
+      "type": "select",
+      "id": "alignment_mobile",
+      "label": "t:shared.layout.alignment_mobile.label",
+      "options": [
+        {
+          "value": "inherit",
+          "label": "t:shared.typography.preset.options__1.label"
+        },
+        {
+          "value": "start",
+          "label": "t:blocks.group.settings.alignment.options__1.label"
+        },
+        {
+          "value": "center",
+          "label": "t:blocks.group.settings.alignment.options__2.label"
+        },
+        {
+          "value": "end",
+          "label": "t:blocks.group.settings.alignment.options__3.label"
+        }
+      ],
+      "default": "inherit"
+    },
+    {
+      "type": "select",
+      "id": "animation_text",
+      "label": "t:shared.animation.animation_text.label",
+      "options": [
+        {
+          "value": "inherit",
+          "label": "t:shared.animation.animation_text.options__1.label"
+        },
+        {
+          "value": "none",
+          "label": "t:shared.animation.animation_text.options__2.label"
+        },
+        {
+          "value": "fade-in",
+          "label": "t:shared.animation.animation_text.options__3.label"
+        },
+        {
+          "value": "fade-up",
+          "label": "t:shared.animation.animation_text.options__4.label"
+        },
+        {
+          "value": "slide-up",
+          "label": "t:shared.animation.animation_text.options__5.label"
+        },
+        {
+          "value": "scale",
+          "label": "t:shared.animation.animation_text.options__6.label"
+        },
+        {
+          "value": "blur",
+          "label": "t:shared.animation.animation_text.options__7.label"
+        },
+        {
+          "value": "split-text",
+          "label": "t:shared.animation.animation_text.options__8.label"
+        },
+        {
+          "value": "words-slide-up",
+          "label": "t:shared.animation.animation_text.options__9.label"
+        },
+        {
+          "value": "words-rotate-in",
+          "label": "t:shared.animation.animation_text.options__10.label"
+        },
+        {
+          "value": "words-slide-from-right",
+          "label": "t:shared.animation.animation_text.options__11.label"
+        },
+        {
+          "value": "letters-slide-up",
+          "label": "t:shared.animation.animation_text.options__12.label"
+        },
+        {
+          "value": "letters-slide-down",
+          "label": "t:shared.animation.animation_text.options__13.label"
+        },
+        {
+          "value": "letters-fade-in",
+          "label": "t:shared.animation.animation_text.options__14.label"
+        },
+        {
+          "value": "letters-fade-in-random",
+          "label": "t:shared.animation.animation_text.options__15.label"
+        },
+        {
+          "value": "typewriter",
+          "label": "t:shared.animation.animation_text.options__16.label"
+        }
+      ],
+      "default": "inherit"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.spacing.block_header"
+    },
+    {
+      "type": "select",
+      "id": "padding_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        {
+          "value": "desktop",
+          "label": "t:shared.spacing.devices.options__1.label"
+        },
+        {
+          "value": "mobile",
+          "label": "t:shared.spacing.devices.options__2.label"
+        }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left_mobile",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right_mobile",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 0,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    }
+  ],
+  "presets": [
+    {
+      "name": "t:blocks.highlight_text.name",
+      "category": "t:categories.text"
+    }
+  ]
+}
+{% endschema %}

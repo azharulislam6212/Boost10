@@ -1,0 +1,270 @@
+{% doc %}
+  blocks/_banner-stat.liquid — private to `blocks/grid-banner.liquid`.
+  A frosted panel pinned to a top corner of the banner: an arc filled to the
+  Progress value, a number and a label. The arc fills as the banner enters.
+{% enddoc %}
+
+{%- liquid
+  assign s = block.settings
+  assign fill = s.fill | default: 0 | plus: 0
+  if fill > 100
+    assign fill = 100
+  endif
+  assign position = s.position | default: 'end'
+-%}
+
+{%- capture stat_style -%}
+  {%- render 'spacing', block: s, declarations: true -%}
+  --banner-stat-width: {{ s.width | default: 204 }}px;
+  --banner-stat-offset: {{ s.offset | default: 36 }}px;
+  --banner-stat-radius: {{ s.radius | default: 16 }}px;
+  --banner-stat-blur: {{ s.blur | default: 0 }}px;
+  --banner-stat-fill: {{ fill }};
+  {%- if s.background != blank -%}--banner-stat-background: {{ s.background }};{%- endif -%}
+  {%- if s.text_color != blank -%}--banner-stat-text: {{ s.text_color }};{%- endif -%}
+  {%- if s.fill_color != blank -%}--banner-stat-arc: {{ s.fill_color }};{%- endif -%}
+  {%- if s.track_color != blank -%}--banner-stat-track: {{ s.track_color }};{%- endif -%}
+{%- endcapture -%}
+
+<div
+  class="banner-stat banner-stat--{{ position }}"
+  data-block-spacing
+  style="{{ stat_style | strip_newlines | strip }}"
+  {{ block.shopify_attributes }}
+>
+  <svg class="banner-stat__arc" viewBox="0 0 160 46" fill="none" aria-hidden="true" focusable="false">
+    <path class="banner-stat__track" d="M8 41.5A100 100 0 0 1 152 41.5" pathLength="100"/>
+    <path class="banner-stat__progress" d="M8 41.5A100 100 0 0 1 152 41.5" pathLength="100"/>
+  </svg>
+  {%- if s.value != blank -%}
+    <span class="banner-stat__value">{{ s.value | escape }}</span>
+  {%- endif -%}
+  {%- if s.label != blank -%}
+    <span class="banner-stat__label">{{ s.label | escape }}</span>
+  {%- endif -%}
+</div>
+
+{% schema %}
+{
+  "name": "t:blocks.banner_stat.name",
+  "tag": null,
+  "settings": [
+    {
+      "type": "text",
+      "id": "value",
+      "label": "t:blocks.testimonial_stat.settings.value.label",
+      "default": "100+"
+    },
+    {
+      "type": "text",
+      "id": "label",
+      "label": "t:blocks.testimonial_stat.settings.label.label",
+      "default": "Short label"
+    },
+    {
+      "type": "range",
+      "id": "fill",
+      "label": "t:blocks.banner_stat.settings.fill.label",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "%",
+      "default": 75
+    },
+    {
+      "type": "select",
+      "id": "position",
+      "label": "t:shared.position.label",
+      "options": [
+        {
+          "value": "end",
+          "label": "t:blocks.group.settings.alignment.options__3.label"
+        },
+        {
+          "value": "start",
+          "label": "t:blocks.group.settings.alignment.options__1.label"
+        }
+      ],
+      "default": "end"
+    },
+    {
+      "type": "range",
+      "id": "offset",
+      "label": "t:blocks.banner_stat.settings.offset.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 36
+    },
+    {
+      "type": "range",
+      "id": "width",
+      "label": "t:blocks.badge_highlight.settings.width.label",
+      "min": 140,
+      "max": 280,
+      "step": 4,
+      "unit": "px",
+      "default": 204
+    },
+    {
+      "type": "header",
+      "content": "t:shared.appearance.header"
+    },
+    {
+      "type": "color",
+      "id": "background",
+      "label": "t:blocks.badge_highlight.settings.background.label",
+      "default": "rgba(255,255,255,0.62)"
+    },
+    {
+      "type": "range",
+      "id": "blur",
+      "label": "t:blocks.card_content.settings.backdrop_blur.label",
+      "min": 0,
+      "max": 40,
+      "step": 2,
+      "unit": "px",
+      "default": 12
+    },
+    {
+      "type": "color",
+      "id": "text_color",
+      "label": "t:blocks.card_content.settings.text_color.label"
+    },
+    {
+      "type": "color",
+      "id": "fill_color",
+      "label": "t:blocks.banner_stat.settings.fill_color.label"
+    },
+    {
+      "type": "color",
+      "id": "track_color",
+      "label": "t:blocks.banner_stat.settings.track_color.label"
+    },
+    {
+      "type": "range",
+      "id": "radius",
+      "label": "t:shared.corners.radius.label",
+      "min": 0,
+      "max": 40,
+      "step": 2,
+      "unit": "px",
+      "default": 16
+    },
+    {
+      "type": "header",
+      "content": "t:shared.spacing.block_header"
+    },
+    {
+      "type": "select",
+      "id": "padding_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        {
+          "value": "desktop",
+          "label": "t:shared.spacing.devices.options__1.label"
+        },
+        {
+          "value": "mobile",
+          "label": "t:shared.spacing.devices.options__2.label"
+        }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 24,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 28,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 20,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 20,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 20,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 24,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left_mobile",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 16,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right_mobile",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 16,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    }
+  ],
+  "presets": [
+    {
+      "name": "t:blocks.banner_stat.name"
+    }
+  ]
+}
+{% endschema %}
