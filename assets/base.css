@@ -10084,8 +10084,10 @@
     margin-block-start: var(--section-gap-y, 4.8rem);
   }
 
+  /* Cards sit 12px apart (6px on mobile); the Layout gap is the space above them. */
   .featured-collection-pills .carousel-shell {
-    --grid-gap-y: var(--section-gap-x, 1.2rem);
+    --grid-gap-x: 1.2rem;
+    --grid-gap-y: 1.2rem;
   }
 
   @media screen and (max-width: 989px) {
@@ -10104,7 +10106,8 @@
     }
 
     .featured-collection-pills .carousel-shell {
-      --grid-gap-y: var(--section-gap-x-mobile, var(--section-gap-x, 0.6rem));
+      --grid-gap-x: 0.6rem;
+      --grid-gap-y: 0.6rem;
     }
   }
 
@@ -16098,6 +16101,14 @@
    with the entrance animation's `transform` instead of fighting it.
    ========================================================================== */
 
+/* How far round the icon ring the hover colour has reached. Registered so it
+   can transition: the colour then travels with the spin, tick by tick. */
+@property --sc-ring-sweep {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
 @layer components {
   .scrolling-cards {
     /* `clip`, not `hidden`: the rounded corners trim the photograph without
@@ -16134,7 +16145,7 @@
     position: relative;
     z-index: 1;
     display: block;
-    margin-block-end: 4.8rem;
+    margin-block-end: var(--sc-space, 4.8rem);
   }
 
   .scrolling-cards__heading .block-group__content > :nth-child(even) {
@@ -16148,16 +16159,16 @@
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: var(--sc-space, 2.4rem);
+    gap: var(--sc-card-gap, 2.4rem);
   }
 
   .scrolling-card {
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: var(--sc-card-align, center);
+    gap: var(--sc-card-gap, 16px);
     inline-size: var(--sc-card-width, 31.2rem);
     max-inline-size: 100%;
-    padding: 4.8rem 4rem 4.4rem;
     border: 1px solid color-mix(in srgb, currentColor var(--sc-border, 20%), transparent);
     border-radius: var(--sc-card-radius, 2.4rem);
     background: linear-gradient(
@@ -16168,74 +16179,111 @@
     -webkit-backdrop-filter: blur(var(--sc-blur, 16px));
     backdrop-filter: blur(var(--sc-blur, 16px));
     color: inherit;
-    text-align: center;
+    text-align: var(--sc-card-align, center);
     transform-origin: 50% 50%;
   }
 
-  .scrolling-card__label {
-    margin: 0;
-    font-family: var(--font-body-family);
-    font-size: 1.2rem;
-    line-height: 1.4;
-    letter-spacing: 0.02em;
-    opacity: 0.9;
+  .scrolling-card--align-start { text-align: start; }
+  .scrolling-card--align-end { text-align: end; }
+
+  /* ---- the icon: a translucent disc in a ring of fine ticks ---- */
+  .scrolling-card-icon {
+    --sc-icon-current: var(--sc-icon-size, 12rem);
+    --sc-icon-ease: var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+
+    display: grid;
+    place-items: center;
   }
 
-  .scrolling-card__title {
-    margin: 0.6rem 0 0;
-    font-family: var(--font-heading-family);
-    font-weight: var(--font-heading-weight);
-    font-size: 2.2rem;
-    line-height: 1.25;
-    color: inherit;
-  }
-
-  /* ---- the icon: a dark disc in a ring of fine ticks ---- */
-  .scrolling-card__icon {
+  .scrolling-card-icon__shape {
     position: relative;
     display: grid;
     place-items: center;
-    inline-size: 12rem;
-    block-size: 12rem;
-    margin-block: 1.6rem 1.8rem;
+    inline-size: var(--sc-icon-current);
+    block-size: var(--sc-icon-current);
   }
 
-  .scrolling-card__icon::before,
-  .scrolling-card__icon::after {
+  /* Painted with background-color through a tick mask, so the colour can
+     transition on hover; a gradient's colour cannot. */
+  .scrolling-card-icon__ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background-color: var(--sc-icon-ring, color-mix(in srgb, currentColor 30%, transparent));
+    -webkit-mask:
+      repeating-conic-gradient(#000 0deg 1.2deg, transparent 1.2deg 4deg),
+      radial-gradient(circle closest-side, transparent calc(100% - 0.8rem), #000 calc(100% - 0.8rem));
+    -webkit-mask-composite: source-in;
+    mask:
+      repeating-conic-gradient(#000 0deg 1.2deg, transparent 1.2deg 4deg),
+      radial-gradient(circle closest-side, transparent calc(100% - 0.8rem), #000 calc(100% - 0.8rem));
+    mask-composite: intersect;
+    transform: rotate(0deg);
+    transition: transform 700ms var(--sc-icon-ease);
+  }
+
+  /* The hover colour, drawn inside the ring's tick mask and uncovered round
+     the circle as the ring turns. */
+  .scrolling-card-icon__ring::after {
     content: '';
     position: absolute;
-    border-radius: 50%;
-  }
-
-  .scrolling-card__icon::before {
     inset: 0;
-    background: repeating-conic-gradient(
-      color-mix(in srgb, currentColor 30%, transparent) 0deg 1.2deg,
-      transparent 1.2deg 4deg
+    background: conic-gradient(
+      var(--sc-icon-ring-hover, rgb(255 255 255)) var(--sc-ring-sweep),
+      transparent var(--sc-ring-sweep)
     );
-    -webkit-mask: radial-gradient(circle closest-side, transparent calc(100% - 0.8rem), #000 calc(100% - 0.8rem));
-    mask: radial-gradient(circle closest-side, transparent calc(100% - 0.8rem), #000 calc(100% - 0.8rem));
+    transition: --sc-ring-sweep 700ms var(--sc-icon-ease);
   }
 
-  .scrolling-card__icon::after {
+  .scrolling-card-icon__disc {
+    position: absolute;
     inset: 1.4rem;
-    background: rgb(20 22 22 / 0.55);
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background-color: var(--sc-icon-fill, rgb(20 22 22 / 0.55));
     box-shadow: 0 0 0 1px color-mix(in srgb, currentColor 10%, transparent);
+    color: var(--sc-icon-color, inherit);
+    transition:
+      background-color 500ms var(--sc-icon-ease),
+      color 500ms var(--sc-icon-ease);
   }
 
-  .scrolling-card__icon .icon {
-    position: relative;
-    z-index: 1;
-    inline-size: 3.2rem;
-    block-size: 3.2rem;
+  .scrolling-card-icon__glyph,
+  .scrolling-card-icon__image {
+    display: block;
+    inline-size: var(--sc-icon-glyph, 3.2rem);
+    block-size: var(--sc-icon-glyph, 3.2rem);
   }
 
-  .scrolling-card__text {
-    font-size: 1.6rem;
-    line-height: 1.4;
+  .scrolling-card-icon__image { object-fit: contain; }
+
+  @media (hover: hover) {
+    .scrolling-card:is(:hover, :focus-within) .scrolling-card-icon__ring {
+      transform: rotate(180deg);
+    }
+
+    .scrolling-card:is(:hover, :focus-within) .scrolling-card-icon__ring::after {
+      --sc-ring-sweep: 360deg;
+    }
+
+    .scrolling-card:is(:hover, :focus-within) .scrolling-card-icon__disc {
+      background-color: var(--sc-icon-fill-hover, rgb(20 22 22 / 0.75));
+      color: var(--sc-icon-color-hover, rgb(255 255 255));
+    }
   }
 
-  .scrolling-card__text > * { margin: 0; }
+  @media (prefers-reduced-motion: reduce) {
+    .scrolling-card-icon__ring,
+    .scrolling-card-icon__ring::after,
+    .scrolling-card-icon__disc {
+      transition-duration: 0.01ms;
+    }
+
+    .scrolling-card:is(:hover, :focus-within) .scrolling-card-icon__ring {
+      transform: none;
+    }
+  }
 
   @media screen and (min-width: 990px) {
     /* The heading stays while the cards pass over it. */
@@ -16256,14 +16304,15 @@
         var(--section-padding-block-end-mobile, var(--section-padding-block-end, 0px));
     }
 
-    .scrolling-cards__heading { margin-block-end: 3.2rem; }
+    .scrolling-cards__heading { margin-block-end: var(--sc-space-mobile, 3.2rem); }
 
-    .scrolling-cards__cards { gap: var(--sc-space-mobile, 1.2rem); }
+    .scrolling-cards__cards { gap: var(--sc-card-gap-mobile, 1.2rem); }
 
     .scrolling-card {
       inline-size: min(100%, 32rem);
-      padding: 3.6rem 2.8rem 3.2rem;
     }
+
+    .scrolling-card-icon { --sc-icon-current: var(--sc-icon-size-mobile, var(--sc-icon-size, 12rem)); }
 
     .scrolling-cards__cards > :nth-child(even) { align-self: flex-end; }
   }
