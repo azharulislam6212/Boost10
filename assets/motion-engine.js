@@ -833,6 +833,11 @@ export function reveal(element, options = {}) {
   /** This reveal, as the owner of the waits it registers. */
   const owner = {};
 
+  const isSectionHeader = element.matches(HEADER_SELECTOR);
+  if (isSectionHeader) headersPending.add(element);
+  /** The section header this reveal queues behind, once it has been looked up. @type {Element|null|undefined} */
+  let gate;
+
   // An item that brings its own entrance — a subheading's fade-up, a heading's
   // letters — plays exactly that, at its turn in this cascade. Moving it here
   // as well stacked two animations on one element and buried its own.
@@ -889,9 +894,14 @@ export function reveal(element, options = {}) {
     // Inside a wrapper that is itself animating, follow it instead of the
     // page-load cascade, which the wrapper has already taken its place in.
     const lead = ancestorLead(element);
-    const cascade = fromLoad && lead === null ? loadCascadeDelay(options) : 0;
-    const baseDelay = (lead ?? 0) + (options.delay ?? DEFAULTS.delay) + cascade;
     const now = performance.now();
+    // Content after its section's header waits for the header's own items to
+    // start first — subheading, heading, text — whichever reveal reaches it.
+    const ready = gate ? headerReady.get(gate) : undefined;
+    const gateWait = ready === undefined ? 0 : Math.max(0, ready - now);
+    const cascade = fromLoad && lead === null && ready === undefined ? loadCascadeDelay(options) : 0;
+    const baseDelay = Math.max(lead ?? 0, gateWait) + (options.delay ?? DEFAULTS.delay) + cascade;
+    let firstStart = now + baseDelay;
 
     list.forEach((target, position) => {
       let delay;
@@ -903,6 +913,7 @@ export function reveal(element, options = {}) {
         // opening a cascade of its own and landing first.
         const start = Math.max(now + baseDelay, nextSlot);
         delay = start - now;
+        if (position === 0) firstStart = start;
         nextSlot = start + stagger + headerHold(target);
       }
 
@@ -934,6 +945,10 @@ export function reveal(element, options = {}) {
       started = true;
       options.onReveal?.();
       if (!targets.includes(element)) element.dispatchEvent(new Event(PLAY_EVENT));
+      if (isSectionHeader) {
+        headerReady.set(element, firstStart + headerHold(element));
+        element.dispatchEvent(new Event(HEADER_EVENT));
+      }
     }
 
     if (units.every((unit) => unit.done)) markRevealed(element, targets);
@@ -973,8 +988,11 @@ export function reveal(element, options = {}) {
     } else if (!waitingOnWrapper) {
       waitingOnWrapper = true;
       cancelWait = afterWrapperPlays(element, owner, () => {
-        wrapperReady = true;
-        scheduleFlush();
+        gate = sectionGate(element);
+        cancelWait = afterHeaderPlays(gate, () => {
+          wrapperReady = true;
+          scheduleFlush();
+        });
       });
     }
   };
@@ -1007,6 +1025,7 @@ export function reveal(element, options = {}) {
     for (const stop of stopObserving.values()) stop();
     stopObserving.clear();
     cancelWait();
+    if (isSectionHeader) headersPending.delete(element);
     for (const target of targets) {
       if (!own.has(target)) clearState(target, restingState);
       clearWaiting(target, owner);
@@ -1104,6 +1123,80 @@ function headerHold(target) {
   const stagger = Number(header.dataset.stagger) || 0;
   const count = header.querySelector('[data-motion-items]')?.childElementCount ?? 1;
   return Math.min(Math.max(0, count - 1) * stagger, HEADER_HOLD_MAX) + HEADER_HOLD;
+}
+
+/** Fired on a section header the moment its own items are scheduled. */
+const HEADER_EVENT = 'motion:header';
+
+/** Section headers whose own entrance is set up but has not played. */
+const headersPending = new WeakSet();
+
+/**
+ * When each section header's items have all started, on the performance
+ * clock: whatever follows the header in its section starts no earlier.
+ *
+ * @type {WeakMap<Element, number>}
+ */
+const headerReady = new WeakMap();
+
+/**
+ * The section header `element` has to follow: the first one in its section,
+ * when it comes before `element` and is still on screen or below. A reveal
+ * that is, holds or sits inside a header is ordered by its own cascade.
+ *
+ * @param {Element} element
+ * @returns {Element|null}
+ * @private
+ */
+function sectionGate(element) {
+  if (element.closest(HEADER_SELECTOR) || element.querySelector(HEADER_SELECTOR)) return null;
+  const header = element.closest('.shopify-section')?.querySelector(HEADER_SELECTOR);
+  if (!header || !(header.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING)) return null;
+  if (headerReady.has(header)) return header;
+  if (!headersPending.has(header)) return null;
+  // A header the visitor has already scrolled past has nothing left to lead.
+  return header.getBoundingClientRect().bottom > 0 ? header : null;
+}
+
+/**
+ * Run `callback` once `header` has scheduled its own items, starting it now
+ * if it is still waiting for its turn. Immediately when there is no header
+ * or it has already played.
+ *
+ * @param {Element|null} header
+ * @param {() => void} callback
+ * @returns {() => void} Stop waiting.
+ * @private
+ */
+function afterHeaderPlays(header, callback) {
+  if (!header || headerReady.has(header) || !headersPending.has(header)) {
+    callback();
+    return () => {};
+  }
+
+  let done = false;
+  const run = () => {
+    if (done) return;
+    done = true;
+    header.removeEventListener(HEADER_EVENT, run);
+    clearTimeout(timer);
+    callback();
+  };
+  const timer = setTimeout(run, NESTED_WAIT);
+  header.addEventListener(HEADER_EVENT, run);
+
+  // Content in view means its header is in view or just above it: start the
+  // header's items, which starts whatever wraps the header in turn.
+  const items = header.querySelector('[data-motion-items]')?.children ?? header.children;
+  for (const node of [header, ...items]) {
+    for (const start of [...(waiting.get(node)?.values() ?? [])]) start();
+  }
+
+  return () => {
+    done = true;
+    header.removeEventListener(HEADER_EVENT, run);
+    clearTimeout(timer);
+  };
 }
 
 /** Fired on a reveal's element the moment its animation is scheduled. */
@@ -1281,9 +1374,11 @@ function shuffledIndices(length) {
 /**
  * Elements a split moves whole, in their place in the cascade: icons, stars and
  * images have no text to split, and a button's label must never come apart
- * (its hover copy is cloned from it).
+ * (its hover copy is cloned from it). A `<motion-effect data-motion-inline>`
+ * set into the text takes its turn the same way and plays its own entrance
+ * when the letters reach it.
  */
-const SPLIT_UNIT = '.button, button-swap, .block-icon-text, .icon-mark, svg, img, picture, video';
+const SPLIT_UNIT = '.button, button-swap, .block-icon-text, .icon-mark, svg, img, picture, video, [data-motion-inline]';
 
 /** Subtrees whose text is never on screen. */
 const SPLIT_SKIP = 'script, style, template, noscript';

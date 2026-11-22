@@ -126,7 +126,11 @@ export class MotionEffect extends BaseComponent {
     // Split only a lone run of text. A wrapper around blocks that animate
     // themselves (a section header) moves whole instead, as one piece, so its
     // subheading pill, icons and gradient heading are never cut into letters.
-    const splitOne = Boolean(preset.split) && targets.length === 1 && !targets[0].querySelector('motion-effect');
+    // Pictures set into the line (`data-motion-inline`) are part of the text.
+    const splitOne =
+      Boolean(preset.split) &&
+      targets.length === 1 &&
+      !targets[0].querySelector('motion-effect:not([data-motion-inline])');
 
     this.setAttribute('data-motion-pending', '');
 
