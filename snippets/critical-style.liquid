@@ -480,10 +480,13 @@
            preset name, and a visitor who has asked for reduced motion.
 
            `data-motion-arm` on `<html>` is set by the head script in
-           `snippets/scripts.liquid`, so it exists only when scripting does. If
-           the motion module never arrives, the delayed animation shows the
-           element anyway; the module marks every host pending on setup, which
-           drops the rule before the delay runs out. Parallax and
+           `snippets/scripts.liquid`, so it exists only when scripting does. The
+           same script drops it at DOMContentLoaded if the motion module has not
+           defined `<motion-effect>` by then — module scripts run before that
+           event, so a module that failed shows the page straight away, while
+           one that is merely slow (a reload re-checks every script with the
+           server) still gets its entrance. The delayed animation is only the
+           last resort for a script that never settles. Parallax and
            marquee are excluded — they are continuous effects with no entrance,
            so there is nothing to wait for. */
         /* Wrapped in `no-preference` rather than paired with a `reduce`
@@ -498,7 +501,7 @@
         @media (prefers-reduced-motion: no-preference) {
           html[data-motion-arm] motion-effect[data-effect]:not([data-effect='none']):not([data-effect='']):not([data-effect='parallax']):not([data-effect='marquee']):not([data-motion-pending]):not([data-motion-revealed]) {
             opacity: 0;
-            animation: motion-arm-failsafe 0s 2.5s forwards;
+            animation: motion-arm-failsafe 0s 12s forwards;
           }
         }
 

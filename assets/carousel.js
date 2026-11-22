@@ -7,7 +7,7 @@
 
 import { BaseComponent, defineComponent } from '@theme/component';
 import { EVENTS } from '@theme/events';
-import { prefersReducedMotion, themeString, rafThrottle, isRTL } from '@theme/utilities';
+import { prefersReducedMotion, themeString, rafThrottle, isRTL, isDesignMode } from '@theme/utilities';
 import { renderControls, findExternalControls, toggleControls } from '@theme/carousel-controls';
 
 /** Matches the 750px breakpoint used throughout `base.css`. */
@@ -17,6 +17,32 @@ const TABLET_QUERY = '(min-width: 750px)';
 const DESKTOP_QUERY = '(min-width: 990px)';
 
 /** The behaviour of a carousel given no configuration at all. */
+/**
+ * Wakes a carousel once it is within a screen of the viewport. Building one
+ * reads its computed style and layout, and on a long page every read
+ * recalculates the whole document: a page of carousels starting together held
+ * the main thread for seconds, right while the sections on screen were making
+ * their entrance, which then jumped instead of animating.
+ *
+ * @type {IntersectionObserver|null}
+ */
+const nearby =
+  typeof IntersectionObserver === 'function'
+    ? new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (!entry.isIntersecting) continue;
+            nearby?.unobserve(entry.target);
+            wakers.get(entry.target)?.();
+          }
+        },
+        { rootMargin: '100% 0px' }
+      )
+    : null;
+
+/** @type {WeakMap<Element, () => void>} */
+const wakers = new WeakMap();
+
 const DEFAULTS = {
   /** Fallback for `--carousel-slides-*` when Liquid did not write them. */
   slidesPerView: 1,
@@ -192,6 +218,9 @@ export class CarouselSlider extends BaseComponent {
   /** True while the carousel is scrolled out of view; autoplay waits. */
   #offscreen = false;
 
+  /** True once the carousel has come near the viewport and may build. */
+  #near = false;
+
   /** @type {number|undefined} */
   #frame;
 
@@ -241,16 +270,30 @@ export class CarouselSlider extends BaseComponent {
 
     this.#external = findExternalControls(this.id);
 
-    this.on(this.#tablet, 'change', () => this.#sync());
-    this.on(this.#desktop, 'change', () => this.#sync());
+    this.on(this.#tablet, 'change', () => this.#near && this.#sync());
+    this.on(this.#desktop, 'change', () => this.#near && this.#sync());
 
     this.#seedSlideVars();
     this.#bindControls();
     this.#watchSlides();
-    this.#sync();
+
+    this.#near = false;
+    if (!nearby || isDesignMode()) {
+      this.#near = true;
+      this.#sync();
+    } else {
+      wakers.set(this, () => {
+        this.#near = true;
+        this.#sync();
+      });
+      nearby.observe(this);
+    }
   }
 
   teardown() {
+    nearby?.unobserve(this);
+    wakers.delete(this);
+    this.#near = false;
     this.#mutations?.disconnect();
     this.#mutations = null;
     this.#visibility?.disconnect();
@@ -384,7 +427,8 @@ export class CarouselSlider extends BaseComponent {
   /** Re-read the slides and re-render. Call after replacing them by hand. */
   refresh() {
     if (!this.running) {
-      this.#sync();
+      // Not near yet: it builds from the fresh slides when it is.
+      if (this.#near) this.#sync();
       return;
     }
 

@@ -81,7 +81,7 @@ export class MotionEffect extends BaseComponent {
     // so content that arrives after the preview has loaded simply appears —
     // unless the animation itself is what changed, which plays so it can be seen.
     const changed = this.#recordSignature();
-    if (editorReady && !this.#replaying && !changed) {
+    if ((editorReady && !this.#replaying && !changed) || (!this.#replaying && this.#shownByFailsafe())) {
       this.removeAttribute('data-motion-pending');
       this.setAttribute('data-motion-revealed', '');
       return;
@@ -224,6 +224,24 @@ export class MotionEffect extends BaseComponent {
     editorSignatures.set(key, signature);
 
     return previous !== undefined && previous !== signature;
+  }
+
+  /**
+   * The critical stylesheet holds a host at opacity 0 until this module claims
+   * it, and lets go after 12s in case a script never settles. A host it has
+   * already let go of that sits on screen has been seen; hiding it again to
+   * animate it is a flash, not an entrance.
+   *
+   * @returns {boolean}
+   * @private
+   */
+  #shownByFailsafe() {
+    // The failsafe counts from after navigation start, so before 12s it cannot
+    // have fired — and no host pays for a style read on a normal load.
+    if (performance.now() < 12000 || this.hasAttribute('data-motion-pending')) return false;
+    if (getComputedStyle(this).opacity === '0') return false;
+    const box = this.getBoundingClientRect();
+    return box.bottom > 0 && box.top < window.innerHeight;
   }
 
   /**

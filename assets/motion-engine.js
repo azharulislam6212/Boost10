@@ -107,6 +107,24 @@ export const PRESETS = {
   },
 
   /**
+   * What a letter or word preset becomes on gradient text, which cannot be
+   * split: the heading rises whole while a soft edge uncovers it left to right.
+   */
+  'gradient-rise': {
+    group: 'text',
+    duration: 1100,
+    easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+    keyframes: ({ distance = 24, rtl = false }) => [
+      {
+        opacity: 0,
+        transform: `translate3d(0, ${distance}px, 0)`,
+        clipPath: rtl ? 'inset(-20% -10% -20% 100%)' : 'inset(-20% 100% -20% -10%)'
+      },
+      { opacity: 1, transform: 'translate3d(0, 0, 0)', clipPath: 'inset(-20% -10% -20% -10%)' }
+    ]
+  },
+
+  /**
    * Content blocks — card rows, product lists, panels — lifting into place on
    * one long, soft ease. A fixed distance rather than a percentage, so a tall
    * grid travels as far as a single card.
@@ -159,6 +177,20 @@ export const PRESETS = {
     keyframes: ({ distance = 48, rtl = false }) => [
       { opacity: 0, transform: `translate3d(${rtl ? distance : -distance}px, 0, 0)` },
       { opacity: 1, transform: 'translate3d(0, 0, 0)' }
+    ]
+  },
+
+  /**
+   * Grows from a tenth of its size — for small pictures set into a line of
+   * text, which a fade or a short rise would barely show.
+   */
+  'grow-in': {
+    group: 'image',
+    duration: 900,
+    easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+    keyframes: () => [
+      { opacity: 0, transform: 'scale(0.1)' },
+      { opacity: 1, transform: 'scale(1)' }
     ]
   },
 
@@ -498,15 +530,19 @@ export function observe(element, callback, options = {}) {
   let entry = observerPool.get(key);
 
   if (!entry) {
+    /** @type {WeakMap<Element, Set<Function>>} */
     const callbacks = new WeakMap();
     const observer = new IntersectionObserver(
       (entries) => {
         for (const item of entries) {
           if (!item.isIntersecting) continue;
-          const handler = callbacks.get(item.target);
-          if (!handler) continue;
-          if (once) observer.unobserve(item.target);
-          handler(item);
+          const handlers = callbacks.get(item.target);
+          if (!handlers) continue;
+          if (once) {
+            observer.unobserve(item.target);
+            callbacks.delete(item.target);
+          }
+          for (const handler of [...handlers]) handler(item);
         }
       },
       { threshold, rootMargin }
@@ -524,8 +560,16 @@ export function observe(element, callback, options = {}) {
     callback(item);
   };
 
-  entry.callbacks.set(element, (item) => fire(item));
-  entry.observer.observe(element);
+  // Several reveals can watch one element — a wrapper's item that also runs
+  // its own entrance — so each keeps its own handler.
+  const { observer, callbacks } = entry;
+  let handlers = callbacks.get(element);
+  if (!handlers) callbacks.set(element, (handlers = new Set()));
+  handlers.add(fire);
+  // Observing afresh is what delivers an initial entry for the new handler;
+  // every handler ignores a second one.
+  observer.unobserve(element);
+  observer.observe(element);
 
   const releaseFloor = watchScrollFloor(element, () =>
     fire({ target: element, isIntersecting: true, intersectionRatio: 1 })
@@ -534,8 +578,13 @@ export function observe(element, callback, options = {}) {
   return () => {
     done = true;
     releaseFloor();
-    entry.callbacks.delete(element);
-    entry.observer.unobserve(element);
+    const current = callbacks.get(element);
+    if (!current) return;
+    current.delete(fire);
+    if (current.size === 0) {
+      callbacks.delete(element);
+      observer.unobserve(element);
+    }
   };
 }
 
@@ -677,8 +726,23 @@ export function applyState(element, frame) {
 
   for (const [property, value] of Object.entries(frame)) {
     if (property === 'offset' || property === 'easing' || property === 'composite') continue;
-    element.style.setProperty(camelToKebab(property), String(value));
+    element.style.setProperty(camelToKebab(property), property === 'transform' ? flatten(String(value)) : String(value));
   }
+}
+
+/**
+ * `translate3d(x, y, 0)` as the 2D `translate(x, y)` it draws the same as. A
+ * resting state sits on every split letter on the page, and each 3D transform
+ * is its own compositing layer: thousands of idle layers made every frame of
+ * the load slow enough that the entrances on screen jumped. The animation
+ * still runs on the compositor; only the waiting is flat.
+ *
+ * @param {string} transform
+ * @returns {string}
+ * @private
+ */
+function flatten(transform) {
+  return transform.replace(/translate3d\(\s*([^,]+),\s*([^,]+),\s*0(?:px)?\s*\)/g, 'translate($1, $2)');
 }
 
 /**
@@ -731,7 +795,13 @@ function camelToKebab(value) {
  * @returns {() => void} Cancel a pending reveal and restore the element.
  */
 export function reveal(element, options = {}) {
-  const effect = options.effect || 'fade-up';
+  const requested = options.effect || 'fade-up';
+  // Gradient text cannot be split: each moving letter is its own GPU layer,
+  // and `background-clip: text` on such a layer paints the gradient — or the
+  // letters themselves — in the wrong place until the cascade ends. It moves
+  // whole instead, revealed left to right so it still reads as a cascade.
+  const effect =
+    getPreset(requested)?.split && !options.targets?.length && hasClippedText(element) ? 'gradient-rise' : requested;
   const preset = getPreset(effect);
 
   if (!preset) {
@@ -760,83 +830,280 @@ export function reveal(element, options = {}) {
 
   const restingState = keyframes[0];
 
-  for (const target of targets) applyState(target, restingState);
+  /** This reveal, as the owner of the waits it registers. */
+  const owner = {};
+
+  // An item that brings its own entrance — a subheading's fade-up, a heading's
+  // letters — plays exactly that, at its turn in this cascade. Moving it here
+  // as well stacked two animations on one element and buried its own.
+  const own = new Set(targets.filter((target) => target !== element && ownsEntrance(target)));
+
+  for (const target of targets) if (!own.has(target)) applyState(target, restingState);
   element.setAttribute('data-motion-pending', '');
 
   const order = preset.random ? shuffledIndices(targets.length) : null;
+  const duration = options.duration ?? (preset.duration ? preset.duration * PRESET_PACE : DEFAULTS.duration);
+  const easing = options.easing ?? preset.easing ?? EASING.outExpo;
+  const baseStagger =
+    options.stagger ?? (preset.stagger ? preset.stagger * PRESET_PACE : targets.length > 1 ? DEFAULTS.stagger : 0);
+  const spread = preset.split ? preset.maxSpread ?? MAX_SPLIT_SPREAD : MAX_ITEM_SPREAD;
 
-  const play = (fromLoad) => {
-    let stagger =
-      options.stagger ?? (preset.stagger ? preset.stagger * PRESET_PACE : targets.length > 1 ? DEFAULTS.stagger : 0);
-    if (targets.length > 1) {
-      const spread = preset.split ? preset.maxSpread ?? MAX_SPLIT_SPREAD : MAX_ITEM_SPREAD;
-      stagger = Math.min(stagger, spread / (targets.length - 1));
-    }
+  // What is watched, and what each sighting plays. A list of whole items —
+  // cards, columns, a header and its content — is watched item by item, so a
+  // tall section's lower rows wait for the visitor instead of playing unseen
+  // the moment its top edge appears. Split text and a single element play as
+  // one piece when the element itself comes into view.
+  // A clip-path resting state is watched through its parent, as it always was.
+  const clips = typeof restingState.clipPath === 'string';
+  /** @type {{ observed: Element, members: HTMLElement[], done: boolean }[]} */
+  const units =
+    !preset.split && targets.length > 1
+      ? targets.map((target) => ({
+          observed: clips ? target.parentElement ?? target : target,
+          members: [target],
+          done: false
+        }))
+      : [
+          {
+            observed: clips && targets.includes(element) ? element.parentElement ?? element : element,
+            members: targets,
+            done: false
+          }
+        ];
+
+  /** @type {Set<HTMLElement>} */
+  const queued = new Set();
+  let queuedFromLoad = false;
+  let wrapperReady = false;
+  let waitingOnWrapper = false;
+  let flushScheduled = false;
+  let started = false;
+  /** Earliest time, on the performance clock, the next whole item may start. */
+  let nextSlot = 0;
+  let cancelWait = () => {};
+  /** @type {Map<object, () => void>} */
+  const stopObserving = new Map();
+
+  const play = (list, fromLoad) => {
+    const stagger = list.length > 1 ? Math.min(baseStagger, spread / (list.length - 1)) : baseStagger;
     // Inside a wrapper that is itself animating, follow it instead of the
     // page-load cascade, which the wrapper has already taken its place in.
     const lead = ancestorLead(element);
-    const cascade = fromLoad && lead === 0 ? loadCascadeDelay(options) : 0;
-    const baseDelay = lead + (options.delay ?? DEFAULTS.delay) + cascade;
-    const duration = options.duration ?? (preset.duration ? preset.duration * PRESET_PACE : DEFAULTS.duration);
+    const cascade = fromLoad && lead === null ? loadCascadeDelay(options) : 0;
+    const baseDelay = (lead ?? 0) + (options.delay ?? DEFAULTS.delay) + cascade;
     const now = performance.now();
 
-    if (preset.split) paintClippedText(targets);
+    list.forEach((target, position) => {
+      let delay;
+      if (preset.split) {
+        delay = baseDelay + (order ? order[targets.indexOf(target)] : position) * stagger;
+      } else {
+        // Whole items queue up across sightings: one that scrolls into view a
+        // moment after the heading still takes its turn behind it, instead of
+        // opening a cascade of its own and landing first.
+        const start = Math.max(now + baseDelay, nextSlot);
+        delay = start - now;
+        nextSlot = start + stagger + headerHold(target);
+      }
 
-    targets.forEach((target, index) => {
-      const position = order ? order[index] : index;
-      const delay = baseDelay + position * stagger;
+      // A zero duration hands an item that animates itself its slot exactly,
+      // with no lead into an entrance this cascade does not play.
+      const owned = own.has(target);
+      targetTiming.set(target, { start: now + delay, duration: owned ? 0 : duration });
 
-      targetTiming.set(target, { start: now + delay, duration });
-
-      const animation = animate(target, keyframes, {
-        duration,
-        delay,
-        easing: options.easing ?? preset.easing ?? EASING.outExpo
-      });
+      const animation = owned ? null : animate(target, keyframes, { duration, delay, easing });
 
       animation?.finished
         .then(() => {
-          animation.commitStyles?.();
+          // The end frame is the element's own style, so there is nothing to
+          // commit: `commitStyles()` recalculated style once per split letter,
+          // a third of a second of main thread that held back the next entrance.
           animation.cancel();
           clearState(target, restingState);
-          unpaintClippedText(target);
         })
         .catch(() => {});
+
+      target.style.setProperty('--motion-delay', `${Math.round(delay)}ms`);
+      target.setAttribute('data-motion-played', '');
+      if (!target.hasAttribute('data-motion-armed')) target.setAttribute('data-motion-revealed', '');
+      clearWaiting(target, owner);
+      target.dispatchEvent(new Event(PLAY_EVENT));
     });
 
-    markRevealed(element, targets);
-    options.onReveal?.();
-    element.dispatchEvent(new Event(PLAY_EVENT));
+    if (!started) {
+      started = true;
+      options.onReveal?.();
+      if (!targets.includes(element)) element.dispatchEvent(new Event(PLAY_EVENT));
+    }
+
+    if (units.every((unit) => unit.done)) markRevealed(element, targets);
   };
 
-  const clipsItself = targets.includes(element) && typeof restingState.clipPath === 'string';
-  const observed = clipsItself ? element.parentElement ?? element : element;
+  const flush = () => {
+    flushScheduled = false;
+    if (queued.size === 0) return;
+    const list = targets.filter((target) => queued.has(target));
+    const fromLoad = queuedFromLoad;
+    queued.clear();
+    queuedFromLoad = false;
+    play(list, fromLoad);
+  };
 
-  let cancelWait = () => {};
+  // Next frame rather than a microtask: observers with different settings
+  // report in separate callbacks, and an item one of them starts early (a
+  // nested reveal forcing its wrapper) must still join the same cascade, or
+  // the content plays ahead of its heading.
+  const scheduleFlush = () => {
+    if (flushScheduled) return;
+    flushScheduled = true;
+    requestAnimationFrame(flush);
+  };
 
-  const cancelObserve = observe(
-    observed,
-    () => {
-      const fromLoad = withinLoadWindow();
-      cancelWait();
-      cancelWait = afterWrapperPlays(element, () => play(fromLoad));
-    },
-    {
-      threshold: options.threshold,
-      rootMargin: options.rootMargin,
-      once: options.once
+  /** @param {{ observed: Element, members: HTMLElement[], done: boolean }} unit */
+  const trigger = (unit) => {
+    if (unit.done) return;
+    unit.done = true;
+    stopObserving.get(unit)?.();
+    stopObserving.delete(unit);
+    for (const member of unit.members) queued.add(member);
+    queuedFromLoad ||= withinLoadWindow();
+
+    if (wrapperReady) {
+      scheduleFlush();
+    } else if (!waitingOnWrapper) {
+      waitingOnWrapper = true;
+      cancelWait = afterWrapperPlays(element, owner, () => {
+        wrapperReady = true;
+        scheduleFlush();
+      });
     }
-  );
+  };
+
+  /** @param {{ observed: Element, members: HTMLElement[], done: boolean }} unit */
+  const sighted = (unit) => {
+    trigger(unit);
+    if (units.length === 1) return;
+    // Everything level with or above what just appeared goes with it: slides a
+    // carousel clips sideways, items the scroll jumped past, anything without
+    // a box of its own. Only the rows still below the fold keep waiting.
+    for (const other of units) {
+      if (!other.done && other.observed.getBoundingClientRect().top < window.innerHeight) trigger(other);
+    }
+  };
+
+  for (const unit of units) {
+    for (const member of unit.members) markWaiting(member, owner, () => trigger(unit));
+    stopObserving.set(
+      unit,
+      observe(unit.observed, () => sighted(unit), {
+        threshold: options.threshold,
+        rootMargin: options.rootMargin,
+        once: options.once
+      })
+    );
+  }
 
   return () => {
-    cancelObserve();
+    for (const stop of stopObserving.values()) stop();
+    stopObserving.clear();
     cancelWait();
     for (const target of targets) {
-      clearState(target, restingState);
-      unpaintClippedText(target);
+      if (!own.has(target)) clearState(target, restingState);
+      clearWaiting(target, owner);
     }
     markRevealed(element, targets);
   };
+}
+
+/**
+ * Animated items whose entrance is not scheduled yet, by the reveal holding
+ * them. Each entry starts that entrance now — for an animation nested inside
+ * the item that is already on screen and must not play while it is invisible.
+ * One element can wait on two reveals: its own, and a wrapper's cascade.
+ *
+ * @type {WeakMap<Element, Map<object, () => void>>}
+ */
+const waiting = new WeakMap();
+
+/**
+ * @param {Element} target
+ * @param {object} owner
+ * @param {() => void} start
+ * @private
+ */
+function markWaiting(target, owner, start) {
+  let owners = waiting.get(target);
+  if (!owners) waiting.set(target, (owners = new Map()));
+  owners.set(owner, start);
+}
+
+/**
+ * @param {Element} target
+ * @param {object} owner
+ * @private
+ */
+function clearWaiting(target, owner) {
+  const owners = waiting.get(target);
+  if (!owners) return;
+  owners.delete(owner);
+  if (owners.size === 0) waiting.delete(target);
+}
+
+/**
+ * @param {Element} node
+ * @param {object} owner
+ * @returns {boolean} True while a reveal other than `owner` still holds `node`.
+ * @private
+ */
+function heldByOthers(node, owner) {
+  const owners = waiting.get(node);
+  if (!owners) return false;
+  for (const key of owners.keys()) if (key !== owner) return true;
+  return false;
+}
+
+/**
+ * Whether `target` is a `<motion-effect>` that plays its own entrance on its
+ * own box or text, rather than cascading things inside it (a wrapper, which a
+ * cascade around it still moves as one piece).
+ *
+ * @param {Element} target
+ * @returns {boolean}
+ * @private
+ */
+function ownsEntrance(target) {
+  if (target.localName !== 'motion-effect' || !(target instanceof HTMLElement)) return false;
+  const { effect = 'fade-up', target: selector, children } = target.dataset;
+  if (effect === '' || effect === 'none' || effect === 'parallax' || effect === 'marquee') return false;
+  if (selector || (children !== undefined && children !== 'false')) return false;
+  return Boolean(getPreset(effect));
+}
+
+/** A section's heading cluster. */
+const HEADER_SELECTOR = '.block-section-header';
+
+/** Settle time, in milliseconds, after a heading cluster's last item starts. */
+const HEADER_HOLD = 150;
+
+/** Longest a heading cluster's own cascade may hold back what follows it. */
+const HEADER_HOLD_MAX = 400;
+
+/**
+ * Extra wait for whatever follows `target` in a cascade when it holds a
+ * heading cluster: long enough for the cluster's own items — subheading,
+ * heading, text — to start one by one first, so tabs or cards land after the
+ * heading instead of beside it.
+ *
+ * @param {Element} target
+ * @returns {number}
+ * @private
+ */
+function headerHold(target) {
+  const header = target.matches(HEADER_SELECTOR) ? target : target.querySelector(HEADER_SELECTOR);
+  if (!(header instanceof HTMLElement)) return 0;
+  const stagger = Number(header.dataset.stagger) || 0;
+  const count = header.querySelector('[data-motion-items]')?.childElementCount ?? 1;
+  return Math.min(Math.max(0, count - 1) * stagger, HEADER_HOLD_MAX) + HEADER_HOLD;
 }
 
 /** Fired on a reveal's element the moment its animation is scheduled. */
@@ -850,8 +1117,12 @@ export const PLAY_EVENT = 'motion:play';
  */
 const targetTiming = new WeakMap();
 
-/** How far into its wrapper's entrance a nested animation begins. */
-const NESTED_LEAD = 0.35;
+/**
+ * How far into its wrapper's entrance a nested animation begins: just after
+ * the wrapper starts to show, so the two read as one motion rather than the
+ * inner one queueing behind the outer.
+ */
+const NESTED_LEAD = 0.1;
 
 /** Longest a nested animation waits for a wrapper that never plays. */
 const NESTED_WAIT = 2500;
@@ -863,7 +1134,7 @@ const NESTED_WAIT = 2500;
  * invisible and waiting its turn, so it never seemed to animate at all.
  *
  * @param {Element} element
- * @returns {number}
+ * @returns {number|null} Null when nothing around it animates.
  * @private
  */
 function ancestorLead(element) {
@@ -873,36 +1144,54 @@ function ancestorLead(element) {
     const timing = targetTiming.get(node);
     if (timing) return Math.max(0, timing.start + timing.duration * NESTED_LEAD - performance.now());
   }
-  return 0;
+  return null;
 }
 
 /**
- * Run `callback` once the animated wrapper around `element` has scheduled its
+ * Run `callback` once the animated item around `element` has scheduled its
  * own entrance, so {@link ancestorLead} can see it. Immediately when there is
- * no such wrapper waiting.
+ * no such item waiting. An item still waiting for its own turn on screen is
+ * started now: `element` being visible means it is too.
  *
  * @param {Element} element
+ * @param {object} owner The reveal asking, whose own hold on `element` does not count.
  * @param {() => void} callback
  * @returns {() => void} Stop waiting.
  * @private
  */
-function afterWrapperPlays(element, callback) {
-  const wrapper = element.parentElement?.closest('[data-motion-pending]');
+function afterWrapperPlays(element, owner, callback) {
+  /** @type {Element|null} */
+  let wrapper = null;
+  for (let node = element; node; node = node.parentElement) {
+    if (heldByOthers(node, owner)) {
+      wrapper = node;
+      break;
+    }
+  }
+
   if (!wrapper) {
     callback();
     return () => {};
   }
 
+  const held = wrapper;
   let done = false;
   const run = () => {
     if (done) return;
     done = true;
-    wrapper.removeEventListener(PLAY_EVENT, run);
+    held.removeEventListener(PLAY_EVENT, onPlay);
     clearTimeout(timer);
     callback();
   };
+  const onPlay = () => {
+    if (!heldByOthers(held, owner)) run();
+  };
   const timer = setTimeout(run, NESTED_WAIT);
-  wrapper.addEventListener(PLAY_EVENT, run);
+  held.addEventListener(PLAY_EVENT, onPlay);
+
+  for (const [key, start] of [...(waiting.get(held) ?? [])]) {
+    if (key !== owner) start();
+  }
 
   return () => {
     done = true;
@@ -911,81 +1200,31 @@ function afterWrapperPlays(element, callback) {
   };
 }
 
-/** Inline properties {@link paintClippedText} writes. */
-const CLIPPED_TEXT_PROPS = [
-  'background-image',
-  'background-size',
-  'background-position',
-  'background-repeat',
-  '-webkit-background-clip',
-  'background-clip'
-];
+/**
+ * Every class the stylesheets give `background-clip: text`. Keep in step with
+ * base.css, header.css and footer.css.
+ */
+const CLIPPED_TEXT_SELECTOR = [
+  '.block-text--gradient',
+  '.text-gradient',
+  '.custom-element--gradient',
+  ".custom-element[style*='--font-custom-gradient']",
+  '.tabs__rail--gradient',
+  '.footer-legal__wordmark-text'
+].join(', ');
 
 /**
- * Gradient text (`background-clip: text`) only paints the letters that share
- * its layer. A split piece mid-animation has its own transform and opacity, so
- * it drops out and the heading is blank until the cascade ends, then jumps in.
- * Each piece borrows the host's gradient, sized and offset to where the piece
- * sits, so it carries its own slice of the same gradient while it moves.
+ * Whether `root` or anything in it paints its text through its background.
+ * Matched by selector: reading computed styles here, between reveals that
+ * have just written inline styles, recalculated the page's style once per
+ * descendant and froze a reload for over a second.
  *
- * @param {HTMLElement[]} parts
+ * @param {Element} root
+ * @returns {boolean}
  * @private
  */
-function paintClippedText(parts) {
-  /** @type {Map<Element, Element|null>} */
-  const hosts = new Map();
-
-  const hostOf = (part) => {
-    const parent = part.parentElement;
-    if (!parent) return null;
-    if (hosts.has(parent)) return hosts.get(parent);
-    let host = null;
-    for (let node = parent; node && node !== document.body; node = node.parentElement) {
-      const style = getComputedStyle(node);
-      if (style.backgroundClip === 'text' || style.webkitBackgroundClip === 'text') {
-        host = style.backgroundImage !== 'none' ? node : null;
-        break;
-      }
-    }
-    hosts.set(parent, host);
-    return host;
-  };
-
-  const painted = [];
-  for (const part of parts) {
-    if (part.hasAttribute('data-motion-unit')) continue;
-    const host = hostOf(part);
-    if (host) painted.push([part, host]);
-  }
-  if (painted.length === 0) return;
-
-  // Measure without the resting offset, then put it back.
-  const transforms = painted.map(([part]) => part.style.transform);
-  for (const [part] of painted) part.style.transform = 'none';
-
-  const boxes = painted.map(([part, host]) => [part.getBoundingClientRect(), host.getBoundingClientRect()]);
-
-  painted.forEach(([part, host], index) => {
-    const [box, hostBox] = boxes[index];
-    part.style.transform = transforms[index];
-    part.style.backgroundImage = getComputedStyle(host).backgroundImage;
-    part.style.backgroundSize = `${hostBox.width}px ${hostBox.height}px`;
-    part.style.backgroundPosition = `${hostBox.left - box.left}px ${hostBox.top - box.top}px`;
-    part.style.backgroundRepeat = 'no-repeat';
-    part.style.setProperty('-webkit-background-clip', 'text');
-    part.style.backgroundClip = 'text';
-    part.setAttribute('data-motion-clipped', '');
-  });
-}
-
-/**
- * @param {HTMLElement} part
- * @private
- */
-function unpaintClippedText(part) {
-  if (!part.hasAttribute('data-motion-clipped')) return;
-  for (const prop of CLIPPED_TEXT_PROPS) part.style.removeProperty(prop);
-  part.removeAttribute('data-motion-clipped');
+function hasClippedText(root) {
+  return root.matches(CLIPPED_TEXT_SELECTOR) || root.querySelector(CLIPPED_TEXT_SELECTOR) !== null;
 }
 
 /**
@@ -1000,7 +1239,9 @@ function loadCascadeDelay(options) {
   const step = options.loadStagger ?? DEFAULTS.loadStagger;
   const delay = loadIndex * step;
   loadIndex += 1;
-  return Math.min(delay, step * 8);
+  // A short cap: a reload that lands mid-page has a dozen hosts on screen,
+  // and the last of them waiting half a second read as a blank section.
+  return Math.min(delay, step * 3);
 }
 
 /**
