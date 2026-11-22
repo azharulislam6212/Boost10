@@ -590,6 +590,10 @@ export class CarouselSlider extends BaseComponent {
     copy.removeAttribute('data-active');
     copy.removeAttribute('data-motion-armed');
     copy.removeAttribute('data-motion-revealed');
+    // A slide copied mid-entrance would keep its hidden starting state forever.
+    for (const prop of ['opacity', 'transform', 'clip-path', 'filter', 'translate', 'scale', 'rotate']) {
+      copy.style.removeProperty(prop);
+    }
 
     for (const node of copy.querySelectorAll('[id]')) node.removeAttribute('id');
 

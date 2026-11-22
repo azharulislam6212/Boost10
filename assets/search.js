@@ -814,6 +814,15 @@ export class SearchDrawer extends DrawerComponent {
     return 'search';
   }
 
+  /** The theme editor: selecting the search drawer's section opens it for editing. */
+  sectionSelected() {
+    this.open();
+  }
+
+  sectionDeselected() {
+    this.close();
+  }
+
   afterOpen() {
     this.querySelector('predictive-search')?.refreshRecent?.();
 

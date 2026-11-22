@@ -510,6 +510,15 @@ export class CartDrawer extends DrawerComponent {
     this.on(document, EVENTS.CART_ERROR, this.#onCartError);
   }
 
+  /** The theme editor: selecting the cart drawer's section opens it for editing. */
+  sectionSelected() {
+    this.open();
+  }
+
+  sectionDeselected() {
+    this.close();
+  }
+
   teardown() {
     for (const id of (this.dataset.sections || '').split(',')) {
       cart.unregisterSection(id.trim());

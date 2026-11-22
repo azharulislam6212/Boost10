@@ -12,6 +12,7 @@ import {
   setCssVar,
   storage,
   isRTL,
+  isDesignMode,
   prefersReducedMotion,
   getFocusableElements,
   bufferOverlayTriggers
@@ -614,29 +615,40 @@ export class CookieBanner extends BaseComponent {
   static KEY = 'cookie-consent';
 
   setup() {
-    const stored = storage.get(CookieBanner.KEY, null);
+    this.on(this.refs.accept, 'click', () => this.respond(true));
+    if (this.refs.decline) this.on(this.refs.decline, 'click', () => this.respond(false));
 
-    if (stored !== null) {
+    // The theme editor ignores any stored choice and shows the banner only while
+    // its section is selected, so it can always be reached for editing.
+    if (isDesignMode() || storage.get(CookieBanner.KEY, null) !== null) {
       this.hidden = true;
       return;
     }
 
-    window.setTimeout(() => {
-      this.hidden = false;
-      this.setAttribute('data-visible', '');
-    }, Number(this.dataset.delay) || 1500);
+    window.setTimeout(() => this.show(), Number(this.dataset.delay) || 1500);
+  }
 
-    this.on(this.refs.accept, 'click', () => this.respond(true));
-    if (this.refs.decline) this.on(this.refs.decline, 'click', () => this.respond(false));
+  show() {
+    this.hidden = false;
+    this.setAttribute('data-visible', '');
+  }
+
+  sectionSelected() {
+    this.show();
+  }
+
+  sectionDeselected() {
+    this.respond(null);
   }
 
   /**
-   * Record the customer's choice and dismiss.
+   * Record the customer's choice and dismiss. Nothing is stored in the theme
+   * editor, or when `accepted` is null.
    *
-   * @param {boolean} accepted
+   * @param {boolean | null} accepted
    */
   respond(accepted) {
-    storage.set(CookieBanner.KEY, accepted);
+    if (accepted !== null && !isDesignMode()) storage.set(CookieBanner.KEY, accepted);
     this.removeAttribute('data-visible');
 
     window.setTimeout(() => {

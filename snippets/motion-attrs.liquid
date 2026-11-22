@@ -1,7 +1,7 @@
 {% doc %}
   Resolves animation settings into `<motion-effect>` attributes.
 
-  @param {string} kind - 'text' or 'image'. Chooses which setting family and which theme-level default to fall back to.
+  @param {string} kind - 'text', 'heading', 'subheading', 'button', 'content' or 'image'. 'content' is for wrappers around cards, lists and panels. Chooses which setting family and which theme-level default to fall back to.
   @param {object} [block] - `block.settings`
   @param {object} [section] - `section.settings`
   @param {string} [effect] - Hard override. Skips the cascade entirely.
@@ -34,13 +34,29 @@
 
 {%- liquid
   # ---- which family are we resolving -------------------------------------
-  if kind == 'image'
-    assign setting_key = 'animation_image'
-    assign theme_default = settings.motion_effect
-  else
-    assign setting_key = 'animation_text'
-    assign theme_default = settings.animation_style
-  endif
+  # Headings, subheadings and buttons share the block's `animation_text`
+  # setting but each fall back to their own theme default. Subheadings and
+  # buttons are whole elements, so they always resolve block-level.
+  assign setting_key = 'animation_text'
+  assign element_level = block_level | default: false
+  case kind
+    when 'image'
+      assign setting_key = 'animation_image'
+      assign theme_default = settings.motion_effect
+    when 'heading'
+      assign theme_default = settings.animation_heading | default: settings.animation_style
+    when 'subheading'
+      assign theme_default = settings.animation_subheading | default: 'fade-up'
+      assign element_level = true
+    when 'button'
+      assign theme_default = settings.animation_button | default: 'fade-up'
+      assign element_level = true
+    when 'content'
+      assign theme_default = settings.animation_content | default: 'smooth-rise'
+      assign element_level = true
+    else
+      assign theme_default = settings.animation_style
+  endcase
 
   # ---- cascade: block › section › theme ----------------------------------
   #
@@ -92,18 +108,18 @@
   # translated: each splitting preset maps to the whole-element preset that
   # moves the same way. A section set to `words-slide-up` gets buttons that
   # slide up in one piece, same direction, same timing.
-  if block_level
+  if element_level
     case resolved
-      when 'words-slide-up', 'letters-slide-up'
-        assign resolved = 'slide-up'
+      when 'words-slide-up', 'letters-slide-up', 'split-text'
+        assign resolved = 'fade-up'
       when 'letters-slide-down'
         assign resolved = 'slide-down'
       when 'words-slide-from-right'
         assign resolved = 'slide-left'
-      when 'letters-fade-in', 'letters-fade-in-random'
+      when 'letters-fade-in', 'letters-fade-in-random', 'typewriter'
         assign resolved = 'fade-in'
-      when 'words-rotate-in', 'split-text'
-        assign resolved = 'fade-up'
+      when 'words-rotate-in'
+        assign resolved = 'flip-up'
     endcase
   endif
 
@@ -134,6 +150,10 @@
   assign resolved_duration = duration | default: 0 | plus: 0
   assign resolved_delay = delay | default: 0 | plus: 0
   assign resolved_stagger = stagger | default: 0 | plus: 0
+  # Content arrives item by item, far enough apart to read as a sequence.
+  if kind == 'content' and resolved_stagger < 200
+    assign resolved_stagger = 200
+  endif
 -%}
 
 {%- liquid

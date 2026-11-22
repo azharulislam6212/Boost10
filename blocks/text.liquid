@@ -16,11 +16,9 @@
   # into the field stays an `<h2>` and takes its size from the global scale,
   # same as it would anywhere else on the page.
   #
-  # Any heading preset is the merchant saying "all of this is a heading at this
-  # level", so it normalises the tags to match: paragraphs become that heading,
-  # and a heading typed at some other level is moved to it. Otherwise the size
-  # would say H2 while the document outline still said H1, and the outline is
-  # the half nobody can see.
+  # A heading preset turns plain paragraphs into that heading. A level chosen in
+  # the editor (H1–H6) is kept as typed, for the outline; the preset alone sets
+  # how it looks, so changing the level never changes the text's appearance.
   assign heading_levels = 'h1 h2 h3 h4 h5 h6'
   assign is_heading = false
   if heading_levels contains preset
@@ -29,19 +27,16 @@
 
   assign body = s.text
 
+  # Headings follow the theme's heading animation, everything else the text one.
+  assign text_kind = 'text'
+  if is_heading
+    assign text_kind = 'heading'
+  endif
+
   if is_heading
     assign open_tag = '<' | append: preset | append: '>'
     assign close_tag = '</' | append: preset | append: '>'
     assign body = body | replace: '<p>', open_tag | replace: '</p>', close_tag
-
-    assign levels = heading_levels | split: ' '
-    for level in levels
-      unless level == preset
-        assign find_open = '<' | append: level | append: '>'
-        assign find_close = '</' | append: level | append: '>'
-        assign body = body | replace: find_open, open_tag | replace: find_close, close_tag
-      endunless
-    endfor
   endif
 
   # ---- width --------------------------------------------------------------
@@ -127,7 +122,7 @@
 
 {%- if s.text != blank -%}
   <motion-effect
-    {% render 'motion-attrs', kind: 'text', block: s %}
+    {% render 'motion-attrs', kind: text_kind, block: s %}
     class="{{ classes }}"
     data-block-spacing
     style="{{ block_style | strip_newlines | strip }}"
@@ -896,7 +891,7 @@
       "name": "t:blocks.text.presets.heading.name",
       "category": "t:categories.text",
       "settings": {
-        "text": "<p>Heading</p>",
+        "text": "<h2>Heading</h2>",
         "preset": "h2",
         "max_width": "none"
       }

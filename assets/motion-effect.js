@@ -123,9 +123,14 @@ export class MotionEffect extends BaseComponent {
 
     const targets = this.#targets();
 
+    // Split only a lone run of text. A wrapper around blocks that animate
+    // themselves (a section header) moves whole instead, as one piece, so its
+    // subheading pill, icons and gradient heading are never cut into letters.
+    const splitOne = Boolean(preset.split) && targets.length === 1 && !targets[0].querySelector('motion-effect');
+
     this.setAttribute('data-motion-pending', '');
 
-    this.#cancelReveal = reveal(preset.split && targets.length === 1 ? targets[0] : this, {
+    this.#cancelReveal = reveal(splitOne ? targets[0] : this, {
       effect,
       onReveal: () => {
         this.removeAttribute('data-motion-pending');
@@ -134,7 +139,7 @@ export class MotionEffect extends BaseComponent {
         // never runs for "none", reduced motion or an editor re-render.
         this.setAttribute('data-motion-played', '');
       },
-      targets: preset.split && targets.length <= 1 ? undefined : targets,
+      targets: splitOne ? undefined : targets,
       duration: this.#number('duration'),
       delay: this.#number('delay'),
       stagger: this.#number('stagger'),
@@ -234,7 +239,7 @@ export class MotionEffect extends BaseComponent {
     }
 
     if (this.dataset.children !== undefined && this.dataset.children !== 'false') {
-      return Array.from(this.children);
+      return itemsOf(Array.from(this.children));
     }
 
     return [this];
@@ -265,6 +270,29 @@ export class MotionEffect extends BaseComponent {
     }
     if (this.hasAttribute('data-motion-split')) unsplitText(this);
   }
+}
+
+/**
+ * The children to cascade, one after another. A box that only holds the real
+ * items — a carousel, its track, a group's content, anything marked
+ * `data-motion-items` — gives way to the items inside it, so a row of cards
+ * comes in card by card instead of as one block.
+ *
+ * @param {Element[]} nodes
+ * @returns {HTMLElement[]}
+ */
+function itemsOf(nodes) {
+  /** @type {HTMLElement[]} */
+  const items = [];
+  for (const node of nodes) {
+    if (!(node instanceof HTMLElement)) continue;
+    if (node.matches("carousel-slider, [data-ref~='track'], [data-motion-items]") && node.children.length > 0) {
+      items.push(...itemsOf(Array.from(node.children)));
+    } else {
+      items.push(node);
+    }
+  }
+  return items;
 }
 
 defineComponent('motion-effect', MotionEffect);

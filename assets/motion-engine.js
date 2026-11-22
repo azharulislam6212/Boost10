@@ -42,6 +42,19 @@ const DEFAULTS = {
  */
 const PRESET_PACE = 0.8;
 
+/**
+ * Longest a split preset may take to cascade across its pieces, in
+ * milliseconds. A heading lands well inside it; a long paragraph split into
+ * letters compresses its stagger instead of trickling in for seconds.
+ */
+const MAX_SPLIT_SPREAD = 1200;
+
+/**
+ * Longest a cascade of whole items (cards, columns, slides) may take to start
+ * its last one, in milliseconds. A long list tightens instead of trickling.
+ */
+const MAX_ITEM_SPREAD = 1800;
+
 /* ==========================================================================
    Preset registry
    ========================================================================== */
@@ -54,7 +67,8 @@ const PRESET_PACE = 0.8;
  * @property {number} [duration] Preset-specific default, in milliseconds.
  * @property {number} [stagger] Preset-specific default, in milliseconds.
  * @property {string} [easing]
- * @property {string} [group] `text`, `image` or `both`. Used by the editor to sort options.
+ * @property {number} [maxSpread] Cap on the whole split cascade, in milliseconds. Defaults to MAX_SPLIT_SPREAD.
+ * @property {string} [group] `text`, `image`, `element` or `both`. Used by the editor to sort options.
  */
 
 /**
@@ -88,6 +102,22 @@ export const PRESETS = {
     easing: 'cubic-bezier(0, 0, 0.3, 1)',
     keyframes: () => [
       { opacity: 0, transform: 'translate3d(0, 30%, 0)' },
+      { opacity: 1, transform: 'translate3d(0, 0, 0)' }
+    ]
+  },
+
+  /**
+   * Content blocks — card rows, product lists, panels — lifting into place on
+   * one long, soft ease. A fixed distance rather than a percentage, so a tall
+   * grid travels as far as a single card.
+   */
+  'smooth-rise': {
+    group: 'element',
+    duration: 1100,
+    stagger: 250,
+    easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+    keyframes: ({ distance = 56 }) => [
+      { opacity: 0, transform: `translate3d(0, ${distance}px, 0)` },
       { opacity: 1, transform: 'translate3d(0, 0, 0)' }
     ]
   },
@@ -146,6 +176,75 @@ export const PRESETS = {
     keyframes: () => [
       { opacity: 0, filter: 'blur(14px)' },
       { opacity: 1, filter: 'blur(0px)' }
+    ]
+  },
+
+  /* ------------------------------------------------------------ element -- ---- */
+  /* Whole-element entrances for subheadings and buttons, each a distinct move. */
+
+  'pop-in': {
+    group: 'element',
+    duration: 600,
+    easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+    keyframes: () => [
+      { opacity: 0, transform: 'scale(0.6)' },
+      { opacity: 1, transform: 'scale(1)' }
+    ]
+  },
+
+  'bounce-in': {
+    group: 'element',
+    duration: 900,
+    easing: 'ease-out',
+    keyframes: () => [
+      { opacity: 0, transform: 'translate3d(0, 40px, 0)' },
+      { opacity: 1, transform: 'translate3d(0, -8px, 0)', offset: 0.55 },
+      { opacity: 1, transform: 'translate3d(0, 3px, 0)', offset: 0.8 },
+      { opacity: 1, transform: 'translate3d(0, 0, 0)' }
+    ]
+  },
+
+  'flip-up': {
+    group: 'element',
+    duration: 800,
+    easing: EASING.outQuint,
+    keyframes: () => [
+      { opacity: 0, transform: 'perspective(600px) rotateX(-75deg)', transformOrigin: '50% 100%' },
+      { opacity: 1, transform: 'perspective(600px) rotateX(0deg)', transformOrigin: '50% 100%' }
+    ]
+  },
+
+  'swing-in': {
+    group: 'element',
+    duration: 850,
+    easing: EASING.outBack,
+    keyframes: ({ rtl = false }) => [
+      {
+        opacity: 0,
+        transform: `perspective(600px) rotateY(${rtl ? 70 : -70}deg)`,
+        transformOrigin: rtl ? '100% 50%' : '0% 50%'
+      },
+      { opacity: 1, transform: 'perspective(600px) rotateY(0deg)', transformOrigin: rtl ? '100% 50%' : '0% 50%' }
+    ]
+  },
+
+  'rotate-in': {
+    group: 'element',
+    duration: 750,
+    easing: EASING.outQuint,
+    keyframes: ({ rtl = false }) => [
+      { opacity: 0, transform: `translate3d(0, 24px, 0) rotate(${rtl ? 8 : -8}deg)` },
+      { opacity: 1, transform: 'translate3d(0, 0, 0) rotate(0deg)' }
+    ]
+  },
+
+  'skew-up': {
+    group: 'element',
+    duration: 750,
+    easing: EASING.outQuint,
+    keyframes: () => [
+      { opacity: 0, transform: 'translate3d(0, 32px, 0) skewY(7deg)' },
+      { opacity: 1, transform: 'translate3d(0, 0, 0) skewY(0deg)' }
     ]
   },
 
@@ -300,6 +399,7 @@ export const PRESETS = {
     split: 'chars',
     duration: 1,
     stagger: 45,
+    maxSpread: 3000,
     keyframes: () => [{ opacity: 0 }, { opacity: 1 }]
   }
 };
@@ -666,16 +766,31 @@ export function reveal(element, options = {}) {
   const order = preset.random ? shuffledIndices(targets.length) : null;
 
   const play = (fromLoad) => {
-    const stagger =
+    let stagger =
       options.stagger ?? (preset.stagger ? preset.stagger * PRESET_PACE : targets.length > 1 ? DEFAULTS.stagger : 0);
-    const baseDelay = (options.delay ?? DEFAULTS.delay) + (fromLoad ? loadCascadeDelay(options) : 0);
+    if (targets.length > 1) {
+      const spread = preset.split ? preset.maxSpread ?? MAX_SPLIT_SPREAD : MAX_ITEM_SPREAD;
+      stagger = Math.min(stagger, spread / (targets.length - 1));
+    }
+    // Inside a wrapper that is itself animating, follow it instead of the
+    // page-load cascade, which the wrapper has already taken its place in.
+    const lead = ancestorLead(element);
+    const cascade = fromLoad && lead === 0 ? loadCascadeDelay(options) : 0;
+    const baseDelay = lead + (options.delay ?? DEFAULTS.delay) + cascade;
+    const duration = options.duration ?? (preset.duration ? preset.duration * PRESET_PACE : DEFAULTS.duration);
+    const now = performance.now();
+
+    if (preset.split) paintClippedText(targets);
 
     targets.forEach((target, index) => {
       const position = order ? order[index] : index;
+      const delay = baseDelay + position * stagger;
+
+      targetTiming.set(target, { start: now + delay, duration });
 
       const animation = animate(target, keyframes, {
-        duration: options.duration ?? (preset.duration ? preset.duration * PRESET_PACE : DEFAULTS.duration),
-        delay: baseDelay + position * stagger,
+        duration,
+        delay,
         easing: options.easing ?? preset.easing ?? EASING.outExpo
       });
 
@@ -684,20 +799,28 @@ export function reveal(element, options = {}) {
           animation.commitStyles?.();
           animation.cancel();
           clearState(target, restingState);
+          unpaintClippedText(target);
         })
         .catch(() => {});
     });
 
     markRevealed(element, targets);
     options.onReveal?.();
+    element.dispatchEvent(new Event(PLAY_EVENT));
   };
 
   const clipsItself = targets.includes(element) && typeof restingState.clipPath === 'string';
   const observed = clipsItself ? element.parentElement ?? element : element;
 
+  let cancelWait = () => {};
+
   const cancelObserve = observe(
     observed,
-    () => play(withinLoadWindow()),
+    () => {
+      const fromLoad = withinLoadWindow();
+      cancelWait();
+      cancelWait = afterWrapperPlays(element, () => play(fromLoad));
+    },
     {
       threshold: options.threshold,
       rootMargin: options.rootMargin,
@@ -707,9 +830,162 @@ export function reveal(element, options = {}) {
 
   return () => {
     cancelObserve();
-    for (const target of targets) clearState(target, restingState);
+    cancelWait();
+    for (const target of targets) {
+      clearState(target, restingState);
+      unpaintClippedText(target);
+    }
     markRevealed(element, targets);
   };
+}
+
+/** Fired on a reveal's element the moment its animation is scheduled. */
+export const PLAY_EVENT = 'motion:play';
+
+/**
+ * When each animated target starts moving and for how long, so an animation
+ * nested inside it can follow on.
+ *
+ * @type {WeakMap<Element, { start: number, duration: number }>}
+ */
+const targetTiming = new WeakMap();
+
+/** How far into its wrapper's entrance a nested animation begins. */
+const NESTED_LEAD = 0.35;
+
+/** Longest a nested animation waits for a wrapper that never plays. */
+const NESTED_WAIT = 2500;
+
+/**
+ * Milliseconds until a nested animation should start: partway into the
+ * entrance of the closest animated element around it. Starting together meant
+ * a button or heading played its whole entrance while its section was still
+ * invisible and waiting its turn, so it never seemed to animate at all.
+ *
+ * @param {Element} element
+ * @returns {number}
+ * @private
+ */
+function ancestorLead(element) {
+  // The element itself first: a text block that is one item in its wrapper's
+  // cascade follows its own turn, not the wrapper's first item.
+  for (let node = element; node; node = node.parentElement) {
+    const timing = targetTiming.get(node);
+    if (timing) return Math.max(0, timing.start + timing.duration * NESTED_LEAD - performance.now());
+  }
+  return 0;
+}
+
+/**
+ * Run `callback` once the animated wrapper around `element` has scheduled its
+ * own entrance, so {@link ancestorLead} can see it. Immediately when there is
+ * no such wrapper waiting.
+ *
+ * @param {Element} element
+ * @param {() => void} callback
+ * @returns {() => void} Stop waiting.
+ * @private
+ */
+function afterWrapperPlays(element, callback) {
+  const wrapper = element.parentElement?.closest('[data-motion-pending]');
+  if (!wrapper) {
+    callback();
+    return () => {};
+  }
+
+  let done = false;
+  const run = () => {
+    if (done) return;
+    done = true;
+    wrapper.removeEventListener(PLAY_EVENT, run);
+    clearTimeout(timer);
+    callback();
+  };
+  const timer = setTimeout(run, NESTED_WAIT);
+  wrapper.addEventListener(PLAY_EVENT, run);
+
+  return () => {
+    done = true;
+    wrapper.removeEventListener(PLAY_EVENT, run);
+    clearTimeout(timer);
+  };
+}
+
+/** Inline properties {@link paintClippedText} writes. */
+const CLIPPED_TEXT_PROPS = [
+  'background-image',
+  'background-size',
+  'background-position',
+  'background-repeat',
+  '-webkit-background-clip',
+  'background-clip'
+];
+
+/**
+ * Gradient text (`background-clip: text`) only paints the letters that share
+ * its layer. A split piece mid-animation has its own transform and opacity, so
+ * it drops out and the heading is blank until the cascade ends, then jumps in.
+ * Each piece borrows the host's gradient, sized and offset to where the piece
+ * sits, so it carries its own slice of the same gradient while it moves.
+ *
+ * @param {HTMLElement[]} parts
+ * @private
+ */
+function paintClippedText(parts) {
+  /** @type {Map<Element, Element|null>} */
+  const hosts = new Map();
+
+  const hostOf = (part) => {
+    const parent = part.parentElement;
+    if (!parent) return null;
+    if (hosts.has(parent)) return hosts.get(parent);
+    let host = null;
+    for (let node = parent; node && node !== document.body; node = node.parentElement) {
+      const style = getComputedStyle(node);
+      if (style.backgroundClip === 'text' || style.webkitBackgroundClip === 'text') {
+        host = style.backgroundImage !== 'none' ? node : null;
+        break;
+      }
+    }
+    hosts.set(parent, host);
+    return host;
+  };
+
+  const painted = [];
+  for (const part of parts) {
+    if (part.hasAttribute('data-motion-unit')) continue;
+    const host = hostOf(part);
+    if (host) painted.push([part, host]);
+  }
+  if (painted.length === 0) return;
+
+  // Measure without the resting offset, then put it back.
+  const transforms = painted.map(([part]) => part.style.transform);
+  for (const [part] of painted) part.style.transform = 'none';
+
+  const boxes = painted.map(([part, host]) => [part.getBoundingClientRect(), host.getBoundingClientRect()]);
+
+  painted.forEach(([part, host], index) => {
+    const [box, hostBox] = boxes[index];
+    part.style.transform = transforms[index];
+    part.style.backgroundImage = getComputedStyle(host).backgroundImage;
+    part.style.backgroundSize = `${hostBox.width}px ${hostBox.height}px`;
+    part.style.backgroundPosition = `${hostBox.left - box.left}px ${hostBox.top - box.top}px`;
+    part.style.backgroundRepeat = 'no-repeat';
+    part.style.setProperty('-webkit-background-clip', 'text');
+    part.style.backgroundClip = 'text';
+    part.setAttribute('data-motion-clipped', '');
+  });
+}
+
+/**
+ * @param {HTMLElement} part
+ * @private
+ */
+function unpaintClippedText(part) {
+  if (!part.hasAttribute('data-motion-clipped')) return;
+  for (const prop of CLIPPED_TEXT_PROPS) part.style.removeProperty(prop);
+  part.removeAttribute('data-motion-clipped');
 }
 
 /**
@@ -735,7 +1011,10 @@ function loadCascadeDelay(options) {
 function markRevealed(element, targets) {
   element.removeAttribute('data-motion-pending');
   element.setAttribute('data-motion-revealed', '');
-  for (const target of targets) target.setAttribute('data-motion-revealed', '');
+  // A carousel's slides carry their own reveal flag; leave it to the carousel.
+  for (const target of targets) {
+    if (!target.hasAttribute('data-motion-armed')) target.setAttribute('data-motion-revealed', '');
+  }
 }
 
 /**
@@ -759,33 +1038,66 @@ function shuffledIndices(length) {
    ========================================================================== */
 
 /**
+ * Elements a split moves whole, in their place in the cascade: icons, stars and
+ * images have no text to split, and a button's label must never come apart
+ * (its hover copy is cloned from it).
+ */
+const SPLIT_UNIT = '.button, button-swap, .block-icon-text, .icon-mark, svg, img, picture, video';
+
+/** Subtrees whose text is never on screen. */
+const SPLIT_SKIP = 'script, style, template, noscript';
+
+/**
+ * Text nodes and whole units under `root`, in document order.
+ *
+ * @param {Element} root
+ * @param {(Text|HTMLElement)[]} [found]
+ * @returns {(Text|HTMLElement)[]}
+ * @private
+ */
+function splitItems(root, found = []) {
+  for (const node of root.childNodes) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      if (node.nodeValue && node.nodeValue.trim()) found.push(/** @type {Text} */ (node));
+    } else if (node instanceof Element) {
+      if (node.matches(SPLIT_SKIP)) continue;
+      if (node.matches(SPLIT_UNIT)) found.push(/** @type {HTMLElement} */ (node));
+      else splitItems(node, found);
+    }
+  }
+  return found;
+}
+
+/**
  * Split an element's text into animatable spans without destroying its markup.
+ * Icons, images and buttons inside it join the cascade whole.
  *
  * @param {HTMLElement} element
  * @param {Object} [options]
  * @param {'chars'|'words'} [options.by='chars']
- * @returns {HTMLElement[]} The generated spans, in document order.
+ * @returns {HTMLElement[]} The generated spans and whole units, in document order.
  */
 export function splitText(element, { by = 'chars' } = {}) {
   if (element.hasAttribute('data-motion-split')) {
     return Array.from(element.querySelectorAll('[data-motion-part]'));
   }
 
-  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
-  const textNodes = [];
-  while (walker.nextNode()) {
-    if (walker.currentNode.nodeValue && walker.currentNode.nodeValue.trim()) {
-      textNodes.push(walker.currentNode);
-    }
-  }
+  const items = splitItems(element);
 
-  if (textNodes.length === 0) return [];
+  if (items.length === 0) return [];
 
   element.setAttribute('data-motion-split', by);
 
   const parts = [];
 
-  for (const node of textNodes) {
+  for (const node of items) {
+    if (node instanceof HTMLElement || node instanceof SVGElement) {
+      node.setAttribute('data-motion-part', '');
+      node.setAttribute('data-motion-unit', '');
+      parts.push(/** @type {HTMLElement} */ (node));
+      continue;
+    }
+
     const original = node.nodeValue ?? '';
     const collapsed = original.replace(/\s+/g, ' ');
 
@@ -851,6 +1163,11 @@ export function unsplitText(element) {
   if (!element.hasAttribute('data-motion-split')) return;
 
   element.removeAttribute('data-motion-split');
+
+  for (const unit of element.querySelectorAll('[data-motion-unit]')) {
+    unit.removeAttribute('data-motion-part');
+    unit.removeAttribute('data-motion-unit');
+  }
 
   for (const site of element.querySelectorAll('[data-motion-split-site]')) {
     site.replaceWith(document.createTextNode(site.dataset.motionText ?? ''));

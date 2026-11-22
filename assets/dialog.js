@@ -104,18 +104,6 @@ export class Overlay extends BaseComponent {
    * @param {HTMLElement} [trigger] The control that opened it. Focus returns here on close.
    * @returns {Promise<void>} Resolves once the entrance animation has finished.
    */
-  /**
-   * The theme editor: selecting the section an overlay lives in opens it, so a
-   * drawer or popup can be seen while it is being edited; leaving closes it.
-   */
-  sectionSelected() {
-    this.open();
-  }
-
-  sectionDeselected() {
-    this.close();
-  }
-
   async open(trigger) {
     if (this.#open) return;
 
