@@ -11,58 +11,11 @@
   if background_media != 'none'
     assign has_background_media = true
   endif
-
-
-  assign direction = s.direction | default: 'column'
-  assign is_row = false
-  if direction == 'row'
-    assign is_row = true
-  endif
-
-  assign alignment_setting = s.alignment | default: 'start'
-
-  case alignment_setting
-    when 'center'
-      assign alignment_axis = 'center'
-    when 'end'
-      assign alignment_axis = 'end'
-    else
-      assign alignment_axis = 'start'
-  endcase
-
-  assign inline_axis = alignment_axis
-  if is_row
-    case alignment_setting
-      when 'space-between', 'space-around', 'space-evenly'
-        assign inline_axis = alignment_setting
-    endcase
-  endif
-
-  case s.position
-    when 'center'
-      assign block_axis = 'center'
-    when 'end'
-      assign block_axis = 'end'
-    when 'stretch'
-      assign block_axis = 'stretch'
-    else
-      assign block_axis = 'start'
-  endcase
-
-  assign gap_x = s.gap_horizontal | default: 24 | plus: 0
-  assign gap_y = s.gap_vertical | default: 24 | plus: 0
-  assign gap_x_mobile = s.gap_horizontal_mobile | default: gap_x | plus: 0
-  assign gap_y_mobile = s.gap_vertical_mobile | default: gap_y | plus: 0
-
-  assign content_classes = 'section-content section-content--' | append: direction
-  if is_row and s.stack_on_mobile != false
-    assign content_classes = content_classes | append: ' section-content--stack-mobile'
-  endif
-
-  if is_row and s.reverse
-    assign content_classes = content_classes | append: ' section-content--reverse'
-  endif
 -%}
+
+{%- capture content_classes -%}
+  {%- render 'section-content', settings: s, output: 'class' -%}
+{%- endcapture -%}
 
 {%- liquid
   assign desktop = s.columns_desktop | default: 2 | plus: 0 | at_most: 3
@@ -70,44 +23,28 @@
   # One banner per row on a phone; they are too rich to share the width.
   assign cols_mobile = 1
 
-  assign cs_layout = 'grid'
-  if s.layout == 'carousel'
-    assign cs_layout = 'carousel'
-  endif
-
-  assign carousel_on_mobile = s.carousel_on_mobile
-  if carousel_on_mobile == nil
-    assign carousel_on_mobile = true
-  endif
-
-  assign cs_layout_mobile = 'grid'
-  if cs_layout == 'carousel' or carousel_on_mobile
-    assign cs_layout_mobile = 'carousel'
-  endif
-
-  assign cs_is_carousel = false
-  if cs_layout == 'carousel' or cs_layout_mobile == 'carousel'
-    assign cs_is_carousel = true
-  endif
-
   assign cs_label = 'accessibility.carousel' | t
   assign carousel_id = 'grid-banner-' | append: section.id
 
   assign cs_count = section.blocks.size
 
-  if cs_layout == 'carousel' and cs_count <= desktop
-    assign cs_layout = 'grid'
+  capture cs_layout
+    render 'carousel-layout', settings: s, count: cs_count, columns: desktop
+  endcapture
+  capture cs_layout_mobile
+    render 'carousel-layout', settings: s, mobile: true
+  endcapture
+  assign cs_layout = cs_layout | strip
+  assign cs_layout_mobile = cs_layout_mobile | strip
+
+  assign cs_is_carousel = false
+  if cs_layout_mobile == 'carousel'
+    assign cs_is_carousel = true
   endif
 -%}
 
 {%- capture content_style -%}
-  --section-gap-x: {{ gap_x }}px;
-  --section-gap-y: {{ gap_y }}px;
-  --section-gap-x-mobile: {{ gap_x_mobile }}px;
-  --section-gap-y-mobile: {{ gap_y_mobile }}px;
-  --section-inline: {{ inline_axis }};
-  --section-align: {{ alignment_axis }};
-  --section-block: {{ block_axis }};
+  {%- render 'section-content', settings: s, output: 'style' -%}
 {%- endcapture -%}
 
 {%- capture section_style -%}

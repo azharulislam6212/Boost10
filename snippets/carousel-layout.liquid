@@ -1,0 +1,50 @@
+{% doc %}
+  Whether a section that can be a grid or a carousel runs as a carousel, on
+  desktop or on mobile. Prints `carousel` or `grid` and nothing else.
+
+  Desktop is a carousel when the merchant chose one and there are more slides
+  than columns. Mobile is a carousel when desktop was chosen as one, or when
+  `carousel_on_mobile` is on (on when never saved).
+
+  @param {object} settings - The section's settings.
+  @param {boolean} [mobile] - Answer for mobile instead of desktop.
+  @param {number} [count] - Slide count, for the desktop guard.
+  @param {number} [columns] - Desktop columns, for the desktop guard.
+
+  @example
+    {%- liquid
+      capture cs_layout
+        render 'carousel-layout', settings: s, count: cs_count, columns: desktop
+      endcapture
+      capture cs_layout_mobile
+        render 'carousel-layout', settings: s, mobile: true
+      endcapture
+    -%}
+{% enddoc %}
+
+{%- liquid
+  assign chosen = false
+  if settings.layout == 'carousel'
+    assign chosen = true
+  endif
+
+  assign out = 'grid'
+
+  if mobile
+    assign on_mobile = settings.carousel_on_mobile
+    if on_mobile == nil
+      assign on_mobile = true
+    endif
+    if chosen or on_mobile
+      assign out = 'carousel'
+    endif
+  elsif chosen
+    assign slide_count = count | default: 0 | plus: 0
+    assign column_count = columns | default: 0 | plus: 0
+    if slide_count > column_count
+      assign out = 'carousel'
+    endif
+  endif
+
+  echo out
+-%}

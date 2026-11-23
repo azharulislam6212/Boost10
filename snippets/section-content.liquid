@@ -1,0 +1,89 @@
+{% doc %}
+  The layout of a section's content wrapper — direction, alignment, position
+  and gaps — as its class list or as its custom properties. One place for the
+  logic the sections used to repeat line for line.
+
+  @param {object} settings - The section's settings.
+  @param {string} output - class | style
+  @param {boolean} [stack_opt_in] - Stack a row on mobile only when `stack_on_mobile` is saved true. By default a row stacks unless it is saved false.
+
+  @example
+    {%- capture content_classes -%}{%- render 'section-content', settings: s, output: 'class' -%}{%- endcapture -%}
+    {%- capture content_style -%}{%- render 'section-content', settings: s, output: 'style' -%}{%- endcapture -%}
+{% enddoc %}
+
+{%- liquid
+  assign s = settings
+
+  assign direction = s.direction | default: 'column'
+  assign is_row = false
+  if direction == 'row'
+    assign is_row = true
+  endif
+
+  if output == 'class'
+    assign stacks = false
+    if is_row
+      if stack_opt_in
+        if s.stack_on_mobile
+          assign stacks = true
+        endif
+      elsif s.stack_on_mobile != false
+        assign stacks = true
+      endif
+    endif
+
+    assign out = 'section-content section-content--' | append: direction
+    if stacks
+      assign out = out | append: ' section-content--stack-mobile'
+    endif
+    if is_row and s.reverse
+      assign out = out | append: ' section-content--reverse'
+    endif
+
+    echo out
+  else
+    assign alignment_setting = s.alignment | default: 'start'
+
+    case alignment_setting
+      when 'center'
+        assign alignment_axis = 'center'
+      when 'end'
+        assign alignment_axis = 'end'
+      else
+        assign alignment_axis = 'start'
+    endcase
+
+    assign inline_axis = alignment_axis
+    if is_row
+      case alignment_setting
+        when 'space-between', 'space-around', 'space-evenly'
+          assign inline_axis = alignment_setting
+      endcase
+    endif
+
+    case s.position
+      when 'center'
+        assign block_axis = 'center'
+      when 'end'
+        assign block_axis = 'end'
+      when 'stretch'
+        assign block_axis = 'stretch'
+      else
+        assign block_axis = 'start'
+    endcase
+
+    assign gap_x = s.gap_horizontal | default: 24 | plus: 0
+    assign gap_y = s.gap_vertical | default: 24 | plus: 0
+    assign gap_x_mobile = s.gap_horizontal_mobile | default: gap_x | plus: 0
+    assign gap_y_mobile = s.gap_vertical_mobile | default: gap_y | plus: 0
+
+    echo '--section-gap-x: ' | append: gap_x | append: 'px; '
+    echo '--section-gap-y: ' | append: gap_y | append: 'px; '
+    echo '--section-gap-x-mobile: ' | append: gap_x_mobile | append: 'px; '
+    echo '--section-gap-y-mobile: ' | append: gap_y_mobile | append: 'px; '
+    echo '--section-inline: ' | append: inline_axis | append: '; '
+    echo '--section-align: ' | append: alignment_axis | append: '; '
+    echo '--section-block: ' | append: block_axis | append: ';'
+  endif
+-%}
