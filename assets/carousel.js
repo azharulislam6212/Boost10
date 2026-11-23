@@ -344,7 +344,7 @@ export class CarouselSlider extends BaseComponent {
         const parsed = JSON.parse(raw);
         if (parsed && typeof parsed === 'object') authored = parsed;
       } catch (error) {
-        console.error('[Boost10] <carousel-slider> could not parse data-options.', error, raw);
+        console.error('[theme] <carousel-slider> could not parse data-options.', error, raw);
       }
     }
 

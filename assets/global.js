@@ -134,7 +134,7 @@ export async function loadModulesFor(root = document) {
     pending.push(
       import(specifier).catch((error) => {
         requested.delete(specifier);
-        console.error(`[Boost10] Could not load ${specifier}.`, error);
+        console.error(`[theme] Could not load ${specifier}.`, error);
       })
     );
   }

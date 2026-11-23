@@ -27,7 +27,7 @@ export function defineComponent(tagName, ElementClass) {
 }
 
 /**
- * Base class for every autonomous custom element in Boost10.
+ * Base class for every autonomous custom element in this theme.
  *
  * @extends HTMLElement
  */
@@ -86,7 +86,7 @@ export class BaseComponent extends HTMLElement {
     try {
       this.setup?.();
     } catch (error) {
-      console.error(`[Boost10] ${this.tagName.toLowerCase()} failed to initialise.`, error);
+      console.error(`[theme] ${this.tagName.toLowerCase()} failed to initialise.`, error);
     }
   }
 
@@ -99,7 +99,7 @@ export class BaseComponent extends HTMLElement {
     try {
       this.teardown?.();
     } catch (error) {
-      console.error(`[Boost10] ${this.tagName.toLowerCase()} failed to tear down.`, error);
+      console.error(`[theme] ${this.tagName.toLowerCase()} failed to tear down.`, error);
     }
   }
 
@@ -192,7 +192,7 @@ export class BaseComponent extends HTMLElement {
     const next = parsed.querySelector(selector);
 
     if (!next) {
-      console.warn(`[Boost10] updateFrom found no "${selector}" in the response.`);
+      console.warn(`[theme] updateFrom found no "${selector}" in the response.`);
       return false;
     }
 
@@ -299,7 +299,7 @@ export class BaseComponent extends HTMLElement {
 
     if (missing.length > 0) {
       console.warn(
-        `[Boost10] <${this.tagName.toLowerCase()}> is missing required refs: ${missing.join(', ')}. Component disabled.`
+        `[theme] <${this.tagName.toLowerCase()}> is missing required refs: ${missing.join(', ')}. Component disabled.`
       );
       return false;
     }

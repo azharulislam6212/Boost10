@@ -73,7 +73,7 @@ export class ShadowComponent extends BaseComponent {
       styleSheetCache.set(ElementClass, sheet);
       return sheet;
     } catch (error) {
-      console.warn(`[Boost10] Could not build a stylesheet for <${ElementClass.name}>.`, error);
+      console.warn(`[theme] Could not build a stylesheet for <${ElementClass.name}>.`, error);
       return null;
     }
   }

@@ -135,7 +135,7 @@ export function getRoute(name, { json = false } = {}) {
   const route = globalThis.Theme?.routes?.[name];
 
   if (!route) {
-    console.warn(`[Boost10] Unknown route "${name}". Check the routes map in theme.liquid.`);
+    console.warn(`[theme] Unknown route "${name}". Check the routes map in theme.liquid.`);
     return json ? '/' : '/';
   }
 
@@ -407,7 +407,7 @@ export function announceUrgent(message) {
 /*  Storage                                                                   */
 /* ========================================================================== */
 
-const STORAGE_PREFIX = () => globalThis.Theme?.storageKey || 'boost10';
+const STORAGE_PREFIX = () => globalThis.Theme?.storageKey || 'theme';
 
 let storageAvailable = null;
 
@@ -418,7 +418,7 @@ function canUseStorage() {
   if (storageAvailable !== null) return storageAvailable;
 
   try {
-    const probe = '__boost10__';
+    const probe = '__theme__';
     window.localStorage.setItem(probe, probe);
     window.localStorage.removeItem(probe);
     storageAvailable = true;
@@ -892,7 +892,7 @@ export function parseJSONScript(source, selector, fallback = null) {
   try {
     return JSON.parse(script.textContent || '');
   } catch (error) {
-    console.warn(`[Boost10] Could not parse JSON from "${selector || script.nodeName}".`, error);
+    console.warn(`[theme] Could not parse JSON from "${selector || script.nodeName}".`, error);
     return fallback;
   }
 }
@@ -912,7 +912,7 @@ export function parseJSONAttribute(element, attribute, fallback = null) {
   try {
     return JSON.parse(raw);
   } catch (error) {
-    console.warn(`[Boost10] Could not parse JSON from the "${attribute}" attribute.`, error);
+    console.warn(`[theme] Could not parse JSON from the "${attribute}" attribute.`, error);
     return fallback;
   }
 }

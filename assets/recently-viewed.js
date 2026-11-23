@@ -139,7 +139,7 @@ export class RecentlyViewed extends BaseComponent {
       this.removeAttribute('hidden');
       return true;
     } catch (error) {
-      console.warn('[Boost10] Recently viewed products could not be loaded.', error);
+      console.warn('[theme] Recently viewed products could not be loaded.', error);
       this.remove();
       return false;
     }

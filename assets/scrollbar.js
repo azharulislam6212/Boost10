@@ -152,7 +152,7 @@ export class SmoothScrollbar extends BaseComponent {
     try {
       ({ default: Lenis } = await import('@theme/lenis'));
     } catch (error) {
-      console.warn('[Boost10] Lenis could not be loaded; falling back to native scrolling.', error);
+      console.warn('[theme] Lenis could not be loaded; falling back to native scrolling.', error);
       this.setAttribute('data-disabled', '');
       this.#trackProgressNatively();
       return;
@@ -396,7 +396,7 @@ defineComponent('scroll-to-top', ScrollToTop);
    `snippets/scroll-restore.liquid` hides the page until it is placed.
    ========================================================================== */
 
-const SCROLL_KEY = 'boost10:scroll';
+const SCROLL_KEY = 'theme:scroll';
 
 /** True when the element, or an ancestor, is sticky or fixed and so can't mark the spot. */
 function isPinned(element) {

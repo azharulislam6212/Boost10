@@ -136,7 +136,7 @@ class RecommendationsBase extends BaseComponent {
     } catch (error) {
       if (error?.name === 'AbortError') return false;
 
-      console.warn('[Boost10] Recommendations could not be loaded.', error);
+      console.warn('[theme] Recommendations could not be loaded.', error);
       this.remove();
       return false;
     } finally {

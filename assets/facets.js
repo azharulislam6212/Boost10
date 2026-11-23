@@ -138,7 +138,7 @@ export class FacetFilters extends BaseComponent {
     } catch (error) {
       if (error?.name === 'AbortError') return false;
 
-      console.error('[Boost10] Filtering failed.', error);
+      console.error('[theme] Filtering failed.', error);
       announceUrgent(themeString('networkError', ''));
       return false;
     } finally {

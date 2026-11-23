@@ -138,7 +138,7 @@ update(html, { focus = true, scroll = false } = {}) {
   const next = new DOMParser().parseFromString(html, 'text/html').querySelector('results-list');
 
   if (!next) {
-    console.warn('[Boost10] <results-list> found no results in the response.');
+    console.warn('[theme] <results-list> found no results in the response.');
     return false;
   }
 
@@ -208,7 +208,7 @@ update(html, { focus = true, scroll = false } = {}) {
     } catch (error) {
       if (error?.name === 'AbortError') return false;
 
-      console.error('[Boost10] Could not load that page.', error);
+      console.error('[theme] Could not load that page.', error);
       announceUrgent(themeString('networkError', ''));
       return false;
     } finally {
@@ -283,7 +283,7 @@ update(html, { focus = true, scroll = false } = {}) {
     } catch (error) {
       if (error?.name === 'AbortError') return false;
 
-      console.error('[Boost10] Could not load more results.', error);
+      console.error('[theme] Could not load more results.', error);
       announceUrgent(themeString('networkError', ''));
       return false;
     } finally {

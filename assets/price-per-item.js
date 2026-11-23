@@ -41,7 +41,7 @@ function readTiers(element) {
   try {
     parsed = JSON.parse(script.textContent);
   } catch {
-    console.warn('[Boost10] Volume pricing tiers could not be parsed.');
+    console.warn('[theme] Volume pricing tiers could not be parsed.');
     return map;
   }
 

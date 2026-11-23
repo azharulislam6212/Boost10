@@ -222,7 +222,7 @@ export class PromoPopup extends ModalDialog {
 
       window.setTimeout(() => this.refs.form.submit(), 600);
     } catch (error) {
-      console.warn('[Boost10] The promotion code could not be stored.', error);
+      console.warn('[theme] The promotion code could not be stored.', error);
       announceUrgent(themeString('cartError', ''));
       this.refs.form.submit();
     } finally {

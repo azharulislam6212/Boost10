@@ -270,7 +270,7 @@ export function applyHTML(html, into, { selector, sectionId = null, morphOptions
   const next = parsed.querySelector(target);
 
   if (!next) {
-    console.warn(`[Boost10] applyHTML found no "${target}" in the response.`);
+    console.warn(`[theme] applyHTML found no "${target}" in the response.`);
     return false;
   }
 
@@ -313,7 +313,7 @@ export function applySections(sections, { root = document, morphOptions } = {}) 
       (onlyRoot?.tagName === live.tagName ? onlyRoot : null);
 
     if (!next) {
-      console.warn(`[Boost10] applySections found no markup for "${sectionId}" in the response.`);
+      console.warn(`[theme] applySections found no markup for "${sectionId}" in the response.`);
       continue;
     }
 

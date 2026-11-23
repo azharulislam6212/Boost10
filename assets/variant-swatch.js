@@ -24,7 +24,7 @@ export class VariantSwatch extends BaseComponent {
     try {
       this.#variants = script ? JSON.parse(script.textContent) : [];
     } catch {
-      console.warn('[Boost10] Card swatch data could not be parsed.');
+      console.warn('[theme] Card swatch data could not be parsed.');
       this.#variants = [];
       return;
     }

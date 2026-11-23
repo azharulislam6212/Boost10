@@ -594,7 +594,7 @@ export class PickupAvailability extends BaseComponent {
     } catch (error) {
       if (error?.name === 'AbortError') return false;
 
-      console.warn('[Boost10] Pickup availability could not be loaded.', error);
+      console.warn('[theme] Pickup availability could not be loaded.', error);
       this.clear();
       return false;
     } finally {

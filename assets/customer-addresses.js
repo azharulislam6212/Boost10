@@ -209,7 +209,7 @@ export class CustomerAddressForm extends BaseComponent {
     try {
       return JSON.parse(raw);
     } catch {
-      console.warn('[Boost10] Could not parse the province list for this country.');
+      console.warn('[theme] Could not parse the province list for this country.');
       return null;
     }
   }

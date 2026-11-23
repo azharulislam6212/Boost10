@@ -805,7 +805,7 @@ export function reveal(element, options = {}) {
   const preset = getPreset(effect);
 
   if (!preset) {
-    console.warn(`[Boost10] No motion preset named "${effect}".`);
+    console.warn(`[theme] No motion preset named "${effect}".`);
     markRevealed(element, options.targets || []);
     return () => {};
   }
@@ -1567,7 +1567,7 @@ function tick() {
     try {
       callback(scrollY);
     } catch (error) {
-      console.error('[Boost10] motion ticker subscriber failed.', error);
+      console.error('[theme] motion ticker subscriber failed.', error);
     }
   }
 

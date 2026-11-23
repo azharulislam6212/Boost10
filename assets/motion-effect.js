@@ -116,7 +116,7 @@ export class MotionEffect extends BaseComponent {
     const preset = getPreset(effect);
 
     if (!preset) {
-      console.warn(`[Boost10] <motion-effect> has no preset named "${effect}".`);
+      console.warn(`[theme] <motion-effect> has no preset named "${effect}".`);
       this.setAttribute('data-motion-revealed', '');
       return;
     }

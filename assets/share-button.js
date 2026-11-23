@@ -65,7 +65,7 @@ export class ShareButton extends BaseComponent {
       await navigator.share({ title: this.dataset.title || document.title, url: this.url });
     } catch (error) {
       if (error?.name !== 'AbortError') {
-        console.error('[Boost10] Share failed.', error);
+        console.error('[theme] Share failed.', error);
       }
     }
   }

@@ -8,7 +8,7 @@
 
 import { BaseComponent, defineComponent } from '@theme/component';
 
-const STORAGE_PREFIX = 'boost10:announcement:';
+const STORAGE_PREFIX = 'theme:announcement:';
 
 export class AnnouncementBar extends BaseComponent {
   setup() {

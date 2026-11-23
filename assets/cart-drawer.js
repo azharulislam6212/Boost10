@@ -180,7 +180,7 @@ export const cart = {
     try {
       await this.refresh({ sections: data.sections });
     } catch (error) {
-      console.error('[Boost10] The cart was updated but the drawer could not be refreshed.', error);
+      console.error('[theme] The cart was updated but the drawer could not be refreshed.', error);
       this._dispatch(EVENTS.CART_ERROR, cartErrorDetail(themeString('cartError', ''), { code: 'refresh' }));
     }
 
@@ -310,7 +310,7 @@ export const cart = {
     try {
       await fetch(discountUrl(codes), { headers: { Accept: 'application/json' } });
     } catch (error) {
-      console.warn(`[Boost10] Could not hand ${codes.join(', ')} to Shopify.`, error);
+      console.warn(`[theme] Could not hand ${codes.join(', ')} to Shopify.`, error);
     }
 
     const data = await this.updateAttributes({ discount_code: codes.join(',') });
@@ -364,7 +364,7 @@ export const cart = {
         const { fetchSections } = await import('@theme/section-renderer');
         this._applySections(await fetchSections(missing, { cache: false }));
       } catch (error) {
-        console.warn(`[Boost10] Could not re-render ${missing.join(', ')}.`, error);
+        console.warn(`[theme] Could not re-render ${missing.join(', ')}.`, error);
       }
     }
 
@@ -707,7 +707,7 @@ export class CartUpsell extends BaseComponent {
     } catch (error) {
       if (error?.name === 'AbortError') return false;
 
-      console.warn('[Boost10] Cart recommendations could not be loaded.', error);
+      console.warn('[theme] Cart recommendations could not be loaded.', error);
       this.remove();
       return false;
     } finally {

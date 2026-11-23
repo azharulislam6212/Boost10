@@ -22,7 +22,7 @@ import {
 const MIN_QUERY_LENGTH = 1;
 
 /** Where recent searches live. Per browser, never sent anywhere. */
-const RECENT_KEY = 'boost10:recent-searches';
+const RECENT_KEY = 'theme:recent-searches';
 
 /** How long each rotating prompt holds before the next one. */
 const PROMPT_INTERVAL = 3200;
@@ -411,7 +411,7 @@ export class PredictiveSearch extends BaseComponent {
     } catch (error) {
       if (error?.name === 'AbortError') return;
 
-      console.error('[Boost10] Predictive search failed.', error);
+      console.error('[theme] Predictive search failed.', error);
       const message = themeString('networkError', '');
       this.#status(message);
       announceUrgent(message);

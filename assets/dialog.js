@@ -120,7 +120,7 @@ export class Overlay extends BaseComponent {
       this.setAttribute('data-state', 'closed');
       this.#trigger?.setAttribute('aria-expanded', 'false');
       this.#trigger = null;
-      console.error(`[Boost10] ${this.id} could not open.`, error);
+      console.error(`[theme] ${this.id} could not open.`, error);
       return;
     }
 
@@ -501,7 +501,7 @@ export class QuickAddModal extends ModalDialog {
 
       this.#loadedUrl = null;
 
-      console.error('[Boost10] <quick-add-modal> could not load the product.', error);
+      console.error('[theme] <quick-add-modal> could not load the product.', error);
       body.textContent = themeString('networkError', '');
       announceUrgent(themeString('networkError', ''));
     } finally {

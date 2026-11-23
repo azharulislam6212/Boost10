@@ -38,7 +38,7 @@ const OPEN_STATE_ELEMENTS = new Set(['DIALOG', 'DETAILS']);
  */
 export function morph(fromNode, toNode, options = {}) {
   if (!(fromNode instanceof Element) || !(toNode instanceof Element)) {
-    console.warn('[Boost10] morph expects two elements.');
+    console.warn('[theme] morph expects two elements.');
     return false;
   }
 
@@ -58,11 +58,11 @@ export function morph(fromNode, toNode, options = {}) {
       morphNode(fromNode, toNode, context);
     }
   } catch (error) {
-    console.error('[Boost10] morph failed, falling back to child replacement.', error);
+    console.error('[theme] morph failed, falling back to child replacement.', error);
     try {
       fromNode.replaceChildren(...Array.from(toNode.cloneNode(true).childNodes));
     } catch (fallbackError) {
-      console.error('[Boost10] morph fallback failed.', fallbackError);
+      console.error('[theme] morph fallback failed.', fallbackError);
     }
     restoreScroll(scroll);
     return false;
@@ -90,7 +90,7 @@ export function morphFromHTML(fromNode, html, selector, options = {}) {
   const next = parsed.querySelector(target);
 
   if (!next) {
-    console.warn(`[Boost10] morphFromHTML found no "${target}" in the response.`);
+    console.warn(`[theme] morphFromHTML found no "${target}" in the response.`);
     return false;
   }
 

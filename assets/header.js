@@ -282,7 +282,7 @@ export class NavMenu extends BaseComponent {
       }
 
       console.warn(
-        `[Boost10] Mega menu panel "${name}" has no matching header menu item.`
+        `[theme] Mega menu panel "${name}" has no matching header menu item.`
       );
     }
   }

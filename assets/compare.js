@@ -270,7 +270,7 @@ export class ProductCompare extends BaseComponent {
     } catch (error) {
       if (error?.name === 'AbortError') return false;
 
-      console.error('[Boost10] The comparison table could not be loaded.', error);
+      console.error('[theme] The comparison table could not be loaded.', error);
       announceUrgent(themeString('networkError', ''));
       return false;
     } finally {

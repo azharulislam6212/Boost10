@@ -577,7 +577,7 @@ export class ProductBundle extends BaseComponent {
     if (existing.includes(code)) return;
 
     await cart.applyDiscount([...existing, code].join(',')).catch((error) => {
-      console.warn('[Boost10] The bundle was added but its discount could not be applied.', error);
+      console.warn('[theme] The bundle was added but its discount could not be applied.', error);
     });
   }
 
