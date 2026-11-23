@@ -1,0 +1,109 @@
+{% doc %}
+  blocks/_category-card.liquid — private, a slide of `category-carousel`.
+  One collection as a framed card: the picture, then a pill with its name and an
+  arrow. On hover the picture grows to fill the frame under a dark wash and the
+  pill turns glass. The whole card is the link.
+{% enddoc %}
+
+{%- liquid
+  assign s = block.settings
+  assign c = s.collection
+
+  assign card_image = s.image
+  if card_image == blank
+    assign card_image = c.featured_image
+  endif
+  if card_image == blank
+    assign card_image = c.products.first.featured_image
+  endif
+
+  assign fallback_title = 'onboarding.collection_title' | t
+  assign card_title = s.title | default: c.title | default: fallback_title
+
+  assign card_url = s.link | default: c.url | default: routes.collections_url
+
+  # A block can't see its place in the row, so each card picks its placeholder
+  # from its own id: the md5's first hex digit, read as a number. Stable across
+  # renders, and neighbours rarely match.
+  if card_image == blank
+    assign placeholders = 'collection-apparel-1,collection-apparel-2,collection-apparel-3,collection-apparel-4' | split: ','
+    assign hex = block.id | md5 | slice: 0
+    assign hex_digits = '0123456789abcdef' | split: hex
+    assign placeholder_index = hex_digits.first.size | modulo: placeholders.size
+    assign placeholder_name = placeholders[placeholder_index]
+  endif
+-%}
+
+<div class="category-card" {{ block.shopify_attributes }}>
+  <a
+    class="category-card__link"
+    href="{{ card_url }}"
+    {% if s.new_tab %}target="_blank" rel="noopener"{% endif %}
+  >
+    <span class="category-card__media">
+      {%- if card_image != blank -%}
+        {% render 'image',
+           image: card_image,
+           alt: card_title,
+           ratio: '1-1',
+           sizes: '(min-width: 990px) 260px, (min-width: 750px) 34vw, 76vw',
+           widths: '240, 360, 480, 600, 720',
+           class: 'category-card__image' %}
+      {%- else -%}
+        {{ placeholder_name | placeholder_svg_tag: 'category-card__placeholder' }}
+      {%- endif -%}
+    </span>
+
+    <span class="category-card__bar">
+      <span class="category-card__title">{{ card_title | escape }}</span>
+      <span class="category-card__arrow" aria-hidden="true">
+        <svg viewBox="272.8 605.8 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+          <path d="M285.8 621.3L289.3 617.8L285.8 614.3M289.3 617.8H280.3"/>
+        </svg>
+      </span>
+    </span>
+  </a>
+</div>
+
+{% schema %}
+{
+  "name": "t:blocks.category_card.name",
+  "tag": null,
+  "settings": [
+    {
+      "type": "collection",
+      "id": "collection",
+      "label": "t:blocks.menu_tab.settings.collection.label"
+    },
+    {
+      "type": "image_picker",
+      "id": "image",
+      "label": "t:blocks.category_card.settings.image.label",
+      "info": "t:blocks.category_card.settings.image.info"
+    },
+    {
+      "type": "text",
+      "id": "title",
+      "label": "t:blocks.category_card.settings.title.label",
+      "info": "t:blocks.category_card.settings.title.info"
+    },
+    {
+      "type": "url",
+      "id": "link",
+      "label": "t:blocks.category_card.settings.link.label",
+      "info": "t:blocks.category_card.settings.link.info"
+    },
+    {
+      "type": "checkbox",
+      "id": "new_tab",
+      "label": "t:blocks.category_card.settings.new_tab.label",
+      "default": false
+    }
+  ],
+  "presets": [
+    {
+      "name": "t:blocks.category_card.name"
+    }
+  ]
+}
+{% endschema %}

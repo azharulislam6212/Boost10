@@ -84,66 +84,21 @@
     assign overlap_mobile = r_tl_m
   endif
 
-  assign direction = s.direction | default: 'column'
-  assign is_row = false
-  if direction == 'row'
-    assign is_row = true
-  endif
+  # One centred column: the header, the tabs strip, the panels. Only the space
+  # between them is a setting.
+  assign gap_y = s.gap_vertical | default: 40 | plus: 0
+  assign gap_y_mobile = s.gap_vertical_mobile | default: 24 | plus: 0
 
-  assign alignment_setting = s.alignment | default: 'start'
-
-  case alignment_setting
-    when 'center'
-      assign alignment_axis = 'center'
-    when 'end'
-      assign alignment_axis = 'end'
-    else
-      assign alignment_axis = 'start'
-  endcase
-
-  assign inline_axis = alignment_axis
-  if is_row
-    case alignment_setting
-      when 'space-between', 'space-around', 'space-evenly'
-        assign inline_axis = alignment_setting
-    endcase
-  endif
-
-  case s.position
-    when 'center'
-      assign block_axis = 'center'
-    when 'end'
-      assign block_axis = 'end'
-    when 'stretch'
-      assign block_axis = 'stretch'
-    else
-      assign block_axis = 'start'
-  endcase
-
-  assign gap_x = s.gap_horizontal | default: 24 | plus: 0
-  assign gap_y = s.gap_vertical | default: 24 | plus: 0
-  assign gap_x_mobile = s.gap_horizontal_mobile | default: gap_x | plus: 0
-  assign gap_y_mobile = s.gap_vertical_mobile | default: gap_y | plus: 0
-
-  assign content_classes = 'section-content section-content--' | append: direction
-  if is_row and s.stack_on_mobile != false
-    assign content_classes = content_classes | append: ' section-content--stack-mobile'
-  endif
-
-  if is_row and s.reverse
-    assign content_classes = content_classes | append: ' section-content--reverse'
-  endif
+  assign content_classes = 'section-content section-content--column'
 -%}
 
 
 {%- capture content_style -%}
-  --section-gap-x: {{ gap_x }}px;
   --section-gap-y: {{ gap_y }}px;
-  --section-gap-x-mobile: {{ gap_x_mobile }}px;
   --section-gap-y-mobile: {{ gap_y_mobile }}px;
-  --section-inline: {{ inline_axis }};
-  --section-align: {{ alignment_axis }};
-  --section-block: {{ block_axis }};
+  --section-inline: center;
+  --section-align: center;
+  --section-block: start;
 {%- endcapture -%}
 
 {%- capture section_style -%}
@@ -235,82 +190,6 @@
     },
     {
       "type": "select",
-      "id": "direction",
-      "label": "t:blocks.group.settings.direction.label",
-      "options": [
-        {
-          "value": "column",
-          "label": "t:blocks.group.settings.direction.options__1.label"
-        },
-        {
-          "value": "row",
-          "label": "t:blocks.group.settings.direction.options__2.label"
-        }
-      ],
-      "default": "column"
-    },
-    {
-      "type": "checkbox",
-      "id": "reverse",
-      "label": "t:sections.faq.settings.reverse.label",
-      "default": false,
-      "visible_if": "{{ section.settings.direction == 'row' }}"
-    },
-    {
-      "type": "select",
-      "id": "alignment",
-      "label": "t:blocks.group.settings.alignment.label",
-      "options": [
-        {
-          "value": "start",
-          "label": "t:blocks.group.settings.alignment.options__1.label"
-        },
-        {
-          "value": "center",
-          "label": "t:blocks.group.settings.alignment.options__2.label"
-        },
-        {
-          "value": "end",
-          "label": "t:blocks.group.settings.alignment.options__3.label"
-        },
-        {
-          "value": "space-between",
-          "label": "t:blocks.group.settings.distribution.options__2.label"
-        },
-        {
-          "value": "space-around",
-          "label": "t:blocks.group.settings.distribution.options__3.label"
-        },
-        {
-          "value": "space-evenly",
-          "label": "t:blocks.group.settings.distribution.options__4.label"
-        }
-      ],
-      "default": "start"
-    },
-    {
-      "type": "select",
-      "id": "position",
-      "label": "t:blocks.group.settings.position.label",
-      "options": [
-        {
-          "value": "start",
-          "label": "t:blocks.group.settings.position.options__1.label"
-        },
-        {
-          "value": "center",
-          "label": "t:blocks.group.settings.position.options__2.label"
-        },
-        {
-          "value": "end",
-          "label": "t:blocks.group.settings.position.options__3.label"
-        }
-      ],
-      "default": "start",
-      "visible_if": "{{ section.settings.direction == 'row' }}"
-    },
-    {
-      "type": "select",
       "id": "gap_device",
       "label": "t:shared.gap.label",
       "options": [
@@ -327,46 +206,24 @@
     },
     {
       "type": "range",
-      "id": "gap_horizontal",
-      "label": "t:shared.gap.horizontal.label",
-      "min": 0,
-      "max": 100,
-      "step": 2,
-      "unit": "px",
-      "default": 24,
-      "visible_if": "{{ section.settings.gap_device == 'desktop' }}"
-    },
-    {
-      "type": "range",
       "id": "gap_vertical",
-      "label": "t:shared.gap.vertical.label",
+      "label": "t:blocks.group.settings.distribution.options__2.label",
       "min": 0,
       "max": 100,
       "step": 2,
       "unit": "px",
-      "default": 24,
+      "default": 40,
       "visible_if": "{{ section.settings.gap_device == 'desktop' }}"
-    },
-    {
-      "type": "range",
-      "id": "gap_horizontal_mobile",
-      "label": "t:shared.gap.horizontal.label",
-      "min": 0,
-      "max": 100,
-      "step": 2,
-      "unit": "px",
-      "default": 12,
-      "visible_if": "{{ section.settings.gap_device == 'mobile' }}"
     },
     {
       "type": "range",
       "id": "gap_vertical_mobile",
-      "label": "t:shared.gap.vertical.label",
+      "label": "t:blocks.group.settings.distribution.options__2.label",
       "min": 0,
       "max": 100,
       "step": 2,
       "unit": "px",
-      "default": 12,
+      "default": 24,
       "visible_if": "{{ section.settings.gap_device == 'mobile' }}"
     },
     {
@@ -641,9 +498,12 @@
         "background_color": "linear-gradient(90deg, #e5f1ee 0%, #fbfdfc 38%, #fbfdfc 62%, #e5f1ee 100%)",
         "border_radius": 40,
         "border_radius_mobile": 24,
-        "alignment": "center",
         "gap_vertical": 40,
-        "gap_vertical_mobile": 24
+        "gap_vertical_mobile": 24,
+        "border_style": "dashed",
+        "border_sides": "top",
+        "border_width": 1,
+        "border_color": "#0F2E2F"
       },
       "blocks": [
         {
@@ -683,7 +543,15 @@
           "type": "tabs",
           "settings": {
             "strip_style": "segmented",
-            "width": "fit"
+            "width": "fill",
+            "font_size": "14",
+            "font_size_mobile": "14",
+            "track_background": "#E5F1EE",
+            "marker_background": "#0F2E2F",
+            "tab_active_color": "#FFFFFF",
+            "tab_border_style": "dashed",
+            "tab_border_width": 1,
+            "tab_border_color": "#7A8F8E"
           },
           "blocks": [
             {
@@ -696,42 +564,54 @@
               },
               "blocks": [
                 {
-                  "type": "group",
-                  "settings": {
-                    "direction": "row",
-                    "gap": 24,
-                    "swipe_on_mobile": true,
-                    "width": "fill"
-                  },
+                  "type": "category-carousel",
                   "blocks": [
                     {
-                      "type": "collection-card",
+                      "type": "_category-card",
                       "settings": {
                         "title": "Vitamins & Capsules"
                       }
                     },
                     {
-                      "type": "collection-card",
+                      "type": "_category-card",
                       "settings": {
                         "title": "Protein & Powders"
                       }
                     },
                     {
-                      "type": "collection-card",
+                      "type": "_category-card",
                       "settings": {
                         "title": "Wellness Gummies"
                       }
                     },
                     {
-                      "type": "collection-card",
+                      "type": "_category-card",
                       "settings": {
                         "title": "Superfood Drinks"
                       }
                     },
                     {
-                      "type": "collection-card",
+                      "type": "_category-card",
                       "settings": {
                         "title": "Herbal Tinctures"
+                      }
+                    },
+                    {
+                      "type": "_category-card",
+                      "settings": {
+                        "title": "Omega & Fish Oils"
+                      }
+                    },
+                    {
+                      "type": "_category-card",
+                      "settings": {
+                        "title": "Probiotics & Gut Care"
+                      }
+                    },
+                    {
+                      "type": "_category-card",
+                      "settings": {
+                        "title": "Sports Nutrition"
                       }
                     }
                   ]
@@ -747,140 +627,94 @@
               },
               "blocks": [
                 {
-                  "type": "group",
-                  "settings": {
-                    "direction": "row",
-                    "gap": 24,
-                    "swipe_on_mobile": true,
-                    "width": "fill"
-                  },
+                  "type": "health-goals",
                   "blocks": [
                     {
-                      "type": "badge-highlight",
+                      "type": "_health-goal",
                       "settings": {
-                        "icon": "bolt",
+                        "icon": "energy",
                         "heading": "Energy Boost",
-                        "link": "/collections/all",
-                        "shape": "circle",
-                        "ring_style": "dashed",
-                        "radius": 24,
-                        "border_width": 1,
-                        "padding_top": 20,
-                        "padding_bottom": 20,
-                        "padding_left": 20,
-                        "padding_right": 20
+                        "link": "/collections/all"
                       }
                     },
                     {
-                      "type": "badge-highlight",
+                      "type": "_health-goal",
                       "settings": {
-                        "icon": "leaf",
-                        "heading": "Gut & Digestive Health",
-                        "link": "/collections/all",
-                        "shape": "circle",
-                        "ring_style": "dashed",
-                        "radius": 24,
-                        "border_width": 1,
-                        "padding_top": 20,
-                        "padding_bottom": 20,
-                        "padding_left": 20,
-                        "padding_right": 20
+                        "icon": "gut",
+                        "heading": "Gut & digestive Health",
+                        "link": "/collections/all"
                       }
                     },
                     {
-                      "type": "badge-highlight",
+                      "type": "_health-goal",
                       "settings": {
-                        "icon": "sparkle",
-                        "heading": "Skin, Hair & Beauty",
-                        "link": "/collections/all",
-                        "shape": "circle",
-                        "ring_style": "dashed",
-                        "radius": 24,
-                        "border_width": 1,
-                        "padding_top": 20,
-                        "padding_bottom": 20,
-                        "padding_left": 20,
-                        "padding_right": 20
+                        "icon": "skin",
+                        "heading": "Skin, hair & beauty",
+                        "link": "/collections/all"
                       }
                     },
                     {
-                      "type": "badge-highlight",
+                      "type": "_health-goal",
                       "settings": {
-                        "icon": "clock",
-                        "heading": "Healthy Ageing",
-                        "link": "/collections/all",
-                        "shape": "circle",
-                        "ring_style": "dashed",
-                        "radius": 24,
-                        "border_width": 1,
-                        "padding_top": 20,
-                        "padding_bottom": 20,
-                        "padding_left": 20,
-                        "padding_right": 20
+                        "icon": "aging",
+                        "heading": "Slow biological aging",
+                        "link": "/collections/all"
                       }
                     },
                     {
-                      "type": "badge-highlight",
+                      "type": "_health-goal",
                       "settings": {
-                        "icon": "scale",
-                        "heading": "Weight Management",
-                        "link": "/collections/all",
-                        "shape": "circle",
-                        "ring_style": "dashed",
-                        "radius": 24,
-                        "border_width": 1,
-                        "padding_top": 20,
-                        "padding_bottom": 20,
-                        "padding_left": 20,
-                        "padding_right": 20
+                        "icon": "weight",
+                        "heading": "Weight Loss",
+                        "link": "/collections/all"
                       }
                     },
                     {
-                      "type": "badge-highlight",
+                      "type": "_health-goal",
                       "settings": {
-                        "icon": "moon",
+                        "icon": "sleep",
                         "heading": "Sleep Support",
-                        "link": "/collections/all",
-                        "shape": "circle",
-                        "ring_style": "dashed",
-                        "radius": 24,
-                        "border_width": 1,
-                        "padding_top": 20,
-                        "padding_bottom": 20,
-                        "padding_left": 20,
-                        "padding_right": 20
+                        "link": "/collections/all"
                       }
                     },
                     {
-                      "type": "badge-highlight",
+                      "type": "_health-goal",
                       "settings": {
-                        "icon": "sun",
+                        "icon": "stress",
                         "heading": "Stress Relief",
-                        "link": "/collections/all",
-                        "shape": "circle",
-                        "ring_style": "dashed",
-                        "radius": 24,
-                        "border_width": 1,
-                        "padding_top": 20,
-                        "padding_bottom": 20,
-                        "padding_left": 20,
-                        "padding_right": 20
+                        "link": "/collections/all"
                       }
                     },
                     {
-                      "type": "badge-highlight",
+                      "type": "_health-goal",
                       "settings": {
                         "icon": "brain",
                         "heading": "Mental Clarity",
-                        "link": "/collections/all",
-                        "shape": "circle",
-                        "ring_style": "dashed",
-                        "radius": 24,
-                        "border_width": 1,
-                        "padding_top": 20,
-                        "padding_bottom": 20,
-                        "padding_left": 20,
-                        "padding_right": 20
+                        "link": "/collections/all"
+                      }
+                    },
+                    {
+                      "type": "_health-goal",
+                      "settings": {
+                        "icon": "female",
+                        "heading": "Women's Hormones",
+                        "link": "/collections/all"
+                      }
+                    },
+                    {
+                      "type": "_health-goal",
+                      "settings": {
+                        "icon": "male",
+                        "heading": "Men's Hormones",
+                        "link": "/collections/all"
+                      }
+                    },
+                    {
+                      "type": "_health-goal",
+                      "settings": {
+                        "icon": "joints",
+                        "heading": "Bones & joints",
+                        "link": "/collections/all"
                       }
                     }
                   ]

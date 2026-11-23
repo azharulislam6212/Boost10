@@ -16634,3 +16634,568 @@
     }
   }
 }
+
+/* ==========================================================================
+   Shop by category — the category carousel and the health-goal grid
+   ========================================================================== */
+
+@layer components {
+  /* ---- category carousel ---- */
+  .category-carousel {
+    display: block;
+    inline-size: 100%;
+    min-inline-size: 0;
+  }
+
+  .category-carousel__carousel {
+    --grid-gap-x: var(--category-gap-mobile, 12px);
+    inline-size: 100%;
+  }
+
+  @media screen and (min-width: 750px) {
+    .category-carousel__carousel {
+      --grid-gap-x: var(--category-gap, 24px);
+    }
+  }
+
+  .category-carousel__carousel > .carousel-controls,
+  .category-carousel__carousel > .carousel-nav--bottom,
+  .category-carousel__carousel > .carousel-pagination {
+    margin-block-start: 3.2rem;
+  }
+
+  /* ---- category card: 244.8 × 284 at 1440, 8px inset, 0.5px dashed frame ---- */
+  .category-card {
+    --card-inset: 0.8rem;
+    --card-radius: 2.4rem;
+    --card-media-radius: 1.6rem;
+
+    position: relative;
+    block-size: 100%;
+    min-inline-size: 0;
+  }
+
+  .category-card__link {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: var(--card-inset);
+    block-size: 100%;
+    padding: var(--card-inset);
+    border-radius: var(--card-radius);
+    color: var(--color-heading);
+    text-decoration: none;
+    isolation: isolate;
+
+    /* an SVG frame: half its 1px stroke is clipped, so the line is the design's 0.5px */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='100%25' height='100%25' rx='24' ry='24' fill='none' stroke='%230F2E2F' stroke-opacity='0.4' stroke-width='1' stroke-dasharray='2 2'/%3E%3C/svg%3E");
+  }
+
+  .category-card__media {
+    position: relative;
+    display: block;
+    aspect-ratio: 1;
+    border-radius: var(--card-media-radius);
+    overflow: hidden;
+    background-color: var(--color-secondary-background);
+  }
+
+  /* the picture, then the picture filling the frame */
+  .category-card__media > responsive-image,
+  .category-card__media > .category-card__placeholder {
+    position: absolute;
+    inset: 0;
+    inline-size: 100%;
+    block-size: 100%;
+    aspect-ratio: auto;
+    border-radius: inherit;
+  }
+
+  .category-card__media img {
+    transition: scale 900ms var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+  }
+
+  .category-card__media::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background: linear-gradient(180deg, rgb(0 0 0 / 0) 0%, rgb(0 0 0 / 0.6) 100%);
+    opacity: 0;
+    transition: opacity 500ms var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+  }
+
+  .category-card__bar {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-block-start: auto;
+  }
+
+  .category-card__title {
+    flex: 1 1 auto;
+    min-inline-size: 0;
+    padding: 0.5rem 1.2rem;
+    border-radius: 999px;
+    background-color: var(--category-pill, #fff);
+    font-size: 1.4rem;
+    line-height: 1.5;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition:
+      background-color 500ms var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+      color 500ms var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+  }
+
+  .category-card__arrow {
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    inline-size: 2.4rem;
+    block-size: 2.4rem;
+    border-radius: 50%;
+    background-color: var(--category-arrow, #0f2e2f);
+    color: #fff;
+    transition:
+      background-color 500ms var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+      color 500ms var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+      rotate 500ms var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+  }
+
+  .category-card__arrow svg {
+    inline-size: 2.4rem;
+    block-size: 2.4rem;
+  }
+
+  /* Hover: the picture grows to fill the card (a clip-path, so it animates
+     without a layout jump), the pill turns glass, the arrow green. */
+  @media (hover: hover) {
+    .category-card__media {
+      position: absolute;
+      inset: 0;
+      aspect-ratio: auto;
+      border-radius: var(--card-radius);
+      background-color: transparent;
+      clip-path: inset(
+        var(--card-inset) var(--card-inset) calc(var(--card-inset) * 2 + 3.1rem) var(--card-inset)
+        round var(--card-media-radius)
+      );
+      transition: clip-path 700ms var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+    }
+
+    /* the square the picture leaves room for, in flow, so the card keeps its height */
+    .category-card__link::before {
+      content: '';
+      display: block;
+      aspect-ratio: 1;
+    }
+
+    .category-card__link:is(:hover, :focus-visible) .category-card__media {
+      clip-path: inset(0 round var(--card-radius));
+    }
+
+    .category-card__link:is(:hover, :focus-visible) .category-card__media::after {
+      opacity: 1;
+    }
+
+    .category-card__link:is(:hover, :focus-visible) .category-card__media img {
+      scale: 1.04;
+    }
+
+    .category-card__link:is(:hover, :focus-visible) .category-card__title {
+      background-color: rgb(255 255 255 / 0.1);
+      color: #fff;
+      -webkit-backdrop-filter: blur(10px);
+      backdrop-filter: blur(10px);
+    }
+
+    .category-card__link:is(:hover, :focus-visible) .category-card__arrow {
+      background-color: var(--category-arrow-hover, #03d26f);
+      color: #0f2e2f;
+      rotate: -45deg;
+    }
+  }
+
+  /* ---- health goals: full rows, a short last row held in the middle ---- */
+  .health-goals {
+    --goals-cols: var(--goals-columns-mobile, 2);
+    --goals-space: var(--goals-gap-mobile, 12px);
+
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--goals-space);
+    inline-size: 100%;
+  }
+
+  @media screen and (min-width: 750px) {
+    .health-goals {
+      --goals-cols: var(--goals-columns-tablet, 4);
+      --goals-space: var(--goals-gap, 24px);
+    }
+  }
+
+  @media screen and (min-width: 990px) {
+    .health-goals {
+      --goals-cols: var(--goals-columns, 7);
+    }
+  }
+
+  .health-goals > * {
+    flex: 0 0 calc((100% - (var(--goals-cols) - 1) * var(--goals-space)) / var(--goals-cols));
+    min-inline-size: 0;
+  }
+
+  /* ---- one goal: 96px dashed ring, 76px disc, 32px icon, dashed curl to the label ---- */
+  .health-goal {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 3.2rem 1.2rem;
+    border-radius: 2.4rem;
+    background-color: var(--goal-box, #fff);
+    box-shadow: var(--goal-shadow, 0 4px 24px rgb(15 46 47 / 0.06), 0 1px 2px rgb(15 46 47 / 0.04));
+    color: var(--color-heading);
+    text-align: center;
+    text-decoration: none;
+    transition:
+      box-shadow 500ms var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+      translate 500ms var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+  }
+
+  .health-goals--flat .health-goal {
+    --goal-shadow: none;
+  }
+
+  .health-goal__mark {
+    position: relative;
+    display: grid;
+    place-items: center;
+    inline-size: 9.6rem;
+    block-size: 9.6rem;
+    flex: 0 0 auto;
+  }
+
+  .health-goal__ring {
+    position: absolute;
+    inset: 0;
+    inline-size: 100%;
+    block-size: 100%;
+    stroke: var(--goal-line, #0f2e2f);
+    stroke-width: 1;
+    stroke-dasharray: 2 5;
+    transition: rotate 1200ms var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+  }
+
+  .health-goal__disc {
+    display: grid;
+    place-items: center;
+    inline-size: 7.6rem;
+    block-size: 7.6rem;
+    border-radius: 50%;
+    background-color: var(--goal-disc, #e5f1ee);
+    color: #161514;
+    transition:
+      background-color 500ms var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+      scale 500ms var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+  }
+
+  .health-goal__disc .icon {
+    --icon-size: 3.2rem;
+  }
+
+  .health-goal__image {
+    inline-size: 3.2rem;
+    block-size: 3.2rem;
+    object-fit: contain;
+  }
+
+  .health-goal__badge {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-end: 0;
+    display: grid;
+    place-items: center;
+    inline-size: 2.4rem;
+    block-size: 2.4rem;
+    border-radius: 50%;
+    background-color: var(--goal-line, #0f2e2f);
+    color: #fff;
+    opacity: 0;
+    scale: 0.4;
+    transition:
+      opacity 300ms var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+      scale 500ms var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+  }
+
+  .health-goal__badge svg {
+    inline-size: 2.4rem;
+    block-size: 2.4rem;
+  }
+
+  /* the curl starts under the ring's centre and ends in an arrowhead */
+  .health-goal__connector {
+    flex: 0 0 auto;
+    inline-size: 3.4rem;
+    block-size: 5.2rem;
+    margin-block-start: -0.1rem;
+    margin-inline-end: 2.8rem;
+    stroke: var(--goal-line, #0f2e2f);
+    stroke-width: 1;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    overflow: visible;
+  }
+
+  .health-goal__curve {
+    stroke-dasharray: 0.6 5.9;
+    transition: stroke-dashoffset 1200ms var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+  }
+
+  .health-goal__label {
+    margin-block-start: 1rem;
+    font-size: 1.6rem;
+    line-height: 1.5;
+    color: #161514;
+  }
+
+  /* hover: the disc turns green, the ring turns, the badge pops, the dots march */
+  @media (hover: hover) {
+    .health-goals:not(.health-goals--flat) .health-goal--link:is(:hover, :focus-visible) {
+      box-shadow: 0 16px 40px rgb(15 46 47 / 0.1), 0 2px 6px rgb(15 46 47 / 0.05);
+      translate: 0 -4px;
+    }
+
+    .health-goal--link:is(:hover, :focus-visible) .health-goal__disc {
+      background-color: var(--goal-disc-hover, #03d26f);
+      scale: 1.04;
+    }
+
+    .health-goal--link:is(:hover, :focus-visible) .health-goal__ring {
+      rotate: 45deg;
+    }
+
+    .health-goal--link:is(:hover, :focus-visible) .health-goal__badge {
+      opacity: 1;
+      scale: 1;
+    }
+
+    .health-goal--link:is(:hover, :focus-visible) .health-goal__curve {
+      stroke-dashoffset: -13;
+    }
+  }
+
+  .health-goal--link:focus-visible {
+    outline: 2px solid var(--goal-disc-hover, #03d26f);
+    outline-offset: 2px;
+  }
+
+  @media screen and (max-width: 749px) {
+    .health-goal {
+      padding: 2.4rem 0.8rem;
+    }
+
+    .health-goal__label {
+      font-size: 1.4rem;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .category-card__media,
+    .category-card__media img,
+    .category-card__arrow,
+    .health-goal,
+    .health-goal__ring,
+    .health-goal__disc,
+    .health-goal__badge,
+    .health-goal__curve {
+      transition: none;
+    }
+  }
+}
+
+/* The strip of the Shop by category tabs. In `overrides`, beside the tab rules
+   in header.css, so it can win them: compact and centred, while the panels
+   under it span the row and both tabs share one width (390 × 54 at 1440,
+   42px pills). */
+@layer overrides {
+  .shop-by-category-section .tabs--segmented .tabs__rail {
+    display: flex;
+    justify-content: center;
+  }
+
+  .shop-by-category-section .tabs--segmented .tabs__list {
+    inline-size: fit-content;
+    max-inline-size: 100%;
+    margin-inline: auto;
+  }
+
+  .shop-by-category-section .tabs--segmented .tabs__tab {
+    flex: 0 0 auto;
+    padding: 1rem 1.8rem;
+  }
+
+  .shop-by-category-section .tabs--segmented .tabs__panels {
+    inline-size: 100%;
+  }
+
+  /* The category carousel's controls bar, to the design: 28px buttons, a
+     12px mono count, a 100 × 3 bar — 226px across in all, centred. */
+  .category-carousel__carousel > .carousel-controls {
+    --carousel-count-size: 1.2rem;
+    --carousel-progress-width: 10rem;
+    --carousel-progress-height: 3px;
+
+    inline-size: auto;
+    gap: var(--space-2);
+    margin-block-start: 3.2rem;
+  }
+
+  .category-carousel__carousel > .carousel-controls .carousel-button {
+    margin-inline: var(--space-1);
+  }
+
+  .category-carousel__carousel > .carousel-controls .carousel-button:first-child {
+    margin-inline-start: 0;
+  }
+
+  .category-carousel__carousel > .carousel-controls .carousel-button:last-child {
+    margin-inline-end: 0;
+  }
+
+  .category-carousel__carousel > .carousel-controls .carousel-controls__progress {
+    flex: 0 0 auto;
+    min-inline-size: 10rem;
+    inline-size: 10rem;
+  }
+
+  .category-carousel__carousel > .carousel-controls .carousel-controls__count {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-weight: 500;
+    color: var(--color-heading);
+  }
+}
+
+/* ==========================================================================
+   Icon with text — the nested item (Icon + heading/text blocks) and the
+   section's Spread layout
+   ========================================================================== */
+
+@layer components {
+  /* The children arrive in one stream, so the icon is lifted out of the flow
+     and the heading and text stack beside it, centred on it. */
+  .block-icon-text--nested {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.2rem;
+    min-inline-size: 0;
+  }
+
+  /* The room for the icon comes from CSS, not from Liquid finding the child: any
+     nested item holding an Icon block gets it. Liquid only sharpens the size. */
+  .block-icon-text--nested.block-icon-text--row {
+    position: relative;
+  }
+
+  .block-icon-text--nested.block-icon-text--row:is(.block-icon-text--has-mark, :has(> .icon-text-icon)) {
+    padding-inline-start: calc(var(--icon-text-mark, 48px) + var(--icon-text-gap, 8px));
+    min-block-size: var(--icon-text-mark, 48px);
+  }
+
+  .block-icon-text--nested.block-icon-text--row > .icon-text-icon {
+    position: absolute;
+    inset-inline-start: 0;
+    inset-block-start: 50%;
+    translate: 0 -50%;
+  }
+
+  .block-icon-text--nested.block-icon-text--column {
+    align-items: center;
+    text-align: center;
+    gap: var(--icon-text-gap, 8px);
+  }
+
+  .block-icon-text--nested.block-icon-text--column > .icon-text-icon {
+    order: -1;
+  }
+
+  @media screen and (max-width: 749px) {
+    .block-icon-text--nested.block-icon-text--row.block-icon-text--has-mark {
+      padding-inline-start: calc(var(--icon-text-mark-mobile, 40px) + var(--icon-text-gap, 8px));
+      min-block-size: var(--icon-text-mark-mobile, 40px);
+    }
+  }
+
+  /* the icon: the glyph or upload, and the ring at its own opacity */
+  .icon-text-icon .icon-mark__ring {
+    opacity: var(--icon-ring-opacity, 1);
+  }
+
+  .icon-text-icon__image {
+    inline-size: var(--icon-text-icon-size, 20px);
+    block-size: var(--icon-text-icon-size, 20px);
+    object-fit: contain;
+  }
+
+  /* Hover stays inside the box: the ring firms up, the glyph lifts. No spin —
+     a dashed square swinging its corners reads as a jump. */
+  .icon-text-icon {
+    --icon-mark-ring-spin: 0deg;
+  }
+
+  .icon-text-icon .icon-mark__ring {
+    transition: opacity 400ms var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+  }
+
+  .icon-text-icon > .icon {
+    transition: translate 500ms var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+  }
+
+  @media (hover: hover) {
+    .icon-mark-host:hover > .icon-text-icon .icon-mark__ring {
+      opacity: min(1, calc(var(--icon-ring-opacity, 1) + 0.3));
+    }
+
+    .icon-mark-host:hover > .icon-text-icon > .icon {
+      translate: 0 -2px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .icon-text-icon .icon-mark__ring,
+    .icon-text-icon > .icon {
+      transition: none;
+    }
+  }
+}
+
+/* Spread: on desktop the items keep their own width and the row's space goes
+   between them — the design's five points, edge to edge. In `overrides`, next
+   to the carousel's grid rules it has to win. */
+@layer overrides {
+  /* A text block fills its row by default (`.block-text` lives here, in
+     overrides); stacked in a nested Icon with text, it takes its own height. */
+  .block-icon-text--nested > .block-text {
+    flex: 0 0 auto;
+  }
+
+  @media screen and (min-width: 990px) {
+    .icon-with-text-section--spread carousel-slider[data-layout='grid']:not([data-running]) > [data-ref~='track'] {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: var(--grid-gap-y) var(--grid-gap-x);
+    }
+
+    .icon-with-text-section--spread carousel-slider[data-layout='grid']:not([data-running]) > [data-ref~='track'] > * {
+      flex: 0 0 auto;
+      inline-size: auto;
+      max-inline-size: 100%;
+    }
+  }
+}

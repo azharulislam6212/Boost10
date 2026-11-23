@@ -145,6 +145,15 @@
     assign cs_layout = 'carousel'
   endif
 
+  # Spread: on desktop the items keep their own width and share the row's
+  # space between them. To the carousel it is a grid.
+  assign is_spread = false
+  if s.layout == 'spread'
+    assign is_spread = true
+  endif
+
+  assign backdrop_blur = s.backdrop_blur | default: 0 | plus: 0
+
   assign carousel_on_mobile = s.carousel_on_mobile
   if carousel_on_mobile == nil
     assign carousel_on_mobile = true
@@ -194,11 +203,15 @@
   {%- if background_paint != '' -%}
     background: {{ background_paint }};
   {%- endif -%}
+  {%- if backdrop_blur > 0 -%}
+    -webkit-backdrop-filter: blur({{ backdrop_blur }}px);
+    backdrop-filter: blur({{ backdrop_blur }}px);
+  {%- endif -%}
 {%- endcapture -%}
 
 
 <div
-  class="section icon-with-text-section color-scheme color-{{ s.color_scheme | default: 'scheme-1' }}{% if has_background_media %} has-background-media{% endif %}"
+  class="section icon-with-text-section{% if is_spread %} icon-with-text-section--spread{% endif %} color-scheme color-{{ s.color_scheme | default: 'scheme-1' }}{% if has_background_media %} has-background-media{% endif %}"
   data-section-spacing
   {%- if s.stack_layer != blank and s.stack_layer != 'default' %} data-section-layer="{{ s.stack_layer }}"{% endif %}
   data-section-id="{{ section.id }}"
@@ -442,9 +455,13 @@
         {
           "value": "carousel",
           "label": "t:shared.carousel.layout_type.options__2.label"
+        },
+        {
+          "value": "spread",
+          "label": "t:sections.icon_with_text.settings.layout.options__spread"
         }
       ],
-      "default": "grid"
+      "default": "spread"
     },
     {
       "type": "checkbox",
@@ -505,6 +522,16 @@
       "type": "color_background",
       "id": "background_color",
       "label": "t:shared.background.color.label"
+    },
+    {
+      "type": "range",
+      "id": "backdrop_blur",
+      "label": "t:sections.icon_with_text.settings.backdrop_blur.label",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0
     },
     {
       "type": "header",
@@ -964,67 +991,153 @@
       "name": "t:blocks.icon_with_text.name",
       "category": "t:categories.text",
       "settings": {
-        "padding_top": 40,
-        "padding_bottom": 40,
-        "padding_top_mobile": 28,
-        "padding_bottom_mobile": 28,
+        "padding_top": 24,
+        "padding_bottom": 64,
+        "padding_top_mobile": 20,
+        "padding_bottom_mobile": 56,
+        "layout": "spread",
         "columns_desktop": 5,
-        "columns_tablet": 3
+        "columns_tablet": 3,
+        "background_color": "rgba(255,255,255,0.1)",
+        "backdrop_blur": 50,
+        "border_radius": 40,
+        "border_radius_mobile": 24
       },
       "blocks": [
         {
           "type": "icon-with-text",
           "settings": {
-            "icon": "sparkle",
-            "shape": "circle",
-            "ring_style": "dashed",
-            "shape_size": 48,
-            "shape_size_mobile": 40,
-            "heading": "Pure Ingredients"
-          }
+            "alignment": "row",
+            "gap": 8
+          },
+          "blocks": [
+            {
+              "type": "_icon-text-icon",
+              "settings": {
+                "icon": "trust-pure"
+              }
+            },
+            {
+              "type": "text",
+              "name": "t:blocks.text.presets.heading.name",
+              "settings": {
+                "text": "<p>Pure Ingredients</p>",
+                "preset": "custom",
+                "font_family": "heading",
+                "font_size": "18",
+                "font_size_mobile": "16",
+                "animation_text": "none"
+              }
+            }
+          ]
         },
         {
           "type": "icon-with-text",
           "settings": {
-            "icon": "shield",
-            "shape": "circle",
-            "ring_style": "dashed",
-            "shape_size": 48,
-            "shape_size_mobile": 40,
-            "heading": "Expert Verified"
-          }
+            "alignment": "row",
+            "gap": 8
+          },
+          "blocks": [
+            {
+              "type": "_icon-text-icon",
+              "settings": {
+                "icon": "trust-verified"
+              }
+            },
+            {
+              "type": "text",
+              "name": "t:blocks.text.presets.heading.name",
+              "settings": {
+                "text": "<p>Expert Verified</p>",
+                "preset": "custom",
+                "font_family": "heading",
+                "font_size": "18",
+                "font_size_mobile": "16",
+                "animation_text": "none"
+              }
+            }
+          ]
         },
         {
           "type": "icon-with-text",
           "settings": {
-            "icon": "flask",
-            "shape": "circle",
-            "ring_style": "dashed",
-            "shape_size": 48,
-            "shape_size_mobile": 40,
-            "heading": "Third-Party Tested"
-          }
+            "alignment": "row",
+            "gap": 8
+          },
+          "blocks": [
+            {
+              "type": "_icon-text-icon",
+              "settings": {
+                "icon": "trust-tested"
+              }
+            },
+            {
+              "type": "text",
+              "name": "t:blocks.text.presets.heading.name",
+              "settings": {
+                "text": "<p>Third-Party Tested</p>",
+                "preset": "custom",
+                "font_family": "heading",
+                "font_size": "18",
+                "font_size_mobile": "16",
+                "animation_text": "none"
+              }
+            }
+          ]
         },
         {
           "type": "icon-with-text",
           "settings": {
-            "shape": "circle",
-            "ring_style": "dashed",
-            "shape_size": 48,
-            "shape_size_mobile": 40,
-            "heading": "Fast Shipping"
-          }
+            "alignment": "row",
+            "gap": 8
+          },
+          "blocks": [
+            {
+              "type": "_icon-text-icon",
+              "settings": {
+                "icon": "trust-shipping"
+              }
+            },
+            {
+              "type": "text",
+              "name": "t:blocks.text.presets.heading.name",
+              "settings": {
+                "text": "<p>Fast Shipping</p>",
+                "preset": "custom",
+                "font_family": "heading",
+                "font_size": "18",
+                "font_size_mobile": "16",
+                "animation_text": "none"
+              }
+            }
+          ]
         },
         {
           "type": "icon-with-text",
           "settings": {
-            "icon": "refresh",
-            "shape": "circle",
-            "ring_style": "dashed",
-            "shape_size": 48,
-            "shape_size_mobile": 40,
-            "heading": "Subscribe & Save"
-          }
+            "alignment": "row",
+            "gap": 8
+          },
+          "blocks": [
+            {
+              "type": "_icon-text-icon",
+              "settings": {
+                "icon": "trust-save"
+              }
+            },
+            {
+              "type": "text",
+              "name": "t:blocks.text.presets.heading.name",
+              "settings": {
+                "text": "<p>Subscribe & Save</p>",
+                "preset": "custom",
+                "font_family": "heading",
+                "font_size": "18",
+                "font_size_mobile": "16",
+                "animation_text": "none"
+              }
+            }
+          ]
         }
       ]
     }
