@@ -11,78 +11,6 @@
     assign has_background_media = true
   endif
 
-  assign background_paint = ''
-  if has_background_media == false
-    assign background_paint = s.background_color | default: ''
-  endif
-
-  assign border_line = s.border_style | default: 'none'
-
-  assign bw_top = 0
-  assign bw_right = 0
-  assign bw_bottom = 0
-  assign bw_left = 0
-  assign border_any = 0
-
-  if border_line != 'none'
-    assign border_sides = s.border_sides | default: 'top'
-    assign border_size = s.border_width | default: 1 | plus: 0
-
-    case border_sides
-      when 'all'
-        assign bw_top = border_size
-        assign bw_right = border_size
-        assign bw_bottom = border_size
-        assign bw_left = border_size
-      when 'bottom'
-        assign bw_bottom = border_size
-      when 'top_bottom'
-        assign bw_top = border_size
-        assign bw_bottom = border_size
-      else
-        assign bw_top = border_size
-    endcase
-    assign border_any = border_size
-
-    if s.border_color == blank
-      assign border_paint = 'currentColor'
-    else
-      assign border_paint = s.border_color
-    endif
-  endif
-
-  assign corner_position = s.corner_position | default: 'top'
-  assign radius = s.border_radius | default: 40 | plus: 0
-  assign radius_mobile = s.border_radius_mobile | default: 24 | plus: 0
-
-  assign r_tl = 0
-  assign r_tr = 0
-  assign r_bl = 0
-  assign r_br = 0
-  assign r_tl_m = 0
-  assign r_tr_m = 0
-  assign r_bl_m = 0
-  assign r_br_m = 0
-
-  if corner_position != 'bottom'
-    assign r_tl = radius
-    assign r_tr = radius
-    assign r_tl_m = radius_mobile
-    assign r_tr_m = radius_mobile
-  endif
-  if corner_position != 'top'
-    assign r_bl = radius
-    assign r_br = radius
-    assign r_bl_m = radius_mobile
-    assign r_br_m = radius_mobile
-  endif
-
-  assign overlap = 0
-  assign overlap_mobile = 0
-  if s.stack_layer == 'over' or s.stack_layer == 'under'
-    assign overlap = r_tl
-    assign overlap_mobile = r_tl_m
-  endif
 
   assign direction = s.direction | default: 'column'
   assign is_row = false
@@ -171,18 +99,7 @@
 
 {%- capture section_style -%}
   {%- render 'spacing', section: s, declarations: true -%}
-  --section-radius: {{ r_tl }}px {{ r_tr }}px {{ r_br }}px {{ r_bl }}px;
-  --section-radius-mobile: {{ r_tl_m }}px {{ r_tr_m }}px {{ r_br_m }}px {{ r_bl_m }}px;
-  --section-overlap: {{ overlap }}px;
-  --section-overlap-mobile: {{ overlap_mobile }}px;
-  {%- if border_any > 0 -%}
-    --section-border-width: {{ bw_top }}px {{ bw_right }}px {{ bw_bottom }}px {{ bw_left }}px;
-    --section-border-style: {{ border_line }};
-    --section-border-color: {{ border_paint }};
-  {%- endif -%}
-  {%- if background_paint != '' -%}
-    background: {{ background_paint }};
-  {%- endif -%}
+  {%- render 'section-frame', settings: s, media: true -%}
 {%- endcapture -%}
 
 

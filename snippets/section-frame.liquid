@@ -1,0 +1,111 @@
+{% doc %}
+  The frame every section draws around itself — corners, border, the overlap
+  with the section before it, and the background colour — as CSS custom
+  properties for its `style` capture. One place for the logic 60 sections used
+  to repeat line for line.
+
+  @param {object} settings - The section's settings.
+  @param {string} [prefix] - Custom property prefix: `--{prefix}-radius`, `--{prefix}-border-*`. Default `section`. The overlap is always `--section-overlap`.
+  @param {boolean} [media] - The section offers background media: the colour is left off while media is on.
+  @param {string} [border_default] - Border style when none is saved. Default `none`.
+
+  @example
+    {%- capture section_style -%}
+      {%- render 'spacing', section: s, declarations: true -%}
+      {%- render 'section-frame', settings: s, media: true -%}
+    {%- endcapture -%}
+{% enddoc %}
+
+{%- liquid
+  assign s = settings
+  assign p = prefix | default: 'section'
+
+  assign background_paint = s.background_color | default: ''
+  if media
+    assign background_media = s.background_media | default: 'none'
+    if background_media != 'none'
+      assign background_paint = ''
+    endif
+  endif
+
+  assign border_fallback = border_default | default: 'none'
+  assign border_line = s.border_style | default: border_fallback
+
+  assign bw_top = 0
+  assign bw_right = 0
+  assign bw_bottom = 0
+  assign bw_left = 0
+  assign border_any = 0
+
+  if border_line != 'none'
+    assign border_sides = s.border_sides | default: 'top'
+    assign border_size = s.border_width | default: 1 | plus: 0
+
+    case border_sides
+      when 'all'
+        assign bw_top = border_size
+        assign bw_right = border_size
+        assign bw_bottom = border_size
+        assign bw_left = border_size
+      when 'bottom'
+        assign bw_bottom = border_size
+      when 'top_bottom'
+        assign bw_top = border_size
+        assign bw_bottom = border_size
+      else
+        assign bw_top = border_size
+    endcase
+    assign border_any = border_size
+
+    if s.border_color == blank
+      assign border_paint = 'currentColor'
+    else
+      assign border_paint = s.border_color
+    endif
+  endif
+
+  assign corner_position = s.corner_position | default: 'top'
+  assign radius = s.border_radius | default: 40 | plus: 0
+  assign radius_mobile = s.border_radius_mobile | default: 24 | plus: 0
+
+  assign r_tl = 0
+  assign r_tr = 0
+  assign r_bl = 0
+  assign r_br = 0
+  assign r_tl_m = 0
+  assign r_tr_m = 0
+  assign r_bl_m = 0
+  assign r_br_m = 0
+
+  if corner_position != 'bottom'
+    assign r_tl = radius
+    assign r_tr = radius
+    assign r_tl_m = radius_mobile
+    assign r_tr_m = radius_mobile
+  endif
+  if corner_position != 'top'
+    assign r_bl = radius
+    assign r_br = radius
+    assign r_bl_m = radius_mobile
+    assign r_br_m = radius_mobile
+  endif
+
+  assign overlap = 0
+  assign overlap_mobile = 0
+  if s.stack_layer == 'over' or s.stack_layer == 'under'
+    assign overlap = r_tl
+    assign overlap_mobile = r_tl_m
+  endif
+-%}
+--{{ p }}-radius: {{ r_tl }}px {{ r_tr }}px {{ r_br }}px {{ r_bl }}px;
+--{{ p }}-radius-mobile: {{ r_tl_m }}px {{ r_tr_m }}px {{ r_br_m }}px {{ r_bl_m }}px;
+--section-overlap: {{ overlap }}px;
+--section-overlap-mobile: {{ overlap_mobile }}px;
+{%- if border_any > 0 -%}
+  --{{ p }}-border-width: {{ bw_top }}px {{ bw_right }}px {{ bw_bottom }}px {{ bw_left }}px;
+  --{{ p }}-border-style: {{ border_line }};
+  --{{ p }}-border-color: {{ border_paint }};
+{%- endif -%}
+{%- if background_paint != '' -%}
+  background: {{ background_paint }};
+{%- endif -%}
