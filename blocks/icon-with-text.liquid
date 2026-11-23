@@ -1,6 +1,6 @@
 {% doc %}
   An icon beside a short line of text. Trust points, shipping promises, feature
-  rows.
+  rows. With a connector, stacked items join into a timeline.
 {% enddoc %}
 
 {%- liquid
@@ -35,6 +35,18 @@
 {%- capture icon_text_style -%}
   {%- render 'spacing', block: block.settings, declarations: true -%}
   --icon-text-gap: {{ gap }}px;
+  {%- if s.connector and has_icon -%}
+    {%- if s.shape == 'none' or s.shape == blank -%}
+      --icon-text-mark: {{ icon_size }}px;
+      --icon-text-mark-mobile: {{ icon_size }}px;
+    {%- else -%}
+      --icon-text-mark: {{ s.shape_size | default: 40 }}px;
+      --icon-text-mark-mobile: {{ s.shape_size_mobile | default: s.shape_size | default: 32 }}px;
+    {%- endif -%}
+    {%- if s.ring_style != 'none' and s.ring_color != blank -%}
+      --icon-text-connector: {{ s.ring_color }};
+    {%- endif -%}
+  {%- endif -%}
 {%- endcapture -%}
 
 {%- capture icon_mark_style -%}
@@ -42,7 +54,7 @@
 {%- endcapture -%}
 
 <div
-  class="block-icon-text icon-mark-host block-icon-text--{{ block.settings.alignment }}"
+  class="block-icon-text icon-mark-host block-icon-text--{{ block.settings.alignment }}{% if s.connector and block.settings.alignment == 'row' %} block-icon-text--connector{% endif %}"
   data-block-spacing
   style="{{ icon_text_style | strip_newlines | strip }}"
   {{ block.shopify_attributes }}
@@ -543,6 +555,13 @@
       "step": 2,
       "unit": "px",
       "default": 12
+    },
+    {
+      "type": "checkbox",
+      "id": "connector",
+      "label": "t:sections.expert_quote.settings.show_connector.label",
+      "default": false,
+      "visible_if": "{{ block.settings.alignment == 'row' }}"
     },
     {
       "type": "header",

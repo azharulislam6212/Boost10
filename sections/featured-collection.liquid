@@ -178,6 +178,53 @@
   if cs_layout == 'carousel' and cs_count <= desktop
     assign cs_layout = 'grid'
   endif
+
+  assign cs_pagination = s.carousel_pagination | default: 'dots'
+  assign cs_nav = s.carousel_navigation
+  if cs_nav == nil
+    assign cs_nav = false
+  endif
+
+  assign panel_controls = false
+  if cs_is_carousel and cs_nav or cs_is_carousel and cs_pagination != 'none'
+    assign panel_controls = true
+  endif
+
+  assign panel_controls_class = 'featured-collection-panel__controls--always'
+  if cs_layout != 'carousel'
+    assign panel_controls_class = 'featured-collection-panel__controls--mobile'
+  endif
+-%}
+
+{%- capture panel -%}
+  {% content_for 'block',
+    type: '_featured-collection-panel',
+    id: 'featured-collection-panel',
+    carousel: carousel_id,
+    controls: panel_controls,
+    controls_class: panel_controls_class
+  %}
+{%- endcapture -%}
+
+{%- liquid
+  assign show_panel = false
+  if panel != blank
+    assign show_panel = true
+  endif
+
+  # Beside the panel the row runs off the page edge, with the last card cut.
+  assign peek_desktop = nil
+  if show_panel
+    assign peek_desktop = 87
+  endif
+
+  assign layout_classes = 'featured-collection-section__layout'
+  if show_panel
+    assign layout_classes = layout_classes | append: ' featured-collection-section__layout--with-panel'
+    if cs_layout == 'carousel'
+      assign layout_classes = layout_classes | append: ' featured-collection-section__layout--bleed'
+    endif
+  endif
 -%}
 
 {%- capture content_style -%}
@@ -229,6 +276,10 @@
       {% content_for 'blocks' %}
 
       {%- if cs_count > 0 -%}
+        <div class="{{ layout_classes }}">
+        {%- if show_panel -%}
+          {{ panel }}
+        {%- endif -%}
         <carousel-slider
           {% render 'carousel-shell-attrs',
              settings: s,
@@ -239,6 +290,7 @@
              columns_desktop: desktop,
              columns_tablet: cols_tablet,
              columns_mobile: cols_mobile,
+             peek_desktop: peek_desktop,
              count: cs_count %}
         >
           <div
@@ -267,8 +319,13 @@
             {%- endif -%}
           </div>
 
-          {% render 'carousel-shell-tail', settings: s, layout: cs_layout, layout_mobile: cs_layout_mobile %}
+          {% render 'carousel-shell-tail',
+             settings: s,
+             layout: cs_layout,
+             layout_mobile: cs_layout_mobile,
+             detached: show_panel %}
         </carousel-slider>
+        </div>
       {%- endif -%}
     </motion-effect>
   </div>
@@ -1008,99 +1065,70 @@
       "name": "t:sections.featured_collection.name",
       "category": "t:categories.products",
       "settings": {
-        "padding_top": 96,
-        "padding_bottom": 96,
+        "padding_top": 100,
+        "padding_bottom": 140,
         "padding_top_mobile": 56,
         "padding_bottom_mobile": 56,
         "layout": "carousel",
         "products_to_show": 6,
+        "columns_desktop": 2,
+        "gap_horizontal": 8,
         "gap_vertical": 40,
-        "gap_vertical_mobile": 24
+        "gap_vertical_mobile": 24,
+        "corner_position": "top",
+        "border_radius": 40,
+        "border_radius_mobile": 24,
+        "carousel_pagination": "controls",
+        "carousel_pagination_align": "start",
+        "carousel_navigation": true,
+        "carousel_controls_style": "split"
       },
       "blocks": [
         {
           "type": "section-header",
-          "settings": {},
           "static": true,
           "id": "featured-collection-header",
+          "settings": {
+            "direction": "row",
+            "alignment": "space-between",
+            "position": "center",
+            "width": "fill"
+          },
           "blocks": [
-            {
-              "type": "subheading",
-              "settings": {
-                "text": "<p>Most Popular</p>",
-                "preset": "subheading",
-                "width": "fit",
-                "icon_source": "icon",
-                "icon": "capsule",
-                "icon_style": "solid",
-                "icon_size": "small",
-                "icon_width": 22,
-                "icon_border_radius": 50,
-                "gap": 8,
-                "border_style": "dashed",
-                "border_radius": 40,
-                "icon_color": "#FFFFFF",
-                "icon_background": "#0F2E2F"
-              }
-            },
-            {
-              "type": "text",
-              "name": "t:blocks.text.presets.heading.name",
-              "settings": {
-                "text": "<h2>Find Your Supple<em>ment</em></h2>",
-                "preset": "h2",
-                "color": "gradient"
-              }
-            },
-            {
-              "type": "text",
-              "settings": {
-                "text": "<p>Discover expert-backed formulas crafted for peak health and vitality.</p>",
-                "preset": "paragraph"
-              }
-            },
             {
               "type": "group",
               "settings": {
-                "direction": "row",
-                "gap": 24,
-                "width": "fill"
+                "direction": "column",
+                "gap": 16,
+                "width": "fit"
               },
               "blocks": [
                 {
-                  "type": "icon-with-text",
+                  "type": "subheading",
                   "settings": {
-                    "icon": "check",
-                    "shape": "circle",
-                    "ring_style": "dashed",
-                    "shape_size": 48,
-                    "shape_size_mobile": 40,
-                    "heading": "Bio-Available Synergies",
-                    "text": "<p>Supports efficient nutrient absorption.</p>"
+                    "text": "<p>Most Popular</p>",
+                    "preset": "subheading",
+                    "width": "fit",
+                    "icon_source": "icon",
+                    "icon": "capsule",
+                    "icon_style": "solid",
+                    "icon_size": "small",
+                    "icon_width": 22,
+                    "icon_border_radius": 50,
+                    "gap": 8,
+                    "border_style": "dashed",
+                    "border_radius": 40,
+                    "icon_color": "#FFFFFF",
+                    "icon_background": "#0F2E2F"
                   }
                 },
                 {
-                  "type": "icon-with-text",
+                  "type": "text",
+                  "name": "t:blocks.text.presets.heading.name",
                   "settings": {
-                    "icon": "check",
-                    "shape": "circle",
-                    "ring_style": "dashed",
-                    "shape_size": 48,
-                    "shape_size_mobile": 40,
-                    "heading": "Pure Botanical Foundations",
-                    "text": "<p>Filler-free plant extracts.</p>"
-                  }
-                },
-                {
-                  "type": "icon-with-text",
-                  "settings": {
-                    "icon": "check",
-                    "shape": "circle",
-                    "ring_style": "dashed",
-                    "shape_size": 48,
-                    "shape_size_mobile": 40,
-                    "heading": "Targeted Daily Support",
-                    "text": "<p>Made to fit an everyday routine.</p>"
+                    "text": "<h2>Find Your Supple<em>ment</em></h2>",
+                    "preset": "h2",
+                    "color": "gradient"
                   }
                 }
               ]
@@ -1113,6 +1141,93 @@
                 "style": "outline",
                 "alignment": "end"
               }
+            }
+          ]
+        },
+        {
+          "type": "_featured-collection-panel",
+          "static": true,
+          "id": "featured-collection-panel",
+          "settings": {
+            "background_color": "linear-gradient(90deg, rgba(229, 241, 238, 1) 0%, rgba(251, 253, 252, 1) 20%, rgba(251, 253, 252, 1) 40%, rgba(244, 249, 248, 1) 60%, rgba(237, 245, 243, 1) 80%, rgba(229, 241, 238, 1) 100%)"
+          },
+          "blocks": [
+            {
+              "type": "text",
+              "settings": {
+                "text": "<p>Discover expert-backed formulas crafted for peak health and vitality.</p>",
+                "preset": "h4"
+              }
+            },
+            {
+              "type": "group",
+              "settings": {
+                "direction": "column",
+                "gap": 24,
+                "width": "fill"
+              },
+              "blocks": [
+                {
+                  "type": "icon-with-text",
+                  "settings": {
+                    "icon": "check",
+                    "icon_size": "extra_small",
+                    "icon_color": "#0F2E2F",
+                    "shape": "circle",
+                    "shape_size": 24,
+                    "shape_size_mobile": 24,
+                    "fill_color": "#03D26F",
+                    "ring_style": "solid",
+                    "ring_width": 1,
+                    "ring_color": "rgba(15,46,47,0.11)",
+                    "heading": "Bio-Available Synergies",
+                    "text": "<p>Supports efficient nutrient absorption.</p>",
+                    "alignment": "row",
+                    "gap": 8,
+                    "connector": true
+                  }
+                },
+                {
+                  "type": "icon-with-text",
+                  "settings": {
+                    "icon": "check",
+                    "icon_size": "extra_small",
+                    "icon_color": "#0F2E2F",
+                    "shape": "circle",
+                    "shape_size": 24,
+                    "shape_size_mobile": 24,
+                    "fill_color": "#03D26F",
+                    "ring_style": "solid",
+                    "ring_width": 1,
+                    "ring_color": "rgba(15,46,47,0.11)",
+                    "heading": "Pure Botanical Foundations",
+                    "text": "<p>Filler-free plant extracts.</p>",
+                    "alignment": "row",
+                    "gap": 8,
+                    "connector": true
+                  }
+                },
+                {
+                  "type": "icon-with-text",
+                  "settings": {
+                    "icon": "check",
+                    "icon_size": "extra_small",
+                    "icon_color": "#0F2E2F",
+                    "shape": "circle",
+                    "shape_size": 24,
+                    "shape_size_mobile": 24,
+                    "fill_color": "#03D26F",
+                    "ring_style": "solid",
+                    "ring_width": 1,
+                    "ring_color": "rgba(15,46,47,0.11)",
+                    "heading": "Targeted Daily Support",
+                    "text": "<p>Made to fit an everyday routine.</p>",
+                    "alignment": "row",
+                    "gap": 8,
+                    "connector": true
+                  }
+                }
+              ]
             }
           ]
         },

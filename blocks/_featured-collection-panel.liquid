@@ -1,0 +1,261 @@
+{% doc %}
+  blocks/_featured-collection-panel.liquid — private, static in sections/featured-collection.liquid.
+  The panel beside the product row: its own nested blocks on top, the
+  carousel's controls pinned to the bottom. Renders nothing without blocks,
+  and the section falls back to its usual layout.
+
+  @param {string} [carousel] - Id of the section's <carousel-slider>
+  @param {boolean} [controls] - Render the carousel controls
+  @param {string} [controls_class] - Hides the controls where the row is a grid
+{% enddoc %}
+
+{%- liquid
+  assign s = block.settings
+  assign ss = section.settings
+
+  assign width = s.width | default: 424 | plus: 0
+  assign gap = s.gap | default: 36 | plus: 0
+  assign radius = s.border_radius | default: 16 | plus: 0
+  assign radius_mobile = s.border_radius_mobile | default: radius | plus: 0
+
+  assign cs_pagination = ss.carousel_pagination | default: 'dots'
+  assign cs_pagination_align = ss.carousel_pagination_align | default: 'start'
+  assign cs_nav = ss.carousel_navigation
+  if cs_nav == nil
+    assign cs_nav = false
+  endif
+-%}
+
+{%- capture panel_style -%}
+  {%- render 'spacing', block: s, declarations: true -%}
+  --fc-panel-width: {{ width }}px;
+  --fc-panel-gap: {{ gap }}px;
+  --fc-panel-radius: {{ radius }}px;
+  --fc-panel-radius-mobile: {{ radius_mobile }}px;
+  {%- if s.background_color != blank -%}
+    --fc-panel-background: {{ s.background_color }};
+  {%- endif -%}
+{%- endcapture -%}
+
+{%- if block.blocks.size > 0 -%}
+<div
+  class="featured-collection-panel"
+  data-block-spacing
+  style="{{ panel_style | strip_newlines | strip }}"
+  {{ block.shopify_attributes }}
+>
+  <div class="featured-collection-panel__content">
+    {% content_for 'blocks' %}
+  </div>
+
+  {%- if controls -%}
+    <div class="featured-collection-panel__controls {{ controls_class }}" style="{% render 'carousel-style', settings: ss %}">
+      {%- if cs_pagination == 'controls' -%}
+        {% render 'carousel-controls',
+           settings: ss,
+           carousel: carousel,
+           align: cs_pagination_align,
+           size: 28,
+           arrows: cs_nav %}
+      {%- else -%}
+        {%- capture pagination_markup -%}
+          {%- if cs_pagination != 'none' -%}
+            {% render 'carousel-pagination',
+               style: cs_pagination,
+               align: cs_pagination_align,
+               carousel: carousel %}
+          {%- endif -%}
+        {%- endcapture -%}
+
+        {%- if cs_nav -%}
+          {% render 'carousel-nav',
+             settings: ss,
+             carousel: carousel,
+             position: 'bottom',
+             between: pagination_markup %}
+        {%- else -%}
+          {{ pagination_markup }}
+        {%- endif -%}
+      {%- endif -%}
+    </div>
+  {%- endif -%}
+</div>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "t:blocks.featured_collection_panel.name",
+  "tag": null,
+  "blocks": [
+    {
+      "type": "@theme"
+    },
+    {
+      "type": "@app"
+    }
+  ],
+  "settings": [
+    {
+      "type": "range",
+      "id": "width",
+      "label": "t:blocks.testimonial_intro.settings.width.label",
+      "min": 280,
+      "max": 600,
+      "step": 4,
+      "unit": "px",
+      "default": 424
+    },
+    {
+      "type": "range",
+      "id": "gap",
+      "label": "t:blocks.testimonial_intro.settings.gap.label",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 36
+    },
+    {
+      "type": "header",
+      "content": "t:shared.appearance.header"
+    },
+    {
+      "type": "color_background",
+      "id": "background_color",
+      "label": "t:shared.appearance.background_color.label"
+    },
+    {
+      "type": "header",
+      "content": "t:shared.corners.header"
+    },
+    {
+      "type": "range",
+      "id": "border_radius",
+      "label": "t:shared.corners.radius.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 16
+    },
+    {
+      "type": "range",
+      "id": "border_radius_mobile",
+      "label": "t:shared.corners.radius_mobile.label",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 16
+    },
+    {
+      "type": "header",
+      "content": "t:shared.spacing.block_header"
+    },
+    {
+      "type": "select",
+      "id": "padding_device",
+      "label": "t:shared.spacing.devices.label",
+      "options": [
+        {
+          "value": "desktop",
+          "label": "t:shared.spacing.devices.options__1.label"
+        },
+        {
+          "value": "mobile",
+          "label": "t:shared.spacing.devices.options__2.label"
+        }
+      ],
+      "default": "desktop"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 120,
+      "step": 2,
+      "unit": "px",
+      "default": 48,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 120,
+      "step": 2,
+      "unit": "px",
+      "default": 48,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 120,
+      "step": 2,
+      "unit": "px",
+      "default": 48,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 120,
+      "step": 2,
+      "unit": "px",
+      "default": 48,
+      "visible_if": "{{ block.settings.padding_device == 'desktop' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "label": "t:shared.spacing.padding_top.label",
+      "min": 0,
+      "max": 120,
+      "step": 2,
+      "unit": "px",
+      "default": 24,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "label": "t:shared.spacing.padding_bottom.label",
+      "min": 0,
+      "max": 120,
+      "step": 2,
+      "unit": "px",
+      "default": 24,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_left_mobile",
+      "label": "t:shared.spacing.padding_left.label",
+      "min": 0,
+      "max": 120,
+      "step": 2,
+      "unit": "px",
+      "default": 24,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    },
+    {
+      "type": "range",
+      "id": "padding_right_mobile",
+      "label": "t:shared.spacing.padding_right.label",
+      "min": 0,
+      "max": 120,
+      "step": 2,
+      "unit": "px",
+      "default": 24,
+      "visible_if": "{{ block.settings.padding_device == 'mobile' }}"
+    }
+  ]
+}
+{% endschema %}
