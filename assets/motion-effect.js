@@ -76,10 +76,6 @@ export class MotionEffect extends BaseComponent {
       return;
     }
 
-    // The editor re-renders a section on every setting change. Replaying its
-    // entrance from invisible each time made every edit feel like a slow reload,
-    // so content that arrives after the preview has loaded simply appears —
-    // unless the animation itself is what changed, which plays so it can be seen.
     const changed = this.#recordSignature();
     if ((editorReady && !this.#replaying && !changed) || (!this.#replaying && this.#shownByFailsafe())) {
       this.removeAttribute('data-motion-pending');
@@ -120,10 +116,6 @@ export class MotionEffect extends BaseComponent {
 
     const targets = this.#targets();
 
-    // Split only a lone run of text. A wrapper around blocks that animate
-    // themselves (a section header) moves whole instead, as one piece, so its
-    // subheading pill, icons and gradient heading are never cut into letters.
-    // Pictures set into the line (`data-motion-inline`) are part of the text.
     const splitOne =
       Boolean(preset.split) &&
       targets.length === 1 &&
@@ -136,8 +128,6 @@ export class MotionEffect extends BaseComponent {
       onReveal: () => {
         this.removeAttribute('data-motion-pending');
         this.setAttribute('data-motion-revealed', '');
-        // Only an entrance that actually played sets this, so CSS keyed to it
-        // never runs for "none", reduced motion or an editor re-render.
         this.setAttribute('data-motion-played', '');
       },
       targets: splitOne ? undefined : targets,
@@ -231,8 +221,6 @@ export class MotionEffect extends BaseComponent {
    * @returns {boolean}
    */
   #shownByFailsafe() {
-    // The failsafe counts from after navigation start, so before 12s it cannot
-    // have fired — and no host pays for a style read on a normal load.
     if (performance.now() < 12000 || this.hasAttribute('data-motion-pending')) return false;
     if (getComputedStyle(this).opacity === '0') return false;
     const box = this.getBoundingClientRect();
@@ -393,8 +381,6 @@ export class ParallaxMedia extends BaseComponent {
 
   #measure() {
     const rect = this.getBoundingClientRect();
-    // The layer is translated by its own offset; take it back out so the centre
-    // is where layout put it. Scaling is about the centre and does not move it.
     this.#geometry = {
       centre: rect.top + rect.height / 2 + window.scrollY - this.#offset,
       height: rect.height
@@ -408,8 +394,6 @@ export class ParallaxMedia extends BaseComponent {
     const viewport = window.innerHeight;
     const strength = this.speed * height;
 
-    // The resting point of the old read-every-frame loop, whose measured centre
-    // included the offset it had just written: solved once instead of chased.
     const distance = centre - scrollY - viewport / 2;
     const offset = (-distance * strength) / (viewport + strength);
 

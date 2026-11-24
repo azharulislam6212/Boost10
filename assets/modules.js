@@ -297,7 +297,6 @@ export class AccordionElement extends BaseComponent {
     const previous = item.dataset.accordionClipped;
     if (previous === undefined) return;
 
-    // An empty string removes the inline property again.
     item.style.overflow = previous;
     delete item.dataset.accordionClipped;
   }

@@ -50,30 +50,13 @@
 
       @layer tokens {
         :root {
-          /* ---- layout ---------------------------------------------------------
-             Only two numbers come from theme settings: the side padding, and
-             the custom width if the merchant asked for one.
-
-             Compact, Standard and Wide are constants in `assets/base.css`, not
-             sliders. A merchant setting three widths independently can put them
-             in the wrong order — Wide narrower than Standard — and every section
-             using them silently disagrees with its own label. Three fixed steps
-             plus one Custom escape hatch is the same flexibility without that
-             failure mode. */
+          /* ---- layout --------------------------------------------------------- */
           --container-custom-width: {{ settings.container_custom_width | default: 1280 }}px;
 
           --container-gutter: {{ settings.container_gutter | default: 20 }}px;
           --container-gutter-desktop: {{ settings.container_gutter_desktop | default: 40 }}px;
 
-          /* ---- grid gaps ----------------------------------------------------
-             `grid_horizontal_space` and `grid_vertical_space` have been in the
-             schema all along with nothing reading them, so both sliders moved a
-             value that changed no pixels. They drive the gaps now.
-
-             Mobile scales rather than taking its own pair of sliders: a
-             merchant who wants 16px on desktop almost never wants 16px on a
-             390px screen, and two more numbers to keep in proportion is a worse
-             control than one percentage. */
+          /* ---- grid gaps ---------------------------------------------------- */
           --grid-gap-x-base: {{ settings.grid_horizontal_space | default: 16 }}px;
           --grid-gap-y-base: {{ settings.grid_vertical_space | default: 32 }}px;
           --grid-gap-scale-mobile: {{ settings.grid_space_scale_mobile | default: 75 | divided_by: 100.0 }};
@@ -83,8 +66,6 @@
             --grid-gap-horizontal: var(--grid-gap-x);
             --grid-gap-vertical: var(--grid-gap-y);
 
-          /* Was declared in the schema and read nowhere, so "Space between
-             sections" did nothing. `base.css` already had the rule waiting. */
           --section-gap: {{ settings.spacing_sections | default: 0 }}px;
             --duration-drawer: 300ms;
             --shadow-header: 0 1px 3px rgb(0 0 0 / 0.08);
@@ -97,11 +78,6 @@
 
           --radius-card: {{ settings.card_radius | default: 8 }}px;
 
-          /* Product cards get their own radius because they are the one card
-             a merchant restyles on its own - the collection card, the blog
-             card and the bundle row are furniture around them. Everything
-             else still follows `--radius-card`, and the product card falls
-             back to it if this setting is ever cleared. */
           --radius-product-card: {{ settings.product_card_radius | default: 16 }}px;
           --radius-media: {{ settings.media_radius | default: 0 }}px;
           --radius-badge: {{ settings.badge_radius | default: 40 }}px;
@@ -118,13 +94,6 @@
           --height-button-small: calc(var(--height-button) * 0.78);
           --height-button-large: calc(var(--height-button) * 1.22);
 
-          /* Horizontal padding and letter spacing are the button's own, so the
-             small and large sizes scale off this rather than carrying their own
-             numbers - a merchant who widens buttons widens all four sizes.
-
-             Letter spacing is an offset in em, added to whatever Typography >
-             Buttons > Letter spacing already set. Neither control is dead: the
-             coarse one picks tight, normal or wide, this one nudges it. */
           --buttons-padding-inline: {{ settings.button_padding_inline | default: 20 }}px;
           --button-letter-spacing: {{ settings.button_letter_spacing | default: 0 | divided_by: 100.0 }}em;
 
@@ -140,19 +109,6 @@
 
           --z-base: 0;
 
-          /* The band a section may order itself within, and the reason the
-             overlap control is a three-way select rather than a number.
-
-             A merchant who can type a z-index types 999 sooner or later, and
-             999 is above `--z-sticky`, `--z-header` and `--z-drawer` — a
-             section painted over the header, the cart and every modal, from a
-             control that looked like it was about spacing. These three values
-             are the only ones a section can ever emit, and all three are two
-             orders of magnitude below the first thing a section must not cover.
-
-             Three is enough for what the control is for: one section pulled up
-             over the one above it, and the neighbour it has to win or lose
-             against. Anything more is a layout that wants a different section. */
           --z-section-under: 1;
           --z-section-base: 2;
           --z-section-over: 3;
@@ -173,8 +129,6 @@
 
              /* ---- icon sizes ---------------------------------------------------- */
 
-            /* rem, not px — an icon sitting beside text should scale with that text when
-            a customer raises their browser font size. */
             --icon-size-sm: {{ icon_sm | divided_by: 16.0 }}rem;
             --icon-size-md: {{ icon_md | divided_by: 16.0 }}rem;
             --icon-size-lg: {{ icon_lg | divided_by: 16.0 }}rem;
@@ -240,8 +194,6 @@
 
         :focus:not(:focus-visible) { outline: none; }
 
-        /* Lenis structural requirements. Without these the library cannot
-           take over the document scroller. */
         html.lenis,
         html.lenis body { height: auto; }
 
@@ -250,8 +202,6 @@
         .lenis.lenis-stopped { overflow: hidden; }
         .lenis.lenis-smooth iframe { pointer-events: none; }
 
-        /* Held while scrollbar.js returns a reload to where it was left; the
-           animation shows the page anyway if that module never runs. */
         html[data-scroll-restoring] body {
           opacity: 0;
           animation: scroll-restore-failsafe 0s 1.5s forwards;
@@ -273,7 +223,6 @@
       }
 
       @layer base {
-
         body {
           margin: 0;
           min-block-size: var(--viewport-height, 100vh);
@@ -292,8 +241,6 @@
           -webkit-font-smoothing: antialiased;
           overflow-wrap: break-word;
         }
-        /* Custom elements are inline by default, which would collapse any
-           layout wrapper built on one. */
         motion-effect,
         smooth-scrollbar,
         page-transition { display: block; }
@@ -301,8 +248,6 @@
         smooth-scrollbar[data-disabled] { display: none; }
         motion-effect[data-effect='marquee'] { overflow: hidden; }
 
-        /* Accordion groups that only collapse below a breakpoint. Above it the
-           summary is decoration: no marker, no pointer, no hover affordance. */
         accordion-element[data-static] summary,
         summary[data-static] {
           cursor: default;
@@ -315,9 +260,6 @@
 
         accordion-element[data-static] .footer__summary-icon { display: none; }
 
-        /* Responsive image boxes. The ratio is reserved before the image loads,
-           and art-directed images can change shape at the breakpoint without the
-           box jumping when the source swaps. */
         responsive-image {
           display: block;
           position: relative;
@@ -355,26 +297,6 @@
           display: block;
         }
 
-        /* `.container` is defined once, in `assets/base.css`.
-
-           It used to be defined here as well, with `max-width:
-           var(--container-max)`. Two definitions of one class is bad enough;
-           the `max-width` made it a real bug. `max-width` and `max-inline-size`
-           are the same property, so once the width variants moved to padding —
-           and base.css stopped declaring a cap — this copy was the only
-           declaration left standing, and it capped every container at the
-           standard width. A section set to Compact or Wide got a 1440px box no
-           matter which variant it asked for, which is exactly what a DevTools
-           badge reading `1440 × 46.4` on a `.container--compact` was reporting.
-
-           base.css is a render-blocking `<link>` emitted immediately below
-           this block, so nothing paints before it arrives and there is no
-           flash to protect against. */
-
-        /* Section and block spacing.
-           Values arrive as custom properties from snippets/spacing.liquid. The
-           media query reads a different property rather than a different rule,
-           so one inline style drives both breakpoints. */
         [data-section-spacing] {
           padding-block-start: var(--section-padding-block-start, 0px);
           padding-block-end: var(--section-padding-block-end, 0px);
@@ -460,44 +382,7 @@
         html:not(.no-js) .js-hidden { display: none !important; }
         [hidden] { display: none !important; }
 
-        /* ---- the resting opacity, held from the first paint ---------------
-           This is the whole fix for "the content appears, then jumps, then the
-           animation starts". The engine hid each element from JavaScript, and
-           modules are deferred — so the browser had already painted the settled
-           page by the time anything was hidden.
-
-           Only opacity is held here, deliberately. Every preset's resting state
-           is opacity plus a transform or a clip-path, and neither of those
-           affects layout, so this reserves the element's real box and nothing
-           reflows when the engine takes over. Holding a transform here as well
-           would mean guessing which preset each element ended up with.
-
-           The stylesheet lets go as soon as `<motion-effect>` says it is in
-           charge. `data-motion-pending` is written on the host the moment the
-           engine applies its own resting state, and that state is also opacity
-           0, so the handoff itself cannot be seen. `data-motion-revealed`
-           covers the paths that never animate at all: effect "none", an unknown
-           preset name, and a visitor who has asked for reduced motion.
-
-           `data-motion-arm` on `<html>` is set by the head script in
-           `snippets/scripts.liquid`, so it exists only when scripting does. The
-           same script drops it at DOMContentLoaded if the motion module has not
-           defined `<motion-effect>` by then — module scripts run before that
-           event, so a module that failed shows the page straight away, while
-           one that is merely slow (a reload re-checks every script with the
-           server) still gets its entrance. The delayed animation is only the
-           last resort for a script that never settles. Parallax and
-           marquee are excluded — they are continuous effects with no entrance,
-           so there is nothing to wait for. */
-        /* Wrapped in `no-preference` rather than paired with a `reduce`
-           override. Someone who has asked the operating system for less
-           movement should never wait for a module to load before they can read
-           the page — and an override would have to out-specify the six `:not()`
-           tests above, which is a specificity race that only has to be lost
-           once. Not arming at all is the same answer with nothing to get wrong.
-
-           A browser too old to report the preference matches neither branch, so
-           it simply keeps the previous behaviour. */
+        /* ---- the resting opacity, held from the first paint --------------- */
         @media (prefers-reduced-motion: no-preference) {
           html[data-motion-arm] motion-effect[data-effect]:not([data-effect='none']):not([data-effect='']):not([data-effect='parallax']):not([data-effect='marquee']):not([data-motion-pending]):not([data-motion-revealed]) {
             opacity: 0;

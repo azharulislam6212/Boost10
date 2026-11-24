@@ -69,7 +69,7 @@ function readCache(key) {
  * @param {string} html
  */
 function writeCache(key, html) {
-  if (isDesignMode()) return; // The Theme Editor must always see fresh output.
+  if (isDesignMode()) return;
 
   cache.set(key, { html, expires: Date.now() + CACHE_TTL });
 

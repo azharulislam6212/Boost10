@@ -4,11 +4,6 @@
  * on its lines kept drifting after the letters had landed, so the two lines
  * visibly jumped together once the animation ended.
  *
- * The growth is scroll-linked rather than played once: it follows the page in
- * both directions. Positions are eased towards their target on each frame, so
- * the movement trails the scroll slightly instead of snapping with it, and the
- * loop stops as soon as everything has settled.
- *
  * @module @theme/scrolling-cards
  */
 

@@ -13,7 +13,6 @@ import { EDITOR_EVENTS } from '@theme/events';
  * @param {string} tagName Must contain a hyphen and carry no vendor prefix.
  * @param {CustomElementConstructor} ElementClass
  * @returns {CustomElementConstructor} The registered class, existing or new.
- *
  * @example
  * export class CartDrawer extends BaseComponent {}
  * defineComponent('cart-drawer', CartDrawer);
@@ -330,9 +329,6 @@ export class BaseComponent extends HTMLElement {
 
       this.on(document, eventName, (event) => {
         const target = /** @type {CustomEvent} */ (event).target;
-        // A section event targets the section around this component; a block
-        // event targets the block, which is usually inside it — a slide in a
-        // carousel. Either way round is this component's business.
         if (target instanceof Node && !target.contains(this) && !this.contains(target)) return;
         method.call(this, event);
       });

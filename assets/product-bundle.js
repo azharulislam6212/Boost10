@@ -322,7 +322,6 @@ export class ProductBundle extends BaseComponent {
       this.toggleAttribute('data-added', true);
       announce(themeString('bundleAddedToCart', ''));
 
-      // The items are in; the code is priced in the background so the button frees up at once.
       if (code) this.#applyCode(code);
 
       return result;

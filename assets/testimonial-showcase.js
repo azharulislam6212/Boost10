@@ -157,7 +157,6 @@ export class TestimonialShowcase extends BaseComponent {
       this.on(lane.element, 'focusout', () => lane.release('focus'));
     }
 
-    // A lane nobody can see is animating for nobody.
     this.#visibility = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
@@ -170,8 +169,6 @@ export class TestimonialShowcase extends BaseComponent {
     );
     this.#lanes.forEach((lane) => this.#visibility?.observe(lane.element));
 
-    // A lane built in a box with no size (closed tab, images not laid out yet)
-    // measures zero and never moves; rebuild once the width really changes.
     let width = this.offsetWidth;
     this.#resize = new ResizeObserver(() => {
       if (this.offsetWidth === width) return;
@@ -180,7 +177,6 @@ export class TestimonialShowcase extends BaseComponent {
     });
     this.#resize.observe(this);
 
-    // Crossing the breakpoint swaps the axis the track moves on.
     this.on(ROW_QUERY, 'change', () => this.#restart());
 
     this.on(this, 'click', (event) => {
@@ -222,7 +218,6 @@ export class TestimonialShowcase extends BaseComponent {
     const label = card instanceof HTMLElement ? card.dataset.showcaseLabel : '';
     if (label) modal.querySelector('dialog')?.setAttribute('aria-label', label);
 
-    // Let the poster decode first so it is painted when the panel animates in.
     const image = stage.querySelector('img');
     if (image) await Promise.race([image.decode().catch(() => {}), new Promise((resolve) => setTimeout(resolve, POSTER_WAIT))]);
 

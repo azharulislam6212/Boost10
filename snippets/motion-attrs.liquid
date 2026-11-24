@@ -33,10 +33,6 @@
 {% enddoc %}
 
 {%- liquid
-  # ---- which family are we resolving -------------------------------------
-  # Headings, subheadings and buttons share the block's `animation_text`
-  # setting but each fall back to their own theme default. Subheadings and
-  # buttons are whole elements, so they always resolve block-level.
   assign setting_key = 'animation_text'
   assign element_level = block_level | default: false
   case kind
@@ -58,14 +54,6 @@
       assign theme_default = settings.animation_style
   endcase
 
-  # ---- cascade: block › section › theme ----------------------------------
-  #
-  # Every optional parameter is coerced with `default` before it is compared.
-  # An unset one is nil in Shopify and Undefined elsewhere, and the two disagree
-  # about whether that is blank — so `if effect != blank` was true for a caller
-  # that never passed an override, and `resolved` came out as the empty string.
-  # `data-effect=""` means "no animation" to the component, which is how a whole
-  # cascade can resolve to nothing while looking correct in the source.
   assign resolved = 'inherit'
 
   assign effect_override = effect | default: ''
@@ -91,23 +79,11 @@
     assign resolved = theme_default
   endif
 
-  # An empty theme-level image setting means "no image animation".
   assign resolved = resolved | default: 'none'
   if resolved == '' or resolved == 'inherit'
     assign resolved = 'none'
   endif
 
-  # ---- block_level: follow the text setting, but never split the text ----
-  #
-  # A button wants the same entrance as the words around it, and nothing at all
-  # happening inside it. The text family's presets split their element into
-  # words or letters and animate the pieces, which on a button means the label
-  # coming apart while the pill sits still — the opposite of what is wanted.
-  #
-  # So the cascade resolves exactly as it always does and only the answer is
-  # translated: each splitting preset maps to the whole-element preset that
-  # moves the same way. A section set to `words-slide-up` gets buttons that
-  # slide up in one piece, same direction, same timing.
   if element_level
     case resolved
       when 'words-slide-up', 'letters-slide-up', 'split-text'
@@ -123,34 +99,17 @@
     endcase
   endif
 
-  # Master switch always wins.
   unless settings.animations_reveal_on_scroll
     assign resolved = 'none'
   endunless
 
-  # ...and the theme editor's preset preview wins over that.
-  #
-  # To fill the thumbnails in the Add block / Add section picker, the editor
-  # renders the preset on a throwaway page and captures it. `<motion-effect>`
-  # hides its content the moment it takes charge and only reveals it after the
-  # load cascade plus the animation's own duration — so that capture lands on an
-  # element that is still at `opacity: 0`. A whole preset made of animated
-  # blocks captures as a blank frame, and a blank frame is what the picker
-  # reports as "No preview available".
-  #
-  # Nobody scrolls a preview, so there is nothing for a scroll reveal to do
-  # there in the first place. `none` makes the component mark itself revealed
-  # without ever writing a resting state, which is exactly the finished frame
-  # the merchant is being shown. The storefront is untouched.
   if request.visual_preview_mode
     assign resolved = 'none'
   endif
 
-  # ---- timing: fixed per caller; `0` leaves the component default ---------
   assign resolved_duration = duration | default: 0 | plus: 0
   assign resolved_delay = delay | default: 0 | plus: 0
   assign resolved_stagger = stagger | default: 0 | plus: 0
-  # Content arrives item by item, far enough apart to read as a sequence.
   if kind == 'content' and resolved_stagger < 200
     assign resolved_stagger = 200
   endif

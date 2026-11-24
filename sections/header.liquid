@@ -10,16 +10,6 @@
   assign st = section.settings
   assign menu = st.menu
 
-  # ---- which menu items have a mega menu ----------------------------------
-  #
-  # Split on the attribute, drop the text before the first one, and take each
-  # value up to its closing quote.
-  #
-  # `escape` on both sides, because the attribute was written escaped and a menu
-  # item called "Gut & Digestion" is `Gut &amp; Digestion` in the markup.
-  # `downcase` on both sides, because typing a name into a block setting is not
-  # the place to demand exact case. The pipes stop "Sale" matching inside
-  # "Sale Items".
   assign mega_menu_items = ''
   assign mega_chunks = header_bay | split: 'data-menu-item="'
 
@@ -30,7 +20,6 @@
     endif
   endfor
 
-  # ---- height -------------------------------------------------------------
   case st.header_height
     when 'compact'
       assign row_height = 56
@@ -42,9 +31,6 @@
       assign row_height = 64
   endcase
 
-  # ---- transparency -------------------------------------------------------
-  # Read once into three plain variables so the markup below never has to ask
-  # which page type it is on again.
   capture transparency
     content_for 'block', type: '_header-transparency', id: 'header-transparency'
   endcapture
@@ -62,7 +48,6 @@
 
   assign transparent_text = transparency[2] | default: blank
 
-  # ---- classes ------------------------------------------------------------
   assign header_classes = 'site-header color-' | append: st.color_scheme
   assign header_classes = header_classes | append: ' site-header--shape-' | append: st.header_shape
   if supports_transparent
@@ -107,7 +92,6 @@
     endif
   endif
 
-  # Logo
   case st.logo_position
     when 'center'
       assign slot_top_center = slot_top_center | append: fragment_logo
@@ -117,13 +101,6 @@
       assign slot_top_start = slot_top_start | append: fragment_logo
   endcase
 
-  # Navigation
-  #
-  # A centred logo and a centred menu both land in the same slot, and the slot
-  # centres the pair — so the logo is never on the centre line and the setting
-  # looks broken. There is only one centre, so the logo takes it and the menu
-  # steps aside to the start. The merchant asked for a centred logo; that is the
-  # setting that wins.
   assign menu_place = st.menu_position
   if st.logo_position == 'center' and st.menu_position == 'center' and st.menu_row == 'top'
     assign menu_place = 'left'
@@ -149,7 +126,6 @@
     endcase
   endif
 
-  # Search
   if st.search_row == 'bottom'
     if st.search_position == 'left'
       assign slot_bottom_start = slot_bottom_start | append: fragment_search
@@ -168,10 +144,8 @@
 
   assign border_total = st.border_thickness | times: 2
 
-  # ---- desktop ------------------------------------------------------------
   assign header_block_size = row_height | plus: st.padding_top | plus: st.padding_bottom | plus: border_total
 
-  # ---- mobile: the sliders fall back to the desktop value at 0 -------------
   assign pad_top_mobile = st.padding_top_mobile
   if pad_top_mobile == 0
     assign pad_top_mobile = st.padding_top
@@ -184,8 +158,6 @@
 
   assign header_block_size_mobile = 54 | plus: pad_top_mobile | plus: pad_bottom_mobile | plus: border_total
 
-  # ---- the second row, when there is one ----------------------------------
-  # `--header-row-height * 0.7` plus its 1px top rule, mirroring header.css.
   if bottom_row != blank
     assign bottom_extra = row_height | times: 70 | divided_by: 100 | plus: 1
     assign header_block_size = header_block_size | plus: bottom_extra
@@ -199,20 +171,6 @@
   :root {
     --header-block-size: {{ header_block_size }}px;
 
-    /* The same number, under the name the rest of the theme reads.
-       `--header-height` positions the sticky bundle tray, the store locator
-       map, the sticky product bar and the search modal.
-
-       It used to be published by `<sticky-header>` alone, from `offsetHeight`,
-       so until that module arrived every one of those offsets resolved through
-       `var(--header-height, 0px)` to zero and then snapped to the real value on
-       upgrade. Stating it here means they start correct.
-
-       The component still writes its own measured value as an inline style on
-       `<html>`, which outranks this rule — so a header whose painted height
-       differs from the arithmetic (a wrapped menu, a webfont with a taller cap
-       height) is still corrected. It simply has nothing left to correct in the
-       ordinary case. */
     --header-height: {{ header_block_size }}px;
   }
 

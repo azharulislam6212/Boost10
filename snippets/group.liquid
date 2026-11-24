@@ -29,11 +29,6 @@
     assign is_row = true
   endif
 
-  # ---- axes -------------------------------------------------------------
-  # Written as flexbox keywords here so the stylesheet does not need a lookup
-  # table of its own. `start` and `end` rather than `flex-start`: the modern
-  # keywords work for both `align-items` and `justify-content`, which is what
-  # lets one property serve both axes.
   case settings.alignment
     when 'center'
       assign inline_axis = 'center'
@@ -43,11 +38,6 @@
       assign inline_axis = 'start'
   endcase
 
-  # `stretch` is the cross axis only, which is the axis this setting feeds, so
-  # there is no arrangement where it lands somewhere it is invalid. It is what a
-  # row of cards wants: three panels whose text wraps to one, two and one lines
-  # are three different heights under `start`, and one row of equal boxes under
-  # this.
   case settings.position
     when 'center'
       assign block_axis = 'center'
@@ -59,21 +49,8 @@
       assign block_axis = 'start'
   endcase
 
-  # Distribution replaces the inline alignment, because both land on
-  # `justify-content` and the later one would win arbitrarily. Only meaningful
-  # on a row, so ignored entirely on a column.
-  #
-  # Coerced with `default` and compared against a real string rather than tested
-  # with `!= blank`. An unset setting is nil in Shopify and Undefined in other
-  # Liquid engines, and only one of those is blank — a difference that silently
-  # emitted `--group-inline:` with no value.
-
-  # The alignment on its own, captured before a distribution can replace it.
-  # See `--group-align` below for what reads it.
   assign alignment_axis = inline_axis
 
-  # The Group block folds distribution into Alignment as a row-only option. Its
-  # children still inherit `start`, as `case` above already resolved it.
   if is_row and settings.alignment == 'space-between'
     assign inline_axis = 'space-between'
   endif
@@ -83,22 +60,9 @@
     assign inline_axis = distribution
   endif
 
-  # ---- size -------------------------------------------------------------
   assign width_pct = settings.width_custom | default: 100 | plus: 0
   assign width_mobile_pct = settings.width_custom_mobile | default: 100 | plus: 0
 
-  # Two properties, not one.
-  #
-  # `flex` only means anything to a flex *item*, and a group is only a flex item
-  # when its parent is another group. At the top level of a section — inside
-  # `.rich-text__inner`, a `.container`, anywhere that is not `display: flex` —
-  # a `flex` declaration is inert, so Fit and Custom did nothing and every group
-  # rendered full width. That is the bug.
-  #
-  # So each option also writes an `inline-size`. Inside a flex row the
-  # `flex-basis` wins for the initial main size and the width is ignored; outside
-  # one the width is all there is. Both agree, so neither context is a special
-  # case.
   case settings.width
     when 'fill'
       assign width_value = '1 1 0%'
@@ -124,8 +88,6 @@
       assign width_mobile_size = 'fit-content'
   endcase
 
-  # Adapt sizes the group to the shape of its background image or uploaded
-  # video. `aspect-ratio` only sets a minimum here, so content can still grow it.
   assign media_ratio = ''
   case settings.height
     when 'adapt'
@@ -149,18 +111,6 @@
       assign height_value = 'auto'
   endcase
 
-  # ---- border -----------------------------------------------------------
-  #
-  # Opacity goes into the colour, not onto the element: `opacity` on the group
-  # would fade its contents along with the frame.
-  #
-  # With no colour picked the border is `currentColor`, which the colour filters
-  # cannot take an alpha channel from — there is no channel to read until the
-  # scheme resolves it in the browser. `color-mix` does the same fade at that
-  # point instead, so both paths honour the slider.
-  # Any style the caller offers, not just solid. The Group block lists None and
-  # Solid; `blocks/card-content.liquid` adds Dashed, and the difference between
-  # them is one keyword in the declaration rather than a second border system.
   assign border_line = settings.border_style | default: 'none'
   assign border_width = 0
   if border_line != 'none'
@@ -177,14 +127,6 @@
 
   assign radius = settings.border_radius | default: 0 | plus: 0
 
-  # ---- gaps -------------------------------------------------------------
-  #
-  # `gap` is the original single control and is what every group saved before
-  # this change is configured with. The two axes layer on top of it: each falls
-  # back to `gap` when the merchant has not moved it, so an existing group
-  # renders exactly as it did and a new one gets the axis it was given. `plus: 0`
-  # coerces the range to a number — `default` alone does not replace a
-  # deliberate 0, which is a value a merchant can legitimately want here.
   assign gap_base = settings.gap | default: 16 | plus: 0
   assign gap_x = settings.gap_horizontal | default: gap_base | plus: 0
   assign gap_y = settings.gap_vertical | default: gap_base | plus: 0
@@ -195,14 +137,6 @@
     assign gap_y_mobile = gap_y_mobile | at_most: gap_mobile_max
   endif
 
-  # ---- mobile layout ----------------------------------------------------
-  #
-  # Swipe is CSS scroll-snap, not a carousel component. The children are already
-  # laid out in a flex row; making that row scroll and snap is four declarations
-  # and works with no script, no resize observer and no second set of markup for
-  # small screens. A `<carousel-slider>` here would mean cloning the children
-  # into slides, which is a different DOM on a phone than on a desktop — and the
-  # blocks inside a group are authored by the merchant, not by the theme.
   assign swipe_on_mobile = settings.swipe_on_mobile | default: false
   assign custom_column_width_mobile = settings.custom_column_width_mobile | default: false
   assign column_width_mobile = settings.column_width_mobile | default: 76 | plus: 0
@@ -211,7 +145,6 @@
 
   assign sticky_desktop = settings.sticky_desktop | default: false
 
-  # ---- flags ------------------------------------------------------------
   assign background_media = settings.background_media | default: 'none'
   assign has_media = false
   if background_media != 'none'
@@ -224,7 +157,6 @@
     assign has_link = true
   endif
 
-  # ---- classes ----------------------------------------------------------
   assign classes = 'block-group'
   assign classes = classes | append: ' block-group--' | append: direction
 
@@ -247,27 +179,10 @@
     assign classes = classes | append: ' block-group--sticky'
   endif
 
-  # Appended last so a caller's own modifier always sits after the group's own
-  # classes, and a block built on this snippet can style itself without forking
-  # it.
   if extra_classes != blank
     assign classes = classes | append: ' ' | append: extra_classes
   endif
 
-  # ---- motion -----------------------------------------------------------
-  #
-  # A group animates itself when it carries the setting, and staggers its own
-  # children when the merchant asks for one. It lives here rather than in each
-  # block because every block built on this snippet is a container, and a
-  # container that animates is the same decision each time.
-  #
-  # `children: true` is what makes **Stagger between items** mean anything: the
-  # blocks inside are the items, and staggering the container against itself
-  # would be one element with a delay on it.
-  #
-  # A caller that brings its own — `blocks/image-card.liquid` animates as an
-  # image, not as text — passes them through `attributes` and has no
-  # `animation_text` setting, so nothing is emitted twice.
   capture motion_attrs
     if settings.animation_text or animate
       render 'motion-attrs', kind: 'content', block: settings, children: true, duration: 1000

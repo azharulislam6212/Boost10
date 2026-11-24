@@ -135,8 +135,6 @@ class PriceBreakComponent extends BaseComponent {
     this.on(document, EVENTS.CART_ITEM_ADDED, this.#onCart);
     this.on(document, EVENTS.CART_ITEM_REMOVED, this.#onCart);
 
-    // The stepper debounces its own event so the cart is not hammered. A price
-    // the customer is reading as they type should not wait on that.
     const input = this.#quantityInput();
     if (input) this.on(input, 'input', () => this.#setQuantity(Number(input.value)));
 
@@ -162,8 +160,6 @@ class PriceBreakComponent extends BaseComponent {
     const own = this.#tiers.get(this.#variantId);
     if (own) return own;
 
-    // An empty map means this element was rendered without a payload of its
-    // own, not that the variant has no breaks — read the owner's and keep it.
     if (this.#tiers.size === 0) {
       const owner = this.root.querySelector?.('volume-pricing');
       if (owner && owner !== this) this.#tiers = readTiers(owner);
@@ -231,7 +227,6 @@ class PriceBreakComponent extends BaseComponent {
   #onQuantityEvent = (event) => {
     const detail = /** @type {CustomEvent} */ (event).detail;
 
-    // Cart lines carry a line or key and broadcast on the same event name.
     if (detail?.line != null || detail?.key) return;
 
     this.#setQuantity(Number(detail?.quantity));

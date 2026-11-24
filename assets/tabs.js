@@ -329,8 +329,6 @@ export class TabGroup extends BaseComponent {
     const tab = this.tabs[this.#index];
     if (!marker || !tab) return;
 
-    // Layout offsets, not client rects: an entrance animation that is still
-    // moving the tab must not drag the marker along with it.
     const box = this.#layoutBox(tab);
 
     if (box.width === 0 && box.height === 0) return;

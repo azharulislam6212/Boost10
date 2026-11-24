@@ -2,17 +2,6 @@
  * `<shoppable-video>`: the centre-focused video carousel of
  * `sections/shoppable-video.liquid`.
  *
- * Every slide is told how far it sits from the active one (`data-offset`);
- * `base.css` turns that distance into a size and a place. While a pointer
- * drags, the same table is interpolated here so the slides follow the finger,
- * and the release settles them on the nearest slide, as Swiper does.
- *
- * Looping copies the slides until there are enough that the one wrapping
- * round is always out of sight, so nothing jumps across the visible stage.
- * The component also plays the active video (uploaded, or a YouTube/Vimeo
- * embed kept in a `<template>` until first play), drives the arrows and the
- * pagination, and autoplays when asked to.
- *
  * @module @theme/shoppable-video
  */
 
@@ -90,7 +79,6 @@ export class ShoppableVideo extends BaseComponent {
     this.#bindInput(stage);
     this.#bindControls();
 
-    // Shopify fires block selection on the block itself, inside this element.
     this.on(document, 'shopify:block:select', (event) => {
       const real = originals.findIndex((slide) => slide.contains(/** @type {Node} */ (event.target)));
       if (real >= 0) {
@@ -234,8 +222,6 @@ export class ShoppableVideo extends BaseComponent {
     this.#slides.forEach((slide, index) => {
       const distance = this.#distance(index, this.#index);
 
-      // The first placement is instant. After that, a slide that wraps from one
-      // end to the other does so out of sight, without a transition.
       if (previous === null) {
         slide.setAttribute('data-jump', '');
       } else {
@@ -248,7 +234,6 @@ export class ShoppableVideo extends BaseComponent {
       slide.dataset.offset = String(Math.max(-limit, Math.min(limit, distance)));
       slide.toggleAttribute('data-active', distance === 0);
       if (slide.hasAttribute('data-copy')) {
-        // A copy in the centre is the slide being shown, so it is announced.
         slide.toggleAttribute('aria-hidden', distance !== 0);
       } else {
         slide.inert = Math.abs(distance) > VISIBLE;
@@ -398,14 +383,12 @@ export class ShoppableVideo extends BaseComponent {
 
     const index = this.#slides.indexOf(slide);
 
-    // On the centre slide the whole video is the play control; the product card keeps its own.
     const onCentreVideo = index === this.#index && !target.closest('.shoppable-video__product, a, button');
     const toggle = target.closest('[data-video-toggle]') || (onCentreVideo && slide.querySelector('[data-video-toggle]'));
 
     if (toggle) {
       this.#stopAutoplay();
       if (this.#isPlaying(slide)) {
-        // Paused by hand: autoplay leaves it alone until it is picked again.
         slide.setAttribute('data-held', '');
         this.#pause(slide);
       } else {
@@ -416,7 +399,6 @@ export class ShoppableVideo extends BaseComponent {
       return;
     }
 
-    // A slide beside the centre is picked rather than followed into.
     if (index !== this.#index) {
       event.preventDefault();
       event.stopPropagation();
@@ -472,7 +454,6 @@ export class ShoppableVideo extends BaseComponent {
     if (!pointer.decided) {
       if (Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) return;
 
-      // Mostly vertical: the page is being scrolled, not the carousel.
       if (Math.abs(dy) > Math.abs(dx)) {
         this.#pointer = null;
         return;
@@ -490,7 +471,6 @@ export class ShoppableVideo extends BaseComponent {
     const towards = isRTL() ? 1 : -1;
     let progress = (dx * towards) / step;
 
-    // Without a loop, pull against the ends instead of running past them.
     if (!this.#loop) {
       const min = -this.#index;
       const max = this.#slides.length - 1 - this.#index;
@@ -533,8 +513,6 @@ export class ShoppableVideo extends BaseComponent {
       if (decisive) steps = Math.sign(pointer.progress || pointer.velocity);
     }
 
-    // Settle from where the finger left the slides: transitions come back on
-    // in the same frame the drag styles are cleared.
     this.removeAttribute('data-dragging');
     this.go(this.#index + steps);
   }
@@ -689,7 +667,6 @@ export class ShoppableVideo extends BaseComponent {
 
       slide.setAttribute('data-started', '');
       video.play().catch(() => {
-        // Sound refused after all: play muted rather than not at all.
         if (!video.muted) {
           video.muted = true;
           video.play().catch(() => this.#setPlaying(slide, false));
@@ -700,7 +677,6 @@ export class ShoppableVideo extends BaseComponent {
       return;
     }
 
-    // An embed: inserted on first play, then driven through its player API.
     let frame = slide.querySelector('iframe');
     if (!frame) {
       const template = slide.querySelector('template[data-video-template]');
@@ -809,7 +785,6 @@ export class ShoppableVideo extends BaseComponent {
       video.currentTime = 0;
     }
 
-    // An embed is dropped; the next play inserts it fresh from the template.
     slide.querySelector('.shoppable-video__media > iframe')?.remove();
 
     slide.removeAttribute('data-started');

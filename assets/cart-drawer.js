@@ -447,7 +447,6 @@ export const cart = {
 
     const drawer = behaviour === 'notification' ? null : document.querySelector('cart-drawer');
 
-    // Quick add sits in a modal; once it has done its job it gets out of the way.
     const covering = [...document.querySelectorAll('[data-state="open"], [data-state="opening"]')].filter(
       (overlay) => overlay !== drawer && overlay instanceof Overlay && overlay.overlayType !== 'cart'
     );

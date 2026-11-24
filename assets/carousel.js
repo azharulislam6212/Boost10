@@ -427,7 +427,6 @@ export class CarouselSlider extends BaseComponent {
   /** Re-read the slides and re-render. Call after replacing them by hand. */
   refresh() {
     if (!this.running) {
-      // Not near yet: it builds from the fresh slides when it is.
       if (this.#near) this.#sync();
       return;
     }
@@ -630,7 +629,6 @@ export class CarouselSlider extends BaseComponent {
     copy.removeAttribute('data-active');
     copy.removeAttribute('data-motion-armed');
     copy.removeAttribute('data-motion-revealed');
-    // A slide copied mid-entrance would keep its hidden starting state forever.
     for (const prop of ['opacity', 'transform', 'clip-path', 'filter', 'translate', 'scale', 'rotate']) {
       copy.style.removeProperty(prop);
     }
@@ -1286,7 +1284,6 @@ export class CarouselSlider extends BaseComponent {
         else this.#playAutoplay();
       });
 
-      // Slides changing off screen still cost frames while the page scrolls.
       this.#visibility = new IntersectionObserver(([entry]) => {
         if (!entry) return;
         const offscreen = !entry.isIntersecting;

@@ -178,7 +178,7 @@ function morphFormControl(from, to) {
         break;
       }
 
-      if (type === 'file') break; // Value is read-only for security reasons.
+      if (type === 'file') break;
 
       if (forced || !isActive) {
         const nextValue = to.getAttribute('value') ?? to.value ?? '';

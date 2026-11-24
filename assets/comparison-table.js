@@ -123,7 +123,6 @@ export class ComparisonTable extends BaseComponent {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) return parsed.map((name) => String(name).trim()).filter(Boolean);
     } catch {
-      // A malformed list leaves the names to the columns themselves.
     }
     return [];
   }

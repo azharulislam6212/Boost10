@@ -8,20 +8,15 @@
   assign heading_font = settings.type_header_font
   assign accent_font = settings.type_accent_font | default: settings.type_header_font
 
-  # Accent only earns its own @font-face when it is not already the heading
-  # face. Comparing all three axes matters: a merchant can pick the same family
-  # at a different weight, and that is a genuinely different file.
   assign accent_is_distinct = true
   if accent_font.family == heading_font.family and accent_font.style == heading_font.style and accent_font.weight == heading_font.weight
     assign accent_is_distinct = false
   endif
 
-  # ---- Seed each family with the weights it always needs -------------------
   assign body_weights = body_font.weight | append: ',700,500,600'
   assign heading_weights = heading_font.weight | append: ''
   assign accent_weights = accent_font.weight | append: ''
 
-  # ---- Collect every weight the typography settings can request ------------
   assign type_roles = 'paragraph,default,menu,button,h1,h2,h3,h4,h5,h6' | split: ','
 
   for role in type_roles
@@ -30,8 +25,6 @@
     assign role_family = settings[family_key]
     assign role_weight = settings[weight_key]
 
-    # 'inherit' means the role takes whatever the cascade gives it, so it adds
-    # no new file requirement of its own.
     if role_weight == blank or role_weight == 'inherit'
       continue
     endif
@@ -46,8 +39,6 @@
     endcase
   endfor
 
-  # The custom style has a weight but no family control, so it can land on
-  # either face depending on where the merchant applies the class.
   assign custom_weight = settings.type_custom_weight
   if custom_weight != blank and custom_weight != 'inherit'
     assign body_weights = body_weights | append: ',' | append: custom_weight
@@ -58,10 +49,6 @@
   assign heading_weight_list = heading_weights | split: ',' | uniq | sort
   assign accent_weight_list = accent_weights | split: ',' | uniq | sort
 
-  # ---- Italics -------------------------------------------------------------
-  # Only body needs them, and only at two weights: <em>, and <em> inside
-  # <strong>. Loading italic at all seven weights would be dead bytes on every
-  # storefront that never writes emphasised text.
   assign body_italic = nil
   assign body_bold_italic = nil
   if body_font.style != 'italic'
@@ -72,11 +59,6 @@
     endif
   endif
 
-  # ---- Preload targets -----------------------------------------------------
-  # Two files, both above the fold on every template: the paragraph face and
-  # the h1 face. Preloading the whole set would push the LCP font behind five
-  # competing requests on a cold connection, which is the exact opposite of
-  # what a preload is for.
   assign paragraph_weight = settings.type_paragraph_weight | default: body_font.weight
   if paragraph_weight == 'inherit'
     assign paragraph_weight = body_font.weight

@@ -41,9 +41,6 @@ export class NavMenu extends BaseComponent {
   setup() {
     this.#relocatePanels();
 
-    // The theme editor: selecting a mega menu block opens its dropdown. Listened
-    // for directly, because the block's own wrapper can sit outside this menu
-    // once its panel has been moved into the matching item.
     if (isDesignMode()) {
       this.on(document, 'shopify:block:select', (event) => {
         const target = event.target;

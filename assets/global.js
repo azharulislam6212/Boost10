@@ -181,7 +181,6 @@ export class StickyHeader extends BaseComponent {
     const announcement = document.querySelector('[data-announcement-bar]');
     if (announcement instanceof HTMLElement) this.#observer.observe(announcement);
 
-    // The ticker already runs once per frame; throttling again left the header a frame behind.
     this.#unsubscribe = subscribeToTicker((scrollY) => this.#onScroll(scrollY));
 
     this.#prime();
@@ -196,7 +195,6 @@ export class StickyHeader extends BaseComponent {
 
     this.on(document, EVENTS.OVERLAY_OPEN, () => this.reveal());
 
-    // A restored reload lands mid-page; adopt it rather than animating in.
     this.on(document, EVENTS.SCROLL_RESTORED, () => this.#prime());
   }
 
@@ -243,7 +241,6 @@ export class StickyHeader extends BaseComponent {
     }
 
     setCssVar('--header-sticky-offset', `${this.#stickyOffset()}px`);
-    // Kept so the scroll handler never has to re-measure the page mid-scroll.
     this.#pinPoint = this.#offsetAbove() + this.offsetHeight;
     setCssVar('--header-offset-above', `${this.#pinPoint - this.offsetHeight}px`);
   }
@@ -297,7 +294,6 @@ export class StickyHeader extends BaseComponent {
     const mode = this.dataset.stickyMode || 'always';
     const scrolled = position > threshold;
 
-    // Everything below depends only on `scrolled`, which flips once per crossing.
     if (scrolled !== this.#scrolled) {
       this.#scrolled = scrolled;
       this.toggleAttribute('data-scrolled', scrolled);
@@ -594,8 +590,6 @@ export class CookieBanner extends BaseComponent {
     this.on(this.refs.accept, 'click', () => this.respond(true));
     if (this.refs.decline) this.on(this.refs.decline, 'click', () => this.respond(false));
 
-    // The theme editor ignores any stored choice and shows the banner only while
-    // its section is selected, so it can always be reached for editing.
     if (isDesignMode() || storage.get(CookieBanner.KEY, null) !== null) {
       this.hidden = true;
       return;

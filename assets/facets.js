@@ -34,9 +34,6 @@ export class FacetFilters extends BaseComponent {
 
     this.on(this.refs.form, 'change', this.#onChange);
 
-    // The toolbar above the grid (active pills, Clear all) sits outside this
-    // element, so listen on the whole results region and let #onClick decide
-    // which of the sidebar and drawer instances owns the click.
     this.on(this.closest('results-list') || this, 'click', this.#onClick);
 
     this.on(window, 'popstate', () => this.apply({ url: window.location.href, push: false }));
@@ -341,8 +338,6 @@ export class PriceRange extends BaseComponent {
       });
     }
 
-    // Optional slider thumbs. They carry no `name`, so the form never submits
-    // them; they only write into the number inputs.
     for (const [thumb, input] of [
       [this.refs.minThumb, this.refs.min],
       [this.refs.maxThumb, this.refs.max]
@@ -532,7 +527,6 @@ export class LayoutToggle extends BaseComponent {
       this.select(button.dataset.viewOption);
     });
 
-    // Every visit opens on the product grid; list view lasts for this page only.
     this.select('grid', { announce: false });
   }
 

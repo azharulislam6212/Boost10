@@ -212,7 +212,6 @@ export const PRESETS = {
   },
 
   /* ------------------------------------------------------------ element -- ---- */
-  /* Whole-element entrances for subheadings and buttons, each a distinct move. */
 
   'pop-in': {
     group: 'element',
@@ -555,14 +554,10 @@ export function observe(element, callback, options = {}) {
     callback(item);
   };
 
-  // Several reveals can watch one element — a wrapper's item that also runs
-  // its own entrance — so each keeps its own handler.
   const { observer, callbacks } = entry;
   let handlers = callbacks.get(element);
   if (!handlers) callbacks.set(element, (handlers = new Set()));
   handlers.add(fire);
-  // Observing afresh is what delivers an initial entry for the new handler;
-  // every handler ignores a second one.
   observer.unobserve(element);
   observer.observe(element);
 
@@ -789,10 +784,6 @@ function camelToKebab(value) {
  */
 export function reveal(element, options = {}) {
   const requested = options.effect || 'fade-up';
-  // Gradient text cannot be split: each moving letter is its own GPU layer,
-  // and `background-clip: text` on such a layer paints the gradient — or the
-  // letters themselves — in the wrong place until the cascade ends. It moves
-  // whole instead, revealed left to right so it still reads as a cascade.
   const effect =
     getPreset(requested)?.split && !options.targets?.length && hasClippedText(element) ? 'gradient-rise' : requested;
   const preset = getPreset(effect);
@@ -831,9 +822,6 @@ export function reveal(element, options = {}) {
   /** The section header this reveal queues behind, once it has been looked up. @type {Element|null|undefined} */
   let gate;
 
-  // An item that brings its own entrance — a subheading's fade-up, a heading's
-  // letters — plays exactly that, at its turn in this cascade. Moving it here
-  // as well stacked two animations on one element and buried its own.
   const own = new Set(targets.filter((target) => target !== element && ownsEntrance(target)));
 
   for (const target of targets) if (!own.has(target)) applyState(target, restingState);
@@ -846,12 +834,6 @@ export function reveal(element, options = {}) {
     options.stagger ?? (preset.stagger ? preset.stagger * PRESET_PACE : targets.length > 1 ? DEFAULTS.stagger : 0);
   const spread = preset.split ? preset.maxSpread ?? MAX_SPLIT_SPREAD : MAX_ITEM_SPREAD;
 
-  // What is watched, and what each sighting plays. A list of whole items —
-  // cards, columns, a header and its content — is watched item by item, so a
-  // tall section's lower rows wait for the visitor instead of playing unseen
-  // the moment its top edge appears. Split text and a single element play as
-  // one piece when the element itself comes into view.
-  // A clip-path resting state is watched through its parent, as it always was.
   const clips = typeof restingState.clipPath === 'string';
   /** @type {{ observed: Element, members: HTMLElement[], done: boolean }[]} */
   const units =
@@ -884,12 +866,8 @@ export function reveal(element, options = {}) {
 
   const play = (list, fromLoad) => {
     const stagger = list.length > 1 ? Math.min(baseStagger, spread / (list.length - 1)) : baseStagger;
-    // Inside a wrapper that is itself animating, follow it instead of the
-    // page-load cascade, which the wrapper has already taken its place in.
     const lead = ancestorLead(element);
     const now = performance.now();
-    // Content after its section's header waits for the header's own items to
-    // start first — subheading, heading, text — whichever reveal reaches it.
     const ready = gate ? headerReady.get(gate) : undefined;
     const gateWait = ready === undefined ? 0 : Math.max(0, ready - now);
     const cascade = fromLoad && lead === null && ready === undefined ? loadCascadeDelay(options) : 0;
@@ -901,17 +879,12 @@ export function reveal(element, options = {}) {
       if (preset.split) {
         delay = baseDelay + (order ? order[targets.indexOf(target)] : position) * stagger;
       } else {
-        // Whole items queue up across sightings: one that scrolls into view a
-        // moment after the heading still takes its turn behind it, instead of
-        // opening a cascade of its own and landing first.
         const start = Math.max(now + baseDelay, nextSlot);
         delay = start - now;
         if (position === 0) firstStart = start;
         nextSlot = start + stagger + headerHold(target);
       }
 
-      // A zero duration hands an item that animates itself its slot exactly,
-      // with no lead into an entrance this cascade does not play.
       const owned = own.has(target);
       targetTiming.set(target, { start: now + delay, duration: owned ? 0 : duration });
 
@@ -919,9 +892,6 @@ export function reveal(element, options = {}) {
 
       animation?.finished
         .then(() => {
-          // The end frame is the element's own style, so there is nothing to
-          // commit: `commitStyles()` recalculated style once per split letter,
-          // a third of a second of main thread that held back the next entrance.
           animation.cancel();
           clearState(target, restingState);
         })
@@ -957,10 +927,6 @@ export function reveal(element, options = {}) {
     play(list, fromLoad);
   };
 
-  // Next frame rather than a microtask: observers with different settings
-  // report in separate callbacks, and an item one of them starts early (a
-  // nested reveal forcing its wrapper) must still join the same cascade, or
-  // the content plays ahead of its heading.
   const scheduleFlush = () => {
     if (flushScheduled) return;
     flushScheduled = true;
@@ -994,9 +960,6 @@ export function reveal(element, options = {}) {
   const sighted = (unit) => {
     trigger(unit);
     if (units.length === 1) return;
-    // Everything level with or above what just appeared goes with it: slides a
-    // carousel clips sideways, items the scroll jumped past, anything without
-    // a box of its own. Only the rows still below the fold keep waiting.
     for (const other of units) {
       if (!other.done && other.observed.getBoundingClientRect().top < window.innerHeight) trigger(other);
     }
@@ -1141,7 +1104,6 @@ function sectionGate(element) {
   if (!header || !(header.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING)) return null;
   if (headerReady.has(header)) return header;
   if (!headersPending.has(header)) return null;
-  // A header the visitor has already scrolled past has nothing left to lead.
   return header.getBoundingClientRect().bottom > 0 ? header : null;
 }
 
@@ -1171,8 +1133,6 @@ function afterHeaderPlays(header, callback) {
   const timer = setTimeout(run, NESTED_WAIT);
   header.addEventListener(HEADER_EVENT, run);
 
-  // Content in view means its header is in view or just above it: start the
-  // header's items, which starts whatever wraps the header in turn.
   const items = header.querySelector('[data-motion-items]')?.children ?? header.children;
   for (const node of [header, ...items]) {
     for (const start of [...(waiting.get(node)?.values() ?? [])]) start();
@@ -1216,8 +1176,6 @@ const NESTED_WAIT = 2500;
  * @returns {number|null} Null when nothing around it animates.
  */
 function ancestorLead(element) {
-  // The element itself first: a text block that is one item in its wrapper's
-  // cascade follows its own turn, not the wrapper's first item.
   for (let node = element; node; node = node.parentElement) {
     const timing = targetTiming.get(node);
     if (timing) return Math.max(0, timing.start + timing.duration * NESTED_LEAD - performance.now());
@@ -1314,8 +1272,6 @@ function loadCascadeDelay(options) {
   const step = options.loadStagger ?? DEFAULTS.loadStagger;
   const delay = loadIndex * step;
   loadIndex += 1;
-  // A short cap: a reload that lands mid-page has a dozen hosts on screen,
-  // and the last of them waiting half a second read as a blank section.
   return Math.min(delay, step * 3);
 }
 
@@ -1326,7 +1282,6 @@ function loadCascadeDelay(options) {
 function markRevealed(element, targets) {
   element.removeAttribute('data-motion-pending');
   element.setAttribute('data-motion-revealed', '');
-  // A carousel's slides carry their own reveal flag; leave it to the carousel.
   for (const target of targets) {
     if (!target.hasAttribute('data-motion-armed')) target.setAttribute('data-motion-revealed', '');
   }
@@ -1544,7 +1499,6 @@ function tick() {
     }
   }
 
-  // Momentum and smooth scrolling keep moving between events.
   requestTick();
 }
 
@@ -1622,8 +1576,6 @@ export function parallax(element, { speed = 0.2, axis = 'y', max = 120 } = {}) {
   measure();
   element.style.setProperty('will-change', 'transform');
 
-  // Follow the scroll only while the element is near the viewport; off screen
-  // there is nothing to see and the frame budget belongs to what is.
   let unsubscribe = null;
   const visibility = new IntersectionObserver(
     ([entry]) => {
@@ -1779,7 +1731,6 @@ export function marquee(track, { speed = 60, direction = 'left', pauseOnHover = 
   });
   observer.observe(container);
 
-  // The first measure can run on the fallback font; re-measure once web fonts land.
   let destroyed = false;
   document.fonts?.ready.then(() => {
     if (!destroyed && document.fonts.status === 'loaded') start();

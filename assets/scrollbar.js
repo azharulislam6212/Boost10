@@ -127,7 +127,6 @@ export class SmoothScrollbar extends BaseComponent {
   /** @returns {boolean} */
   #shouldSmooth() {
     if (prefersReducedMotion()) return false;
-    // The editor scrolls to the selected section itself; Lenis would fight it.
     if (isDesignMode()) return false;
     if (this.dataset.enabled === 'false') return false;
     return true;
@@ -164,8 +163,6 @@ export class SmoothScrollbar extends BaseComponent {
     });
 
     this.#unsubscribe = this.#lenis.on?.('scroll', this.#onLenisScroll) ?? null;
-    // Wheel and touch input arrive here before Lenis starts animating, so a
-    // sleeping loop wakes in time to draw the first frame of the scroll.
     this.#unsubscribeWake = this.#lenis.on?.('virtual-scroll', () => this.#startLoop()) ?? null;
     this.#adoptRestoredScroll();
     this.#startLoop();
@@ -203,8 +200,6 @@ export class SmoothScrollbar extends BaseComponent {
     this.#idleFrames = 0;
     if (this.#frame !== null || !this.#lenis) return;
 
-    // Lenis times each step from its previous timestamp; after a sleep that gap
-    // is seconds long and the first frame would jump straight to the target.
     this.#lenis.time = performance.now() - 1000 / 60;
 
     const tick = (time) => {
@@ -258,9 +253,6 @@ export class SmoothScrollbar extends BaseComponent {
    * @param {number} scrollY
    */
   #publishProgress(progress, scrollY) {
-    // Written on the back-to-top control only: a custom property on <html> is
-    // inherited by every element, so writing it there each frame restyled the
-    // whole document for the length of every scroll.
     if (this.#backToTop === undefined) this.#backToTop = document.querySelector('scroll-to-top');
     this.#backToTop?.updateFromScroll?.(scrollY, progress);
   }
@@ -313,7 +305,6 @@ export class ScrollToTop extends BaseComponent {
     const threshold = Number(this.dataset.offset) || 400;
     const shouldShow = scrollY > threshold;
 
-    // The ring is only drawn while the control is on screen.
     if (shouldShow && Number.isFinite(progress)) {
       this.style.setProperty('--scroll-progress', String(clamp(progress, 0, 1)));
     }

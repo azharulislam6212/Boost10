@@ -86,7 +86,6 @@ export class PromoPopup extends ModalDialog {
    * @returns {boolean}
    */
   get shouldShow() {
-    // Never on its own timer in the theme editor; selecting the section shows it.
     if (isDesignMode()) return false;
 
     if (this.#pageViews() < MIN_PAGE_VIEWS) return false;

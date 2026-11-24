@@ -7,7 +7,6 @@
  */
 
 /* ========================================================================== */
-/*  Network                                                                   */
 /* ========================================================================== */
 
 /**
@@ -58,7 +57,6 @@ export class CartError extends RequestError {
  * @param {AbortSignal} [options.signal]
  * @param {Record<string, string>} [options.headers] Extra headers, merged last.
  * @returns {RequestInit}
- *
  * @example
  * const response = await fetch(
  *   `${Theme.routes.cartAdd}.js`,
@@ -159,7 +157,6 @@ export function themeString(key, fallback = '', replacements = {}) {
 }
 
 /* ========================================================================== */
-/*  Timing                                                                    */
 /* ========================================================================== */
 
 /**
@@ -295,7 +292,6 @@ export function whenIdle(fn, timeout = 2000) {
 }
 
 /* ========================================================================== */
-/*  Money                                                                     */
 /* ========================================================================== */
 
 const MONEY_PATTERN = /\{\{\s*(\w+)\s*\}\}/;
@@ -306,7 +302,6 @@ const MONEY_PATTERN = /\{\{\s*(\w+)\s*\}\}/;
  * @param {number|string} cents Amount in the store's minor unit.
  * @param {string} [format] Defaults to `Theme.shop.moneyFormat`.
  * @returns {string}
- *
  * @example
  * formatMoney(2599, '${{amount}}'); // "$25.99"
  */
@@ -367,7 +362,6 @@ export function formatMoney(cents, format) {
 }
 
 /* ========================================================================== */
-/*  Screen reader announcements                                               */
 /* ========================================================================== */
 
 /**
@@ -402,7 +396,6 @@ export function announceUrgent(message) {
 }
 
 /* ========================================================================== */
-/*  Storage                                                                   */
 /* ========================================================================== */
 
 const STORAGE_PREFIX = () => globalThis.Theme?.storageKey || 'theme';
@@ -489,7 +482,6 @@ export const storage = {
 };
 
 /* ========================================================================== */
-/*  Environment                                                               */
 /* ========================================================================== */
 
 /**
@@ -525,7 +517,6 @@ export function isRTL() {
 }
 
 /* ========================================================================== */
-/*  Visibility                                                                */
 /* ========================================================================== */
 
 /**
@@ -591,7 +582,6 @@ export function onVisible(element, callback, options = { rootMargin: '200px 0px'
 }
 
 /* ========================================================================== */
-/*  Focus management                                                          */
 /* ========================================================================== */
 
 const FOCUSABLE_SELECTOR = [
@@ -678,7 +668,6 @@ export function trapFocus(container, { initialFocus = null, signal } = {}) {
 }
 
 /* ========================================================================== */
-/*  Touch gestures                                                            */
 /* ========================================================================== */
 
 /**
@@ -824,7 +813,6 @@ export function createPinchDetector(element, onPinch, { onPinchStart, onPinchEnd
 }
 
 /* ========================================================================== */
-/*  Misc                                                                      */
 /* ========================================================================== */
 
 /**
@@ -946,7 +934,6 @@ export function bufferOverlayTriggers(root = document) {
 export function setCssVar(name, value, target = document.documentElement) {
   const property = name.startsWith('--') ? name : `--${name}`;
   const next = String(value);
-  // An unchanged write still invalidates styles; on <html> that is every element.
   if (target.style.getPropertyValue(property) === next) return;
   target.style.setProperty(property, next);
 }
@@ -962,7 +949,6 @@ export function getCssVar(name, target = document.documentElement) {
 }
 
 /* ========================================================================== */
-/*  Scroll locking                                                            */
 /* ========================================================================== */
 
 /**

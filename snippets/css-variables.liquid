@@ -10,11 +10,6 @@
   assign heading_font = settings.type_header_font
   assign accent_font = settings.type_accent_font | default: settings.type_header_font
 
-  # ---- Role values, read straight from Theme settings ----------------------
-  # The `| default:` on each line is the floor for a setting with no schema
-  # default, not a second source of truth. If a value here disagrees with
-  # settings_schema.json, the schema wins and this line is stale.
-
   assign p_font = settings.type_paragraph_font | default: 'body'
   assign p_weight = settings.type_paragraph_weight | default: 400
   assign p_size = settings.type_paragraph_size | default: 16
@@ -42,12 +37,6 @@
   assign btn_size = settings.type_button_size | default: 16
   assign btn_case = settings.type_button_case | default: 'none'
 
-  # ---- Swatches ------------------------------------------------------------
-  # Three named choices that CSS cannot branch on, turned into values it can.
-  #
-  # The selected state is the exception and is NOT resolved here: ring, border
-  # and underline are three different rules, not three values of one, so it
-  # travels as `data-swatch-selected` on <html> and the stylesheet keys off it.
   case settings.swatch_hover_effect
     when 'lift'
       assign swatch_hover = 'translateY(-2px)'
@@ -66,28 +55,12 @@
       assign swatch_justify = 'flex-start'
   endcase
 
-  # No circle branch here. `.swatch[data-shape='circle']` is 50% in the
-  # stylesheet, where the shape is known per element - a block that overrides
-  # the shape to Rounded would otherwise inherit a 50% token from a theme set
-  # to Circle and draw a circle anyway.
   assign swatch_radius = settings.swatch_radius | default: 6
-
-  # ---- Named line heights and tracking ------------------------------------
-  # Merchants choose words; CSS needs numbers. Doing the translation here means
-  # the schema never asks anyone what 1.15 looks like.
 
   assign line_map_tight = 1.15
   assign line_map_normal = 1.6
   assign line_map_loose = 1.9
 
-  # Headings need their own scale. The body values were being reused for all six
-  # levels, which put a "Normal" h4 at 1.6 — base.css's own fallback for that
-  # same variable is 1.3, so the stylesheet and the token disagreed by a wide
-  # margin on every heading a merchant left at the default. Large type needs
-  # less leading than body copy, not the same amount.
-  #
-  # These three land exactly on the fallbacks base.css already declares: 1.1 for
-  # h1-h3 (default "Tight") and 1.3 for h4-h6 (default "Normal").
   assign head_line_tight = 1.1
   assign head_line_normal = 1.3
   assign head_line_loose = 1.6
@@ -96,7 +69,6 @@
   assign track_map_normal = '0em'
   assign track_map_wide = '0.06em'
 
-  # Paragraph
   case settings.type_paragraph_line
     when 'tight'
       assign p_line = line_map_tight
@@ -114,12 +86,6 @@
       assign p_track = track_map_normal
   endcase
 
-  # Default text.
-  #
-  # `type_default_line` and `type_default_track` are both in the schema and
-  # neither was ever read here: the line height was pinned to a literal 1.5 and
-  # the tracking had no variable at all. Two controls a merchant could move all
-  # day with nothing happening on the page.
   case settings.type_default_line
     when 'tight'
       assign d_line = line_map_tight
@@ -137,7 +103,6 @@
       assign d_track = track_map_normal
   endcase
 
-  # Subheading
   case settings.type_subheading_track
     when 'tight'
       assign sub_track = track_map_tight
@@ -147,7 +112,6 @@
       assign sub_track = track_map_wide
   endcase
 
-  # Menu
   case settings.type_menu_track
     when 'tight'
       assign menu_track = track_map_tight
@@ -157,7 +121,6 @@
       assign menu_track = track_map_normal
   endcase
 
-  # Button
   case settings.type_button_track
     when 'tight'
       assign btn_track = track_map_tight
@@ -191,8 +154,6 @@
       --font-weight-semibold: 600;
       --font-weight-bold: 700;
 
-      /* Body bold, relative to whatever weight the merchant picked. Clamped at
-         900 because 1000 is not a weight any Shopify font ships. */
       --font-body-weight-bold: {{ body_font.weight | plus: 300 | at_most: 900 }};
 
       /* ---- paragraph ---- */
@@ -338,13 +299,7 @@
           --font-custom-color: var(--color-text);
       {%- endcase -%}
 
-      /* ---- swatches -------------------------------------------------------
-         `--swatch-size` is the one a caller may override per element -
-         `snippets/swatch.liquid` writes it inline for the named small, medium
-         and large steps - so the theme setting lands on `--swatch-size-card`
-         and the component picks between them. Writing the setting straight
-         into `--swatch-size` would have made the three named sizes
-         unreachable. */
+      /* ---- swatches ------------------------------------------------------- */
       --swatch-size-card: {{ settings.swatch_size | default: 24 }}px;
       --swatch-gap: {{ settings.swatch_gap | default: 8 }}px;
       --swatch-border-width: {{ settings.swatch_border_width | default: 1 }}px;
@@ -354,10 +309,7 @@
       --swatch-hover-transform: {{ swatch_hover }};
       --swatch-justify: {{ swatch_justify }};
 
-      /* ---- names the rest of the theme already reads ----
-         `--font-size-base` follows the responsive paragraph token rather than
-         the desktop one, so the two components that read it shrink on mobile
-         with everything else. */
+      /* ---- names the rest of the theme already reads ---- */
       --font-size-base: var(--font-paragraph-size-current);
       --font-size-xs: {{ d_size | minus: 2 | at_least: 10 | divided_by: 10.0 }}rem;
       --font-size-sm: {{ d_size | divided_by: 10.0 }}rem;

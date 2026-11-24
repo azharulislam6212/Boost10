@@ -487,7 +487,6 @@ export class QuickAddModal extends ModalDialog {
   open(trigger) {
     if (trigger?.dataset.productUrl) {
       this.dataset.pendingUrl = trigger.dataset.productUrl;
-      // Quick add and quick view share this modal; each trigger names its own section.
       this.dataset.pendingSection = trigger.dataset.sectionId || 'quick-add';
     }
 

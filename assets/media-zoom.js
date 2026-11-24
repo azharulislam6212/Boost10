@@ -192,7 +192,7 @@ export class MediaZoomModal extends ModalDialog {
     this.on(viewport, 'pointerdown', this.#onPointerDown);
 
     this.on(viewport, 'wheel', (event) => {
-      if (!event.ctrlKey) return; // Leave plain wheel scrolling alone.
+      if (!event.ctrlKey) return;
       event.preventDefault();
       this.zoomBy(event.deltaY > 0 ? -0.25 : 0.25);
     }, { passive: false });
