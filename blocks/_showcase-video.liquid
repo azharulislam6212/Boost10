@@ -4,26 +4,22 @@
 
 {%- liquid
   assign s = block.settings
-
-  assign video_source = s.video_source | default: 'external'
+  assign author = s.author
 
   assign hosted = false
-  assign embed_src = ''
-  if video_source == 'upload'
+  assign embed_src = blank
+  if s.video_source == 'upload'
     if s.video
       assign hosted = true
     endif
-  elsif s.video_url != blank
-    case s.video_url.type
-      when 'youtube'
-        assign embed_src = 'https://www.youtube.com/embed/' | append: s.video_url.id | append: '?autoplay=1&rel=0&modestbranding=1&playsinline=1'
-      when 'vimeo'
-        assign embed_src = 'https://player.vimeo.com/video/' | append: s.video_url.id | append: '?autoplay=1&playsinline=1&dnt=1'
-    endcase
+  elsif s.video_url.type == 'youtube'
+    assign embed_src = 'https://www.youtube.com/embed/' | append: s.video_url.id | append: '?autoplay=1&rel=0&modestbranding=1&playsinline=1'
+  elsif s.video_url.type == 'vimeo'
+    assign embed_src = 'https://player.vimeo.com/video/' | append: s.video_url.id | append: '?autoplay=1&playsinline=1&dnt=1'
   endif
 
-  assign has_video = false
-  if hosted or embed_src != ''
+  assign has_video = hosted
+  if embed_src != blank
     assign has_video = true
   endif
 
@@ -32,20 +28,10 @@
     assign poster = s.video.preview_image
   endif
 
-  assign author = s.author | default: ''
-  assign rating = s.rating | default: 5 | plus: 0
-
-  assign show_verified = s.show_verified
-  if show_verified == nil
-    assign show_verified = true
-  endif
-
   assign play_label = 'sections.testimonials_showcase.play_video' | t
-  if author != ''
+  if author != blank
     assign play_label = 'sections.testimonials_showcase.play_video_by' | t: name: author
   endif
-
-  assign card_sizes = '(min-width: 990px) 360px, (min-width: 750px) 320px, 80vw'
 -%}
 
 <article
@@ -62,18 +48,13 @@
        class: 'showcase-card__image',
        wrapper_class: 'showcase-card__frame',
        placeholder: 'hero-apparel-2',
-       sizes: card_sizes %}
+       sizes: '(min-width: 990px) 360px, (min-width: 750px) 320px, 80vw' %}
   </div>
 
   <span class="showcase-card__scrim" aria-hidden="true"></span>
 
   {%- if has_video -%}
-    <button
-      type="button"
-      class="showcase-card__play"
-      data-showcase-play
-      aria-label="{{ play_label | escape }}"
-    >
+    <button type="button" class="showcase-card__play" data-showcase-play aria-label="{{ play_label | escape }}">
       <span class="showcase-card__play-glyph" aria-hidden="true">
         {% render 'icon', icon: 'play', size: 17 %}
       </span>
@@ -81,26 +62,19 @@
   {%- endif -%}
 
   <div class="showcase-card__body">
-    {%- if author != blank or rating > 0 -%}
+    {%- if author != blank or s.rating > 0 -%}
       <div class="showcase-card__head">
         {%- if author != blank -%}
           <span class="showcase-card__identity">
-            {%- if show_verified -%}
-
-              <svg
-                class="showcase-card__seal"
-                viewBox="0 0 24 24"
-                fill="none"
-                aria-hidden="true"
-                focusable="false"
-              >
+            {%- if s.show_verified -%}
+              <svg class="showcase-card__seal" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
                 <path
                   d="M12 1.2l2.1 2.1 2.9-.4.9 2.8 2.8.9-.4 2.9 2.1 2.1-2.1 2.1.4 2.9-2.8.9-.9 2.8-2.9-.4L12 22.8l-2.1-2.1-2.9.4-.9-2.8-2.8-.9.4-2.9L1.6 12.4l2.1-2.1-.4-2.9 2.8-.9.9-2.8 2.9.4L12 1.2z"
                   fill="currentColor"
                 />
                 <path
                   d="M8.4 12.2l2.5 2.5 4.7-5"
-                  stroke="var(--sv-verified-check, #0F2E2F)"
+                  stroke="#0F2E2F"
                   stroke-width="2"
                   stroke-linecap="round"
                   stroke-linejoin="round"
@@ -111,9 +85,9 @@
           </span>
         {%- endif -%}
 
-        {%- if rating > 0 -%}
+        {%- if s.rating > 0 -%}
           <span class="showcase-card__rating">
-            {% render 'rating-stars', rating: rating, size: 11 %}
+            {% render 'rating-stars', rating: s.rating, size: 11 %}
           </span>
         {%- endif -%}
       </div>
@@ -129,15 +103,9 @@
   </div>
 
   {%- if has_video -%}
-
     <template data-showcase-video>
       <deferred-media class="showcase-media" data-autoplay="false">
-        <button
-          type="button"
-          class="showcase-media__poster"
-          data-ref="poster"
-          aria-label="{{ play_label | escape }}"
-        >
+        <button type="button" class="showcase-media__poster" data-ref="poster" aria-label="{{ play_label | escape }}">
           {% render 'image',
              image: poster,
              alt: '',

@@ -10,113 +10,69 @@ import { EVENTS } from '@theme/events';
 import { prefersReducedMotion } from '@theme/utilities';
 
 /** Below this width a lane is a row rather than a column. */
-const ROW_QUERY = '(max-width: 749px)';
+const ROW_QUERY = window.matchMedia('(max-width: 749px)');
 
 /** Longest wait for the modal poster to decode before opening anyway, in milliseconds. */
 const POSTER_WAIT = 600;
 
-/** Speed below which the movement is not movement, and above which it is unreadable. */
+/** Pixels per second: slower is not movement, faster is unreadable. */
 const SPEED_MIN = 2;
 const SPEED_MAX = 400;
 
+const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
 /** One lane: a clipped viewport, a track inside it, and a loop. */
 class Lane {
+  /** @type {Element[]} */
+  clones = [];
+
+  /** @type {Animation|null} */
+  animation = null;
+
+  /** Held by a pointer, by focus, by the modal, or by being off screen. */
+  holds = new Set();
+
   /** @param {HTMLElement} element The lane viewport. */
   constructor(element) {
-    /** @type {HTMLElement} */
     this.element = element;
-
     /** @type {HTMLElement|null} */
     this.track = element.querySelector('[data-showcase-track]');
-
-    /** @type {Element[]} */
-    this.originals = this.track
-      ? Array.from(this.track.children).filter((node) => !node.hasAttribute('data-showcase-clone'))
-      : [];
-
-    /** @type {Element[]} */
-    this.clones = [];
-
-    /** @type {Animation|null} */
-    this.animation = null;
-
-    /** Held by a pointer, by focus, or by the lane being off screen. */
-    this.holds = new Set();
-  }
-
-  /** @returns {boolean} Whether this lane is a row at the current width. */
-  get isRow() {
-    return window.matchMedia(ROW_QUERY).matches;
-  }
-
-  /** @returns {'up'|'down'|'left'|'right'} */
-  get direction() {
-    const data = this.element.dataset;
-    if (this.isRow) return data.directionMobile === 'right' ? 'right' : 'left';
-    return data.directionDesktop === 'down' ? 'down' : 'up';
+    this.originals = this.track ? [...this.track.children].filter((node) => !node.hasAttribute('data-showcase-clone')) : [];
   }
 
   /**
-   * How far into its own loop the lane starts, as a share of one cycle.
+   * Clone the originals until the track covers twice its viewport.
    *
-   * @returns {number} 0 to 1.
+   * @param {boolean} row
+   * @returns {number} The length of one cycle.
    */
-  get offset() {
-    const value = Number(this.element.dataset.offset);
-    if (!Number.isFinite(value)) return 0;
-    return Math.min(Math.max(value, 0), 100) / 100;
-  }
+  build(row) {
+    const { element, track, originals } = this;
+    if (!track || originals.length === 0) return 0;
 
-  /** @returns {number} Pixels per second, clamped. */
-  get speed() {
-    const value = Number(this.element.dataset.speed);
-    if (!Number.isFinite(value)) return 40;
-    return Math.min(Math.max(value, SPEED_MIN), SPEED_MAX);
-  }
+    this.clear();
 
-  /**
-   * Clone the originals until the track covers twice its viewport, and return
-   * the length of one cycle.
-   *
-   * @returns {number}
-   * @private
-   */
-  build() {
-    const track = this.track;
-    if (!track || this.originals.length === 0) return 0;
-
-    for (const clone of this.clones) clone.remove();
-    this.clones = [];
-
-    const row = this.isRow;
-    const viewport = row ? this.element.offsetWidth : this.element.offsetHeight;
+    const viewport = row ? element.offsetWidth : element.offsetHeight;
     const base = row ? track.scrollWidth : track.scrollHeight;
     if (base === 0) return 0;
 
     const copies = Math.max(2, Math.ceil((viewport * 2) / base) + 1);
 
     for (let copy = 1; copy < copies; copy += 1) {
-      for (const node of this.originals) {
+      for (const node of originals) {
         const clone = /** @type {Element} */ (node.cloneNode(true));
         clone.setAttribute('aria-hidden', 'true');
         clone.setAttribute('data-showcase-clone', '');
-
-        for (const focusable of clone.querySelectorAll('a, button, input, select, textarea')) {
-          focusable.setAttribute('tabindex', '-1');
-        }
-
         clone.removeAttribute('data-shopify-editor-block');
-        for (const marked of clone.querySelectorAll('[data-shopify-editor-block]')) {
-          marked.removeAttribute('data-shopify-editor-block');
-        }
-
-        track.appendChild(clone);
+        clone.querySelectorAll('[data-shopify-editor-block]').forEach((el) => el.removeAttribute('data-shopify-editor-block'));
+        clone.querySelectorAll('a, button, input, select, textarea').forEach((el) => el.setAttribute('tabindex', '-1'));
+        track.append(clone);
         this.clones.push(clone);
       }
     }
 
     const first = /** @type {HTMLElement} */ (track.children[0]);
-    const next = /** @type {HTMLElement} */ (track.children[this.originals.length]);
+    const next = /** @type {HTMLElement} */ (track.children[originals.length]);
     if (!first || !next) return base;
 
     return row ? next.offsetLeft - first.offsetLeft : next.offsetTop - first.offsetTop;
@@ -127,40 +83,32 @@ class Lane {
     this.animation?.cancel();
     this.animation = null;
 
-    if (prefersReducedMotion()) {
-      this.element.setAttribute('data-showcase-static', '');
-      return;
-    }
+    const reduced = prefersReducedMotion();
+    this.element.toggleAttribute('data-showcase-static', reduced);
+    if (reduced) return;
 
-    this.element.removeAttribute('data-showcase-static');
-
-    const distance = this.build();
+    const row = ROW_QUERY.matches;
+    const distance = this.build(row);
     if (!distance || !this.track) return;
 
-    const duration = (distance / this.speed) * 1000;
-    const row = this.isRow;
-    const backwards = this.direction === 'down' || this.direction === 'right';
-
-    const from = backwards ? -distance : 0;
-    const to = backwards ? 0 : -distance;
-
-    const frame = (value) =>
-      row ? `translate3d(${value}px, 0, 0)` : `translate3d(0, ${value}px, 0)`;
+    const { speed, offset, directionDesktop, directionMobile } = this.element.dataset;
+    const duration = (distance / clamp(Number(speed) || 40, SPEED_MIN, SPEED_MAX)) * 1000;
+    const backwards = row ? directionMobile === 'right' : directionDesktop === 'down';
+    const frame = (value) => (row ? `translate3d(${value}px, 0, 0)` : `translate3d(0, ${value}px, 0)`);
 
     this.animation = this.track.animate(
-      [{ transform: frame(from) }, { transform: frame(to) }],
+      [{ transform: frame(backwards ? -distance : 0) }, { transform: frame(backwards ? 0 : -distance) }],
       { duration, easing: 'linear', iterations: Infinity }
     );
 
-    if (this.offset > 0) this.animation.currentTime = duration * this.offset;
-
+    const start = clamp(Number(offset) || 0, 0, 100) / 100;
+    if (start > 0) this.animation.currentTime = duration * start;
     if (this.holds.size > 0) this.animation.pause();
   }
 
   /**
    * Hold the lane still for a named reason. Every reason has to be released
-   * before it moves again — a pointer leaving while the lane is off screen
-   * must not start it.
+   * before it moves again, so a pointer leaving an off-screen lane can't start it.
    *
    * @param {string} reason
    */
@@ -175,11 +123,15 @@ class Lane {
     if (this.holds.size === 0) this.animation?.play();
   }
 
+  clear() {
+    this.clones.forEach((clone) => clone.remove());
+    this.clones = [];
+  }
+
   destroy() {
     this.animation?.cancel();
     this.animation = null;
-    for (const clone of this.clones) clone.remove();
-    this.clones = [];
+    this.clear();
   }
 }
 
@@ -194,49 +146,63 @@ export class TestimonialShowcase extends BaseComponent {
   /** @type {IntersectionObserver|null} */
   #visibility = null;
 
-  /** @type {number} */
-  #lastSize = 0;
-
   setup() {
-    this.#lanes = Array.from(this.querySelectorAll('[data-showcase-lane]')).map(
-      (element) => new Lane(/** @type {HTMLElement} */ (element))
+    this.#lanes = [...this.querySelectorAll('[data-showcase-lane]')].map((element) => new Lane(/** @type {HTMLElement} */ (element)));
+    this.#restart();
+
+    for (const lane of this.#lanes) {
+      this.on(lane.element, 'pointerenter', () => lane.hold('pointer'));
+      this.on(lane.element, 'pointerleave', () => lane.release('pointer'));
+      this.on(lane.element, 'focusin', () => lane.hold('focus'));
+      this.on(lane.element, 'focusout', () => lane.release('focus'));
+    }
+
+    // A lane nobody can see is animating for nobody.
+    this.#visibility = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const lane = this.#lanes.find((candidate) => candidate.element === entry.target);
+          if (entry.isIntersecting) lane?.release('offscreen');
+          else lane?.hold('offscreen');
+        }
+      },
+      { rootMargin: '200px' }
     );
+    this.#lanes.forEach((lane) => this.#visibility?.observe(lane.element));
 
-    for (const lane of this.#lanes) lane.start();
+    // A lane built in a box with no size (closed tab, images not laid out yet)
+    // measures zero and never moves; rebuild once the width really changes.
+    let width = this.offsetWidth;
+    this.#resize = new ResizeObserver(() => {
+      if (this.offsetWidth === width) return;
+      width = this.offsetWidth;
+      this.#restart();
+    });
+    this.#resize.observe(this);
 
-    this.#watchPointer();
-    this.#watchVisibility();
-    this.#watchSize();
-    this.#watchBreakpoint();
+    // Crossing the breakpoint swaps the axis the track moves on.
+    this.on(ROW_QUERY, 'change', () => this.#restart());
 
     this.on(this, 'click', (event) => {
-      const target = /** @type {HTMLElement} */ (event.target);
-      if (!target || typeof target.closest !== 'function') return;
-
-      const trigger = target.closest('[data-showcase-play]');
+      const trigger = /** @type {Element} */ (event.target).closest?.('[data-showcase-play]');
       if (!trigger) return;
-
       event.preventDefault();
       this.openVideo(trigger.closest('[data-showcase-card]'));
     });
 
     this.on(document, EVENTS.OVERLAY_CLOSE, (event) => {
-      if (event.target !== this.#modal) return;
-      for (const lane of this.#lanes) lane.release('modal');
+      if (event.target === this.#modal) this.#lanes.forEach((lane) => lane.release('modal'));
     });
   }
 
   teardown() {
-    for (const lane of this.#lanes) lane.destroy();
+    this.#lanes.forEach((lane) => lane.destroy());
     this.#lanes = [];
-
     this.#resize?.disconnect();
     this.#resize = null;
     this.#visibility?.disconnect();
     this.#visibility = null;
   }
-
-  /* ------------------------------------------------------------- the modal ---- */
 
   /**
    * Show one card's video.
@@ -244,127 +210,34 @@ export class TestimonialShowcase extends BaseComponent {
    * @param {Element|null} card
    */
   async openVideo(card) {
-    const modal = this.#modal;
+    const modal = /** @type {any} */ (this.#modal);
     const stage = modal?.querySelector('[data-showcase-stage]');
     const template = card?.querySelector('template[data-showcase-video]');
-    const overlay = /** @type {any} */ (modal);
 
-    if (!modal || !(stage instanceof HTMLElement) || !(template instanceof HTMLTemplateElement)) {
-      return;
-    }
-    if (overlay.isOpen || typeof overlay.open !== 'function') return;
+    if (!(stage instanceof HTMLElement) || !(template instanceof HTMLTemplateElement)) return;
+    if (modal.isOpen || typeof modal.open !== 'function') return;
 
     stage.replaceChildren(template.content.cloneNode(true));
 
     const label = card instanceof HTMLElement ? card.dataset.showcaseLabel : '';
-    const dialog = modal.querySelector('dialog');
-    if (dialog && label) dialog.setAttribute('aria-label', label);
+    if (label) modal.querySelector('dialog')?.setAttribute('aria-label', label);
 
-    await this.#posterReady(stage);
-
-    for (const lane of this.#lanes) lane.hold('modal');
-    overlay.open();
-  }
-
-  /**
-   * Wait for the poster to decode so it is already painted when the panel
-   * animates in, instead of popping in halfway through.
-   *
-   * @param {HTMLElement} stage
-   * @returns {Promise<void>}
-   * @private
-   */
-  #posterReady(stage) {
+    // Let the poster decode first so it is painted when the panel animates in.
     const image = stage.querySelector('img');
-    if (!(image instanceof HTMLImageElement) || typeof image.decode !== 'function') {
-      return Promise.resolve();
-    }
+    if (image) await Promise.race([image.decode().catch(() => {}), new Promise((resolve) => setTimeout(resolve, POSTER_WAIT))]);
 
-    const decoded = image.decode().catch(() => {});
-    const timeout = new Promise((resolve) => setTimeout(resolve, POSTER_WAIT));
-    return Promise.race([decoded, timeout]).then(() => {});
+    this.#lanes.forEach((lane) => lane.hold('modal'));
+    modal.open();
   }
 
-  /**
-   * @returns {HTMLElement|null}
-   * @private
-   */
+  #restart() {
+    this.#lanes.forEach((lane) => lane.start());
+  }
+
+  /** @returns {HTMLElement|null} */
   get #modal() {
     const id = this.dataset.modal;
     return id ? document.getElementById(id) : null;
-  }
-
-  /* ---------------------------------------------------------- the holding ---- */
-
-  /** @private */
-  #watchPointer() {
-    for (const lane of this.#lanes) {
-      this.on(lane.element, 'pointerenter', () => lane.hold('pointer'));
-      this.on(lane.element, 'pointerleave', () => lane.release('pointer'));
-
-      this.on(lane.element, 'focusin', () => lane.hold('focus'));
-      this.on(lane.element, 'focusout', () => lane.release('focus'));
-    }
-  }
-
-  /**
-   * A lane that is not on the screen is animating for nobody. Holding it costs
-   * one observer and gives back a composited animation per lane on every page
-   * where this section is not the part being looked at.
-   *
-   * @private
-   */
-  #watchVisibility() {
-    if (!('IntersectionObserver' in window)) return;
-
-    this.#visibility = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          const lane = this.#lanes.find((candidate) => candidate.element === entry.target);
-          if (!lane) continue;
-          if (entry.isIntersecting) lane.release('offscreen');
-          else lane.hold('offscreen');
-        }
-      },
-      { rootMargin: '200px' }
-    );
-
-    for (const lane of this.#lanes) this.#visibility.observe(lane.element);
-  }
-
-  /**
-   * A lane built inside a box with no size — a section in a closed tab, or one
-   * measured before its images have reserved their space — measures zero and
-   * would never move. Rebuilding when the box gains a real size is the same
-   * recovery `<carousel-slider>` and the shared marquee both make.
-   *
-   * @private
-   */
-  #watchSize() {
-    if (!('ResizeObserver' in window)) return;
-
-    this.#lastSize = this.offsetWidth;
-
-    this.#resize = new ResizeObserver(() => {
-      const size = this.offsetWidth;
-      if (size === this.#lastSize) return;
-      this.#lastSize = size;
-      for (const lane of this.#lanes) lane.start();
-    });
-
-    this.#resize.observe(this);
-  }
-
-  /**
-   * Crossing the breakpoint changes the axis, and an animation built for the
-   * other one translates the track off its own viewport.
-   *
-   * @private
-   */
-  #watchBreakpoint() {
-    this.on(window.matchMedia(ROW_QUERY), 'change', () => {
-      for (const lane of this.#lanes) lane.start();
-    });
   }
 }
 
@@ -373,10 +246,7 @@ defineComponent('testimonial-showcase', TestimonialShowcase);
 /** Emptying the stage on close is what stops playback. */
 document.addEventListener(EVENTS.OVERLAY_CLOSE, (event) => {
   const modal = event.target;
-  if (!(modal instanceof HTMLElement)) return;
-
-  const stage = modal.querySelector('[data-showcase-stage]');
-  if (stage instanceof HTMLElement) stage.replaceChildren();
+  if (modal instanceof HTMLElement) modal.querySelector('[data-showcase-stage]')?.replaceChildren();
 });
 
 export default TestimonialShowcase;
