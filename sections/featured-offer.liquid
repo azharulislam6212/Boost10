@@ -5,49 +5,34 @@
 
 {%- liquid
   assign s = section.settings
-
   assign background_media = s.background_media
   assign has_background_media = false
   if background_media != 'none'
     assign has_background_media = true
   endif
 
-
-
   # The blocks always stack in one column; Alignment places them across it.
   case s.alignment
-    when 'center'
-      assign alignment_axis = 'center'
-    when 'end'
-      assign alignment_axis = 'end'
+    when 'center', 'end'
+      assign alignment_axis = s.alignment
     else
       assign alignment_axis = 'start'
   endcase
 
-  assign inline_axis = alignment_axis
-  assign block_axis = 'start'
-
-  assign gap_x = s.gap_horizontal
-  assign gap_y = s.gap_vertical
-  assign gap_x_mobile = s.gap_horizontal_mobile
-  assign gap_y_mobile = s.gap_vertical_mobile
-
-  assign content_classes = 'featured-offer__content featured-offer__content--column'
+  capture section_style
+    render 'spacing', section: s, declarations: true
+    render 'section-frame', settings: s, media: true
+  endcapture
 -%}
 
 {%- capture content_style -%}
-  --featured-offer-gap-x: {{ gap_x }}px;
-  --featured-offer-gap-y: {{ gap_y }}px;
-  --featured-offer-gap-x-mobile: {{ gap_x_mobile }}px;
-  --featured-offer-gap-y-mobile: {{ gap_y_mobile }}px;
-  --featured-offer-inline: {{ inline_axis }};
+  --featured-offer-gap-x: {{ s.gap_horizontal }}px;
+  --featured-offer-gap-y: {{ s.gap_vertical }}px;
+  --featured-offer-gap-x-mobile: {{ s.gap_horizontal_mobile }}px;
+  --featured-offer-gap-y-mobile: {{ s.gap_vertical_mobile }}px;
+  --featured-offer-inline: {{ alignment_axis }};
   --featured-offer-align: {{ alignment_axis }};
-  --featured-offer-block: {{ block_axis }};
-{%- endcapture -%}
-
-{%- capture section_style -%}
-  {%- render 'spacing', section: s, declarations: true -%}
-  {%- render 'section-frame', settings: s, media: true -%}
+  --featured-offer-block: start;
 {%- endcapture -%}
 
 <div
@@ -57,18 +42,13 @@
   data-section-id="{{ section.id }}"
   style="{{ section_style | strip_newlines | strip }}"
 >
-
   {%- if has_background_media -%}
-    {% render 'background-media',
-       settings: s,
-       priority: true,
-       placeholder: 'hero-apparel-1' %}
+    {% render 'background-media', settings: s, priority: true, placeholder: 'hero-apparel-1' %}
   {%- endif -%}
 
   <div class="featured-offer__inner {% render 'container', width: s.container_width %}">
-
     <motion-effect
-      class="{{ content_classes }}"
+      class="featured-offer__content featured-offer__content--column"
       data-easing="outQuint"
       style="{{ content_style | strip_newlines | strip }}"
       {% render 'motion-attrs', kind: 'content', section: s, children: true, duration: 1000, stagger: 80 %}
