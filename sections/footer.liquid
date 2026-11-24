@@ -4,10 +4,8 @@
 
 {%- liquid
   assign st = section.settings
-
-  assign background_media = st.background_media
   assign has_background_media = false
-  if background_media != 'none'
+  if st.background_media != 'none'
     assign has_background_media = true
   endif
 
@@ -16,24 +14,18 @@
     assign background_paint = st.background_color | default: ''
   endif
 
-  assign border_line = st.border_style
-
+  # Border widths as top / sides / bottom.
+  assign border_size = 0
   assign bw_top = 0
-  assign bw_right = 0
+  assign bw_side = 0
   assign bw_bottom = 0
-  assign bw_left = 0
-  assign border_any = 0
-
-  if border_line != 'none'
-    assign border_sides = st.border_sides
+  if st.border_style != 'none'
     assign border_size = st.border_width
-
-    case border_sides
+    case st.border_sides
       when 'all'
         assign bw_top = border_size
-        assign bw_right = border_size
+        assign bw_side = border_size
         assign bw_bottom = border_size
-        assign bw_left = border_size
       when 'bottom'
         assign bw_bottom = border_size
       when 'top_bottom'
@@ -42,49 +34,28 @@
       else
         assign bw_top = border_size
     endcase
-    assign border_any = border_size
-
-    if st.border_color == blank
-      assign border_paint = 'currentColor'
-    else
-      assign border_paint = st.border_color
-    endif
   endif
 
-  assign corner_position = st.corner_position
-  assign radius = st.border_radius
-  assign radius_mobile = st.border_radius_mobile
-
-  assign r_tl = 0
-  assign r_tr = 0
-  assign r_bl = 0
-  assign r_br = 0
-  assign r_tl_m = 0
-  assign r_tr_m = 0
-  assign r_bl_m = 0
-  assign r_br_m = 0
-
-  if corner_position != 'bottom'
-    assign r_tl = radius
-    assign r_tr = radius
-    assign r_tl_m = radius_mobile
-    assign r_tr_m = radius_mobile
+  # Corner radius on the top pair, the bottom pair, or both.
+  assign r_top = 0
+  assign r_top_m = 0
+  assign r_bottom = 0
+  assign r_bottom_m = 0
+  if st.corner_position != 'bottom'
+    assign r_top = st.border_radius
+    assign r_top_m = st.border_radius_mobile
   endif
-  if corner_position != 'top'
-    assign r_bl = radius
-    assign r_br = radius
-    assign r_bl_m = radius_mobile
-    assign r_br_m = radius_mobile
+  if st.corner_position != 'top'
+    assign r_bottom = st.border_radius
+    assign r_bottom_m = st.border_radius_mobile
   endif
 
   assign overlap = 0
   assign overlap_mobile = 0
   if st.stack_layer == 'over' or st.stack_layer == 'under'
-    assign overlap = r_tl
-    assign overlap_mobile = r_tl_m
+    assign overlap = r_top
+    assign overlap_mobile = r_top_m
   endif
-
-  assign columns_id = 'FooterColumns-' | append: section.id
 
   assign has_policy = false
   if st.policy_menu != blank and st.policy_menu.links.size > 0
@@ -97,14 +68,14 @@
 -%}
 
 {%- capture footer_styles -%}
-  --footer-radius: {{ r_tl }}px {{ r_tr }}px {{ r_br }}px {{ r_bl }}px;
-  --footer-radius-mobile: {{ r_tl_m }}px {{ r_tr_m }}px {{ r_br_m }}px {{ r_bl_m }}px;
+  --footer-radius: {{ r_top }}px {{ r_top }}px {{ r_bottom }}px {{ r_bottom }}px;
+  --footer-radius-mobile: {{ r_top_m }}px {{ r_top_m }}px {{ r_bottom_m }}px {{ r_bottom_m }}px;
   --section-overlap: {{ overlap }}px;
   --section-overlap-mobile: {{ overlap_mobile }}px;
-  {%- if border_any > 0 -%}
-    --footer-border-width: {{ bw_top }}px {{ bw_right }}px {{ bw_bottom }}px {{ bw_left }}px;
-    --footer-border-style: {{ border_line }};
-    --footer-border-color: {{ border_paint }};
+  {%- if border_size > 0 -%}
+    --footer-border-width: {{ bw_top }}px {{ bw_side }}px {{ bw_bottom }}px {{ bw_side }}px;
+    --footer-border-style: {{ st.border_style }};
+    --footer-border-color: {{ st.border_color | default: 'currentColor' }};
   {%- endif -%}
   {%- if background_paint != '' -%}
     background: {{ background_paint }};
@@ -125,14 +96,13 @@
 
   <div class="{% render 'container', width: st.container_width %}">
     {%- if section.blocks.size > 0 -%}
-
       <motion-effect
         class="footer__panel footer__panel--{{ st.panel_style }}"
         data-easing="outQuint"
         {% render 'motion-attrs', kind: 'content', section: st, children: true, duration: 1000, stagger: 120 %}
       >
         <footer-columns
-          id="{{ columns_id }}"
+          id="FooterColumns-{{ section.id }}"
           class="footer__columns"
           data-motion-items
           {% if has_policy %}data-has-policy{% endif %}
@@ -144,9 +114,7 @@
             <div class="footer__policies" style="--column-order: 2;">
               <ul class="footer__policies-list" role="list">
                 {%- for link in st.policy_menu.links -%}
-                  <li>
-                    <a class="footer__policy-link" href="{{ link.url }}">{{ link.title }}</a>
-                  </li>
+                  <li><a class="footer__policy-link" href="{{ link.url }}">{{ link.title }}</a></li>
                 {%- endfor -%}
               </ul>
             </div>
