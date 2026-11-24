@@ -1,0 +1,192 @@
+{% doc %}
+  blocks/_hero-media.liquid — private, the media behind Hero banner: an image
+  (with a mobile image and optional parallax) or a Shopify-hosted MP4 video
+  (with an optional mobile video), under an optional overlay.
+{% enddoc %}
+
+{%- liquid
+  assign s = block.settings
+  assign media_type = s.media_type | default: 'image'
+
+  assign desktop_video = s.video
+  assign mobile_video = s.video_mobile | default: s.video
+
+  assign show_placeholder = false
+  if media_type == 'image' and s.image == blank
+    assign show_placeholder = true
+  elsif media_type == 'video' and s.video == blank and s.video_mobile == blank
+    assign show_placeholder = true
+  endif
+
+  assign split_video = false
+  if media_type == 'video' and s.video != blank and s.video_mobile != blank
+    assign split_video = true
+  endif
+  if media_type == 'video' and s.video == blank and s.video_mobile != blank
+    assign desktop_video = s.video_mobile
+  endif
+-%}
+
+<div class="background-media hero-media" aria-hidden="true" {{ block.shopify_attributes }}>
+  {%- if show_placeholder -%}
+    {% render 'image', placeholder: 'hero-apparel-1', wrapper_class: 'background-media__placeholder' %}
+  {%- elsif media_type == 'image' -%}
+    {% render 'background-image',
+       image: s.image,
+       mobile_image: s.image_mobile,
+       position: s.image_position,
+       parallax: s.image_parallax,
+       speed: s.image_parallax_speed,
+       priority: true %}
+  {%- elsif split_video -%}
+    {% render 'background-video', video: desktop_video, classes: 'hero-media__video hero-media__video--desktop' %}
+    {% render 'background-video', video: mobile_video, classes: 'hero-media__video hero-media__video--mobile' %}
+  {%- else -%}
+    {% render 'background-video', video: desktop_video, classes: 'hero-media__video' %}
+  {%- endif -%}
+
+  {%- if s.overlay_enabled -%}
+    {% render 'overlay',
+       style: s.overlay_style,
+       color: s.overlay_color,
+       gradient: s.overlay_gradient,
+       opacity: s.overlay_opacity %}
+  {%- endif -%}
+</div>
+
+{% schema %}
+{
+  "name": "t:blocks.hero_media.name",
+  "tag": null,
+  "settings": [
+    {
+      "type": "select",
+      "id": "media_type",
+      "label": "t:blocks.hero_media.settings.media_type.label",
+      "options": [
+        {
+          "value": "image",
+          "label": "t:shared.background.media.options__2.label"
+        },
+        {
+          "value": "video",
+          "label": "t:shared.background.media.options__3.label"
+        }
+      ],
+      "default": "image"
+    },
+    {
+      "type": "image_picker",
+      "id": "image",
+      "label": "t:shared.background.image.label",
+      "visible_if": "{{ block.settings.media_type == 'image' }}"
+    },
+    {
+      "type": "image_picker",
+      "id": "image_mobile",
+      "label": "t:shared.background.image_mobile.label",
+      "visible_if": "{{ block.settings.media_type == 'image' }}"
+    },
+    {
+      "type": "select",
+      "id": "image_position",
+      "label": "t:shared.background.image_position.label",
+      "options": [
+        {
+          "value": "cover",
+          "label": "t:shared.background.image_position.options__1.label"
+        },
+        {
+          "value": "fit",
+          "label": "t:shared.background.image_position.options__2.label"
+        }
+      ],
+      "default": "cover",
+      "visible_if": "{{ block.settings.media_type == 'image' }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "image_parallax",
+      "label": "t:shared.background.image_parallax.label",
+      "default": false,
+      "visible_if": "{{ block.settings.media_type == 'image' }}"
+    },
+    {
+      "type": "range",
+      "id": "image_parallax_speed",
+      "label": "t:shared.background.image_parallax_speed.label",
+      "min": 5,
+      "max": 40,
+      "step": 5,
+      "unit": "%",
+      "default": 15,
+      "visible_if": "{{ block.settings.media_type == 'image' and block.settings.image_parallax }}"
+    },
+    {
+      "type": "video",
+      "id": "video",
+      "label": "t:blocks.hero_media.settings.video.label",
+      "visible_if": "{{ block.settings.media_type == 'video' }}"
+    },
+    {
+      "type": "video",
+      "id": "video_mobile",
+      "label": "t:blocks.hero_media.settings.video_mobile.label",
+      "info": "t:blocks.hero_media.settings.video_mobile.info",
+      "visible_if": "{{ block.settings.media_type == 'video' }}"
+    },
+    {
+      "type": "header",
+      "content": "t:blocks.hero_media.headers.overlay"
+    },
+    {
+      "type": "checkbox",
+      "id": "overlay_enabled",
+      "label": "t:shared.background.overlay_enabled.label",
+      "default": true
+    },
+    {
+      "type": "select",
+      "id": "overlay_style",
+      "label": "t:shared.background.overlay_style.label",
+      "options": [
+        {
+          "value": "solid",
+          "label": "t:shared.background.overlay_style.options__1.label"
+        },
+        {
+          "value": "gradient",
+          "label": "t:shared.background.overlay_style.options__2.label"
+        }
+      ],
+      "default": "solid",
+      "visible_if": "{{ block.settings.overlay_enabled }}"
+    },
+    {
+      "type": "color",
+      "id": "overlay_color",
+      "label": "t:shared.background.overlay_color.label",
+      "default": "#000000",
+      "visible_if": "{{ block.settings.overlay_enabled and block.settings.overlay_style == 'solid' }}"
+    },
+    {
+      "type": "color_background",
+      "id": "overlay_gradient",
+      "label": "t:shared.background.overlay_gradient.label",
+      "default": "linear-gradient(90deg, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.2) 100%)",
+      "visible_if": "{{ block.settings.overlay_enabled and block.settings.overlay_style == 'gradient' }}"
+    },
+    {
+      "type": "range",
+      "id": "overlay_opacity",
+      "label": "t:shared.background.overlay_opacity.label",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 35,
+      "visible_if": "{{ block.settings.overlay_enabled }}"
+    }
+  ]
+}
+{% endschema %}

@@ -520,6 +520,10 @@ carousel-slider[data-direction='vertical']:not([data-running]) > [data-ref~='tra
   font-variant-numeric: tabular-nums;
   line-height: 1;
   color: var(--color-slider-indicator-active);
+
+  /* a fixed box: fonts without tabular figures would otherwise move the bar and arrows as the number changes */
+  inline-size: 3ch;
+  text-align: center;
 }
 
 .carousel-controls__count--total {
@@ -779,6 +783,58 @@ carousel-slider[data-locked] .carousel-shell__counter,
 carousel-slider[data-locked] .carousel-shell__progress,
 carousel-slider[data-locked] .carousel-shell__pause {
   display: none;
+}
+
+/* ---- before the script: Liquid already chose carousel or grid for each
+   size, so the controls take their place on first paint instead of popping
+   in and pushing the page once the script starts. The script takes over when
+   it runs, and hides them again when every slide fits. ---- */
+@media screen and (max-width: 989px) {
+  carousel-slider[data-layout-mobile='carousel']:not([data-running]) > :is(.carousel-controls, .carousel-nav) {
+    display: flex;
+  }
+
+  carousel-slider[data-layout-mobile='carousel']:not([data-running]) > :is(.carousel-shell__dots, .carousel-shell__counter, .carousel-shell__progress) {
+    display: block;
+  }
+}
+
+@media screen and (min-width: 990px) {
+  carousel-slider[data-layout='carousel']:not([data-running]) > :is(.carousel-controls, .carousel-nav) {
+    display: flex;
+  }
+
+  carousel-slider[data-layout='carousel']:not([data-running]) > :is(.carousel-shell__dots, .carousel-shell__counter, .carousel-shell__progress) {
+    display: block;
+  }
+}
+
+/* controls drawn outside their carousel, linked by data-carousel-for: the
+   same, read from the carousel in their section */
+@media screen and (max-width: 989px) {
+  .shopify-section:has(carousel-slider[data-layout-mobile='carousel']:not([data-running])) :is(.carousel-controls, .carousel-nav):has([data-carousel-for]) {
+    display: flex;
+  }
+
+  .shopify-section:has(carousel-slider[data-layout-mobile='carousel']:not([data-running])) :is(.carousel-shell__dots, .carousel-shell__counter, .carousel-shell__progress)[data-carousel-for] {
+    display: block;
+  }
+}
+
+@media screen and (min-width: 990px) {
+  .shopify-section:has(carousel-slider[data-layout='carousel']:not([data-running])) :is(.carousel-controls, .carousel-nav):has([data-carousel-for]) {
+    display: flex;
+  }
+
+  .shopify-section:has(carousel-slider[data-layout='carousel']:not([data-running])) :is(.carousel-shell__dots, .carousel-shell__counter, .carousel-shell__progress)[data-carousel-for] {
+    display: block;
+  }
+}
+
+/* the script fills the dots and the counter; hold their line until it does */
+.carousel-shell__dots,
+.carousel-shell__counter {
+  min-block-size: 1lh;
 }
 
 .product-recommendations__arrow.carousel-button--disabled,
