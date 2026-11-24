@@ -167,9 +167,7 @@ export class QuickAddSummary extends BaseComponent {
       planCompare.toggleAttribute('hidden', !show);
     }
 
-    if (chosen) {
-      this.#renderSaving('[data-plan-price]', Number(chosen.compare_at_price), Number(chosen.price));
-    }
+    if (chosen) this.#renderSaving('[data-plan-price]', Number(chosen.compare_at_price), Number(chosen.price));
   }
 
   /**

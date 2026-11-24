@@ -802,9 +802,7 @@ export class ProductBundle extends BaseComponent {
       }
 
       const increase = slot.querySelector('[data-slot-increase]');
-      if (increase instanceof HTMLButtonElement) {
-        increase.disabled = full || item.quantity >= this.maxPerProduct;
-      }
+      if (increase instanceof HTMLButtonElement) increase.disabled = full || item.quantity >= this.maxPerProduct;
 
       const remove = slot.querySelector('[data-slot-remove]');
       if (remove instanceof HTMLElement) {

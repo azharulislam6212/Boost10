@@ -287,9 +287,7 @@ export class VariantSwatches extends BaseComponent {
   setup() {
     this.#applyLimit();
 
-    if (this.refs.more) {
-      this.on(this.refs.more, 'click', () => this.expand());
-    }
+    if (this.refs.more) this.on(this.refs.more, 'click', () => this.expand());
 
     if (this.dataset.trigger === 'hover' && window.matchMedia('(hover: hover)').matches) {
       this.on(this, 'pointerenter', this.#onPreview, { capture: true });

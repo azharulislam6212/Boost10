@@ -120,21 +120,15 @@ function morphNode(from, to, context) {
 
   morphAttributes(from, to);
 
-  if (VALUE_ELEMENTS.has(from.tagName)) {
-    morphFormControl(from, to);
-  }
+  if (VALUE_ELEMENTS.has(from.tagName)) morphFormControl(from, to);
 
-  if (OPEN_STATE_ELEMENTS.has(from.tagName)) {
-    preserveOpenState(from, to);
-  }
+  if (OPEN_STATE_ELEMENTS.has(from.tagName)) preserveOpenState(from, to);
 
   if (from.hasAttribute('data-morph-skip-children')) return;
 
   morphChildren(from, to, context);
 
-  if (from.tagName === 'SELECT' && !shouldPreserveValue(from)) {
-    syncSelectValue(from, to);
-  }
+  if (from.tagName === 'SELECT' && !shouldPreserveValue(from)) syncSelectValue(from, to);
 }
 
 /**

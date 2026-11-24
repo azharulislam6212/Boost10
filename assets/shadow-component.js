@@ -45,9 +45,7 @@ export class ShadowComponent extends BaseComponent {
 
     this.attachShadow({ mode: ElementClass.shadowMode });
 
-    if (ElementClass.template) {
-      this.shadowRoot.innerHTML = ElementClass.template;
-    }
+    if (ElementClass.template) this.shadowRoot.innerHTML = ElementClass.template;
 
     const sheet = ShadowComponent.#sheetFor(ElementClass);
     if (sheet) this.shadowRoot.adoptedStyleSheets = [sheet];

@@ -485,9 +485,7 @@ export class CartDrawer extends DrawerComponent {
   setup() {
     super.setup();
 
-    for (const id of (this.dataset.sections || '').split(',')) {
-      cart.registerSection(id.trim());
-    }
+    for (const id of (this.dataset.sections || '').split(',')) cart.registerSection(id.trim());
 
     cart.state = window.Theme?.cart ?? cart.state;
 
@@ -506,9 +504,7 @@ export class CartDrawer extends DrawerComponent {
   }
 
   teardown() {
-    for (const id of (this.dataset.sections || '').split(',')) {
-      cart.unregisterSection(id.trim());
-    }
+    for (const id of (this.dataset.sections || '').split(',')) cart.unregisterSection(id.trim());
     super.teardown();
   }
 
@@ -867,9 +863,7 @@ export class CartFreeGift extends BaseComponent {
         : themeString('freeGiftRemaining', '', { amount: formatMoney(remaining) });
     }
 
-    if (this.refs.claim instanceof HTMLElement) {
-      this.refs.claim.hidden = !earned || this.claimed;
-    }
+    if (this.refs.claim instanceof HTMLElement) this.refs.claim.hidden = !earned || this.claimed;
   }
 }
 

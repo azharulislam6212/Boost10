@@ -302,16 +302,12 @@ export class StickyHeader extends BaseComponent {
       this.#scrolled = scrolled;
       this.toggleAttribute('data-scrolled', scrolled);
 
-      if (this.classList.contains('site-header--transparent')) {
-        this.toggleAttribute('data-transparent', !scrolled);
-      }
+      if (this.classList.contains('site-header--transparent')) this.toggleAttribute('data-transparent', !scrolled);
 
       const scheme = this.dataset.stickyScheme;
       const shell = this.querySelector('.site-header__shell');
 
-      if (scheme && shell) {
-        shell.classList.toggle(scheme, scrolled);
-      }
+      if (scheme && shell) shell.classList.toggle(scheme, scrolled);
     }
 
     if (mode === 'scroll-down') {
@@ -342,9 +338,7 @@ export class StickyHeader extends BaseComponent {
     if (Math.abs(delta) < 6) return;
     this.#lastScroll = position;
 
-    if (mode === 'scroll-up') {
-      this.toggleAttribute('data-hidden', delta > 0 && position > threshold * 2);
-    }
+    if (mode === 'scroll-up') this.toggleAttribute('data-hidden', delta > 0 && position > threshold * 2);
   }
 }
 
@@ -575,9 +569,7 @@ export class ResponsiveImage extends BaseComponent {
     if (name !== 'data-loaded' || newValue !== null) return;
 
     const image = this.querySelector('img');
-    if (image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0) {
-      this.#markLoaded();
-    }
+    if (image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0) this.#markLoaded();
   }
 
   #markLoaded() {

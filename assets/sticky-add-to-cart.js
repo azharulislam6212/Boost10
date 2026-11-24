@@ -99,9 +99,7 @@ export class StickyAddToCart extends BaseComponent {
       this.refs.variantSelect.value = String(variant.id);
     }
 
-    if (this.refs.price instanceof HTMLElement) {
-      this.refs.price.textContent = variant ? formatMoney(variant.price) : '';
-    }
+    if (this.refs.price instanceof HTMLElement) this.refs.price.textContent = variant ? formatMoney(variant.price) : '';
 
     if (!(button instanceof HTMLButtonElement)) return;
 

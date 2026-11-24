@@ -36,13 +36,9 @@ export class QuantitySelector extends BaseComponent {
       this.#debounceDelay()
     );
 
-    if (this.refs.decrease instanceof HTMLButtonElement) {
-      this.on(this.refs.decrease, 'click', () => this.stepBy(-1));
-    }
+    if (this.refs.decrease instanceof HTMLButtonElement) this.on(this.refs.decrease, 'click', () => this.stepBy(-1));
 
-    if (this.refs.increase instanceof HTMLButtonElement) {
-      this.on(this.refs.increase, 'click', () => this.stepBy(1));
-    }
+    if (this.refs.increase instanceof HTMLButtonElement) this.on(this.refs.increase, 'click', () => this.stepBy(1));
 
     this.on(input, 'input', this.#onInput);
     this.on(input, 'change', this.#onCommit);
@@ -69,9 +65,7 @@ export class QuantitySelector extends BaseComponent {
   get value() {
     const input = this.refs?.input;
 
-    if (!(input instanceof HTMLInputElement)) {
-      return this.min;
-    }
+    if (!(input instanceof HTMLInputElement)) return this.min;
 
     const value = Number.parseInt(input.value, 10);
 
@@ -128,9 +122,7 @@ export class QuantitySelector extends BaseComponent {
   setValue(next, { silent = false } = {}) {
     const input = this.refs?.input;
 
-    if (!(input instanceof HTMLInputElement)) {
-      return this.#applyRules(next);
-    }
+    if (!(input instanceof HTMLInputElement)) return this.#applyRules(next);
 
     const applied = this.#applyRules(next);
 
@@ -138,9 +130,7 @@ export class QuantitySelector extends BaseComponent {
 
     this.#syncButtons();
 
-    if (!silent && applied !== this.#lastNotified) {
-      this.#notify(applied);
-    }
+    if (!silent && applied !== this.#lastNotified) this.#notify(applied);
 
     return applied;
   }
@@ -189,9 +179,7 @@ export class QuantitySelector extends BaseComponent {
     const max = this.max;
     const step = this.step;
 
-    if (!Number.isFinite(value)) {
-      return min;
-    }
+    if (!Number.isFinite(value)) return min;
 
     const stepped =
       step > 1
@@ -213,9 +201,7 @@ export class QuantitySelector extends BaseComponent {
     const current = this.value;
     const applied = this.#applyRules(current);
 
-    if (applied !== current) {
-      input.value = String(applied);
-    }
+    if (applied !== current) input.value = String(applied);
   }
 
   #syncButtons() {
@@ -225,9 +211,7 @@ export class QuantitySelector extends BaseComponent {
 
     const value = this.value;
 
-    if (this.refs.decrease instanceof HTMLButtonElement) {
-      this.refs.decrease.disabled = value <= this.min;
-    }
+    if (this.refs.decrease instanceof HTMLButtonElement) this.refs.decrease.disabled = value <= this.min;
 
     if (this.refs.increase instanceof HTMLButtonElement) {
       this.refs.increase.disabled =
@@ -305,9 +289,7 @@ export class QuantitySelector extends BaseComponent {
 
     this.toggleAttribute('data-invalid', Boolean(text));
 
-    if (text && announceIt) {
-      announce(text);
-    }
+    if (text && announceIt) announce(text);
   }
 
   /** @param {number} value */
@@ -336,9 +318,7 @@ export class QuantitySelector extends BaseComponent {
   #debounceDelay() {
     const explicit = Number(this.dataset.debounce);
 
-    if (Number.isFinite(explicit)) {
-      return explicit;
-    }
+    if (Number.isFinite(explicit)) return explicit;
 
     return this.dataset.line || this.dataset.key ? 400 : 0;
   }

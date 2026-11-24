@@ -315,9 +315,7 @@ export class PredictiveSearch extends BaseComponent {
       if (this.#rendered) this.open();
     });
 
-    if (this.refs.reset) {
-      this.on(this.refs.reset, 'click', () => this.reset());
-    }
+    if (this.refs.reset) this.on(this.refs.reset, 'click', () => this.reset());
 
     this.on(document, 'click', (event) => {
       if (this.contains(event.target)) return;
@@ -559,9 +557,7 @@ export class PredictiveSearch extends BaseComponent {
     this.toggleAttribute('data-loading', busy);
     this.refs.panel.setAttribute('aria-busy', busy ? 'true' : 'false');
 
-    if (this.refs.busy instanceof HTMLElement) {
-      this.refs.busy.textContent = busy ? themeString('loading', '') : '';
-    }
+    if (this.refs.busy instanceof HTMLElement) this.refs.busy.textContent = busy ? themeString('loading', '') : '';
   }
 
   /** @param {string} message */

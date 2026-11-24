@@ -10,9 +10,7 @@ import { themeString, announce, announceUrgent } from '@theme/utilities';
 
 export class CustomerOrderHistory extends BaseComponent {
   setup() {
-    if (this.refs.filter) {
-      this.on(this.refs.filter, 'change', (event) => this.filter(event.target.value));
-    }
+    if (this.refs.filter) this.on(this.refs.filter, 'change', (event) => this.filter(event.target.value));
 
     this.on(this, 'click', this.#onClick);
 
@@ -46,9 +44,7 @@ export class CustomerOrderHistory extends BaseComponent {
 
     const count = this.visibleOrders.length;
 
-    if (this.refs.empty instanceof HTMLElement) {
-      this.refs.empty.toggleAttribute('hidden', count > 0);
-    }
+    if (this.refs.empty instanceof HTMLElement) this.refs.empty.toggleAttribute('hidden', count > 0);
 
     this.dataset.filter = wanted;
     this.#syncUrl(wanted);

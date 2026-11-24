@@ -1393,9 +1393,7 @@ function splitItems(root, found = []) {
  * @returns {HTMLElement[]} The generated spans and whole units, in document order.
  */
 export function splitText(element, { by = 'chars' } = {}) {
-  if (element.hasAttribute('data-motion-split')) {
-    return Array.from(element.querySelectorAll('[data-motion-part]'));
-  }
+  if (element.hasAttribute('data-motion-split')) return Array.from(element.querySelectorAll('[data-motion-part]'));
 
   const items = splitItems(element);
 
@@ -1718,9 +1716,7 @@ export function marquee(track, { speed = 60, direction = 'left', pauseOnHover = 
         for (const focusable of clone.querySelectorAll('a, button, input, select, textarea')) {
           focusable.setAttribute('tabindex', '-1');
         }
-        if (clone.matches('a, button, input, select, textarea')) {
-          clone.setAttribute('tabindex', '-1');
-        }
+        if (clone.matches('a, button, input, select, textarea')) clone.setAttribute('tabindex', '-1');
         track.appendChild(clone);
         clones.push(clone);
       }

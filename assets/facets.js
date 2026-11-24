@@ -228,9 +228,7 @@ export class FacetFilters extends BaseComponent {
       badge.toggleAttribute('hidden', count === 0);
     }
 
-    if (this.refs.clear instanceof HTMLElement) {
-      this.refs.clear.toggleAttribute('hidden', count === 0);
-    }
+    if (this.refs.clear instanceof HTMLElement) this.refs.clear.toggleAttribute('hidden', count === 0);
   }
 
   /** @param {Event} event */
@@ -463,12 +461,8 @@ export class PriceRange extends BaseComponent {
     this.style.setProperty('--range-start', `${start}%`);
     this.style.setProperty('--range-end', `${end}%`);
 
-    if (this.refs.minThumb instanceof HTMLInputElement) {
-      this.refs.minThumb.value = String((min ?? this.floor) / 100);
-    }
-    if (this.refs.maxThumb instanceof HTMLInputElement) {
-      this.refs.maxThumb.value = String((max ?? this.ceiling) / 100);
-    }
+    if (this.refs.minThumb instanceof HTMLInputElement) this.refs.minThumb.value = String((min ?? this.floor) / 100);
+    if (this.refs.maxThumb instanceof HTMLInputElement) this.refs.maxThumb.value = String((max ?? this.ceiling) / 100);
 
     if (this.refs.output instanceof HTMLElement) {
       this.refs.output.textContent = themeString('facetsPriceRange', '', {

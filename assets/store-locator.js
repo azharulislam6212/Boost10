@@ -27,13 +27,9 @@ export class StoreLocator extends BaseComponent {
       });
     }
 
-    if (this.refs.radius) {
-      this.on(this.refs.radius, 'change', () => this.filter());
-    }
+    if (this.refs.radius) this.on(this.refs.radius, 'change', () => this.filter());
 
-    if (this.refs.locate) {
-      this.on(this.refs.locate, 'click', () => this.locate());
-    }
+    if (this.refs.locate) this.on(this.refs.locate, 'click', () => this.locate());
 
     this.on(this, 'click', (event) => {
       const trigger = event.target instanceof Element ? event.target.closest('[data-store-select]') : null;
@@ -89,9 +85,7 @@ export class StoreLocator extends BaseComponent {
         : themeString('storesFound', '', { count: matches })
     );
 
-    if (this.refs.empty instanceof HTMLElement) {
-      this.refs.empty.toggleAttribute('hidden', matches > 0);
-    }
+    if (this.refs.empty instanceof HTMLElement) this.refs.empty.toggleAttribute('hidden', matches > 0);
   }
 
   /**

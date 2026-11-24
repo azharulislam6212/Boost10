@@ -36,9 +36,7 @@ export class PromoPopup extends ModalDialog {
 
     if (!this.shouldShow) return;
 
-    if (this.refs.form) {
-      this.on(this.refs.form, 'submit', this.#onSubmit);
-    }
+    if (this.refs.form) this.on(this.refs.form, 'submit', this.#onSubmit);
 
     switch (this.trigger) {
       case 'scroll':

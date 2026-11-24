@@ -210,14 +210,10 @@ export class VariantSwatch extends BaseComponent {
     }
 
     const image = card.querySelector('[data-card-image] img');
-    if (image instanceof HTMLImageElement && image.dataset.originalSrc) {
-      image.src = image.dataset.originalSrc;
-    }
+    if (image instanceof HTMLImageElement && image.dataset.originalSrc) image.src = image.dataset.originalSrc;
 
     const price = card.querySelector('[data-card-price]');
-    if (price instanceof HTMLElement && price.dataset.originalPrice) {
-      price.textContent = price.dataset.originalPrice;
-    }
+    if (price instanceof HTMLElement && price.dataset.originalPrice) price.textContent = price.dataset.originalPrice;
   }
 
   #syncPressed() {

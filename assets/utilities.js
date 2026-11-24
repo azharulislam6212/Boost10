@@ -74,9 +74,7 @@ export function fetchConfig(type = 'json', { method = 'POST', body = null, signa
     'X-Requested-With': 'XMLHttpRequest'
   };
 
-  if (!isFormData) {
-    baseHeaders['Content-Type'] = type === 'javascript' ? 'application/javascript' : 'application/json';
-  }
+  if (!isFormData) baseHeaders['Content-Type'] = type === 'javascript' ? 'application/javascript' : 'application/json';
 
   /** @type {RequestInit} */
   const config = { method, headers: { ...baseHeaders, ...headers } };
@@ -664,9 +662,7 @@ export function trapFocus(container, { initialFocus = null, signal } = {}) {
   document.addEventListener('keydown', onKeydown, { signal: controller.signal });
 
   const target = initialFocus || getFocusableElements(container)[0] || container;
-  if (target === container && !container.hasAttribute('tabindex')) {
-    container.setAttribute('tabindex', '-1');
-  }
+  if (target === container && !container.hasAttribute('tabindex')) container.setAttribute('tabindex', '-1');
   target.focus({ preventScroll: true });
 
   const release = () => {

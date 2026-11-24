@@ -87,9 +87,7 @@ export class ScrollingCards extends BaseComponent {
     this.#visibility = null;
     this.#resize = null;
 
-    for (const item of this.#cards) {
-      item.el.style.removeProperty('scale');
-    }
+    for (const item of this.#cards) item.el.style.removeProperty('scale');
   }
 
   /* ---------------------------------------------------------- internals -- ---- */
@@ -172,9 +170,7 @@ export class ScrollingCards extends BaseComponent {
   };
 
   #paint() {
-    for (const card of this.#cards) {
-      card.el.style.scale = card.now.toFixed(4);
-    }
+    for (const card of this.#cards) card.el.style.scale = card.now.toFixed(4);
   }
 }
 

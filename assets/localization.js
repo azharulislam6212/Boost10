@@ -126,9 +126,7 @@ export class LocalizationForm extends BaseComponent {
       if (matches) visible += 1;
     }
 
-    if (this.refs.empty instanceof HTMLElement) {
-      this.refs.empty.toggleAttribute('hidden', visible > 0);
-    }
+    if (this.refs.empty instanceof HTMLElement) this.refs.empty.toggleAttribute('hidden', visible > 0);
 
     announce(
       visible > 0

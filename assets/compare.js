@@ -273,9 +273,7 @@ export class ProductCompare extends BaseComponent {
   render() {
     const count = compareList.handles.length;
 
-    if (this.refs.count instanceof HTMLElement) {
-      this.refs.count.textContent = String(count);
-    }
+    if (this.refs.count instanceof HTMLElement) this.refs.count.textContent = String(count);
 
     if (this.refs.open instanceof HTMLElement) {
       this.refs.open.hidden = count < 2;

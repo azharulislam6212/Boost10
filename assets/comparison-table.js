@@ -59,9 +59,7 @@ export class ComparisonTable extends BaseComponent {
     this.#resize();
     this.#labelMarks();
 
-    for (const query of [TABLET, MOBILE]) {
-      this.on(window.matchMedia(query), 'change', () => this.#resize());
-    }
+    for (const query of [TABLET, MOBILE]) this.on(window.matchMedia(query), 'change', () => this.#resize());
 
     this.on(this, 'click', this.#onClick);
     this.on(this, 'keydown', this.#onKeydown);
@@ -291,9 +289,7 @@ export class ComparisonTable extends BaseComponent {
     const option = target.closest('[data-comparison-option]');
     if (option instanceof HTMLElement) {
       const column = option.closest('[data-comparison-column]');
-      if (column instanceof HTMLElement) {
-        this.#choose(column, Number(option.dataset.comparisonOption));
-      }
+      if (column instanceof HTMLElement) this.#choose(column, Number(option.dataset.comparisonOption));
       return;
     }
 
@@ -419,9 +415,7 @@ export class ComparisonTable extends BaseComponent {
       case ' ': {
         keyEvent.preventDefault();
         const column = panel.closest('[data-comparison-column]');
-        if (column instanceof HTMLElement) {
-          this.#choose(column, Number(options[current].dataset.comparisonOption));
-        }
+        if (column instanceof HTMLElement) this.#choose(column, Number(options[current].dataset.comparisonOption));
         break;
       }
       case 'Escape': {

@@ -45,9 +45,7 @@ export class ResultsList extends BaseComponent {
     this.#markCurrentPage();
     this.#applyMode();
 
-    if (!document.querySelector('facet-filters')) {
-      this.on(window, 'popstate', () => this.#onPopState());
-    }
+    if (!document.querySelector('facet-filters')) this.on(window, 'popstate', () => this.#onPopState());
 
     this.on(window, 'pageshow', (event) => {
       if (event.persisted) {
@@ -241,9 +239,7 @@ update(html, { focus = true, scroll = false } = {}) {
       if (direction === 'append') {
         for (const node of incoming) this.refs.grid.appendChild(node);
       } else {
-        for (const node of [...incoming].reverse()) {
-          this.refs.grid.insertBefore(node, this.refs.grid.firstChild);
-        }
+        for (const node of [...incoming].reverse()) this.refs.grid.insertBefore(node, this.refs.grid.firstChild);
       }
 
       this.#recordPageAnchor(pageNumber, firstIncoming);

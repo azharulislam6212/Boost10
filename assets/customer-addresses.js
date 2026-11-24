@@ -74,9 +74,7 @@ export class CustomerAddressForm extends BaseComponent {
 
     this.removeAttribute('data-editing');
 
-    if (this.usesModal) {
-      form?.closest('modal-dialog')?.close?.();
-    }
+    if (this.usesModal) form?.closest('modal-dialog')?.close?.();
 
     this.#opener?.setAttribute('aria-expanded', 'false');
     this.#opener?.focus({ preventScroll: true });

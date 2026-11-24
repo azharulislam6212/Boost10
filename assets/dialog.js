@@ -297,9 +297,7 @@ export class Overlay extends BaseComponent {
       return;
     }
 
-    if (target === this.refs.dialog && this.dataset.dismissible !== 'false') {
-      this.close();
-    }
+    if (target === this.refs.dialog && this.dataset.dismissible !== 'false') this.close();
   };
 
   /** @param {Event} event */

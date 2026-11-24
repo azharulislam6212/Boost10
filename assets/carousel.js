@@ -525,9 +525,7 @@ export class CarouselSlider extends BaseComponent {
 
     this.#disarm();
 
-    for (const slide of this.#real) {
-      slide.removeAttribute('data-active');
-    }
+    for (const slide of this.#real) slide.removeAttribute('data-active');
 
     this.#dots = [];
     const pagination = this.#pagination;
@@ -739,9 +737,7 @@ export class CarouselSlider extends BaseComponent {
     const bounded = bound(index, 0, slides.length - 1);
     let position = this.#positions[bounded] ?? 0;
 
-    if (this.options.centeredSlides) {
-      position -= (this.#viewport - (this.#sizes[bounded] ?? 0)) / 2;
-    }
+    if (this.options.centeredSlides) position -= (this.#viewport - (this.#sizes[bounded] ?? 0)) / 2;
 
     if (this.#looping) return position;
 

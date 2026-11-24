@@ -24,9 +24,7 @@ export class GiftCardRecipientForm extends BaseComponent {
       this.#renderCounter();
     }
 
-    if (this.refs.email) {
-      this.on(this.refs.email, 'input', () => this.#error(''));
-    }
+    if (this.refs.email) this.on(this.refs.email, 'input', () => this.#error(''));
 
     this.#constrainDate();
     this.setEnabled(this.refs.toggle.checked, { silent: true });
@@ -59,13 +57,9 @@ export class GiftCardRecipientForm extends BaseComponent {
     this.refs.fields.hidden = !enabled;
     this.toggleAttribute('data-enabled', enabled);
 
-    for (const field of this.refs.fields.querySelectorAll('input, textarea, select')) {
-      field.disabled = !enabled;
-    }
+    for (const field of this.refs.fields.querySelectorAll('input, textarea, select')) field.disabled = !enabled;
 
-    if (this.refs.offset instanceof HTMLInputElement) {
-      this.refs.offset.value = String(new Date().getTimezoneOffset());
-    }
+    if (this.refs.offset instanceof HTMLInputElement) this.refs.offset.value = String(new Date().getTimezoneOffset());
 
     if (this.refs.email instanceof HTMLInputElement) {
       this.refs.email.required = enabled;
@@ -179,9 +173,7 @@ export class GiftCardRecipientForm extends BaseComponent {
     }
 
     if (!message) {
-      for (const field of this.refs.fields.querySelectorAll('[aria-invalid]')) {
-        field.removeAttribute('aria-invalid');
-      }
+      for (const field of this.refs.fields.querySelectorAll('[aria-invalid]')) field.removeAttribute('aria-invalid');
       this.removeAttribute('data-invalid');
     }
   }

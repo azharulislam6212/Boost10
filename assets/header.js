@@ -55,9 +55,7 @@ export class NavMenu extends BaseComponent {
       this.on(document, 'shopify:block:deselect', () => this.closeAll());
     }
 
-    if (document.readyState === 'loading') {
-      this.on(document, 'DOMContentLoaded', () => this.#relocatePanels());
-    }
+    if (document.readyState === 'loading') this.on(document, 'DOMContentLoaded', () => this.#relocatePanels());
 
     this.#watchBay();
 
