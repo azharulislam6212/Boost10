@@ -73,12 +73,10 @@ export class AccordionElement extends BaseComponent {
 
   /** @param {HTMLDetailsElement} item */
   open(item) {
-    const running = this.#animations.get(item);
+    const direction = this.#animations.get(item)?.direction;
+    if (direction === 'open' || (item.open && direction !== 'close')) return;
 
-    if (running?.direction === 'open') return;
-    if (item.open && running?.direction !== 'close') return;
-
-    if (this.dataset.single !== undefined && this.dataset.single !== 'false') {
+    if (this.#single) {
       for (const other of this.#items()) {
         if (other !== item && other.open) this.close(other);
       }
@@ -90,16 +88,13 @@ export class AccordionElement extends BaseComponent {
 
   /** @param {HTMLDetailsElement} item */
   close(item) {
-    if (this.#animations.get(item)?.direction === 'close') return;
-    if (!item.open) return;
+    if (!item.open || this.#animations.get(item)?.direction === 'close') return;
     this.#animateClose(item);
   }
 
   /** Open every item. Used by print stylesheets and by in-page search. */
   openAll() {
-    for (const item of this.#items()) {
-      item.open = true;
-    }
+    for (const item of this.#items()) item.open = true;
   }
 
   /** @returns {number|null} The width below which this group collapses. */
@@ -109,6 +104,11 @@ export class AccordionElement extends BaseComponent {
   }
 
   /* ---------------------------------------------------------- internals -- ---- */
+
+  /** Whether opening one row closes the others. */
+  get #single() {
+    return this.dataset.single !== undefined && this.dataset.single !== 'false';
+  }
 
   /** Open everything above the breakpoint, restore the authored state below it. */
   #watchBreakpoint() {
@@ -146,9 +146,7 @@ export class AccordionElement extends BaseComponent {
    * @returns {HTMLDetailsElement[]}
    */
   #items() {
-    const found = this.querySelectorAll('details:not([data-no-collapse])');
-
-    return Array.from(found).filter((item) => nearestAccordion(item) === this);
+    return [...this.querySelectorAll('details:not([data-no-collapse])')].filter((item) => nearestAccordion(item) === this);
   }
 
   /**
@@ -170,8 +168,7 @@ export class AccordionElement extends BaseComponent {
     }
 
     if (prefersReducedMotion()) {
-      if (item.open) return;
-      if (this.dataset.single !== undefined && this.dataset.single !== 'false') {
+      if (!item.open && this.#single) {
         for (const other of this.#items()) {
           if (other !== item) other.open = false;
         }
@@ -180,12 +177,7 @@ export class AccordionElement extends BaseComponent {
     }
 
     event.preventDefault();
-
-    if (item.open) {
-      this.close(item);
-    } else {
-      this.open(item);
-    }
+    item.open ? this.close(item) : this.open(item);
   }
 
   /** @param {HTMLDetailsElement} item */
@@ -193,17 +185,37 @@ export class AccordionElement extends BaseComponent {
     const panel = this.#panelOf(item);
     if (!panel || prefersReducedMotion()) return;
 
+    const start = this.#stop(item) ?? this.#closedHeight(item);
+    this.#run(item, 'open', start, item.offsetHeight, panel, 300, 'cubic-bezier(0.16, 1, 0.3, 1)');
+  }
+
+  /** @param {HTMLDetailsElement} item */
+  #animateClose(item) {
+    const panel = this.#panelOf(item);
+
+    if (!panel || prefersReducedMotion()) {
+      item.open = false;
+      return;
+    }
+
+    const start = this.#stop(item) ?? item.offsetHeight;
+    this.#run(item, 'close', start, this.#closedHeight(item), panel, 260, 'cubic-bezier(0.33, 0, 0.2, 1)');
+  }
+
+  /**
+   * Cancel whatever is running on a row.
+   *
+   * @param {HTMLDetailsElement} item
+   * @returns {number|null} The height it had reached, or null when idle.
+   */
+  #stop(item) {
     const running = this.#animations.get(item);
-    const from = running ? item.getBoundingClientRect().height : null;
-    running?.animation.cancel();
-    running?.fade?.cancel();
+    if (!running) return null;
 
-    const start = from ?? this.#closedHeight(item);
-    const end = item.offsetHeight;
-
-    this.#clip(item, true);
-
-    this.#run(item, 'open', start, end, panel, 300, 'cubic-bezier(0.16, 1, 0.3, 1)');
+    const height = item.getBoundingClientRect().height;
+    running.animation.cancel();
+    running.fade?.cancel();
+    return height;
   }
 
   /**
@@ -238,6 +250,8 @@ export class AccordionElement extends BaseComponent {
    * @param {string} easing
    */
   #run(item, direction, start, end, panel, duration, easing) {
+    this.#clip(item, true);
+
     const animation = item.animate([{ height: `${start}px` }, { height: `${end}px` }], {
       duration,
       easing,
@@ -275,9 +289,7 @@ export class AccordionElement extends BaseComponent {
    */
   #clip(item, on) {
     if (on) {
-      if (item.dataset.accordionClipped === undefined) {
-        item.dataset.accordionClipped = item.style.overflow || '';
-      }
+      item.dataset.accordionClipped ??= item.style.overflow;
       item.style.overflow = 'hidden';
       return;
     }
@@ -285,35 +297,9 @@ export class AccordionElement extends BaseComponent {
     const previous = item.dataset.accordionClipped;
     if (previous === undefined) return;
 
-    if (previous === '') {
-      item.style.removeProperty('overflow');
-    } else {
-      item.style.overflow = previous;
-    }
-
+    // An empty string removes the inline property again.
+    item.style.overflow = previous;
     delete item.dataset.accordionClipped;
-  }
-
-  /** @param {HTMLDetailsElement} item */
-  #animateClose(item) {
-    const panel = this.#panelOf(item);
-
-    if (!panel || prefersReducedMotion()) {
-      item.open = false;
-      return;
-    }
-
-    const running = this.#animations.get(item);
-    const from = running ? item.getBoundingClientRect().height : null;
-    running?.animation.cancel();
-    running?.fade?.cancel();
-
-    const start = from ?? item.offsetHeight;
-    const end = this.#closedHeight(item);
-
-    this.#clip(item, true);
-
-    this.#run(item, 'close', start, end, panel, 260, 'cubic-bezier(0.33, 0, 0.2, 1)');
   }
 }
 
@@ -385,10 +371,7 @@ export class FooterColumns extends AccordionElement {
     const columns = children.filter((el) => el.classList.contains('footer-column'));
     const policy = children.find((el) => el.classList.contains('footer__policies'));
 
-    if (columns.length === 0) {
-      this.removeAttribute('data-measured');
-      return;
-    }
+    if (columns.length === 0) return this.removeAttribute('data-measured');
 
     const tracks = columns
       .slice(0, FOOTER_MAX_COLUMNS)
@@ -409,11 +392,8 @@ export class FooterColumns extends AccordionElement {
 
     const pinAside = hasAside && asideIndex < trackCount;
 
-    if (pinAside) {
-      this.style.setProperty('--aside-column', String(asideIndex + 1));
-    } else {
-      this.style.removeProperty('--aside-column');
-    }
+    if (pinAside) this.style.setProperty('--aside-column', String(asideIndex + 1));
+    else this.style.removeProperty('--aside-column');
 
     this.toggleAttribute('data-aside-pinned', pinAside);
 
@@ -451,13 +431,10 @@ export class FooterColumns extends AccordionElement {
    * @returns {number}
    */
   #rowCount() {
-    const inside = Array.from(this.children).filter(
+    const inside = [...this.children].filter(
       (el) => !el.classList.contains('footer-utilities') && !el.classList.contains('footer-legal')
     );
-
-    const offsets = new Set(inside.map((el) => Math.round(el.getBoundingClientRect().top)));
-
-    return Math.max(offsets.size, 1);
+    return Math.max(new Set(inside.map((el) => Math.round(el.getBoundingClientRect().top))).size, 1);
   }
 }
 
@@ -615,8 +592,7 @@ export class ShowMore extends BaseComponent {
 
   /** @param {boolean} expanded */
   #setExpanded(expanded) {
-    const content = this.refs.content;
-    const button = this.refs.button;
+    const { content, button } = this.refs;
 
     button.setAttribute('aria-expanded', expanded ? 'true' : 'false');
     this.toggleAttribute('data-expanded', expanded);
@@ -624,10 +600,7 @@ export class ShowMore extends BaseComponent {
     content.style.maxHeight = expanded ? `${content.scrollHeight}px` : `${this.#threshold()}px`;
 
     const label = expanded ? button.dataset.labelLess : button.dataset.labelMore;
-    if (label) {
-      const text = button.querySelector('[data-ref="label"]') || button;
-      text.textContent = label;
-    }
+    if (label) (button.querySelector('[data-ref="label"]') || button).textContent = label;
 
     if (expanded) {
       content.addEventListener(
@@ -646,8 +619,7 @@ export class ShowMore extends BaseComponent {
   }
 
   #measure() {
-    const content = this.refs.content;
-    const button = this.refs.button;
+    const { content, button } = this.refs;
     const threshold = this.#threshold();
 
     const previous = content.style.maxHeight;
@@ -660,12 +632,8 @@ export class ShowMore extends BaseComponent {
     button.toggleAttribute('hidden', !needed);
     this.toggleAttribute('data-collapsible', needed);
 
-    if (!needed) {
-      content.style.maxHeight = 'none';
-      return;
-    }
-
-    if (!this.expanded) content.style.maxHeight = `${threshold}px`;
+    if (!needed) content.style.maxHeight = 'none';
+    else if (!this.expanded) content.style.maxHeight = `${threshold}px`;
   }
 }
 
@@ -763,10 +731,8 @@ export class DeferredMedia extends BaseComponent {
     const template = this.refs.template;
     if (!(template instanceof HTMLTemplateElement)) return null;
 
-    const content = template.content.cloneNode(true);
     const host = this.refs.container instanceof HTMLElement ? this.refs.container : this;
-
-    host.appendChild(content);
+    host.appendChild(template.content.cloneNode(true));
 
     this.#loaded = true;
     this.setAttribute('data-loaded', '');
@@ -774,9 +740,7 @@ export class DeferredMedia extends BaseComponent {
 
     const media = this.querySelector('video, iframe, model-viewer');
 
-    if (media instanceof HTMLVideoElement) {
-      media.play().catch(() => {});
-    }
+    if (media instanceof HTMLVideoElement) media.play().catch(() => {});
 
     if (media instanceof HTMLElement && this.dataset.autoplay !== 'true') {
       media.setAttribute('tabindex', '-1');
@@ -881,7 +845,7 @@ export class ShareButton extends BaseComponent {
   #confirm(message) {
     announce(message);
 
-    const feedback = this.refs.feedback;
+    const { feedback } = this.refs;
     if (!(feedback instanceof HTMLElement)) return;
 
     feedback.textContent = message;
@@ -895,17 +859,18 @@ export class ShareButton extends BaseComponent {
 
   /** Put the URL on screen and select it, so it can be copied by hand. */
   #selectFallback() {
-    const feedback = this.refs.feedback;
+    const { feedback } = this.refs;
     if (!(feedback instanceof HTMLElement)) {
       announce(this.url);
       return;
     }
 
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.readOnly = true;
-    input.value = this.url;
-    input.className = 'share-button__url';
+    const input = Object.assign(document.createElement('input'), {
+      type: 'text',
+      readOnly: true,
+      value: this.url,
+      className: 'share-button__url'
+    });
     input.setAttribute('aria-label', themeString('shareLink', ''));
 
     feedback.replaceChildren(input);
