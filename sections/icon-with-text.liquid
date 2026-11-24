@@ -4,35 +4,16 @@
 
 {%- liquid
   assign s = section.settings
-
   assign background_media = s.background_media | default: 'none'
   assign has_background_media = false
   if background_media != 'none'
     assign has_background_media = true
   endif
--%}
 
-{%- capture content_classes -%}
-  {%- render 'section-content', settings: s, output: 'class' -%}
-{%- endcapture -%}
-
-{%- liquid
   assign desktop = s.columns_desktop
   assign cols_tablet = s.columns_tablet
   assign cols_mobile = s.columns_mobile | plus: 0
-
-  # Spread: on desktop the items keep their own width and share the row's
-  # space between them. To the carousel it is a grid.
-  assign is_spread = false
-  if s.layout == 'spread'
-    assign is_spread = true
-  endif
-
-  assign backdrop_blur = s.backdrop_blur
-
-  assign cs_label = 'accessibility.carousel' | t
   assign carousel_id = 'icon-with-text-' | append: section.id
-
   assign cs_count = section.blocks.size
 
   capture cs_layout
@@ -44,28 +25,26 @@
   assign cs_layout = cs_layout | strip
   assign cs_layout_mobile = cs_layout_mobile | strip
 
-  assign cs_is_carousel = false
-  if cs_layout_mobile == 'carousel'
-    assign cs_is_carousel = true
-  endif
+  capture content_classes
+    render 'section-content', settings: s, output: 'class'
+  endcapture
+  capture content_style
+    render 'section-content', settings: s, output: 'style'
+  endcapture
 -%}
-
-{%- capture content_style -%}
-  {%- render 'section-content', settings: s, output: 'style' -%}
-{%- endcapture -%}
 
 {%- capture section_style -%}
   {%- render 'spacing', section: s, declarations: true -%}
   {%- render 'section-frame', settings: s, media: true -%}
-  {%- if backdrop_blur > 0 -%}
-    -webkit-backdrop-filter: blur({{ backdrop_blur }}px);
-    backdrop-filter: blur({{ backdrop_blur }}px);
+  {%- if s.backdrop_blur > 0 -%}
+    -webkit-backdrop-filter: blur({{ s.backdrop_blur }}px);
+    backdrop-filter: blur({{ s.backdrop_blur }}px);
   {%- endif -%}
 {%- endcapture -%}
 
-
+{%- comment -%} Spread: on desktop the items keep their own width and share the row; to the carousel it is a grid. {%- endcomment -%}
 <div
-  class="section icon-with-text-section{% if is_spread %} icon-with-text-section--spread{% endif %} color-scheme color-{{ s.color_scheme | default: 'scheme-1' }}{% if has_background_media %} has-background-media{% endif %}"
+  class="section icon-with-text-section{% if s.layout == 'spread' %} icon-with-text-section--spread{% endif %} color-scheme color-{{ s.color_scheme | default: 'scheme-1' }}{% if has_background_media %} has-background-media{% endif %}"
   data-section-spacing
   {%- if s.stack_layer != blank and s.stack_layer != 'default' %} data-section-layer="{{ s.stack_layer }}"{% endif %}
   data-section-id="{{ section.id }}"
@@ -99,7 +78,7 @@
           <div
             class="carousel-shell__track icon-with-text-section__grid"
             data-ref="track"
-            {% if cs_is_carousel %}aria-label="{{ cs_label | escape }}"{% endif %}
+            {% if cs_layout_mobile == 'carousel' %}aria-label="{{ 'accessibility.carousel' | t | escape }}"{% endif %}
           >
             {% content_for 'blocks' %}
           </div>

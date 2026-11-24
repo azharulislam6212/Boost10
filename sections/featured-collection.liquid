@@ -4,30 +4,19 @@
 
 {%- liquid
   assign s = section.settings
-
   assign background_media = s.background_media | default: 'none'
   assign has_background_media = false
   if background_media != 'none'
     assign has_background_media = true
   endif
--%}
 
-{%- capture content_classes -%}
-  {%- render 'section-content', settings: s, output: 'class' -%}
-{%- endcapture -%}
-
-{%- liquid
   assign desktop = s.columns_desktop
-  assign cols_tablet = s.columns_tablet
   assign cols_mobile = s.columns_mobile | plus: 0
-
-  assign cs_label = 'accessibility.carousel' | t
   assign carousel_id = 'featured-collection-' | append: section.id
 
   assign product_limit = s.products_to_show
-  assign product_source = s.collection.products
   assign show_placeholder = false
-  assign cs_count = product_source | size
+  assign cs_count = s.collection.products | size
   if s.collection == blank or cs_count == 0
     assign show_placeholder = true
     assign cs_count = product_limit
@@ -45,20 +34,16 @@
   assign cs_layout = cs_layout | strip
   assign cs_layout_mobile = cs_layout_mobile | strip
 
-  assign cs_is_carousel = false
-  if cs_layout_mobile == 'carousel'
-    assign cs_is_carousel = true
-  endif
-
-  assign cs_pagination = s.carousel_pagination
   assign cs_nav = s.carousel_navigation
   if cs_nav == nil
     assign cs_nav = false
   endif
 
   assign panel_controls = false
-  if cs_is_carousel and cs_nav or cs_is_carousel and cs_pagination != 'none'
-    assign panel_controls = true
+  if cs_layout_mobile == 'carousel'
+    if cs_nav or s.carousel_pagination != 'none'
+      assign panel_controls = true
+    endif
   endif
 
   assign panel_controls_class = 'featured-collection-panel__controls--always'
@@ -78,44 +63,36 @@
 {%- endcapture -%}
 
 {%- liquid
-  # Hidden with the eye icon, the panel renders nothing of its own; test for its
-  # markup rather than for blank, so stray whitespace or editor comments can't
-  # keep the side-by-side layout (and its bleed) alive without a panel.
+  # A panel hidden with the eye icon renders nothing of its own; test for its
+  # markup, not for blank, so whitespace or editor comments can't keep the
+  # side-by-side layout alive. Without it the arrows sit under the row; beside
+  # it the row runs off the page edge with the last card cut.
   assign show_panel = false
+  assign nav_position = 'bottom'
+  assign peek_desktop = nil
+  assign layout_classes = 'featured-collection-section__layout'
+
   if panel contains 'featured-collection-panel'
     assign show_panel = true
-  endif
-
-  # Without the panel the arrows have no home beside the row; they sit under it.
-  assign nav_position = nil
-  unless show_panel
-    assign nav_position = 'bottom'
-  endunless
-
-  # Beside the panel the row runs off the page edge, with the last card cut.
-  assign peek_desktop = nil
-  if show_panel
+    assign nav_position = nil
     assign peek_desktop = 87
-  endif
-
-  assign layout_classes = 'featured-collection-section__layout'
-  if show_panel
     assign layout_classes = layout_classes | append: ' featured-collection-section__layout--with-panel'
     if cs_layout == 'carousel'
       assign layout_classes = layout_classes | append: ' featured-collection-section__layout--bleed'
     endif
   endif
+
+  capture content_classes
+    render 'section-content', settings: s, output: 'class'
+  endcapture
+  capture content_style
+    render 'section-content', settings: s, output: 'style'
+  endcapture
+  capture section_style
+    render 'spacing', section: s, declarations: true
+    render 'section-frame', settings: s, media: true
+  endcapture
 -%}
-
-{%- capture content_style -%}
-  {%- render 'section-content', settings: s, output: 'style' -%}
-{%- endcapture -%}
-
-{%- capture section_style -%}
-  {%- render 'spacing', section: s, declarations: true -%}
-  {%- render 'section-frame', settings: s, media: true -%}
-{%- endcapture -%}
-
 
 <div
   class="section featured-collection-section color-scheme color-{{ s.color_scheme | default: 'scheme-1' }}{% if has_background_media %} has-background-media{% endif %}"
@@ -140,55 +117,43 @@
 
       {%- if cs_count > 0 -%}
         <div class="{{ layout_classes }}">
-        {%- if show_panel -%}
-          {{ panel }}
-        {%- endif -%}
-        <carousel-slider
-          {% render 'carousel-shell-attrs',
-             settings: s,
-             id: carousel_id,
-             layout: cs_layout,
-             layout_mobile: cs_layout_mobile,
-             classes: 'featured-collection-section__carousel',
-             columns_desktop: desktop,
-             columns_tablet: cols_tablet,
-             columns_mobile: cols_mobile,
-             peek_desktop: peek_desktop,
-             count: cs_count %}
-        >
-          <div
-            class="carousel-shell__track featured-collection-section__grid"
-            data-ref="track"
-            {% if cs_is_carousel %}aria-label="{{ cs_label | escape }}"{% endif %}
+          {%- if show_panel -%}{{ panel }}{%- endif -%}
+          <carousel-slider
+            {% render 'carousel-shell-attrs',
+               settings: s,
+               id: carousel_id,
+               layout: cs_layout,
+               layout_mobile: cs_layout_mobile,
+               classes: 'featured-collection-section__carousel',
+               columns_desktop: desktop,
+               columns_tablet: s.columns_tablet,
+               columns_mobile: cols_mobile,
+               peek_desktop: peek_desktop,
+               count: cs_count %}
           >
-            {%- if show_placeholder -%}
-              {%- for i in (1..cs_count) -%}
-                {% content_for 'block',
-                  type: '_product-card',
-                  id: 'product-card',
-                  placeholder: true,
-                  index: forloop.index0
-                %}
-              {%- endfor -%}
-            {%- else -%}
-              {%- for product in product_source limit: product_limit -%}
-                {% content_for 'block',
-                  type: '_product-card',
-                  id: 'product-card',
-                  product: product,
-                  index: forloop.index0
-                %}
-              {%- endfor -%}
-            {%- endif -%}
-          </div>
+            <div
+              class="carousel-shell__track featured-collection-section__grid"
+              data-ref="track"
+              {% if cs_layout_mobile == 'carousel' %}aria-label="{{ 'accessibility.carousel' | t | escape }}"{% endif %}
+            >
+              {%- if show_placeholder -%}
+                {%- for i in (1..cs_count) -%}
+                  {% content_for 'block', type: '_product-card', id: 'product-card', placeholder: true, index: forloop.index0 %}
+                {%- endfor -%}
+              {%- else -%}
+                {%- for product in s.collection.products limit: product_limit -%}
+                  {% content_for 'block', type: '_product-card', id: 'product-card', product: product, index: forloop.index0 %}
+                {%- endfor -%}
+              {%- endif -%}
+            </div>
 
-          {% render 'carousel-shell-tail',
-             settings: s,
-             layout: cs_layout,
-             layout_mobile: cs_layout_mobile,
-             detached: show_panel,
-             nav_position: nav_position %}
-        </carousel-slider>
+            {% render 'carousel-shell-tail',
+               settings: s,
+               layout: cs_layout,
+               layout_mobile: cs_layout_mobile,
+               detached: show_panel,
+               nav_position: nav_position %}
+          </carousel-slider>
         </div>
       {%- endif -%}
     </motion-effect>
