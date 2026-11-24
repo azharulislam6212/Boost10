@@ -6,40 +6,25 @@
   assign section_settings = section.settings
   assign count = section.blocks.size
   assign mode = section_settings.mode
-
-  assign should_render = true
-  if section_settings.homepage_only and request.page_type != 'index'
-    assign should_render = false
-  endif
-
-  # A slider needs something to slide between. Below two blocks the section
-  # renders the announcement on its own — no track, no arrows, no live region.
-  assign is_slider = false
-  if mode == 'slider' and count > 1
-    assign is_slider = true
-  endif
+  assign pagination = section_settings.carousel_pagination
 
   assign show_nav = section_settings.carousel_navigation
   if show_nav == nil
     assign show_nav = true
   endif
 
-  assign pagination = section_settings.carousel_pagination
+  assign should_render = true
+  if section_settings.homepage_only and request.page_type != 'index'
+    assign should_render = false
+  endif
 -%}
 
 {%- if count > 0 and should_render -%}
-  {%- capture announcements -%}
-    {%- content_for 'blocks' -%}
-  {%- endcapture -%}
-
-  {%- liquid
-    assign announcement_text = announcements | strip_html | strip
-    assign dismiss_key = announcement_text | md5 | slice: 0, 10
-    assign bar_id = 'AnnouncementBar-' | append: section.id
-  -%}
+  {%- capture announcements -%}{%- content_for 'blocks' -%}{%- endcapture -%}
+  {%- assign dismiss_key = announcements | strip_html | strip | md5 | slice: 0, 10 -%}
 
   <announcement-bar
-    id="{{ bar_id }}"
+    id="AnnouncementBar-{{ section.id }}"
     class="announcement-bar color-scheme color-{{ section_settings.color_scheme }}{% unless section_settings.enable_on_mobile %} announcement-bar--desktop-only{% endunless %}"
     data-announcement-bar
     data-section-id="{{ section.id }}"
@@ -48,94 +33,67 @@
     {% render 'spacing', section: section_settings %}
   >
     <div class="{% render 'container', width: section_settings.container_width, classes: 'announcement-bar__inner' %}">
-      {%- case mode -%}
-        {%- when 'marquee' -%}
-
-          <motion-effect
-            class="announcement-bar__marquee marquee__viewport"
-            data-effect="marquee"
-            data-target=".marquee__track"
-            data-direction="{{ section_settings.marquee_direction }}"
-            data-speed="{{ section_settings.marquee_speed }}"
-            data-pause-on-hover="{{ section_settings.pause_on_hover | default: true }}"
-            role="marquee"
+      {%- if mode == 'marquee' -%}
+        <motion-effect
+          class="announcement-bar__marquee marquee__viewport"
+          data-effect="marquee"
+          data-target=".marquee__track"
+          data-direction="{{ section_settings.marquee_direction }}"
+          data-speed="{{ section_settings.marquee_speed }}"
+          data-pause-on-hover="{{ section_settings.pause_on_hover | default: true }}"
+          role="marquee"
+          aria-label="{{ 'sections.announcements.carousel_label' | t }}"
+        >
+          <div class="marquee__track" data-marquee-track>
+            <div class="announcement-bar__group">{{ announcements }}</div>
+            {%- for i in (1..4) -%}
+              <div class="announcement-bar__group" data-marquee-clone aria-hidden="true" inert>
+                {{- announcements -}}
+              </div>
+            {%- endfor -%}
+          </div>
+        </motion-effect>
+      {%- elsif mode == 'slider' and count > 1 -%}
+        {%- comment -%} A single announcement renders on its own: no track, arrows or live region. {%- endcomment -%}
+        <carousel-slider
+          class="announcement-bar__carousel carousel-shell"
+          data-layout="carousel"
+          data-layout-mobile="carousel"
+          data-options="{%- render 'carousel-options', settings: section_settings, count: count, columns_desktop: 1, columns_tablet: 1, columns_mobile: 1, pagination: pagination -%}"
+          style="{% render 'carousel-vars', settings: section_settings, columns_desktop: 1, columns_tablet: 1, columns_mobile: 1, peek_mobile: 0, peek_desktop: 0 %}{% render 'carousel-style', settings: section_settings %}"
+        >
+          <div
+            class="announcement-bar__track carousel-shell__track"
+            data-ref="track"
+            role="group"
             aria-label="{{ 'sections.announcements.carousel_label' | t }}"
           >
-            <div class="marquee__track" data-marquee-track>
-              <div class="announcement-bar__group">{{ announcements }}</div>
-              {%- for i in (1..4) -%}
-                <div class="announcement-bar__group" data-marquee-clone aria-hidden="true" inert>
-                  {{- announcements -}}
-                </div>
-              {%- endfor -%}
-            </div>
-          </motion-effect>
+            {{ announcements }}
+          </div>
 
-        {%- else -%}
-          {%- if is_slider -%}
-            <carousel-slider
-              class="announcement-bar__carousel carousel-shell"
-              data-layout="carousel"
-              data-layout-mobile="carousel"
-              data-options="{%- render 'carousel-options',
-                settings: section_settings,
-                count: count,
-                columns_desktop: 1,
-                columns_tablet: 1,
-                columns_mobile: 1,
-                pagination: pagination -%}"
-              style="{% render 'carousel-vars',
-                settings: section_settings,
-                columns_desktop: 1,
-                columns_tablet: 1,
-                columns_mobile: 1,
-                peek_mobile: 0,
-                peek_desktop: 0 %}{% render 'carousel-style', settings: section_settings %}"
-            >
-              <div
-                class="announcement-bar__track carousel-shell__track"
-                data-ref="track"
-                role="group"
-                aria-label="{{ 'sections.announcements.carousel_label' | t }}"
-              >
-                {{ announcements }}
-              </div>
-
-              {%- if show_nav -%}
-                {% render 'carousel-nav',
-                   settings: section_settings,
-                   position: 'inside',
-                   size: 28 %}
-              {%- endif -%}
-
-              {%- if pagination == 'controls' -%}
-                {% render 'carousel-controls', settings: section_settings, size: 28 %}
-              {%- elsif pagination != 'none' -%}
-                {% render 'carousel-pagination', style: pagination %}
-              {%- endif -%}
-
-              <p class="visually-hidden" data-ref="status" role="status"></p>
-            </carousel-slider>
-          {%- else -%}
-            <div class="announcement-bar__single">
-              {{ announcements }}
-            </div>
+          {%- if show_nav -%}
+            {% render 'carousel-nav', settings: section_settings, position: 'inside', size: 28 %}
           {%- endif -%}
-      {%- endcase -%}
+
+          {%- if pagination == 'controls' -%}
+            {% render 'carousel-controls', settings: section_settings, size: 28 %}
+          {%- elsif pagination != 'none' -%}
+            {% render 'carousel-pagination', style: pagination %}
+          {%- endif -%}
+
+          <p class="visually-hidden" data-ref="status" role="status"></p>
+        </carousel-slider>
+      {%- else -%}
+        <div class="announcement-bar__single">{{ announcements }}</div>
+      {%- endif -%}
 
       {%- if section_settings.show_close -%}
-        <button
-          type="button"
-          class="announcement-bar__close"
-          data-ref="close"
-          aria-label="{{ 'accessibility.close' | t }}"
-        >
+        <button type="button" class="announcement-bar__close" data-ref="close" aria-label="{{ 'accessibility.close' | t }}">
           {% render 'icon', icon: 'close', size: 14 %}
         </button>
       {%- endif -%}
     </div>
   </announcement-bar>
-
 {%- endif -%}
 
 {% schema %}

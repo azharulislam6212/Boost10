@@ -12,45 +12,17 @@ const STORAGE_PREFIX = 'theme:announcement:';
 
 export class AnnouncementBar extends BaseComponent {
   setup() {
-    if (!this.hasAttribute('data-dismissible')) {
-      this.#reveal();
-      return;
-    }
-
-    if (this.#isDismissed()) {
-      this.setAttribute('data-dismissed', '');
-      return;
-    }
-
-    this.#reveal();
-    this.#bindClose();
+    this.#init();
   }
 
   /**
-   * The theme editor re-renders this section in place, which replaces the close
-   * button with a new node while this element stays connected. Without
-   * re-binding, closing the bar works once and then stops for the rest of the
-   * editing session.
+   * The editor re-renders the section in place, replacing the close button
+   * while this element stays connected, so the button is bound again.
    */
   sectionLoaded() {
     this.refreshRefs();
-
-    if (!this.hasAttribute('data-dismissible')) {
-      this.#reveal();
-      return;
-    }
-
-    if (this.#isDismissed()) {
-      this.setAttribute('data-dismissed', '');
-      return;
-    }
-
-    this.removeAttribute('data-dismissed');
-    this.#reveal();
-    this.#bindClose();
+    this.#init(true);
   }
-
-  /* --------------------------------------------------------- public API -- ---- */
 
   dismiss() {
     this.setAttribute('data-dismissed', '');
@@ -62,61 +34,33 @@ export class AnnouncementBar extends BaseComponent {
     window.dispatchEvent(new Event('resize'));
   }
 
-  /* ---------------------------------------------------------- internals -- ---- */
+  /** @param {boolean} [reloaded] */
+  #init(reloaded = false) {
+    if (this.hasAttribute('data-dismissible')) {
+      if (this.#isDismissed()) {
+        this.setAttribute('data-dismissed', '');
+        return;
+      }
+      if (reloaded) this.removeAttribute('data-dismissed');
+      this.#bindClose();
+    }
 
-  /** @private */
+    this.setAttribute('data-ready', '');
+  }
+
   #bindClose() {
-    const close = this.refs.close;
+    const { close } = this.refs;
     if (!close || close.dataset.bound === 'true') return;
 
     close.dataset.bound = 'true';
     this.on(close, 'click', () => this.dismiss());
   }
 
-  /** @private */
-  #reveal() {
-    this.setAttribute('data-ready', '');
-  }
-
-  /**
-   * The storage key, preferring the one Liquid stamped on the element.
-   *
-   * @private
-   */
+  /** Liquid stamps a hash of the announcement text, so new wording shows again. */
   get #key() {
-    const key = this.dataset.dismissKey || this.#contentHash;
-    return `${STORAGE_PREFIX}${this.dataset.sectionId}:${key}`;
+    return `${STORAGE_PREFIX}${this.dataset.sectionId}:${this.dataset.dismissKey}`;
   }
 
-  /**
-   * A small non-cryptographic hash of the visible text. Only needs to change
-   * when the wording does; collisions cost a customer one extra dismissal.
-   *
-   * @private
-   */
-  get #contentHash() {
-    const source = this.querySelectorAll('.announcement__text');
-    const text = (
-      source.length > 0
-        ? Array.from(source)
-            .filter((node) => !node.closest('[data-marquee-clone]'))
-            .map((node) => node.textContent ?? '')
-            .join(' ')
-        : (this.textContent ?? '')
-    )
-      .replace(/\s+/g, ' ')
-      .trim();
-
-    let hash = 0;
-    for (let i = 0; i < text.length; i++) {
-      hash = (hash << 5) - hash + text.charCodeAt(i);
-      hash |= 0;
-    }
-
-    return Math.abs(hash).toString(36);
-  }
-
-  /** @private */
   #isDismissed() {
     try {
       return sessionStorage.getItem(this.#key) === '1';
