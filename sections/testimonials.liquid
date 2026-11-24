@@ -5,186 +5,113 @@
 
 {%- liquid
   assign s = section.settings
+  assign carousel_id = 'testimonials-' | append: section.id
+  assign columns_mobile = s.columns_mobile | plus: 0
+  assign slide_count = section.blocks | where: 'type', '_testimonial-card' | size
+  assign stagger = 120
 
-  assign desktop = s.columns_desktop | default: 3 | plus: 0
-
-  assign cols_mobile = s.columns_mobile | default: 1 | plus: 0
-  if cols_mobile > 2
-    assign cols_mobile = 2
-  endif
-  if cols_mobile < 1
-    assign cols_mobile = 1
-  endif
-
-  assign cols_tablet = s.columns_tablet | default: 2 | plus: 0
-
-
-  assign gap_x = s.gap | default: 24 | plus: 0
-  assign gap_y = gap_x
-
-  assign gap_x_mobile = s.gap_mobile | plus: 0
-  if s.gap_mobile == nil
-    assign gap_x_mobile = 16
-  endif
-  assign gap_y_mobile = gap_x_mobile
-
-  capture cs_layout
+  capture layout
     render 'carousel-layout', settings: s, fallback: 'carousel', guard: false
   endcapture
-  capture cs_layout_mobile
+  capture layout_mobile
     render 'carousel-layout', settings: s, fallback: 'carousel', mobile: true
   endcapture
-  assign cs_layout = cs_layout | strip
-  assign cs_layout_mobile = cs_layout_mobile | strip
-
-  assign cs_is_carousel = false
-  if cs_layout == 'carousel' or cs_layout_mobile == 'carousel'
-    assign cs_is_carousel = true
-  endif
-
-  assign cs_count = 0
-  for review_block in section.blocks
-    if review_block.type == '_testimonial-card'
-      assign cs_count = cs_count | plus: 1
-    endif
-  endfor
-
-  assign cs_label = 'accessibility.carousel' | t
-
-  assign carousel_id = 'testimonials-' | append: section.id
-
-  assign cs_pagination = s.carousel_pagination | default: 'controls'
-  assign cs_pagination_align = s.carousel_pagination_align | default: 'center'
-
-  assign cs_nav = s.carousel_navigation
-  if cs_nav == nil
-    assign cs_nav = true
-  endif
+  assign layout = layout | strip
+  assign layout_mobile = layout_mobile | strip
 
   assign has_controls = false
-  if cs_is_carousel and cs_nav or cs_is_carousel and cs_pagination != 'none'
-    assign has_controls = true
-  endif
-
-  assign controls_class = 'testimonials__controls testimonials__controls--' | append: cs_pagination_align
-  if cs_layout == 'carousel'
-    assign controls_class = controls_class | append: ' testimonials__controls--always'
-  elsif cs_layout_mobile == 'carousel'
-    assign controls_class = controls_class | append: ' testimonials__controls--mobile'
-  endif
-
-  assign card_stagger = 120
-
-  assign track_classes = 'testimonials__track'
-  if cs_layout == 'carousel'
-    assign track_classes = track_classes | append: ' testimonials__track--bleed-desktop'
-  endif
-  if cs_layout_mobile == 'carousel'
-    assign track_classes = track_classes | append: ' testimonials__track--bleed-mobile'
+  if layout == 'carousel' or layout_mobile == 'carousel'
+    if s.carousel_navigation or s.carousel_pagination != 'none'
+      assign has_controls = true
+    endif
   endif
 -%}
 
 {%- capture section_style -%}
   {%- render 'spacing', section: s, declarations: true -%}
-  --tc-space: {{ s.space_between | default: 40 | plus: 0 }}px;
-  --tc-space-mobile: {{ s.space_between_mobile | default: 20 | plus: 0 }}px;
-  --tc-gap-x: {{ gap_x }}px;
-  --tc-gap-y: {{ gap_y }}px;
-  --tc-gap-x-mobile: {{ gap_x_mobile }}px;
-  --tc-gap-y-mobile: {{ gap_y_mobile }}px;
+  --tc-space: {{ s.space_between }}px;
+  --tc-space-mobile: {{ s.space_between_mobile }}px;
+  --tc-gap: {{ s.gap }}px;
+  --tc-gap-mobile: {{ s.gap_mobile }}px;
   {%- render 'section-frame', settings: s -%}
 {%- endcapture -%}
 
 {%- capture intro_panel -%}
   {% content_for 'block', type: '_testimonial-intro', id: 'testimonials-intro' %}
 {%- endcapture -%}
-{%- assign show_intro = false -%}
-{%- if intro_panel != blank -%}
-  {%- assign show_intro = true -%}
-{%- endif -%}
 
 <div
-  class="testimonials testimonials--thumb-zoom-in color-scheme color-{{ s.color_scheme | default: 'scheme-1' }}"
+  class="testimonials color-scheme color-{{ s.color_scheme }}"
   data-section-spacing
   {%- if s.stack_layer != blank and s.stack_layer != 'default' %} data-section-layer="{{ s.stack_layer }}"{% endif %}
   data-section-id="{{ section.id }}"
   style="{{ section_style | strip_newlines | strip }}"
 >
-
   <div class="{% render 'container', width: s.container_width %}">
-
     <motion-effect
       class="testimonials__header"
-      {% render 'motion-attrs', kind: 'content', section: s, children: true, duration: 800, stagger: card_stagger %}
+      {% render 'motion-attrs', kind: 'content', section: s, children: true, duration: 800, stagger: stagger %}
     >
       {% content_for 'block', type: 'section-header', id: 'testimonials-header' %}
     </motion-effect>
 
-    <div class="testimonials__layout testimonials__layout--{{ cs_layout }}{% if show_intro %} testimonials__layout--with-intro{% endif %}">
-      {%- if show_intro -%}
+    <div class="testimonials__layout testimonials__layout--{{ layout }}{% if intro_panel != blank %} testimonials__layout--with-intro{% endif %}">
+      {%- if intro_panel != blank -%}
         <motion-effect
           class="testimonials__intro"
-          {% render 'motion-attrs', kind: 'content', section: s, duration: 800, stagger: card_stagger %}
+          {% render 'motion-attrs', kind: 'content', section: s, duration: 800, stagger: stagger %}
         >
           {{ intro_panel }}
         </motion-effect>
       {%- endif -%}
 
       <motion-effect
-        class="{{ track_classes }} testimonials__track--{{ cs_layout }}"
-        {% render 'motion-attrs',
-           kind: 'content',
-           section: s,
-           target: '.testimonial-card',
-           duration: 800,
-           stagger: card_stagger %}
+        class="testimonials__track testimonials__track--{{ layout }}
+          {%- if layout == 'carousel' %} testimonials__track--bleed-desktop{% endif %}
+          {%- if layout_mobile == 'carousel' %} testimonials__track--bleed-mobile{% endif %}"
+        {% render 'motion-attrs', kind: 'content', section: s, target: '.testimonial-card', duration: 800, stagger: stagger %}
       >
         <carousel-slider
           {% render 'carousel-shell-attrs',
              settings: s,
              id: carousel_id,
-             layout: cs_layout,
-             layout_mobile: cs_layout_mobile,
+             layout: layout,
+             layout_mobile: layout_mobile,
              classes: 'testimonials__carousel',
-             columns_desktop: desktop,
-             columns_tablet: cols_tablet,
-             columns_mobile: cols_mobile,
+             columns_desktop: s.columns_desktop,
+             columns_tablet: s.columns_tablet,
+             columns_mobile: columns_mobile,
              peek_mobile: 25,
              peek_desktop: 15,
-             count: cs_count %}
+             count: slide_count %}
         >
           <div
             class="carousel-shell__track testimonials__grid"
             data-ref="track"
-            {% if cs_is_carousel %}aria-label="{{ cs_label | escape }}"{% endif %}
+            {% if layout == 'carousel' or layout_mobile == 'carousel' %}aria-label="{{ 'accessibility.carousel' | t | escape }}"{% endif %}
           >
             {% content_for 'blocks' %}
           </div>
 
-          {% render 'carousel-shell-tail',
-             settings: s,
-             layout: cs_layout,
-             layout_mobile: cs_layout_mobile,
-             autoplay: false,
-             detached: true %}
+          {% render 'carousel-shell-tail', settings: s, layout: layout, layout_mobile: layout_mobile, autoplay: false, detached: true %}
         </carousel-slider>
       </motion-effect>
     </div>
 
     {%- if has_controls -%}
-      <div class="{{ controls_class }}">
+      <div class="testimonials__controls testimonials__controls--{{ s.carousel_pagination_align }}
+        {%- if layout == 'carousel' %} testimonials__controls--always{% elsif layout_mobile == 'carousel' %} testimonials__controls--mobile{% endif %}">
         {%- render 'carousel-outside-controls',
            settings: s,
            carousel: carousel_id,
-           pagination: cs_pagination,
-           align: cs_pagination_align,
-           nav: cs_nav,
+           pagination: s.carousel_pagination,
+           align: s.carousel_pagination_align,
+           nav: s.carousel_navigation,
            between: true -%}
       </div>
     {%- endif -%}
   </div>
 </div>
-
 
 {% schema %}
 {

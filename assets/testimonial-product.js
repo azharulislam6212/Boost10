@@ -8,10 +8,8 @@
 import { BaseComponent, defineComponent } from '@theme/component';
 
 /**
- * The breakpoint the card's own stylesheet uses to decide that hover is not
- * available. Kept identical to the media query in `base.css` — the panel is
- * revealed by CSS on a pointer and by this element on a touch screen, and if
- * the two disagree there is a width where both fire or neither does.
+ * Must match the media query in `base.css`: CSS reveals the panel on hover,
+ * this element reveals it on touch.
  */
 const TOUCH_QUERY = '(hover: none), (max-width: 749px)';
 
@@ -19,40 +17,27 @@ const TOUCH_QUERY = '(hover: none), (max-width: 749px)';
 export class TestimonialProduct extends BaseComponent {
   static requiredRefs = ['toggle', 'panel'];
 
-  /** @type {MediaQueryList|null} */
-  #touch = null;
-
   setup() {
-    this.#touch = window.matchMedia(TOUCH_QUERY);
-
     this.on(this.refs.toggle, 'click', () => this.toggle());
-
-    if (this.refs.close) {
-      this.on(this.refs.close, 'click', () => this.close());
-    }
+    if (this.refs.close) this.on(this.refs.close, 'click', () => this.close());
 
     this.on(this, 'keydown', (event) => {
-      if (event.key === 'Escape' && this.open) {
-        this.close();
-        this.refs.toggle.focus();
-      }
+      if (event.key !== 'Escape' || !this.open) return;
+      this.close();
+      this.refs.toggle.focus();
     });
 
     this.on(document, 'pointerdown', (event) => {
-      if (!this.open) return;
-
+      const { panel, toggle } = this.refs;
       const target = /** @type {Node} */ (event.target);
-      if (this.refs.panel.contains(target)) return;
-      if (this.refs.toggle.contains(target)) return;
-
-      this.close();
+      if (this.open && !panel.contains(target) && !toggle.contains(target)) this.close();
     });
 
     this.on(document, 'testimonial-product:open', (event) => {
       if (event.target !== this) this.close();
     });
 
-    this.on(this.#touch, 'change', (event) => {
+    this.on(window.matchMedia(TOUCH_QUERY), 'change', (event) => {
       if (!event.matches) this.close();
     });
 
@@ -65,26 +50,25 @@ export class TestimonialProduct extends BaseComponent {
   }
 
   toggle() {
-    if (this.open) this.close();
-    else this.show();
+    this.open ? this.close() : this.show();
   }
 
   show() {
     if (this.open) return;
-    this.setAttribute('data-open', '');
+    this.toggleAttribute('data-open', true);
     this.#sync();
     this.dispatch('testimonial-product:open', { bubbles: true });
   }
 
   close() {
     if (!this.open) return;
-    this.removeAttribute('data-open');
+    this.toggleAttribute('data-open', false);
     this.#sync();
   }
 
   /** Mirrors the state onto the button. */
   #sync() {
-    this.refs.toggle.setAttribute('aria-expanded', this.open ? 'true' : 'false');
+    this.refs.toggle.setAttribute('aria-expanded', String(this.open));
   }
 }
 
