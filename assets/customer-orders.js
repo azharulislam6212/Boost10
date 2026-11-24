@@ -21,16 +21,12 @@ export class CustomerOrderHistory extends BaseComponent {
 
   /* --------------------------------------------------------- public API -- ---- */
 
-  /**
-   * @returns {HTMLElement[]}
-   */
+  /** @returns {HTMLElement[]} */
   get orders() {
     return Array.from(this.querySelectorAll('[data-order]'));
   }
 
-  /**
-   * @returns {HTMLElement[]}
-   */
+  /** @returns {HTMLElement[]} */
   get visibleOrders() {
     return this.orders.filter((order) => !order.hasAttribute('hidden'));
   }
@@ -109,10 +105,7 @@ export class CustomerOrderHistory extends BaseComponent {
 
   /* ---------------------------------------------------------- internals -- ---- */
 
-  /**
-   * @param {MouseEvent} event
-   * @private
-   */
+  /** @param {MouseEvent} event */
   #onClick = (event) => {
     const trigger = event.target instanceof Element ? event.target.closest('[data-reorder]') : null;
     if (!(trigger instanceof HTMLElement)) return;
@@ -124,8 +117,6 @@ export class CustomerOrderHistory extends BaseComponent {
   /**
    * Restore a filter from the URL, so a filtered view can be shared or returned
    * to with the Back button.
-   *
-   * @private
    */
   #applyFilterFromUrl() {
     const status = new URL(window.location.href).searchParams.get('status');
@@ -135,10 +126,7 @@ export class CustomerOrderHistory extends BaseComponent {
     this.filter(status);
   }
 
-  /**
-   * @param {string} status
-   * @private
-   */
+  /** @param {string} status */
   #syncUrl(status) {
     const url = new URL(window.location.href);
 
@@ -151,10 +139,7 @@ export class CustomerOrderHistory extends BaseComponent {
     window.history.replaceState({ orders: true }, '', `${url.pathname}${url.search}`);
   }
 
-  /**
-   * @param {string} message
-   * @private
-   */
+  /** @param {string} message */
   #status(message) {
     if (this.refs.status instanceof HTMLElement) this.refs.status.textContent = message;
   }

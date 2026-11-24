@@ -361,11 +361,7 @@ export class ProductBundle extends BaseComponent {
 
   /* ------------------------------------------------------ the modal -- ---- */
 
-  /**
-   * Listen to the quick add modal for a variant chosen on this bundle's behalf.
-   *
-   * @private
-   */
+  /** Listen to the quick add modal for a variant chosen on this bundle's behalf. */
   #bindQuickAdd() {
     const modal = this.#quickAdd;
     if (!modal) return;
@@ -384,7 +380,6 @@ export class ProductBundle extends BaseComponent {
    * @param {Object} [options]
    * @param {boolean} [options.redraw=false] Ask the summary to rewrite the
    *   button. Needed only on the reopen path, where nothing rendered.
-   * @private
    */
   #claimQuickAdd({ redraw = false } = {}) {
     if (this.#pendingRow) return;
@@ -413,10 +408,7 @@ export class ProductBundle extends BaseComponent {
     return document.getElementById('QuickAdd');
   }
 
-  /**
-   * @param {SubmitEvent} event
-   * @private
-   */
+  /** @param {SubmitEvent} event */
   #onQuickAddSubmit = (event) => {
     if (!this.#pendingRow) return;
 
@@ -475,7 +467,6 @@ export class ProductBundle extends BaseComponent {
    * Hand a product with options to the quick add modal.
    *
    * @param {HTMLElement} row
-   * @private
    */
   #openQuickAddFor(row) {
     const modal = this.#quickAdd;
@@ -510,7 +501,6 @@ export class ProductBundle extends BaseComponent {
    *
    * @param {HTMLElement} modal
    * @param {number} quantity
-   * @private
    */
   #applyQuantity(modal, quantity) {
     if (!Number.isFinite(quantity) || quantity <= 1) return;
@@ -525,11 +515,7 @@ export class ProductBundle extends BaseComponent {
     if (input instanceof HTMLInputElement) input.value = String(quantity);
   }
 
-  /**
-   * The row's half: its control stops spinning and stops being the pending one.
-   *
-   * @private
-   */
+  /** The row's half: its control stops spinning and stops being the pending one. */
   #releaseRow() {
     const button = this.#pendingRow?.querySelector('[data-bundle-add]');
     if (button instanceof HTMLElement) delete button.dataset.loading;
@@ -537,11 +523,7 @@ export class ProductBundle extends BaseComponent {
     this.#pendingRow = null;
   }
 
-  /**
-   * Both halves: the dismissal path and `teardown()`.
-   *
-   * @private
-   */
+  /** Both halves: the dismissal path and `teardown()`. */
   #clearPending() {
     this.#releaseRow();
     delete this.#quickAdd?.dataset.bundleMode;
@@ -555,7 +537,6 @@ export class ProductBundle extends BaseComponent {
    *
    * @param {string} name
    * @returns {HTMLElement|null}
-   * @private
    */
   #part(name) {
     const node = this.querySelector(`[data-ref~="${name}"]`);
@@ -566,7 +547,6 @@ export class ProductBundle extends BaseComponent {
    * Merge the bundle's code into whatever codes the cart already carries.
    *
    * @param {string} code
-   * @private
    */
   async #applyCode(code) {
     const existing = (cart.state?.attributes?.discount_code || '')
@@ -581,10 +561,7 @@ export class ProductBundle extends BaseComponent {
     });
   }
 
-  /**
-   * @param {boolean} busy
-   * @private
-   */
+  /** @param {boolean} busy */
   #setBusy(busy) {
     this.setLoading(busy);
 
@@ -596,7 +573,6 @@ export class ProductBundle extends BaseComponent {
     if (busy) submit.disabled = true;
   }
 
-  /** @private */
   #full() {
     const message = themeString('bundleFull', '');
     this.#error(message);
@@ -606,7 +582,6 @@ export class ProductBundle extends BaseComponent {
   /**
    * @param {number} productId
    * @returns {HTMLElement|null} The picker row for a product, if this bundle has one.
-   * @private
    */
   #rowFor(productId) {
     if (!Number.isFinite(productId)) return null;
@@ -618,11 +593,7 @@ export class ProductBundle extends BaseComponent {
     return null;
   }
 
-  /**
-   * Put every row's stepper back to one.
-   *
-   * @private
-   */
+  /** Put every row's stepper back to one. */
   #resetRowQuantities() {
     for (const selector of this.querySelectorAll('[data-bundle-quantity]')) {
       if (typeof (/** @type {any} */ (selector).setValue) === 'function') {
@@ -635,10 +606,7 @@ export class ProductBundle extends BaseComponent {
     }
   }
 
-  /**
-   * @param {HTMLElement} button
-   * @private
-   */
+  /** @param {HTMLElement} button */
   #onRowToggle(button) {
     const row = button.closest('[data-bundle-row]');
     if (!(row instanceof HTMLElement)) return;
@@ -679,7 +647,6 @@ export class ProductBundle extends BaseComponent {
    *
    * @param {HTMLElement} button
    * @param {() => void} then
-   * @private
    */
   #hold(button, then) {
     button.dataset.loading = '';
@@ -693,7 +660,6 @@ export class ProductBundle extends BaseComponent {
   /**
    * @param {number} productId
    * @returns {number} Index in the bundle, or -1.
-   * @private
    */
   #indexOfProduct(productId) {
     return this.#items.findIndex((item) => item.productId === productId);
@@ -704,7 +670,6 @@ export class ProductBundle extends BaseComponent {
    *
    * @param {HTMLElement} target
    * @returns {number} Index into `#items`, or -1.
-   * @private
    */
   #slotIndexOf(target) {
     const slot = target.closest('[data-bundle-slot]');
@@ -719,7 +684,6 @@ export class ProductBundle extends BaseComponent {
    * @param {Object} [options]
    * @param {boolean} [options.refocus=false] Keep keyboard focus inside the slots.
    * @returns {boolean}
-   * @private
    */
   #removeAt(index, { refocus = false } = {}) {
     if (index < 0 || index >= this.#items.length) return false;
@@ -740,7 +704,6 @@ export class ProductBundle extends BaseComponent {
    * After a removal, focus the control that took the removed one's place.
    *
    * @param {number} index
-   * @private
    */
   #focusSlot(index) {
     const slots = this.#part('slots')?.querySelectorAll('[data-bundle-slot]') ?? [];
@@ -756,7 +719,6 @@ export class ProductBundle extends BaseComponent {
   /**
    * @param {number} index
    * @param {number} delta
-   * @private
    */
   #step(index, delta) {
     if (index < 0 || index >= this.#items.length) return;
@@ -780,11 +742,7 @@ export class ProductBundle extends BaseComponent {
     this.render();
   }
 
-  /**
-   * The next row a customer could add, in the category they are looking at.
-   *
-   * @private
-   */
+  /** The next row a customer could add, in the category they are looking at. */
   #focusPicker() {
     const candidates = this.querySelectorAll(
       '[data-bundle-panel] [data-bundle-row]:not([data-in-bundle]) [data-bundle-add]:not(:disabled)'
@@ -801,11 +759,7 @@ export class ProductBundle extends BaseComponent {
     }
   }
 
-  /**
-   * Fill the slots the bundle has, and empty the ones it does not.
-   *
-   * @private
-   */
+  /** Fill the slots the bundle has, and empty the ones it does not. */
   #renderSlots() {
     const slots = this.#part('slots')?.querySelectorAll('[data-bundle-slot]') ?? [];
     const full = this.isFull;
@@ -866,7 +820,6 @@ export class ProductBundle extends BaseComponent {
     }
   }
 
-  /** @private */
   #renderTotals() {
     const total = this.#part('total');
     if (total instanceof HTMLElement) {
@@ -889,7 +842,6 @@ export class ProductBundle extends BaseComponent {
    * The discount, written for a sentence: "10%" or "$5.00".
    *
    * @returns {string} Empty when there is no discount value.
-   * @private
    */
   get #discountLabel() {
     const discount = this.discount;
@@ -902,8 +854,6 @@ export class ProductBundle extends BaseComponent {
    * The pill under the heading: the merchant's message until something is
    * added, then how far the bundle is from its discount. Its border fills as
    * the bundle approaches the minimum.
-   *
-   * @private
    */
   #renderProgress() {
     const pill = this.#part('progress');
@@ -935,11 +885,7 @@ export class ProductBundle extends BaseComponent {
     }
   }
 
-  /**
-   * The button says what happens next: how many more items, or the price.
-   *
-   * @private
-   */
+  /** The button says what happens next: how many more items, or the price. */
   #renderSubmit() {
     const submit = this.#part('submit');
     if (!(submit instanceof HTMLButtonElement)) return;
@@ -960,11 +906,7 @@ export class ProductBundle extends BaseComponent {
     if (text && label.textContent !== text) label.textContent = text;
   }
 
-  /**
-   * Put every row's control into the state the bundle says it is in.
-   *
-   * @private
-   */
+  /** Put every row's control into the state the bundle says it is in. */
   #syncRows() {
     const full = this.isFull;
 
@@ -989,10 +931,7 @@ export class ProductBundle extends BaseComponent {
     }
   }
 
-  /**
-   * @param {string} message
-   * @private
-   */
+  /** @param {string} message */
   #error(message) {
     const target = this.#part('error');
     if (!(target instanceof HTMLElement)) return;

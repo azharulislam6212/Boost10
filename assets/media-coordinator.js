@@ -23,16 +23,12 @@ export class MediaCoordinator extends BaseComponent {
 
   /* --------------------------------------------------------- public API -- ---- */
 
-  /**
-   * @returns {HTMLElement} The nearest product container, or the document.
-   */
+  /** @returns {HTMLElement} The nearest product container, or the document. */
   get root() {
     return this.closest('[data-product-root]') || document;
   }
 
-  /**
-   * @returns {MediaGallery|null}
-   */
+  /** @returns {MediaGallery|null} */
   get gallery() {
     const id = this.dataset.gallery;
     const byId = id ? document.getElementById(id) : null;
@@ -68,9 +64,7 @@ export class MediaCoordinator extends BaseComponent {
     return gallery.goToMedia(mediaId, { animate });
   }
 
-  /**
-   * @returns {boolean} Whether image filtering is enabled.
-   */
+  /** @returns {boolean} Whether image filtering is enabled. */
   get filterImages() {
     return this.dataset.filterImages === 'true';
   }
@@ -110,10 +104,7 @@ export class MediaCoordinator extends BaseComponent {
 
   /* ---------------------------------------------------------- internals -- ---- */
 
-  /**
-   * @returns {HTMLElement|null}
-   * @private
-   */
+  /** @returns {HTMLElement|null} */
   #picker() {
     return this.root.querySelector?.('variant-picker') || null;
   }
@@ -123,7 +114,6 @@ export class MediaCoordinator extends BaseComponent {
    *
    * @param {Object} variant
    * @returns {Map<string, string>}
-   * @private
    */
   #optionMap(variant) {
     const map = new Map();
@@ -152,7 +142,6 @@ export class MediaCoordinator extends BaseComponent {
    * @param {Map<string, string>} selected
    * @param {string} variantId
    * @returns {boolean}
-   * @private
    */
   #itemMatches(item, selected, variantId) {
     const tagged = item.dataset.variantIds;
@@ -183,7 +172,6 @@ export class MediaCoordinator extends BaseComponent {
    *
    * @param {Object} variant
    * @param {HTMLElement} gallery
-   * @private
    */
   #filterToVariant(variant, gallery) {
     const id = String(variant.id);

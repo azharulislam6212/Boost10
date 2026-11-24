@@ -23,17 +23,13 @@ const STORAGE_KEY = 'compare';
  * need the same list, and the drawer may not be on the page at all.
  */
 export const compareList = {
-  /**
-   * @returns {string[]} Product handles, in the order they were added.
-   */
+  /** @returns {string[]} Product handles, in the order they were added. */
   get handles() {
     const stored = storage.get(STORAGE_KEY, []);
     return Array.isArray(stored) ? stored : [];
   },
 
-  /**
-   * @returns {number}
-   */
+  /** @returns {number} */
   get limit() {
     return Number(window.Theme?.settings?.compareLimit) || 4;
   },
@@ -66,9 +62,7 @@ export const compareList = {
     return true;
   },
 
-  /**
-   * @param {string} handle
-   */
+  /** @param {string} handle */
   remove(handle) {
     this._write(this.handles.filter((item) => item !== handle));
     announce(themeString('compareRemoved', ''));
@@ -98,7 +92,6 @@ export const compareList = {
    * without instantiating anything.
    *
    * @param {string[]} handles
-   * @private
    */
   _write(handles) {
     storage.set(STORAGE_KEY, handles);
@@ -138,9 +131,7 @@ export class CompareTrigger extends BaseComponent {
     this.render();
   }
 
-  /**
-   * @returns {string}
-   */
+  /** @returns {string} */
   get handle() {
     return this.dataset.productHandle || '';
   }
@@ -212,9 +203,7 @@ export class ProductCompare extends BaseComponent {
 
   /* --------------------------------------------------------- public API -- ---- */
 
-  /**
-   * @returns {HTMLElement|null}
-   */
+  /** @returns {HTMLElement|null} */
   get drawer() {
     return this.querySelector('drawer-component');
   }

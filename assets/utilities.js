@@ -411,9 +411,7 @@ const STORAGE_PREFIX = () => globalThis.Theme?.storageKey || 'theme';
 
 let storageAvailable = null;
 
-/**
- * @returns {boolean}
- */
+/** @returns {boolean} */
 function canUseStorage() {
   if (storageAvailable !== null) return storageAvailable;
 
@@ -486,9 +484,7 @@ export const storage = {
     return this.get(key, undefined) !== undefined;
   },
 
-  /**
-   * @returns {boolean} Whether writes will succeed at all.
-   */
+  /** @returns {boolean} Whether writes will succeed at all. */
   get available() {
     return canUseStorage();
   }
@@ -515,23 +511,17 @@ export function prefersReducedMotion() {
   return matchesQuery('(prefers-reduced-motion: reduce)');
 }
 
-/**
- * @returns {boolean} Whether the primary pointer is coarse (touch).
- */
+/** @returns {boolean} Whether the primary pointer is coarse (touch). */
 export function isTouchDevice() {
   return matchesQuery('(hover: none) and (pointer: coarse)');
 }
 
-/**
- * @returns {boolean} Whether the storefront is being viewed in the Theme Editor.
- */
+/** @returns {boolean} Whether the storefront is being viewed in the Theme Editor. */
 export function isDesignMode() {
   return Boolean(globalThis.Shopify?.designMode || globalThis.Theme?.template?.designMode);
 }
 
-/**
- * @returns {boolean}
- */
+/** @returns {boolean} */
 export function isRTL() {
   return document.documentElement.getAttribute('dir') === 'rtl';
 }
@@ -1014,9 +1004,7 @@ export function unlockScroll() {
   document.querySelector('smooth-scrollbar')?.start?.();
 }
 
-/**
- * @returns {boolean} True while at least one overlay holds a scroll lock.
- */
+/** @returns {boolean} True while at least one overlay holds a scroll lock. */
 export function isScrollLocked() {
   return scrollLockCount > 0;
 }

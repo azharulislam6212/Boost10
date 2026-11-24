@@ -42,25 +42,19 @@ export class VariantPicker extends BaseComponent {
     return this.#current;
   }
 
-  /**
-   * @returns {Object[]}
-   */
+  /** @returns {Object[]} */
   get variants() {
     return this.#variants;
   }
 
-  /**
-   * @returns {string[]} Option names in position order, e.g. ['Flavour', 'Size'].
-   */
+  /** @returns {string[]} Option names in position order, e.g. ['Flavour', 'Size']. */
   get optionNames() {
     return Array.from(this.querySelectorAll('[data-option-name]')).map(
       (node) => node.dataset.optionName
     );
   }
 
-  /**
-   * @returns {string[]} The currently selected value for each option, in order.
-   */
+  /** @returns {string[]} The currently selected value for each option, in order. */
   get selectedOptions() {
     return Array.from(this.querySelectorAll('[data-option-index]')).map((group) => {
       const checked = group.querySelector('input:checked');
@@ -126,7 +120,6 @@ export class VariantPicker extends BaseComponent {
    * A control inside the picker was used.
    *
    * @param {Event} [event]
-   * @private
    */
   #onChange = (event) => {
     const target = event?.target;
@@ -142,8 +135,6 @@ export class VariantPicker extends BaseComponent {
   /**
    * Echo each option's chosen value beside its own heading — the
    * "Choose Flavour :  Fresh Watermelon" line.
-   *
-   * @private
    */
   #syncSelectedLabels() {
     const chosen = this.selectedOptions;
@@ -157,10 +148,7 @@ export class VariantPicker extends BaseComponent {
     }
   }
 
-  /**
-   * @param {Object|null|undefined} variant
-   * @private
-   */
+  /** @param {Object|null|undefined} variant */
   #commit(variant) {
     this.#current = variant || null;
     this.#syncIdInput();
@@ -194,11 +182,7 @@ export class VariantPicker extends BaseComponent {
     );
   }
 
-  /**
-   * Say what is selected, once, to whatever was already listening.
-   *
-   * @private
-   */
+  /** Say what is selected, once, to whatever was already listening. */
   #announceReady() {
     this.dispatch(
       EVENTS.VARIANT_READY,
@@ -213,7 +197,6 @@ export class VariantPicker extends BaseComponent {
   /**
    * @param {string[]} options
    * @returns {Object|undefined}
-   * @private
    */
   #findVariant(options) {
     return this.#variants.find((variant) =>
@@ -221,11 +204,7 @@ export class VariantPicker extends BaseComponent {
     );
   }
 
-  /**
-   * Mark each option value as available, sold out or non-existent.
-   *
-   * @private
-   */
+  /** Mark each option value as available, sold out or non-existent. */
   #markAvailability() {
     const selected = this.selectedOptions;
 
@@ -263,11 +242,7 @@ export class VariantPicker extends BaseComponent {
     }
   }
 
-  /**
-   * Write the chosen id onto every field that carries it.
-   *
-   * @private
-   */
+  /** Write the chosen id onto every field that carries it. */
   #syncIdInput() {
     const inputs = [...this.querySelectorAll('[name="id"]')];
 
@@ -291,7 +266,6 @@ export class VariantPicker extends BaseComponent {
    * bookmarked and refreshed onto the same choice.
    *
    * @param {Object} variant
-   * @private
    */
   #updateUrl(variant) {
     if (this.dataset.updateUrl === 'false') return;
@@ -324,9 +298,7 @@ export class VariantSwatches extends BaseComponent {
 
   /* --------------------------------------------------------- public API -- ---- */
 
-  /**
-   * @returns {HTMLElement[]}
-   */
+  /** @returns {HTMLElement[]} */
   get swatches() {
     return Array.from(this.querySelectorAll('[data-swatch-item]'));
   }
@@ -343,7 +315,6 @@ export class VariantSwatches extends BaseComponent {
 
   /* ---------------------------------------------------------- internals -- ---- */
 
-  /** @private */
   #applyLimit() {
     const limit = Number(this.dataset.maxVisible) || 0;
     const items = this.swatches;
@@ -366,10 +337,7 @@ export class VariantSwatches extends BaseComponent {
     }
   }
 
-  /**
-   * @param {PointerEvent} event
-   * @private
-   */
+  /** @param {PointerEvent} event */
   #onPreview = (event) => {
     const input = event.target instanceof Element ? event.target.closest('label')?.control : null;
     if (!(input instanceof HTMLInputElement) || input.checked) return;
@@ -400,16 +368,12 @@ export class InventoryStatus extends BaseComponent {
     if (picker?.currentVariant) this.render(picker.currentVariant);
   }
 
-  /**
-   * @returns {HTMLElement|Document}
-   */
+  /** @returns {HTMLElement|Document} */
   get root() {
     return this.closest('[data-product-root]') || document;
   }
 
-  /**
-   * @param {Object|null} variant
-   */
+  /** @param {Object|null} variant */
   render(variant) {
     if (!variant) {
       this.hidden = true;
@@ -447,7 +411,6 @@ export class InventoryStatus extends BaseComponent {
    * @param {string} state
    * @param {number} quantity
    * @param {number} threshold
-   * @private
    */
   #renderBar(state, quantity, threshold) {
     const bar = this.refs.bar;
@@ -486,23 +449,17 @@ export class ProductSku extends BaseComponent {
     if (picker?.currentVariant) this.render(picker.currentVariant);
   }
 
-  /**
-   * @returns {HTMLElement|Document}
-   */
+  /** @returns {HTMLElement|Document} */
   get root() {
     return this.closest('[data-product-root]') || document;
   }
 
-  /**
-   * @returns {'sku'|'barcode'}
-   */
+  /** @returns {'sku'|'barcode'} */
   get field() {
     return this.dataset.field === 'barcode' ? 'barcode' : 'sku';
   }
 
-  /**
-   * @param {Object|null} variant
-   */
+  /** @param {Object|null} variant */
   render(variant) {
     const value = variant?.[this.field];
 
@@ -549,9 +506,7 @@ export class PickupAvailability extends BaseComponent {
     this.#request = null;
   }
 
-  /**
-   * @returns {HTMLElement|Document}
-   */
+  /** @returns {HTMLElement|Document} */
   get root() {
     return this.closest('[data-product-root]') || document;
   }

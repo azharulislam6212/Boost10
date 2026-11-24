@@ -113,11 +113,7 @@ export class BackgroundVideo extends BaseComponent {
 
   /* ---------------------------------------------------------- internals -- ---- */
 
-  /**
-   * One observer, two jobs.
-   *
-   * @private
-   */
+  /** One observer, two jobs. */
   #watch() {
     if (!('IntersectionObserver' in window)) {
       this.load();
@@ -140,7 +136,6 @@ export class BackgroundVideo extends BaseComponent {
     this.#observer.observe(this);
   }
 
-  /** @private */
   #unload() {
     const media = this.#media;
     this.#media = null;

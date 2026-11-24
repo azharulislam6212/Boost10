@@ -34,16 +34,12 @@ export class GiftCardRecipientForm extends BaseComponent {
 
   /* --------------------------------------------------------- public API -- ---- */
 
-  /**
-   * @returns {boolean}
-   */
+  /** @returns {boolean} */
   get enabled() {
     return this.refs.toggle.checked;
   }
 
-  /**
-   * @returns {{ email: string, name: string, message: string, sendOn: string }}
-   */
+  /** @returns {{ email: string, name: string, message: string, sendOn: string }} */
   get values() {
     return {
       email: this.refs.email?.value?.trim() ?? '',
@@ -137,11 +133,7 @@ export class GiftCardRecipientForm extends BaseComponent {
 
   /* ---------------------------------------------------------- internals -- ---- */
 
-  /**
-   * Bound the date picker to a sensible window.
-   *
-   * @private
-   */
+  /** Bound the date picker to a sensible window. */
   #constrainDate() {
     const input = this.refs.sendOn;
     if (!(input instanceof HTMLInputElement)) return;
@@ -154,7 +146,6 @@ export class GiftCardRecipientForm extends BaseComponent {
     input.max = max.toISOString().split('T')[0];
   }
 
-  /** @private */
   #renderCounter() {
     const target = this.refs.counter;
     const message = this.refs.message;
@@ -167,7 +158,6 @@ export class GiftCardRecipientForm extends BaseComponent {
   /**
    * @param {HTMLElement} field
    * @param {string} message
-   * @private
    */
   #fail(field, message) {
     this.setAttribute('data-invalid', '');
@@ -179,10 +169,7 @@ export class GiftCardRecipientForm extends BaseComponent {
     announceUrgent(message);
   }
 
-  /**
-   * @param {string} message
-   * @private
-   */
+  /** @param {string} message */
   #error(message) {
     const target = this.refs.error;
 

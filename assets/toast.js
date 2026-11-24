@@ -234,13 +234,11 @@ export class ToastNotification extends ShadowComponent {
 
   /* ---------------------------------------------------------- internals -- ---- */
 
-  /** @private */
   #run() {
     this.#startedAt = Date.now();
     this.#timer = window.setTimeout(() => this.hide(), this.#remaining);
   }
 
-  /** @private */
   #clear() {
     if (this.#timer !== null) window.clearTimeout(this.#timer);
     this.#timer = null;

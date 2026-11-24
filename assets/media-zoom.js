@@ -50,16 +50,12 @@ export class MediaZoom extends BaseComponent {
 
   /* --------------------------------------------------------- public API -- ---- */
 
-  /**
-   * @returns {string} The high-resolution source.
-   */
+  /** @returns {string} The high-resolution source. */
   get zoomSrc() {
     return this.dataset.zoomSrc || this.refs.image?.src || '';
   }
 
-  /**
-   * @returns {number} Magnification factor.
-   */
+  /** @returns {number} Magnification factor. */
   get level() {
     return Number(this.dataset.level) || 2;
   }
@@ -105,10 +101,7 @@ export class MediaZoom extends BaseComponent {
 
   /* ---------------------------------------------------------- internals -- ---- */
 
-  /**
-   * @returns {boolean}
-   * @private
-   */
+  /** @returns {boolean} */
   #usesModal() {
     return isTouchDevice() || this.dataset.mode === 'modal';
   }
@@ -117,7 +110,6 @@ export class MediaZoom extends BaseComponent {
    * Fetch the high-resolution image once, on first use.
    *
    * @returns {Promise<HTMLImageElement|null>}
-   * @private
    */
   #loadZoomImage() {
     if (this.#zoomImage) return Promise.resolve(this.#zoomImage);
@@ -146,7 +138,6 @@ export class MediaZoom extends BaseComponent {
    * Translate the magnified image so the point under the cursor stays put.
    *
    * @param {PointerEvent} event
-   * @private
    */
   #onPointerMove = (event) => {
     if (!this.#active) return;
@@ -240,16 +231,12 @@ export class MediaZoomModal extends ModalDialog {
     await this.open(trigger);
   }
 
-  /**
-   * @param {number} delta
-   */
+  /** @param {number} delta */
   zoomBy(delta) {
     this.setScale(this.#scale + delta);
   }
 
-  /**
-   * @param {number} scale
-   */
+  /** @param {number} scale */
   setScale(scale) {
     this.#scale = clamp(scale, 1, 4);
 
@@ -261,9 +248,7 @@ export class MediaZoomModal extends ModalDialog {
     if (this.refs.zoomOut instanceof HTMLButtonElement) this.refs.zoomOut.disabled = this.#scale <= 1;
   }
 
-  /**
-   * @returns {number}
-   */
+  /** @returns {number} */
   get scale() {
     return this.#scale;
   }
@@ -274,14 +259,12 @@ export class MediaZoomModal extends ModalDialog {
 
   /* ---------------------------------------------------------- internals -- ---- */
 
-  /** @private */
   #reset() {
     this.#scale = 1;
     this.#offset = { x: 0, y: 0 };
     this.#paint();
   }
 
-  /** @private */
   #paint() {
     const image = this.refs.image;
     if (!(image instanceof HTMLElement)) return;
@@ -304,7 +287,6 @@ export class MediaZoomModal extends ModalDialog {
    * element — which it will, because a zoomed image is bigger than its frame.
    *
    * @param {PointerEvent} event
-   * @private
    */
   #onPointerDown = (event) => {
     if (this.#scale <= 1) return;

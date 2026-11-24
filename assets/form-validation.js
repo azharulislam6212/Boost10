@@ -40,16 +40,12 @@ export class ValidatedForm extends BaseComponent {
 
   /* --------------------------------------------------------- public API -- ---- */
 
-  /**
-   * @returns {HTMLFormElement|null}
-   */
+  /** @returns {HTMLFormElement|null} */
   get form() {
     return this.querySelector('form');
   }
 
-  /**
-   * @returns {HTMLElement[]}
-   */
+  /** @returns {HTMLElement[]} */
   get fields() {
     return Array.from(this.form?.querySelectorAll(FIELD_SELECTOR) ?? []);
   }
@@ -124,10 +120,7 @@ export class ValidatedForm extends BaseComponent {
 
   /* ---------------------------------------------------------- internals -- ---- */
 
-  /**
-   * @param {SubmitEvent} event
-   * @private
-   */
+  /** @param {SubmitEvent} event */
   #onSubmit = (event) => {
     this.#submitted = true;
 
@@ -140,7 +133,6 @@ export class ValidatedForm extends BaseComponent {
   /**
    * @param {HTMLElement} field
    * @returns {boolean}
-   * @private
    */
   #isIncompleteEmail(field) {
     return field.type === 'email' && field.value !== '' && !EMAIL_PATTERN.test(field.value.trim());
@@ -152,7 +144,6 @@ export class ValidatedForm extends BaseComponent {
    *
    * @param {HTMLElement} field
    * @returns {string}
-   * @private
    */
   #labelFor(field) {
     const explicit = field.id ? this.querySelector(`label[for="${CSS.escape(field.id)}"]`) : null;
@@ -167,7 +158,6 @@ export class ValidatedForm extends BaseComponent {
   /**
    * @param {HTMLElement} field
    * @param {string} message
-   * @private
    */
   #showError(field, message) {
     const id = this.#errorId(field);
@@ -192,10 +182,7 @@ export class ValidatedForm extends BaseComponent {
     field.setAttribute('aria-describedby', `${described} ${id}`.trim());
   }
 
-  /**
-   * @param {HTMLElement} field
-   * @private
-   */
+  /** @param {HTMLElement} field */
   #clearError(field) {
     const id = this.#errorId(field);
     const target = this.querySelector(`#${CSS.escape(id)}`);
@@ -215,7 +202,6 @@ export class ValidatedForm extends BaseComponent {
   /**
    * @param {HTMLElement} field
    * @returns {string}
-   * @private
    */
   #errorId(field) {
     const base = field.id || field.name || 'field';

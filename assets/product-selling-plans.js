@@ -44,16 +44,12 @@ export class SellingPlanSelector extends BaseComponent {
 
   /* --------------------------------------------------------- public API -- ---- */
 
-  /**
-   * @returns {HTMLElement|Document}
-   */
+  /** @returns {HTMLElement|Document} */
   get root() {
     return this.closest('[data-product-root]') || document;
   }
 
-  /**
-   * @returns {string} The selected plan id, or '' for a one-time purchase.
-   */
+  /** @returns {string} The selected plan id, or '' for a one-time purchase. */
   get value() {
     const checked = this.querySelector('input[name="purchase-option"]:checked');
 
@@ -68,16 +64,12 @@ export class SellingPlanSelector extends BaseComponent {
     return select instanceof HTMLSelectElement ? select.value : '';
   }
 
-  /**
-   * @returns {boolean}
-   */
+  /** @returns {boolean} */
   get isSubscription() {
     return this.value !== '';
   }
 
-  /**
-   * @returns {Object|null} The full allocation for the selected plan.
-   */
+  /** @returns {Object|null} The full allocation for the selected plan. */
   get currentPlan() {
     const id = this.value;
     if (!id) return null;
@@ -146,7 +138,6 @@ export class SellingPlanSelector extends BaseComponent {
 
   /* ---------------------------------------------------------- internals -- ---- */
 
-  /** @private */
   #onChange = () => {
     this.#commit(this.value);
   };
@@ -154,7 +145,6 @@ export class SellingPlanSelector extends BaseComponent {
   /**
    * @param {string} value
    * @param {{ silent?: boolean }} [options]
-   * @private
    */
   #commit(value, { silent = false } = {}) {
     const subscribing = value !== '';
@@ -186,7 +176,6 @@ export class SellingPlanSelector extends BaseComponent {
    * Rebuild the interval options for the current variant.
    *
    * @param {Array<Object>} plans
-   * @private
    */
   #renderIntervals(plans) {
     const select = this.refs.interval;
@@ -204,10 +193,7 @@ export class SellingPlanSelector extends BaseComponent {
     );
   }
 
-  /**
-   * @param {boolean} available
-   * @private
-   */
+  /** @param {boolean} available */
   #setSubscriptionAvailable(available) {
     if (this.refs.subscribe instanceof HTMLInputElement) {
       this.refs.subscribe.disabled = !available;
@@ -222,10 +208,7 @@ export class SellingPlanSelector extends BaseComponent {
     this.toggleAttribute('data-no-plans', !available);
   }
 
-  /**
-   * @param {string} value
-   * @private
-   */
+  /** @param {string} value */
   #renderSummary(value) {
     const target = this.refs.summary;
     if (!(target instanceof HTMLElement)) return;

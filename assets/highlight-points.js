@@ -100,11 +100,7 @@ export class HighlightPoints extends BaseComponent {
     return clamp(percent, 10, 100) / 100;
   }
 
-  /**
-   * Measure, map, and light one point.
-   *
-   * @private
-   */
+  /** Measure, map, and light one point. */
   #update() {
     if (this.#holdUntil !== null) {
       if (Date.now() < this.#holdUntil) return;
@@ -157,7 +153,6 @@ export class HighlightPoints extends BaseComponent {
    * screen the whole run of them asks for.
    *
    * @returns {{ centres: number[], span: number }}
-   * @private
    */
   #measure() {
     const points = this.#points;
@@ -181,10 +176,7 @@ export class HighlightPoints extends BaseComponent {
     return geometry;
   }
 
-  /**
-   * @param {number} index
-   * @private
-   */
+  /** @param {number} index */
   #apply(index) {
     if (index === this.#index) return;
     this.#index = index;

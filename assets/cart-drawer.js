@@ -120,9 +120,7 @@ export const cart = {
    */
   _sections: new Map(),
 
-  /**
-   * @param {string} sectionId
-   */
+  /** @param {string} sectionId */
   registerSection(sectionId) {
     const id = resolveSectionId(sectionId);
     if (!id) return;
@@ -130,9 +128,7 @@ export const cart = {
     this._sections.set(id, (this._sections.get(id) ?? 0) + 1);
   },
 
-  /**
-   * @param {string} sectionId
-   */
+  /** @param {string} sectionId */
   unregisterSection(sectionId) {
     const id = resolveSectionId(sectionId);
     const count = this._sections.get(id);
@@ -142,9 +138,7 @@ export const cart = {
     else this._sections.delete(id);
   },
 
-  /**
-   * @returns {string[]}
-   */
+  /** @returns {string[]} */
   get sections() {
     return Array.from(this._sections.keys());
   },
@@ -334,9 +328,7 @@ export const cart = {
     return data;
   },
 
-  /**
-   * @returns {string} Checkout URL, carrying the stored discount code.
-   */
+  /** @returns {string} Checkout URL, carrying the stored discount code. */
   get checkoutUrl() {
     const base = getRoute('cart') + '/checkout';
     const code = this.state?.attributes?.discount_code;
@@ -378,9 +370,7 @@ export const cart = {
     return this.state;
   },
 
-  /**
-   * @returns {number}
-   */
+  /** @returns {number} */
   get itemCount() {
     return this.state?.item_count ?? 0;
   },
@@ -391,7 +381,6 @@ export const cart = {
    * @param {string} url
    * @param {Object} body
    * @returns {Promise<Object>}
-   * @private
    */
   async _post(url, body) {
     this._request?.abort();
@@ -429,7 +418,6 @@ export const cart = {
   /**
    * @param {Object} sections
    * @returns {string[]} The ids that were placed on the page.
-   * @private
    */
   _applySections(sections) {
     if (!sections) return [];
@@ -439,7 +427,6 @@ export const cart = {
   /**
    * @param {string} type
    * @param {Object} detail
-   * @private
    */
   _dispatch(type, detail) {
     this.host.dispatchEvent(new CustomEvent(type, { detail, bubbles: true, composed: true }));
@@ -449,7 +436,6 @@ export const cart = {
    * Show the customer what just happened, in whichever way the merchant chose.
    *
    * @param {Object} added
-   * @private
    */
   async _reveal(added) {
     const behaviour = window.Theme?.settings?.cartType || 'drawer';
@@ -573,19 +559,14 @@ export class CartDrawer extends DrawerComponent {
     return cart.updateNote(note);
   }
 
-  /**
-   * @returns {Promise<Object>}
-   */
+  /** @returns {Promise<Object>} */
   refresh() {
     return cart.refresh();
   }
 
   /* ---------------------------------------------------------- internals -- ---- */
 
-  /**
-   * @param {SubmitEvent} event
-   * @private
-   */
+  /** @param {SubmitEvent} event */
   #onQuickAdd = async (event) => {
     const form = event.target;
     if (!(form instanceof HTMLFormElement) || !form.matches('[data-quick-add-form]')) return;
@@ -608,10 +589,7 @@ export class CartDrawer extends DrawerComponent {
     }
   };
 
-  /**
-   * @param {CustomEvent} event
-   * @private
-   */
+  /** @param {CustomEvent} event */
   #onCartError = async (event) => {
     const { toast } = await import('@theme/toast');
     toast(event.detail?.message || themeString('cartError', ''), { type: 'error' });
@@ -652,9 +630,7 @@ export class CartUpsell extends BaseComponent {
     this.#request = null;
   }
 
-  /**
-   * @returns {string|null}
-   */
+  /** @returns {string|null} */
   get productId() {
     return this.dataset.productId || null;
   }
@@ -717,10 +693,7 @@ export class CartUpsell extends BaseComponent {
 
   /* ---------------------------------------------------------- internals -- ---- */
 
-  /**
-   * @param {Object[]} products
-   * @private
-   */
+  /** @param {Object[]} products */
   #render(products) {
     const template = this.refs.template;
     const list = this.refs.list;
@@ -788,10 +761,7 @@ export class CartUpsell extends BaseComponent {
     this.removeAttribute('hidden');
   }
 
-  /**
-   * @param {MouseEvent} event
-   * @private
-   */
+  /** @param {MouseEvent} event */
   #onClick = async (event) => {
     const button = event.target instanceof Element ? event.target.closest('[data-upsell-add]') : null;
     if (!(button instanceof HTMLElement)) return;
@@ -841,23 +811,17 @@ export class CartFreeGift extends BaseComponent {
     this.render(window.Theme?.cart);
   }
 
-  /**
-   * @returns {number} Threshold in cents.
-   */
+  /** @returns {number} Threshold in cents. */
   get threshold() {
     return Number(this.dataset.threshold) || 0;
   }
 
-  /**
-   * @returns {string|null}
-   */
+  /** @returns {string|null} */
   get variantId() {
     return this.dataset.variantId || null;
   }
 
-  /**
-   * @returns {boolean}
-   */
+  /** @returns {boolean} */
   get claimed() {
     return this.dataset.claimed === 'true';
   }
@@ -889,9 +853,7 @@ export class CartFreeGift extends BaseComponent {
     }
   }
 
-  /**
-   * @param {Object} [state] The cart, as returned by Shopify.
-   */
+  /** @param {Object} [state] The cart, as returned by Shopify. */
   render(state) {
     const subtotal = Number(state?.items_subtotal_price ?? 0);
     const remaining = Math.max(0, this.threshold - subtotal);

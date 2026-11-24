@@ -133,7 +133,6 @@ export class NavMenu extends BaseComponent {
    * Flip a nested flyout to the other side when it would leave the viewport.
    *
    * @param {HTMLDetailsElement} details
-   * @private
    */
   #placeFlyout(details) {
     const panel = panelOf(details);
@@ -174,7 +173,6 @@ export class NavMenu extends BaseComponent {
    * Bind hover intent to one disclosure, once.
    *
    * @param {HTMLDetailsElement} details
-   * @private
    */
   #bindHover(details) {
     if (this.#bound.has(details)) return;
@@ -191,7 +189,6 @@ export class NavMenu extends BaseComponent {
    * @param {HTMLElement} panel
    * @param {string} name
    * @returns {HTMLDetailsElement|null}
-   * @private
    */
   #promote(link, panel, name) {
     const item = link.closest('.nav__item');
@@ -228,11 +225,7 @@ export class NavMenu extends BaseComponent {
     return details;
   }
 
-  /**
-   * Watch the bay so a panel that arrives late still finds its menu item.
-   *
-   * @private
-   */
+  /** Watch the bay so a panel that arrives late still finds its menu item. */
   #watchBay() {
     const bay = this.closest('sticky-header')?.querySelector('[data-nav-bay]');
     if (!bay) return;
@@ -248,7 +241,6 @@ export class NavMenu extends BaseComponent {
     this.#bayObserver.observe(bay, { childList: true, subtree: true });
   }
 
-  /** @private */
   #relocatePanels() {
     const bay = this.closest('sticky-header')?.querySelector('[data-nav-bay]');
     if (!bay) return;
@@ -293,7 +285,6 @@ export class NavMenu extends BaseComponent {
    * @param {Event} event
    * @param {HTMLDetailsElement} details
    * @param {boolean} entering
-   * @private
    */
   #onPointer(event, details, entering) {
     if (window.matchMedia('(hover: none)').matches) return;
@@ -309,10 +300,7 @@ export class NavMenu extends BaseComponent {
     );
   }
 
-  /**
-   * @param {KeyboardEvent} event
-   * @private
-   */
+  /** @param {KeyboardEvent} event */
   #onKeydown(event) {
     const target = /** @type {Element|null} */ (event.target);
 
@@ -370,7 +358,6 @@ export class NavMenu extends BaseComponent {
    * sub dropdown plays when it opens rather than with its parent.
    *
    * @param {HTMLDetailsElement} details
-   * @private
    */
   #playPanel(details) {
     const panel = panelOf(details);
@@ -412,7 +399,6 @@ export class NavMenu extends BaseComponent {
    * Move focus to the first link in a panel once it is rendered.
    *
    * @param {HTMLDetailsElement} details
-   * @private
    */
   #focusFirstLink(details) {
     requestAnimationFrame(() => {
@@ -421,7 +407,6 @@ export class NavMenu extends BaseComponent {
     });
   }
 
-  /** @private */
   #clearHover() {
     if (this.#hoverTimer === null) return;
     window.clearTimeout(this.#hoverTimer);
@@ -477,11 +462,7 @@ export class MobileNav extends BaseComponent {
 
   /* ---------------------------------------------------------- internals -- ---- */
 
-  /**
-   * Copy each mega menu panel that opted into mobile into its placeholder.
-   *
-   * @private
-   */
+  /** Copy each mega menu panel that opted into mobile into its placeholder. */
   #adoptMegaPanels() {
     const placeholders = this.querySelectorAll('[data-mobile-mega]');
     if (placeholders.length === 0) return;
@@ -515,7 +496,6 @@ export class MobileNav extends BaseComponent {
     }
   }
 
-  /** @private */
   #setupAccordion() {
     this.delegate('click', 'summary', (event, summary) => {
       const details = /** @type {HTMLDetailsElement|null} */ (summary.closest('[data-mobile-details]'));
@@ -537,7 +517,6 @@ export class MobileNav extends BaseComponent {
     });
   }
 
-  /** @private */
   #setupSlide() {
     this.#stack = [];
     this.#applySlideState();
@@ -564,18 +543,13 @@ export class MobileNav extends BaseComponent {
     });
   }
 
-  /**
-   * Match the container to the active screen.
-   *
-   * @private
-   */
+  /** Match the container to the active screen. */
   #resize() {
     const screen = this.querySelector('[data-menu-panel][data-active]');
     if (!(screen instanceof HTMLElement)) return;
     this.style.blockSize = `${screen.scrollHeight}px`;
   }
 
-  /** @private */
   #applySlideState() {
     const active = this.#stack[this.#stack.length - 1] || null;
 
@@ -706,7 +680,6 @@ export class MarketPicker extends BaseComponent {
     this.#closeTimer = window.setTimeout(finish, 400);
   }
 
-  /** @private */
   #filter() {
     const term = /** @type {HTMLInputElement} */ (this.refs.filter).value.trim().toLowerCase();
     let shown = 0;
@@ -802,11 +775,7 @@ export class AccountAnchor extends BaseComponent {
     );
   }
 
-  /**
-   * Adds the one rule the component does not expose a variable for, once.
-   *
-   * @private
-   */
+  /** Adds the one rule the component does not expose a variable for, once. */
   #injectPlacementRule() {
     if (this.#styled) return;
 

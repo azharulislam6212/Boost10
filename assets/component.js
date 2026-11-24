@@ -258,9 +258,7 @@ export class BaseComponent extends HTMLElement {
     return true;
   }
 
-  /**
-   * @returns {Record<string, HTMLElement|HTMLElement[]>}
-   */
+  /** @returns {Record<string, HTMLElement|HTMLElement[]>} */
   #collectRefs() {
     /** @type {Record<string, HTMLElement|HTMLElement[]>} */
     const refs = {};
@@ -288,9 +286,7 @@ export class BaseComponent extends HTMLElement {
     return refs;
   }
 
-  /**
-   * @returns {boolean}
-   */
+  /** @returns {boolean} */
   #validateRefs() {
     const required = /** @type {typeof BaseComponent} */ (this.constructor).requiredRefs;
     if (!required?.length) return true;

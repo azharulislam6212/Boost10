@@ -51,25 +51,19 @@ export class FacetFilters extends BaseComponent {
 
   /* --------------------------------------------------------- public API -- ---- */
 
-  /**
-   * @returns {string} The section id to re-render.
-   */
+  /** @returns {string} The section id to re-render. */
   get sectionId() {
     return this.dataset.sectionId || '';
   }
 
-  /**
-   * @returns {ResultsList|null} The results container this instance drives.
-   */
+  /** @returns {ResultsList|null} The results container this instance drives. */
   get results() {
     const id = this.dataset.results;
     const element = id ? document.getElementById(id) : null;
     return element?.closest('results-list') || document.querySelector('results-list');
   }
 
-  /**
-   * @returns {number} How many filter values are currently selected.
-   */
+  /** @returns {number} How many filter values are currently selected. */
   get activeCount() {
     return this.#selectedInputs().length;
   }
@@ -192,10 +186,7 @@ export class FacetFilters extends BaseComponent {
 
   /* ---------------------------------------------------------- internals -- ---- */
 
-  /**
-   * @returns {HTMLInputElement[]}
-   * @private
-   */
+  /** @returns {HTMLInputElement[]} */
   #selectedInputs() {
     return Array.from(this.refs.form.elements).filter((element) => {
       if (!(element instanceof HTMLInputElement) && !(element instanceof HTMLSelectElement)) return false;
@@ -213,7 +204,6 @@ export class FacetFilters extends BaseComponent {
    * Re-render the filter controls themselves.
    *
    * @param {string} html
-   * @private
    */
   #updateFilterMarkup(html) {
     const parsed = new DOMParser().parseFromString(html, 'text/html');
@@ -228,7 +218,6 @@ export class FacetFilters extends BaseComponent {
     if (drawer && nextForm && drawer !== this.refs.form) morph(drawer, nextForm.cloneNode(true));
   }
 
-  /** @private */
   #syncActiveCount() {
     const count = this.activeCount;
 
@@ -244,10 +233,7 @@ export class FacetFilters extends BaseComponent {
     }
   }
 
-  /**
-   * @param {Event} event
-   * @private
-   */
+  /** @param {Event} event */
   #onChange = (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
@@ -257,10 +243,7 @@ export class FacetFilters extends BaseComponent {
     this.apply();
   };
 
-  /**
-   * @param {MouseEvent} event
-   * @private
-   */
+  /** @param {MouseEvent} event */
   #onClick = (event) => {
     const target = event.target instanceof Element ? event.target : null;
     if (!target) return;
@@ -282,10 +265,7 @@ export class FacetFilters extends BaseComponent {
     }
   };
 
-  /**
-   * @param {boolean} loading
-   * @private
-   */
+  /** @param {boolean} loading */
   #setLoading(loading) {
     this.toggleAttribute('data-loading', loading);
     this.refs.form.setAttribute('aria-busy', loading ? 'true' : 'false');
@@ -394,23 +374,17 @@ export class PriceRange extends BaseComponent {
 
   /* --------------------------------------------------------- public API -- ---- */
 
-  /**
-   * @returns {number} Lowest selectable price, in cents.
-   */
+  /** @returns {number} Lowest selectable price, in cents. */
   get floor() {
     return Number(this.dataset.min) || 0;
   }
 
-  /**
-   * @returns {number} Highest selectable price, in cents.
-   */
+  /** @returns {number} Highest selectable price, in cents. */
   get ceiling() {
     return Number(this.dataset.max) || 0;
   }
 
-  /**
-   * @returns {{ min: number|null, max: number|null }} Values in cents.
-   */
+  /** @returns {{ min: number|null, max: number|null }} Values in cents. */
   get value() {
     const min = this.refs.min.value === '' ? null : Number(this.refs.min.value) * 100;
     const max = this.refs.max.value === '' ? null : Number(this.refs.max.value) * 100;
@@ -450,7 +424,6 @@ export class PriceRange extends BaseComponent {
    *
    * @param {HTMLInputElement} input
    * @returns {boolean}
-   * @private
    */
   #isSettled(input) {
     return input.validity.valid && !/[.,]$/.test(input.value);
@@ -460,7 +433,6 @@ export class PriceRange extends BaseComponent {
    * Stop the two ends crossing.
    *
    * @param {HTMLInputElement} edited
-   * @private
    */
   #clampAgainstEachOther(edited) {
     const min = this.refs.min;
@@ -480,7 +452,6 @@ export class PriceRange extends BaseComponent {
     }
   }
 
-  /** @private */
   #paint() {
     const span = this.ceiling - this.floor;
     if (span <= 0) return;
@@ -522,9 +493,7 @@ export class SortBy extends BaseComponent {
     this.on(this.refs.select, 'change', () => this.apply());
   }
 
-  /**
-   * @returns {string}
-   */
+  /** @returns {string} */
   get value() {
     return this.refs.select.value;
   }
@@ -573,9 +542,7 @@ export class LayoutToggle extends BaseComponent {
     this.select('grid', { announce: false });
   }
 
-  /**
-   * @returns {HTMLElement|null}
-   */
+  /** @returns {HTMLElement|null} */
   get target() {
     const id = this.dataset.target;
     return (id && document.getElementById(id)) || this.closest('results-list')?.querySelector('[data-product-grid]') || null;

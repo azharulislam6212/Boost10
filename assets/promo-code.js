@@ -119,7 +119,6 @@ export class PromoCode extends BaseComponent {
    * @param {number|null} amount
    * @param {boolean} pending
    * @returns {HTMLElement}
-   * @private
    */
   #row(code, amount, pending) {
     const item = document.createElement('li');
@@ -156,19 +155,13 @@ export class PromoCode extends BaseComponent {
     return item;
   }
 
-  /**
-   * @param {SubmitEvent} event
-   * @private
-   */
+  /** @param {SubmitEvent} event */
   #onSubmit = (event) => {
     event.preventDefault();
     this.apply(this.refs.input.value);
   };
 
-  /**
-   * @param {MouseEvent} event
-   * @private
-   */
+  /** @param {MouseEvent} event */
   #onClick = (event) => {
     const trigger = event.target instanceof Element ? event.target.closest('[data-remove-discount]') : null;
     if (!trigger) return;
@@ -177,10 +170,7 @@ export class PromoCode extends BaseComponent {
     this.remove();
   };
 
-  /**
-   * @param {boolean} busy
-   * @private
-   */
+  /** @param {boolean} busy */
   #busy(busy) {
     this.setAttribute('aria-busy', busy ? 'true' : 'false');
     if (this.refs.submit instanceof HTMLButtonElement) this.refs.submit.disabled = busy;
@@ -190,7 +180,6 @@ export class PromoCode extends BaseComponent {
   /**
    * @param {string} text
    * @param {boolean} [isError=false]
-   * @private
    */
   #message(text, isError = false) {
     const target = this.refs.message;
@@ -205,7 +194,6 @@ export class PromoCode extends BaseComponent {
 /**
  * @param {number} cents
  * @returns {string}
- * @private
  */
 function formatAmount(cents) {
   return window.Theme?.shop?.moneyFormat

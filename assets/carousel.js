@@ -435,9 +435,7 @@ export class CarouselSlider extends BaseComponent {
     this.#rebuild();
   }
 
-  /**
-   * @param {string} name
-   */
+  /** @param {string} name */
   attributeChanged(name) {
     if (name !== 'data-options') return;
 
@@ -835,9 +833,7 @@ export class CarouselSlider extends BaseComponent {
     this.#settle();
   }
 
-  /**
-   * @param {number} direction 1 or -1.
-   */
+  /** @param {number} direction 1 or -1. */
   #step(direction) {
     if (!this.running || this.hasAttribute('data-locked')) return;
 
@@ -1118,9 +1114,7 @@ export class CarouselSlider extends BaseComponent {
 
   /* -------------------------------------------------------- thumbnails -- ---- */
 
-  /**
-   * @param {number} current
-   */
+  /** @param {number} current */
   #updateThumbs(current) {
     const thumbs = this.#thumbs;
     if (!thumbs.length) return;
@@ -1415,9 +1409,7 @@ export class CarouselSlider extends BaseComponent {
 
   /* ------------------------------------------------------------- input -- ---- */
 
-  /**
-   * @param {KeyboardEvent} event
-   */
+  /** @param {KeyboardEvent} event */
   #onKeydown(event) {
     const vertical = this.direction === 'vertical';
 
@@ -1436,9 +1428,7 @@ export class CarouselSlider extends BaseComponent {
     action();
   }
 
-  /**
-   * @param {PointerEvent} event
-   */
+  /** @param {PointerEvent} event */
   #onPointerDown(event) {
     if (event.button !== 0 || !this.running || this.hasAttribute('data-locked')) return;
 
@@ -1454,9 +1444,7 @@ export class CarouselSlider extends BaseComponent {
     };
   }
 
-  /**
-   * @param {PointerEvent} event
-   */
+  /** @param {PointerEvent} event */
   #onPointerMove(event) {
     const pointer = this.#pointer;
     if (pointer.id === null || event.pointerId !== pointer.id) return;
@@ -1505,9 +1493,7 @@ export class CarouselSlider extends BaseComponent {
     }
   }
 
-  /**
-   * @param {PointerEvent} event
-   */
+  /** @param {PointerEvent} event */
   #onPointerEnd(event) {
     const pointer = this.#pointer;
     if (pointer.id === null || event.pointerId !== pointer.id) return;

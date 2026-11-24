@@ -71,9 +71,7 @@ export class AccordionElement extends BaseComponent {
 
   /* --------------------------------------------------------- public API -- ---- */
 
-  /**
-   * @param {HTMLDetailsElement} item
-   */
+  /** @param {HTMLDetailsElement} item */
   open(item) {
     const running = this.#animations.get(item);
 
@@ -90,9 +88,7 @@ export class AccordionElement extends BaseComponent {
     this.#animateOpen(item);
   }
 
-  /**
-   * @param {HTMLDetailsElement} item
-   */
+  /** @param {HTMLDetailsElement} item */
   close(item) {
     if (this.#animations.get(item)?.direction === 'close') return;
     if (!item.open) return;
@@ -106,9 +102,7 @@ export class AccordionElement extends BaseComponent {
     }
   }
 
-  /**
-   * @returns {number|null} The width below which this group collapses.
-   */
+  /** @returns {number|null} The width below which this group collapses. */
   get collapseBelow() {
     const value = Number(this.dataset.collapseBelow);
     return Number.isFinite(value) && value > 0 ? value : null;
@@ -116,11 +110,7 @@ export class AccordionElement extends BaseComponent {
 
   /* ---------------------------------------------------------- internals -- ---- */
 
-  /**
-   * Open everything above the breakpoint, restore the authored state below it.
-   *
-   * @private
-   */
+  /** Open everything above the breakpoint, restore the authored state below it. */
   #watchBreakpoint() {
     const width = this.collapseBelow;
     if (width === null) return;
@@ -154,7 +144,6 @@ export class AccordionElement extends BaseComponent {
    * Every disclosure this group owns, at any depth.
    *
    * @returns {HTMLDetailsElement[]}
-   * @private
    */
   #items() {
     const found = this.querySelectorAll('details:not([data-no-collapse])');
@@ -165,7 +154,6 @@ export class AccordionElement extends BaseComponent {
   /**
    * @param {HTMLDetailsElement} item
    * @returns {HTMLElement|null}
-   * @private
    */
   #panelOf(item) {
     return item.querySelector(':scope > *:not(summary)');
@@ -174,7 +162,6 @@ export class AccordionElement extends BaseComponent {
   /**
    * @param {MouseEvent} event
    * @param {HTMLDetailsElement} item
-   * @private
    */
   #onSummaryClick(event, item) {
     if (this.hasAttribute('data-static')) {
@@ -201,10 +188,7 @@ export class AccordionElement extends BaseComponent {
     }
   }
 
-  /**
-   * @param {HTMLDetailsElement} item
-   * @private
-   */
+  /** @param {HTMLDetailsElement} item */
   #animateOpen(item) {
     const panel = this.#panelOf(item);
     if (!panel || prefersReducedMotion()) return;
@@ -227,7 +211,6 @@ export class AccordionElement extends BaseComponent {
    *
    * @param {HTMLDetailsElement} item
    * @returns {number}
-   * @private
    */
   #closedHeight(item) {
     const panel = this.#panelOf(item);
@@ -253,7 +236,6 @@ export class AccordionElement extends BaseComponent {
    * @param {HTMLElement} panel
    * @param {number} duration
    * @param {string} easing
-   * @private
    */
   #run(item, direction, start, end, panel, duration, easing) {
     const animation = item.animate([{ height: `${start}px` }, { height: `${end}px` }], {
@@ -290,7 +272,6 @@ export class AccordionElement extends BaseComponent {
    *
    * @param {HTMLDetailsElement} item
    * @param {boolean} on
-   * @private
    */
   #clip(item, on) {
     if (on) {
@@ -313,10 +294,7 @@ export class AccordionElement extends BaseComponent {
     delete item.dataset.accordionClipped;
   }
 
-  /**
-   * @param {HTMLDetailsElement} item
-   * @private
-   */
+  /** @param {HTMLDetailsElement} item */
   #animateClose(item) {
     const panel = this.#panelOf(item);
 
@@ -381,11 +359,7 @@ export class FooterColumns extends AccordionElement {
     }
   }
 
-  /**
-   * Coalesce measurements to one per frame.
-   *
-   * @private
-   */
+  /** Coalesce measurements to one per frame. */
   #schedule(reset = false) {
     if (reset) this.#passes = 0;
     if (this.#pending) return;
@@ -406,7 +380,6 @@ export class FooterColumns extends AccordionElement {
     this.#pending = 0;
   }
 
-  /** @private */
   #measure() {
     const children = Array.from(this.children);
     const columns = children.filter((el) => el.classList.contains('footer-column'));
@@ -476,7 +449,6 @@ export class FooterColumns extends AccordionElement {
    * How many grid rows the card covers.
    *
    * @returns {number}
-   * @private
    */
   #rowCount() {
     const inside = Array.from(this.children).filter(
@@ -535,19 +507,14 @@ export class TabsElement extends BaseComponent {
     this.dataset.selected = String(index);
   }
 
-  /**
-   * @returns {number}
-   */
+  /** @returns {number} */
   get selectedIndex() {
     return Number(this.dataset.selected) || 0;
   }
 
   /* ---------------------------------------------------------- internals -- ---- */
 
-  /**
-   * @returns {HTMLElement[]}
-   * @private
-   */
+  /** @returns {HTMLElement[]} */
   #tabs() {
     const list = this.querySelector('[role="tablist"]') ?? this;
     return /** @type {HTMLElement[]} */ ([...list.querySelectorAll('[role="tab"]')]);
@@ -558,7 +525,6 @@ export class TabsElement extends BaseComponent {
    * two are paired by index in `select()`.
    *
    * @returns {HTMLElement[]}
-   * @private
    */
   #panels() {
     return /** @type {HTMLElement[]} */ ([...this.querySelectorAll('[role="tabpanel"]')]);
@@ -567,7 +533,6 @@ export class TabsElement extends BaseComponent {
   /**
    * @param {KeyboardEvent} event
    * @param {number} index
-   * @private
    */
   #onKeydown(event, index) {
     const tabs = this.#tabs();
@@ -629,9 +594,7 @@ export class ShowMore extends BaseComponent {
 
   /* --------------------------------------------------------- public API -- ---- */
 
-  /**
-   * @returns {boolean}
-   */
+  /** @returns {boolean} */
   get expanded() {
     return this.refs.button.getAttribute('aria-expanded') === 'true';
   }
@@ -650,10 +613,7 @@ export class ShowMore extends BaseComponent {
 
   /* ---------------------------------------------------------- internals -- ---- */
 
-  /**
-   * @param {boolean} expanded
-   * @private
-   */
+  /** @param {boolean} expanded */
   #setExpanded(expanded) {
     const content = this.refs.content;
     const button = this.refs.button;
@@ -680,15 +640,11 @@ export class ShowMore extends BaseComponent {
     }
   }
 
-  /**
-   * @returns {number}
-   * @private
-   */
+  /** @returns {number} */
   #threshold() {
     return Number(this.dataset.height) || 180;
   }
 
-  /** @private */
   #measure() {
     const content = this.refs.content;
     const button = this.refs.button;
@@ -830,16 +786,13 @@ export class DeferredMedia extends BaseComponent {
     return media instanceof HTMLElement ? media : null;
   }
 
-  /**
-   * @returns {boolean}
-   */
+  /** @returns {boolean} */
   get loaded() {
     return this.#loaded;
   }
 
   /* ---------------------------------------------------------- internals -- ---- */
 
-  /** @private */
   #loadWhenVisible() {
     if (!('IntersectionObserver' in window)) {
       this.load();
@@ -882,24 +835,17 @@ export class ShareButton extends BaseComponent {
     this.#timer = null;
   }
 
-  /**
-   * @returns {string}
-   */
+  /** @returns {string} */
   get url() {
     return this.dataset.url || window.location.href;
   }
 
-  /**
-   * @returns {string}
-   */
+  /** @returns {string} */
   get title() {
     return this.dataset.title || document.title;
   }
 
-  /**
-   * @param {MouseEvent} event
-   * @private
-   */
+  /** @param {MouseEvent} event */
   #onClick = async (event) => {
     event.preventDefault();
 
@@ -931,10 +877,7 @@ export class ShareButton extends BaseComponent {
     }
   }
 
-  /**
-   * @param {string} message
-   * @private
-   */
+  /** @param {string} message */
   #confirm(message) {
     announce(message);
 
@@ -950,11 +893,7 @@ export class ShareButton extends BaseComponent {
     }, 3000);
   }
 
-  /**
-   * Put the URL on screen and select it, so it can be copied by hand.
-   *
-   * @private
-   */
+  /** Put the URL on screen and select it, so it can be copied by hand. */
   #selectFallback() {
     const feedback = this.refs.feedback;
     if (!(feedback instanceof HTMLElement)) {

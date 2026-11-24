@@ -145,9 +145,7 @@ class PriceBreakComponent extends BaseComponent {
 
   /* --------------------------------------------------------- public API -- ---- */
 
-  /**
-   * @returns {HTMLElement|Document}
-   */
+  /** @returns {HTMLElement|Document} */
   get root() {
     return this.closest('[data-product-root]') || document;
   }
@@ -184,16 +182,12 @@ class PriceBreakComponent extends BaseComponent {
     return this.inCart + Math.max(0, this.#quantity);
   }
 
-  /**
-   * @returns {number}
-   */
+  /** @returns {number} */
   get inCart() {
     return cartQuantity(this.#cart, this.#variantId);
   }
 
-  /**
-   * @returns {number} Unit price in cents at the quantity in play.
-   */
+  /** @returns {number} Unit price in cents at the quantity in play. */
   get unitPrice() {
     return tierFor(this.tiers, this.effectiveQuantity)?.price ?? this.#variantPrice;
   }
@@ -222,10 +216,7 @@ class PriceBreakComponent extends BaseComponent {
 
   /* ---------------------------------------------------------- internals -- ---- */
 
-  /**
-   * @param {Object|null|undefined} variant
-   * @private
-   */
+  /** @param {Object|null|undefined} variant */
   #onVariant(variant) {
     if (!variant?.id) return;
 
@@ -236,10 +227,7 @@ class PriceBreakComponent extends BaseComponent {
     this.render();
   }
 
-  /**
-   * @param {Event} event
-   * @private
-   */
+  /** @param {Event} event */
   #onQuantityEvent = (event) => {
     const detail = /** @type {CustomEvent} */ (event).detail;
 
@@ -249,10 +237,7 @@ class PriceBreakComponent extends BaseComponent {
     this.#setQuantity(Number(detail?.quantity));
   };
 
-  /**
-   * @param {Event} event
-   * @private
-   */
+  /** @param {Event} event */
   #onCart = (event) => {
     const state = /** @type {CustomEvent} */ (event).detail?.cart;
     if (state) this.#cart = state;
@@ -260,10 +245,7 @@ class PriceBreakComponent extends BaseComponent {
     this.render();
   };
 
-  /**
-   * @param {number} value
-   * @private
-   */
+  /** @param {number} value */
   #setQuantity(value) {
     if (!Number.isFinite(value) || value < 0) return;
     if (value === this.#quantity) return;
@@ -272,19 +254,13 @@ class PriceBreakComponent extends BaseComponent {
     this.render();
   }
 
-  /**
-   * @returns {HTMLInputElement|null}
-   * @private
-   */
+  /** @returns {HTMLInputElement|null} */
   #quantityInput() {
     const input = this.root.querySelector?.('product-form [name="quantity"]');
     return input instanceof HTMLInputElement ? input : null;
   }
 
-  /**
-   * @returns {number}
-   * @private
-   */
+  /** @returns {number} */
   #readQuantity() {
     const value = Number(this.#quantityInput()?.value);
     return Number.isFinite(value) && value > 0 ? value : 1;
@@ -313,9 +289,7 @@ export class VolumePricing extends PriceBreakComponent {
     }
   }
 
-  /**
-   * @returns {number} Rows shown before the toggle hides the rest. 0 means all.
-   */
+  /** @returns {number} Rows shown before the toggle hides the rest. 0 means all. */
   get limit() {
     const value = Number(this.dataset.visibleTiers);
     return Number.isFinite(value) && value > 0 ? value : 0;
@@ -347,7 +321,6 @@ export class VolumePricing extends PriceBreakComponent {
    * @param {boolean} active
    * @param {boolean} hidden
    * @returns {HTMLLIElement}
-   * @private
    */
   #row(tier, active, hidden) {
     const row = document.createElement('li');
@@ -385,7 +358,6 @@ export class VolumePricing extends PriceBreakComponent {
   /**
    * @param {number} total
    * @param {number} limit
-   * @private
    */
   #renderToggle(total, limit) {
     const toggle = this.refs.toggle;

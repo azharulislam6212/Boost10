@@ -48,23 +48,17 @@ export class StoreLocator extends BaseComponent {
 
   /* --------------------------------------------------------- public API -- ---- */
 
-  /**
-   * @returns {HTMLElement[]}
-   */
+  /** @returns {HTMLElement[]} */
   get stores() {
     return Array.from(this.refs.list.querySelectorAll('[data-store]'));
   }
 
-  /**
-   * @returns {HTMLElement[]}
-   */
+  /** @returns {HTMLElement[]} */
   get visibleStores() {
     return this.stores.filter((store) => !store.hasAttribute('hidden'));
   }
 
-  /**
-   * @returns {number} Radius in kilometres, or 0 for no limit.
-   */
+  /** @returns {number} Radius in kilometres, or 0 for no limit. */
   get radius() {
     return Number(this.refs.radius?.value) || 0;
   }
@@ -165,7 +159,6 @@ export class StoreLocator extends BaseComponent {
    *
    * @param {HTMLElement} store
    * @returns {number}
-   * @private
    */
   #distanceTo(store) {
     if (!this.#origin) return Number.NaN;
@@ -188,7 +181,6 @@ export class StoreLocator extends BaseComponent {
     return EARTH_RADIUS_KM * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 
-  /** @private */
   #renderDistances() {
     for (const store of this.stores) {
       const distance = this.#distanceTo(store);
@@ -215,7 +207,6 @@ export class StoreLocator extends BaseComponent {
     }
   }
 
-  /** @private */
   #sortByDistance() {
     const sorted = this.stores.sort((a, b) => {
       const first = Number(a.dataset.distance);
@@ -234,7 +225,6 @@ export class StoreLocator extends BaseComponent {
    * Point the embed at a store.
    *
    * @param {HTMLElement} store
-   * @private
    */
   #showOnMap(store) {
     const frame = this.refs.map;
@@ -251,10 +241,7 @@ export class StoreLocator extends BaseComponent {
     frame.setAttribute('title', themeString('storeMapTitle', '', { name: store.dataset.name || '' }));
   }
 
-  /**
-   * @param {string} message
-   * @private
-   */
+  /** @param {string} message */
   #status(message) {
     if (this.refs.status instanceof HTMLElement) this.refs.status.textContent = message;
   }

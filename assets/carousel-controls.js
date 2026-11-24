@@ -39,14 +39,8 @@ export function renderControls(refs, index, count, progress) {
   if (refs.total) refs.total.textContent = pad(count);
 
   if (refs.bar) {
-    const fraction = Number.isFinite(progress)
-      ? progress
-      : count > 0
-        ? index / count
-        : 0;
-
-    const clamped = Math.min(Math.max(fraction, 0), 1);
-    refs.bar.style.setProperty('--carousel-progress', String(clamped));
+    const fraction = Number.isFinite(progress) ? progress : count > 0 ? index / count : 0;
+    refs.bar.style.setProperty('--carousel-progress', String(Math.min(Math.max(fraction, 0), 1)));
   }
 }
 
@@ -57,19 +51,11 @@ export function renderControls(refs, index, count, progress) {
  * @returns {ControlRefs}
  */
 export function findExternalControls(id) {
-  /** @type {ControlRefs} */
-  const empty = { previous: null, next: null, current: null, total: null, bar: null };
-  if (!id) return empty;
+  const scope = id ? `[data-carousel-for="${CSS.escape(id)}"]` : '';
+  /** @param {string} name */
+  const find = (name) => (scope ? document.querySelector(`${scope}[data-ref="${name}"]`) : null);
 
-  const scope = `[data-carousel-for="${CSS.escape(id)}"]`;
-
-  return {
-    previous: document.querySelector(`${scope}[data-ref="previous"]`),
-    next: document.querySelector(`${scope}[data-ref="next"]`),
-    current: document.querySelector(`${scope}[data-ref="current"]`),
-    total: document.querySelector(`${scope}[data-ref="total"]`),
-    bar: document.querySelector(`${scope}[data-ref="bar"]`),
-  };
+  return { previous: find('previous'), next: find('next'), current: find('current'), total: find('total'), bar: find('bar') };
 }
 
 /**
@@ -81,13 +67,6 @@ export function findExternalControls(id) {
 export function toggleControls(refs, active) {
   if (!refs) return;
 
-  const seen = new Set();
-
-  for (const element of Object.values(refs)) {
-    const wrapper = element?.closest?.('[data-carousel-nav]');
-    if (!wrapper || seen.has(wrapper)) continue;
-
-    seen.add(wrapper);
-    wrapper.toggleAttribute('data-carousel-active', active);
-  }
+  const wrappers = new Set(Object.values(refs).map((element) => element?.closest?.('[data-carousel-nav]')));
+  for (const wrapper of wrappers) wrapper?.toggleAttribute('data-carousel-active', active);
 }

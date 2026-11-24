@@ -108,10 +108,7 @@ export class MotionEffect extends BaseComponent {
 
   /* ------------------------------------------------------------ effects -- ---- */
 
-  /**
-   * @param {string} effect
-   * @private
-   */
+  /** @param {string} effect */
   #setupReveal(effect) {
     const preset = getPreset(effect);
 
@@ -156,10 +153,7 @@ export class MotionEffect extends BaseComponent {
     });
   }
 
-  /**
-   * @param {string} effect
-   * @private
-   */
+  /** @param {string} effect */
   #setupContinuous(effect) {
     const target = effect === 'marquee' ? this.#marqueeTrack() : this.#targets()[0] || this.firstElementChild || this;
 
@@ -183,7 +177,6 @@ export class MotionEffect extends BaseComponent {
    * The element a marquee actually translates.
    *
    * @returns {HTMLElement}
-   * @private
    */
   #marqueeTrack() {
     const opted = /** @type {HTMLElement|null} */ (this.querySelector('[data-marquee-track]'));
@@ -203,7 +196,6 @@ export class MotionEffect extends BaseComponent {
    * Remember this element's animation settings in the editor.
    *
    * @returns {boolean} True when they differ from what this spot ran last time.
-   * @private
    */
   #recordSignature() {
     if (!isDesignMode()) return false;
@@ -237,7 +229,6 @@ export class MotionEffect extends BaseComponent {
    * animate it is a flash, not an entrance.
    *
    * @returns {boolean}
-   * @private
    */
   #shownByFailsafe() {
     // The failsafe counts from after navigation start, so before 12s it cannot
@@ -252,7 +243,6 @@ export class MotionEffect extends BaseComponent {
    * Resolve which elements the effect applies to.
    *
    * @returns {HTMLElement[]}
-   * @private
    */
   #targets() {
     if (this.dataset.target) {
@@ -270,7 +260,6 @@ export class MotionEffect extends BaseComponent {
   /**
    * @param {string} name
    * @returns {number|undefined}
-   * @private
    */
   #number(name) {
     const raw = this.dataset[name];
@@ -279,7 +268,6 @@ export class MotionEffect extends BaseComponent {
     return Number.isFinite(value) ? value : undefined;
   }
 
-  /** @private */
   #teardownEffect() {
     this.#cancelReveal?.();
     this.#cancelReveal = null;
@@ -394,18 +382,15 @@ export class ParallaxMedia extends BaseComponent {
     this.#unsubscribe ??= subscribeToTicker(this.#tick);
   }
 
-  /** @private */
   #stop() {
     this.#unsubscribe?.();
     this.#unsubscribe = null;
   }
 
-  /** @private */
   #invalidate = () => {
     this.#geometry = null;
   };
 
-  /** @private */
   #measure() {
     const rect = this.getBoundingClientRect();
     // The layer is translated by its own offset; take it back out so the centre
@@ -416,7 +401,6 @@ export class ParallaxMedia extends BaseComponent {
     };
   }
 
-  /** @private */
   #tick = (scrollY = window.scrollY) => {
     if (!this.#geometry) this.#measure();
     const { centre, height } = /** @type {{ centre: number, height: number }} */ (this.#geometry);

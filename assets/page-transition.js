@@ -66,10 +66,7 @@ export class PageTransition extends BaseComponent {
 
   /* ---------------------------------------------------------- internals -- ---- */
 
-  /**
-   * @returns {boolean}
-   * @private
-   */
+  /** @returns {boolean} */
   #enabled() {
     if (prefersReducedMotion()) return false;
     if (isDesignMode()) return false;
@@ -77,18 +74,12 @@ export class PageTransition extends BaseComponent {
     return typeof Element.prototype.animate === 'function';
   }
 
-  /**
-   * @returns {boolean}
-   * @private
-   */
+  /** @returns {boolean} */
   #supportsViewTransitions() {
     return typeof document.startViewTransition === 'function' && CSS.supports('view-transition-name', 'none');
   }
 
-  /**
-   * @param {MouseEvent} event
-   * @private
-   */
+  /** @param {MouseEvent} event */
   #onDocumentClick = (event) => {
     if (this.#supportsViewTransitions()) return;
     if (event.defaultPrevented) return;
@@ -107,7 +98,6 @@ export class PageTransition extends BaseComponent {
   /**
    * @param {HTMLAnchorElement|null} link
    * @returns {boolean}
-   * @private
    */
   #isTransitionable(link) {
     if (!link) return false;
@@ -136,10 +126,7 @@ export class PageTransition extends BaseComponent {
 
   /* --------------------------------------------------------- animation --- */
 
-  /**
-   * @returns {Promise<void>}
-   * @private
-   */
+  /** @returns {Promise<void>} */
   async #playExit() {
     this.setAttribute('data-state', 'exiting');
 
@@ -152,7 +139,6 @@ export class PageTransition extends BaseComponent {
     await Promise.race([animation.finished.catch(() => {}), timeout(EXIT_TIMEOUT)]);
   }
 
-  /** @private */
   #playEntrance() {
     this.setAttribute('data-state', 'entering');
 
@@ -171,10 +157,7 @@ export class PageTransition extends BaseComponent {
       });
   }
 
-  /**
-   * @returns {Keyframe[]}
-   * @private
-   */
+  /** @returns {Keyframe[]} */
   #exitKeyframes() {
     switch (this.#mode) {
       case 'curtain':
@@ -192,10 +175,7 @@ export class PageTransition extends BaseComponent {
     }
   }
 
-  /**
-   * @returns {Keyframe[]}
-   * @private
-   */
+  /** @returns {Keyframe[]} */
   #entranceKeyframes() {
     switch (this.#mode) {
       case 'curtain':
@@ -213,10 +193,7 @@ export class PageTransition extends BaseComponent {
     }
   }
 
-  /**
-   * @returns {number}
-   * @private
-   */
+  /** @returns {number} */
   #duration() {
     const value = Number(this.dataset.duration);
     return Number.isFinite(value) && value > 0 ? value : 420;
@@ -226,7 +203,6 @@ export class PageTransition extends BaseComponent {
 /**
  * @param {number} ms
  * @returns {Promise<void>}
- * @private
  */
 function timeout(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));

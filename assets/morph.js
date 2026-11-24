@@ -107,7 +107,6 @@ export function morphFromHTML(fromNode, html, selector, options = {}) {
  * @param {Node} from
  * @param {Node} to
  * @param {Object} context
- * @private
  */
 function morphNode(from, to, context) {
   if (from.nodeType === Node.TEXT_NODE || from.nodeType === Node.COMMENT_NODE) {
@@ -143,7 +142,6 @@ function morphNode(from, to, context) {
  *
  * @param {Element} from
  * @param {Element} to
- * @private
  */
 function morphAttributes(from, to) {
   const toAttributes = to.attributes;
@@ -169,7 +167,6 @@ function morphAttributes(from, to) {
  *
  * @param {Element} from
  * @param {Element} to
- * @private
  */
 function morphFormControl(from, to) {
   if (shouldPreserveValue(from)) return;
@@ -220,7 +217,6 @@ function morphFormControl(from, to) {
 /**
  * @param {Element} select
  * @param {Element} next
- * @private
  */
 function syncSelectValue(select, next) {
   if (document.activeElement === select) return;
@@ -236,7 +232,6 @@ function syncSelectValue(select, next) {
  *
  * @param {Element} from
  * @param {Element} to
- * @private
  */
 function preserveOpenState(from, to) {
   if (from.hasAttribute('data-morph-force-open')) return;
@@ -248,7 +243,6 @@ function preserveOpenState(from, to) {
 /**
  * @param {Element} element
  * @returns {boolean}
- * @private
  */
 function shouldPreserveValue(element) {
   return element.hasAttribute('data-morph-preserve-value');
@@ -264,7 +258,6 @@ function shouldPreserveValue(element) {
  * @param {Element} from
  * @param {Element} to
  * @param {Object} context
- * @private
  */
 function morphChildren(from, to, context) {
   const keyed = collectKeyedChildren(from);
@@ -309,7 +302,6 @@ function morphChildren(from, to, context) {
 /**
  * @param {Element} parent
  * @returns {Map<string, Node>}
- * @private
  */
 function collectKeyedChildren(parent) {
   const keyed = new Map();
@@ -327,7 +319,6 @@ function collectKeyedChildren(parent) {
  * @param {Node|null} cursor
  * @param {Map<string, Node>} unclaimed
  * @param {Object} context
- * @private
  */
 function removeRemaining(parent, cursor, unclaimed, context) {
   let node = cursor;
@@ -350,7 +341,6 @@ function removeRemaining(parent, cursor, unclaimed, context) {
  * @param {Element} parent
  * @param {Node} node
  * @param {Object} context
- * @private
  */
 function discard(parent, node, context) {
   if (node.nodeType === Node.ELEMENT_NODE) {
@@ -367,7 +357,6 @@ function discard(parent, node, context) {
  * @param {Node} a
  * @param {Node} b
  * @returns {boolean}
- * @private
  */
 function isCompatible(a, b) {
   if (a.nodeType !== b.nodeType) return false;
@@ -378,7 +367,6 @@ function isCompatible(a, b) {
 /**
  * @param {Node} node
  * @returns {string|null}
- * @private
  */
 function keyOf(node) {
   if (node.nodeType !== Node.ELEMENT_NODE) return null;
@@ -394,7 +382,6 @@ function keyOf(node) {
  *
  * @param {Element} root
  * @returns {Object|null}
- * @private
  */
 function captureFocus(root) {
   const active = document.activeElement;
@@ -417,7 +404,6 @@ function captureFocus(root) {
  * the common case the original element is still there and simply needs focus.
  *
  * @param {Object|null} snapshot
- * @private
  */
 function restoreFocus(snapshot) {
   if (!snapshot) return;
@@ -442,7 +428,6 @@ function restoreFocus(snapshot) {
  * @param {Element} root
  * @param {Element} node
  * @returns {{ root: Element, indices: number[] }}
- * @private
  */
 function pathTo(root, node) {
   const indices = [];
@@ -461,7 +446,6 @@ function pathTo(root, node) {
 /**
  * @param {{ root: Element, indices: number[] }} path
  * @returns {Node|null}
- * @private
  */
 function resolvePath({ root, indices }) {
   let node = root;
@@ -484,7 +468,6 @@ function resolvePath({ root, indices }) {
  *
  * @param {Element} root
  * @returns {Array<{ key: string|null, node: Element, top: number, left: number }>}
- * @private
  */
 function captureScroll(root) {
   const snapshots = [];
@@ -507,7 +490,6 @@ function captureScroll(root) {
  * Reapply scroll offsets after the tree has settled.
  *
  * @param {Array<Object>} snapshots
- * @private
  */
 function restoreScroll(snapshots) {
   if (snapshots.length === 0) return;

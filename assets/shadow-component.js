@@ -7,9 +7,7 @@
 
 import { BaseComponent } from '@theme/component';
 
-/**
- * @type {WeakMap<typeof ShadowComponent, CSSStyleSheet>}
- */
+/** @type {WeakMap<typeof ShadowComponent, CSSStyleSheet>} */
 const styleSheetCache = new WeakMap();
 
 /**

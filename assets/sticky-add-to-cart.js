@@ -70,16 +70,12 @@ export class StickyAddToCart extends BaseComponent {
 
   /* --------------------------------------------------------- public API -- ---- */
 
-  /**
-   * @returns {HTMLElement|Document}
-   */
+  /** @returns {HTMLElement|Document} */
   get root() {
     return document.querySelector('[data-product-root]') || document;
   }
 
-  /**
-   * @returns {ProductForm|null}
-   */
+  /** @returns {ProductForm|null} */
   get form() {
     const id = this.dataset.form;
     const byId = id ? document.getElementById(id) : null;
@@ -89,16 +85,13 @@ export class StickyAddToCart extends BaseComponent {
   /**
    * @param {number|string} id
    * @returns {Object|null}
-   * @private
    */
   #variantById(id) {
     const picker = this.root.querySelector('variant-picker');
     return picker?.variants?.find((item) => String(item.id) === String(id)) || null;
   }
 
-  /**
-   * @param {Object|null} variant
-   */
+  /** @param {Object|null} variant */
   render(variant) {
     const button = this.refs.submit;
 
@@ -124,7 +117,6 @@ export class StickyAddToCart extends BaseComponent {
 
   /* ---------------------------------------------------------- internals -- ---- */
 
-  /** @private */
   #observeTrigger() {
     const id = this.dataset.watch;
     const trigger = id ? document.getElementById(id) : this.form?.refs?.submit;

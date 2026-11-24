@@ -68,16 +68,12 @@ export class ResultsList extends BaseComponent {
 
   /* --------------------------------------------------------- public API -- ---- */
 
-  /**
-   * @returns {'paginate'|'load-more'|'infinite'}
-   */
+  /** @returns {'paginate'|'load-more'|'infinite'} */
   get pagination() {
     return this.dataset.pagination || window.Theme?.settings?.paginationType || 'paginate';
   }
 
-  /**
-   * @returns {string}
-   */
+  /** @returns {string} */
   get sectionId() {
     return this.dataset.sectionId || '';
   }
@@ -90,37 +86,27 @@ export class ResultsList extends BaseComponent {
     return this.dataset.itemSelector || '[data-product-id]';
   }
 
-  /**
-   * @returns {number} Items currently rendered.
-   */
+  /** @returns {number} Items currently rendered. */
   get count() {
     return this.refs.grid.querySelectorAll(this.itemSelector).length;
   }
 
-  /**
-   * @returns {number} Items matching the current filters, across all pages.
-   */
+  /** @returns {number} Items matching the current filters, across all pages. */
   get total() {
     return Number(this.dataset.total) || this.count;
   }
 
-  /**
-   * @returns {number} The page the server rendered into this element.
-   */
+  /** @returns {number} The page the server rendered into this element. */
   get page() {
     return Number(this.dataset.page) || 1;
   }
 
-  /**
-   * @returns {string|null}
-   */
+  /** @returns {string|null} */
   get nextUrl() {
     return this.refs.loadMore?.dataset.nextUrl || null;
   }
 
-  /**
-   * @returns {string|null}
-   */
+  /** @returns {string|null} */
   get previousUrl() {
     return this.refs.loadPrevious?.dataset.prevUrl || null;
   }
@@ -232,7 +218,6 @@ update(html, { focus = true, scroll = false } = {}) {
    * @param {string} url
    * @param {'append'|'prepend'} direction
    * @returns {Promise<boolean>}
-   * @private
    */
   async #loadPage(url, direction) {
     this.#request?.abort();
@@ -295,7 +280,6 @@ update(html, { focus = true, scroll = false } = {}) {
   /**
    * @param {string} url
    * @returns {Promise<string>}
-   * @private
    */
   async #fetch(url) {
     if (this.sectionId) {
@@ -313,7 +297,6 @@ update(html, { focus = true, scroll = false } = {}) {
 
   /* ------------------------------------------------------------- wiring -- ---- */
 
-  /** @private */
 #bindControls() {
   this.on(this, 'click', (event) => {
     if (event.defaultPrevented || event.button !== 0) return;
@@ -345,11 +328,7 @@ update(html, { focus = true, scroll = false } = {}) {
   });
 }
 
-  /**
-   * Apply whatever the current mode requires, and make deep links recoverable.
-   *
-   * @private
-   */
+  /** Apply whatever the current mode requires, and make deep links recoverable. */
   #applyMode() {
     this.#sentinelObserver?.disconnect();
     this.#sentinelObserver = null;
@@ -364,7 +343,6 @@ update(html, { focus = true, scroll = false } = {}) {
     this.#observePages();
   }
 
-  /** @private */
   #markCurrentPage() {
     const first = this.refs.grid.querySelector(this.itemSelector);
     if (first) this.#recordPageAnchor(this.page, first);
@@ -373,7 +351,6 @@ update(html, { focus = true, scroll = false } = {}) {
   /**
    * @param {number|null} page
    * @param {Element|undefined} node
-   * @private
    */
   #recordPageAnchor(page, node) {
     if (!page || !node) return;
@@ -384,11 +361,7 @@ update(html, { focus = true, scroll = false } = {}) {
     this.#pageAnchors.sort((a, b) => a.page - b.page);
   }
 
-  /**
-   * Keep the address bar pointing at the page currently in view.
-   *
-   * @private
-   */
+  /** Keep the address bar pointing at the page currently in view. */
   #observePages() {
     this.#pageObserver?.disconnect();
     this.#pageObserver = null;
@@ -413,10 +386,7 @@ update(html, { focus = true, scroll = false } = {}) {
     for (const { node } of this.#pageAnchors) this.#pageObserver.observe(node);
   }
 
-  /**
-   * @param {number} page
-   * @private
-   */
+  /** @param {number} page */
   #syncUrlToPage(page) {
     const url = new URL(window.location.href);
     const current = Number(url.searchParams.get('page')) || 1;
@@ -433,7 +403,6 @@ update(html, { focus = true, scroll = false } = {}) {
     this.dataset.page = String(page);
   }
 
-  /** @private */
   #onPopState() {
     this.goToPage(window.location.href, { push: false });
   }
@@ -441,7 +410,6 @@ update(html, { focus = true, scroll = false } = {}) {
   /**
    * @param {Element} next
    * @param {'append'|'prepend'} direction
-   * @private
    */
   #syncControlsFrom(next, direction) {
     const ref = direction === 'append' ? 'loadMore' : 'loadPrevious';
@@ -462,7 +430,6 @@ update(html, { focus = true, scroll = false } = {}) {
     }
   }
 
-  /** @private */
   #observeSentinel() {
     const sentinel = this.refs.sentinel;
     if (!(sentinel instanceof HTMLElement) || !('IntersectionObserver' in window)) return;
@@ -489,10 +456,7 @@ update(html, { focus = true, scroll = false } = {}) {
 
   /* ----------------------------------------------------------- feedback -- ---- */
 
-  /**
-   * @param {boolean} loading
-   * @private
-   */
+  /** @param {boolean} loading */
   #setLoading(loading) {
     this.toggleAttribute('data-loading', loading);
     this.refs.grid.setAttribute('aria-busy', loading ? 'true' : 'false');
@@ -506,7 +470,6 @@ update(html, { focus = true, scroll = false } = {}) {
     }
   }
 
-  /** @private */
   #announceCount() {
     const message =
       this.total > 0
@@ -517,7 +480,6 @@ update(html, { focus = true, scroll = false } = {}) {
     announce(message);
   }
 
-  /** @private */
   #announceLoaded() {
     const message = themeString('paginationShowing', '', {
       shown: this.count,
@@ -535,7 +497,6 @@ update(html, { focus = true, scroll = false } = {}) {
    *
    * @param {Element} first
    * @param {'append'|'prepend'} direction
-   * @private
    */
   #focusNewContent(first, direction) {
     if (direction === 'prepend') return;
@@ -545,7 +506,6 @@ update(html, { focus = true, scroll = false } = {}) {
     (focusable || first).focus({ preventScroll: true });
   }
 
-  /** @private */
   #scrollIntoView() {
     const scrollbar = document.querySelector('smooth-scrollbar');
     const header = document.querySelector('sticky-header');
@@ -560,10 +520,7 @@ update(html, { focus = true, scroll = false } = {}) {
     window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
   }
 
-  /**
-   * @param {string} message
-   * @private
-   */
+  /** @param {string} message */
   #status(message) {
     if (this.refs.status instanceof HTMLElement) this.refs.status.textContent = message;
   }

@@ -23,9 +23,7 @@ export class CartSellingPlanSelector extends BaseComponent {
 
   /* --------------------------------------------------------- public API -- ---- */
 
-  /**
-   * @returns {string} The selling plan id currently in the cart, or '' for one-time.
-   */
+  /** @returns {string} The selling plan id currently in the cart, or '' for one-time. */
   get sellingPlanId() {
     return this.#committed;
   }
@@ -72,20 +70,14 @@ export class CartSellingPlanSelector extends BaseComponent {
 
   /* ---------------------------------------------------------- internals -- ---- */
 
-  /**
-   * @param {Event} event
-   * @private
-   */
+  /** @param {Event} event */
   #onChange = (event) => {
     const value = /** @type {HTMLSelectElement} */ (event.target).value;
     if (value === this.#committed) return;
     this.change(value);
   };
 
-  /**
-   * @param {boolean} busy
-   * @private
-   */
+  /** @param {boolean} busy */
   #busy(busy) {
     this.setAttribute('aria-busy', busy ? 'true' : 'false');
     this.refs.select.disabled = busy;
@@ -112,24 +104,17 @@ export class CartVariantSelector extends BaseComponent {
     this.on(this.refs.select, 'change', this.#onChange);
   }
 
-  /**
-   * @returns {string}
-   */
+  /** @returns {string} */
   get key() {
     return this.dataset.key || '';
   }
 
-  /**
-   * @returns {number}
-   */
+  /** @returns {number} */
   get quantity() {
     return Number(this.dataset.quantity) || 1;
   }
 
-  /**
-   * @param {Event} event
-   * @private
-   */
+  /** @param {Event} event */
   #onChange = async (event) => {
     const id = event.target.value;
     if (!id || !this.key) return;

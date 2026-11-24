@@ -29,9 +29,7 @@ export class CustomerAddressForm extends BaseComponent {
 
   /* --------------------------------------------------------- public API -- ---- */
 
-  /**
-   * @returns {boolean}
-   */
+  /** @returns {boolean} */
   get usesModal() {
     return this.dataset.modal === 'true';
   }
@@ -101,10 +99,7 @@ export class CustomerAddressForm extends BaseComponent {
 
   /* ---------------------------------------------------------- internals -- ---- */
 
-  /**
-   * @param {MouseEvent} event
-   * @private
-   */
+  /** @param {MouseEvent} event */
   #onClick = (event) => {
     const target = event.target instanceof Element ? event.target : null;
     if (!target) return;
@@ -131,10 +126,7 @@ export class CustomerAddressForm extends BaseComponent {
     }
   };
 
-  /**
-   * @param {Event} event
-   * @private
-   */
+  /** @param {Event} event */
   #onChange = (event) => {
     const select = event.target;
     if (!(select instanceof HTMLSelectElement) || !select.hasAttribute('data-country')) return;
@@ -142,11 +134,7 @@ export class CustomerAddressForm extends BaseComponent {
     this.#syncProvinces(select);
   };
 
-  /**
-   * Populate every province select on first render.
-   *
-   * @private
-   */
+  /** Populate every province select on first render. */
   #initCountries() {
     for (const select of this.querySelectorAll('select[data-country]')) {
       if (select.dataset.default) select.value = select.dataset.default;
@@ -158,7 +146,6 @@ export class CustomerAddressForm extends BaseComponent {
    * Rebuild the province select for the selected country.
    *
    * @param {HTMLSelectElement} countrySelect
-   * @private
    */
   #syncProvinces(countrySelect) {
     const group = countrySelect.closest('form') || this;
@@ -200,7 +187,6 @@ export class CustomerAddressForm extends BaseComponent {
    *
    * @param {HTMLOptionElement|undefined} option
    * @returns {Array|null}
-   * @private
    */
   #parseAttribute(option) {
     const raw = option?.getAttribute('data-provinces');

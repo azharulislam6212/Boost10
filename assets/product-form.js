@@ -32,16 +32,12 @@ export class ProductForm extends BaseComponent {
 
   /* --------------------------------------------------------- public API -- ---- */
 
-  /**
-   * @returns {HTMLElement|Document}
-   */
+  /** @returns {HTMLElement|Document} */
   get root() {
     return this.closest('[data-product-root]') || document;
   }
 
-  /**
-   * @returns {number}
-   */
+  /** @returns {number} */
   get quantity() {
     const selector = this.querySelector('quantity-selector');
     if (selector?.value) return selector.value;
@@ -50,9 +46,7 @@ export class ProductForm extends BaseComponent {
     return Number(input?.value) || 1;
   }
 
-  /**
-   * @returns {number|null}
-   */
+  /** @returns {number|null} */
   get variantId() {
     const value = Number(this.refs.form.querySelector('[name="id"]')?.value);
     return Number.isFinite(value) && value > 0 ? value : null;
@@ -86,9 +80,7 @@ export class ProductForm extends BaseComponent {
     this.#error('');
   }
 
-  /**
-   * @param {number} quantity
-   */
+  /** @param {number} quantity */
   setQuantity(quantity) {
     const selector = this.querySelector('quantity-selector');
     if (selector?.setValue) {
@@ -100,9 +92,7 @@ export class ProductForm extends BaseComponent {
     if (input instanceof HTMLInputElement) input.value = String(quantity);
   }
 
-  /**
-   * @param {number|null} sellingPlanId
-   */
+  /** @param {number|null} sellingPlanId */
   setSellingPlan(sellingPlanId) {
     let input = this.refs.form.querySelector('[name="selling_plan"]');
 
@@ -169,10 +159,7 @@ export class ProductForm extends BaseComponent {
 
   /* ---------------------------------------------------------- internals -- ---- */
 
-  /**
-   * @param {SubmitEvent} event
-   * @private
-   */
+  /** @param {SubmitEvent} event */
   #onSubmit = (event) => {
     event.preventDefault();
     this.submit();
@@ -181,17 +168,13 @@ export class ProductForm extends BaseComponent {
   /**
    * @param {Object} variant
    * @returns {boolean}
-   * @private
    */
   #isPreorder(variant) {
     if (window.Theme?.settings?.preorderEnabled !== true) return false;
     return Boolean(variant.inventory_management) && variant.inventory_policy === 'continue' && Number(variant.inventory_quantity) <= 0;
   }
 
-  /**
-   * @param {string} message
-   * @private
-   */
+  /** @param {string} message */
   #error(message) {
     const target = this.refs.error;
     if (target instanceof HTMLElement) {

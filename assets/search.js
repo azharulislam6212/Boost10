@@ -50,9 +50,7 @@ export const recentSearches = {
     }
   },
 
-  /**
-   * @param {string[]} list
-   */
+  /** @param {string[]} list */
   write(list) {
     try {
       window.localStorage.setItem(RECENT_KEY, JSON.stringify(list));
@@ -116,23 +114,17 @@ export class SearchList extends BaseComponent {
 
   /* --------------------------------------------------------- public API -- ---- */
 
-  /**
-   * @returns {HTMLElement[]} Selectable options, in document order.
-   */
+  /** @returns {HTMLElement[]} Selectable options, in document order. */
   get options() {
     return Array.from(this.querySelectorAll('[data-result]'));
   }
 
-  /**
-   * @returns {HTMLElement|null}
-   */
+  /** @returns {HTMLElement|null} */
   get active() {
     return this.options[this.#index] || null;
   }
 
-  /**
-   * @returns {number}
-   */
+  /** @returns {number} */
   get count() {
     return this.options.length;
   }
@@ -241,19 +233,13 @@ export class SearchList extends BaseComponent {
 
   /* ---------------------------------------------------------- internals -- ---- */
 
-  /**
-   * @returns {HTMLElement|null}
-   * @private
-   */
+  /** @returns {HTMLElement|null} */
   #input() {
     const id = this.dataset.input;
     return id ? document.getElementById(id) : null;
   }
 
-  /**
-   * @param {PointerEvent} event
-   * @private
-   */
+  /** @param {PointerEvent} event */
   #onPointerMove = (event) => {
     const option = event.target instanceof Element ? event.target.closest('[data-result]') : null;
     if (!option) return;
@@ -262,10 +248,7 @@ export class SearchList extends BaseComponent {
     if (index !== -1 && index !== this.#index) this.select(index);
   };
 
-  /**
-   * @param {MouseEvent} event
-   * @private
-   */
+  /** @param {MouseEvent} event */
   #onClick = (event) => {
     const option = event.target instanceof Element ? event.target.closest('[data-result]') : null;
     if (!option) return;
@@ -359,16 +342,12 @@ export class PredictiveSearch extends BaseComponent {
 
   /* --------------------------------------------------------- public API -- ---- */
 
-  /**
-   * @returns {boolean}
-   */
+  /** @returns {boolean} */
   get isOpen() {
     return this.hasAttribute('data-open');
   }
 
-  /**
-   * @returns {SearchList|null}
-   */
+  /** @returns {SearchList|null} */
   get results() {
     return this.refs.panel.querySelector('search-list');
   }
@@ -466,9 +445,7 @@ export class PredictiveSearch extends BaseComponent {
     this.#renderRecent();
   }
 
-  /**
-   * @returns {string}
-   */
+  /** @returns {string} */
   get sectionId() {
     return this.dataset.sectionId || 'predictive-search';
   }
@@ -481,7 +458,6 @@ export class PredictiveSearch extends BaseComponent {
    *
    * @param {string} term
    * @returns {Object}
-   * @private
    */
   #params(term) {
     const settings = window.Theme?.settings || {};
@@ -505,7 +481,6 @@ export class PredictiveSearch extends BaseComponent {
   /**
    * @param {string} html
    * @param {string} term
-   * @private
    */
   #render(html, term) {
     const next = new DOMParser().parseFromString(html, 'text/html').querySelector('[data-results-panel]');
@@ -538,11 +513,7 @@ export class PredictiveSearch extends BaseComponent {
     this.dispatch(EVENTS.SEARCH_RESULTS, { query: term, count });
   }
 
-  /**
-   * Put every image in the freshly morphed panel back into a visible state.
-   *
-   * @private
-   */
+  /** Put every image in the freshly morphed panel back into a visible state. */
   #refreshMedia() {
     const figures = this.refs.panel.querySelectorAll('responsive-image');
 
@@ -568,10 +539,7 @@ export class PredictiveSearch extends BaseComponent {
     }
   }
 
-  /**
-   * @param {KeyboardEvent} event
-   * @private
-   */
+  /** @param {KeyboardEvent} event */
   #onKeydown = (event) => {
     if (event.key === 'Escape') {
       if (this.isOpen) {
@@ -586,10 +554,7 @@ export class PredictiveSearch extends BaseComponent {
     this.results?.handleKeydown(event);
   };
 
-  /**
-   * @param {boolean} busy
-   * @private
-   */
+  /** @param {boolean} busy */
   #busy(busy) {
     this.toggleAttribute('data-loading', busy);
     this.refs.panel.setAttribute('aria-busy', busy ? 'true' : 'false');
@@ -599,18 +564,12 @@ export class PredictiveSearch extends BaseComponent {
     }
   }
 
-  /**
-   * @param {string} message
-   * @private
-   */
+  /** @param {string} message */
   #status(message) {
     if (this.refs.status instanceof HTMLElement) this.refs.status.textContent = message;
   }
 
-  /**
-   * @param {boolean} visible
-   * @private
-   */
+  /** @param {boolean} visible */
   #toggleReset(visible) {
     if (!(this.refs.reset instanceof HTMLElement)) return;
 
@@ -625,18 +584,13 @@ export class PredictiveSearch extends BaseComponent {
    * How many recent searches this field keeps, and whether it keeps any.
    *
    * @returns {number} 0 when the merchant has turned recent searches off.
-   * @private
    */
   get #recentLimit() {
     if (this.hasAttribute('data-recent-disabled')) return 0;
     return Number(this.dataset.recentLimit) || 6;
   }
 
-  /**
-   * The animated prompt.
-   *
-   * @private
-   */
+  /** The animated prompt. */
   #setupPrompts() {
     const prompt = this.refs.prompt;
     if (!(prompt instanceof HTMLElement)) return;
@@ -671,11 +625,7 @@ export class PredictiveSearch extends BaseComponent {
     }, PROMPT_INTERVAL);
   }
 
-  /**
-   * Keep the field's chrome in step with its value.
-   *
-   * @private
-   */
+  /** Keep the field's chrome in step with its value. */
   #syncField() {
     const filled = this.refs.input.value.trim().length > 0;
 
@@ -683,11 +633,7 @@ export class PredictiveSearch extends BaseComponent {
     this.toggleAttribute('data-filled', filled);
   }
 
-  /**
-   * Wire the recent searches block.
-   *
-   * @private
-   */
+  /** Wire the recent searches block. */
   #setupRecent() {
     const { recent, recentList, recentClear } = this.refs;
     if (!(recent instanceof HTMLElement) || !(recentList instanceof HTMLElement)) return;
@@ -712,11 +658,7 @@ export class PredictiveSearch extends BaseComponent {
     });
   }
 
-  /**
-   * Repaint the recent chips from storage.
-   *
-   * @private
-   */
+  /** Repaint the recent chips from storage. */
   #renderRecent() {
     const { recent, recentList } = this.refs;
     if (!(recent instanceof HTMLElement) || !(recentList instanceof HTMLElement)) return;
@@ -751,11 +693,7 @@ export class PredictiveSearch extends BaseComponent {
     recent.toggleAttribute('hidden', terms.length === 0);
   }
 
-  /**
-   * Chips and tags run their term through the field rather than navigating.
-   *
-   * @private
-   */
+  /** Chips and tags run their term through the field rather than navigating. */
   #setupTerms() {
     this.on(this, 'click', (event) => {
       const trigger = event.target instanceof Element ? event.target.closest('[data-search-term]') : null;
@@ -780,10 +718,7 @@ export class PredictiveSearch extends BaseComponent {
     });
   }
 
-  /**
-   * @param {string} term
-   * @private
-   */
+  /** @param {string} term */
   #useTerm(term) {
     const value = term.trim();
     if (!value) return;

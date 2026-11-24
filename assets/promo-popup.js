@@ -62,30 +62,22 @@ export class PromoPopup extends ModalDialog {
 
   /* --------------------------------------------------------- public API -- ---- */
 
-  /**
-   * @returns {'delay'|'scroll'|'exit-intent'}
-   */
+  /** @returns {'delay'|'scroll'|'exit-intent'} */
   get trigger() {
     return this.dataset.trigger || 'delay';
   }
 
-  /**
-   * @returns {number} Milliseconds.
-   */
+  /** @returns {number} Milliseconds. */
   get delay() {
     return (Number(this.dataset.delay) || 6) * 1000;
   }
 
-  /**
-   * @returns {number} Days before it may show again.
-   */
+  /** @returns {number} Days before it may show again. */
   get frequency() {
     return Number(this.dataset.frequency) || 7;
   }
 
-  /**
-   * @returns {string|null}
-   */
+  /** @returns {string|null} */
   get discountCode() {
     return this.dataset.discountCode || null;
   }
@@ -143,25 +135,19 @@ export class PromoPopup extends ModalDialog {
 
   /* ---------------------------------------------------------- internals -- ---- */
 
-  /** @private */
   #remember() {
     storage.set(SEEN_KEY, String(Date.now()));
   }
 
-  /**
-   * @returns {number}
-   * @private
-   */
+  /** @returns {number} */
   #pageViews() {
     return Number(storage.get(VIEWS_KEY, 0)) || 0;
   }
 
-  /** @private */
   #countPageView() {
     storage.set(VIEWS_KEY, this.#pageViews() + 1);
   }
 
-  /** @private */
   #watchScroll() {
     const depth = Number(this.dataset.scrollDepth) || 50;
 
@@ -180,11 +166,7 @@ export class PromoPopup extends ModalDialog {
     this.#detach = () => window.removeEventListener('scroll', check);
   }
 
-  /**
-   * Exit intent: the pointer leaves through the top of the viewport.
-   *
-   * @private
-   */
+  /** Exit intent: the pointer leaves through the top of the viewport. */
   #watchExitIntent() {
     if (isTouchDevice()) {
       this.#timer = window.setTimeout(() => this.reveal(), this.delay * 3);
@@ -202,10 +184,7 @@ export class PromoPopup extends ModalDialog {
     this.#detach = () => document.removeEventListener('mouseout', onLeave);
   }
 
-  /**
-   * @param {SubmitEvent} event
-   * @private
-   */
+  /** @param {SubmitEvent} event */
   #onSubmit = async (event) => {
     if (!this.discountCode) return;
 
@@ -231,10 +210,7 @@ export class PromoPopup extends ModalDialog {
     }
   };
 
-  /**
-   * @param {string} text
-   * @private
-   */
+  /** @param {string} text */
   #message(text) {
     if (this.refs.message instanceof HTMLElement) this.refs.message.textContent = text;
     announce(text);

@@ -79,16 +79,12 @@ export class SmoothScrollbar extends BaseComponent {
     this.#startLoop();
   }
 
-  /**
-   * @returns {boolean} True while a Lenis instance is driving the page.
-   */
+  /** @returns {boolean} True while a Lenis instance is driving the page. */
   get running() {
     return Boolean(this.#lenis) && !this.#lenis.isStopped;
   }
 
-  /**
-   * @returns {number} Scroll progress from 0 to 1.
-   */
+  /** @returns {number} Scroll progress from 0 to 1. */
   get progress() {
     if (this.#lenis && Number.isFinite(this.#lenis.progress)) return clamp(this.#lenis.progress, 0, 1);
 
@@ -128,10 +124,7 @@ export class SmoothScrollbar extends BaseComponent {
 
   /* ---------------------------------------------------------- internals -- ---- */
 
-  /**
-   * @returns {boolean}
-   * @private
-   */
+  /** @returns {boolean} */
   #shouldSmooth() {
     if (prefersReducedMotion()) return false;
     // The editor scrolls to the selected section itself; Lenis would fight it.
@@ -144,7 +137,6 @@ export class SmoothScrollbar extends BaseComponent {
    * Load Lenis and start the frame loop.
    *
    * @param {number} token
-   * @private
    */
   async #initLenis(token) {
     let Lenis;
@@ -179,11 +171,7 @@ export class SmoothScrollbar extends BaseComponent {
     this.#startLoop();
   }
 
-  /**
-   * Take on whatever scroll position the browser restored.
-   *
-   * @private
-   */
+  /** Take on whatever scroll position the browser restored. */
   #adoptRestoredScroll() {
     const adopt = () => {
       const lenis = this.#lenis;
@@ -210,8 +198,6 @@ export class SmoothScrollbar extends BaseComponent {
   /**
    * Drive Lenis only while it is animating. A loop that never sleeps keeps the
    * main thread busy on a page nobody is scrolling.
-   *
-   * @private
    */
   #startLoop() {
     this.#idleFrames = 0;
@@ -243,17 +229,13 @@ export class SmoothScrollbar extends BaseComponent {
     this.#frame = requestAnimationFrame(tick);
   }
 
-  /** @private */
   #stopLoop() {
     if (this.#frame === null) return;
     cancelAnimationFrame(this.#frame);
     this.#frame = null;
   }
 
-  /**
-   * @param {{ scroll: number, progress: number }} state
-   * @private
-   */
+  /** @param {{ scroll: number, progress: number }} state */
   #onLenisScroll = (state) => {
     this.#publishProgress(state?.progress ?? this.progress, state?.scroll ?? window.scrollY);
   };
@@ -261,8 +243,6 @@ export class SmoothScrollbar extends BaseComponent {
   /**
    * Keep progress reporting alive when Lenis is disabled, so the scroll-to-top
    * control and any progress indicators behave identically either way.
-   *
-   * @private
    */
   #trackProgressNatively() {
     const update = rafThrottle(() => this.#publishProgress(this.progress, window.scrollY));
@@ -276,7 +256,6 @@ export class SmoothScrollbar extends BaseComponent {
   /**
    * @param {number} progress
    * @param {number} scrollY
-   * @private
    */
   #publishProgress(progress, scrollY) {
     // Written on the back-to-top control only: a custom property on <html> is
@@ -289,7 +268,6 @@ export class SmoothScrollbar extends BaseComponent {
   /**
    * @param {number|string|Element} target
    * @returns {number}
-   * @private
    */
   #resolveOffset(target) {
     if (typeof target === 'number') return target;
@@ -367,16 +345,12 @@ export class ScrollToTop extends BaseComponent {
 
   /* ---------------------------------------------------------- internals -- ---- */
 
-  /** @private */
   #onClick = (event) => {
     event.preventDefault();
     this.scrollToTop();
   };
 
-  /**
-   * @param {boolean} visible
-   * @private
-   */
+  /** @param {boolean} visible */
   #applyVisibility(visible) {
     this.toggleAttribute('data-visible', visible);
     this.toggleAttribute('inert', !visible);

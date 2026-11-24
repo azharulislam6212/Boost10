@@ -471,9 +471,7 @@ export function presetNames(group) {
    Capability
    ========================================================================== */
 
-/**
- * @returns {boolean} True when animations should actually run.
- */
+/** @returns {boolean} True when animations should actually run. */
 export function motionEnabled() {
   return !prefersReducedMotion() && typeof Element.prototype.animate === 'function';
 }
@@ -484,10 +482,7 @@ const bootedAt = performance.now();
 /** How many elements have already animated inside the load window. */
 let loadIndex = 0;
 
-/**
- * @returns {boolean} True while the page is still in its initial paint window.
- * @private
- */
+/** @returns {boolean} True while the page is still in its initial paint window. */
 function withinLoadWindow() {
   return performance.now() - bootedAt < DEFAULTS.loadWindow;
 }
@@ -739,7 +734,6 @@ export function applyState(element, frame) {
  *
  * @param {string} transform
  * @returns {string}
- * @private
  */
 function flatten(transform) {
   return transform.replace(/translate3d\(\s*([^,]+),\s*([^,]+),\s*0(?:px)?\s*\)/g, 'translate($1, $2)');
@@ -764,7 +758,6 @@ export function clearState(element, frame) {
 /**
  * @param {string} value
  * @returns {string}
- * @private
  */
 function camelToKebab(value) {
   return value.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
@@ -1048,7 +1041,6 @@ const waiting = new WeakMap();
  * @param {Element} target
  * @param {object} owner
  * @param {() => void} start
- * @private
  */
 function markWaiting(target, owner, start) {
   let owners = waiting.get(target);
@@ -1059,7 +1051,6 @@ function markWaiting(target, owner, start) {
 /**
  * @param {Element} target
  * @param {object} owner
- * @private
  */
 function clearWaiting(target, owner) {
   const owners = waiting.get(target);
@@ -1072,7 +1063,6 @@ function clearWaiting(target, owner) {
  * @param {Element} node
  * @param {object} owner
  * @returns {boolean} True while a reveal other than `owner` still holds `node`.
- * @private
  */
 function heldByOthers(node, owner) {
   const owners = waiting.get(node);
@@ -1088,7 +1078,6 @@ function heldByOthers(node, owner) {
  *
  * @param {Element} target
  * @returns {boolean}
- * @private
  */
 function ownsEntrance(target) {
   if (target.localName !== 'motion-effect' || !(target instanceof HTMLElement)) return false;
@@ -1115,7 +1104,6 @@ const HEADER_HOLD_MAX = 400;
  *
  * @param {Element} target
  * @returns {number}
- * @private
  */
 function headerHold(target) {
   const header = target.matches(HEADER_SELECTOR) ? target : target.querySelector(HEADER_SELECTOR);
@@ -1146,7 +1134,6 @@ const headerReady = new WeakMap();
  *
  * @param {Element} element
  * @returns {Element|null}
- * @private
  */
 function sectionGate(element) {
   if (element.closest(HEADER_SELECTOR) || element.querySelector(HEADER_SELECTOR)) return null;
@@ -1166,7 +1153,6 @@ function sectionGate(element) {
  * @param {Element|null} header
  * @param {() => void} callback
  * @returns {() => void} Stop waiting.
- * @private
  */
 function afterHeaderPlays(header, callback) {
   if (!header || headerReady.has(header) || !headersPending.has(header)) {
@@ -1228,7 +1214,6 @@ const NESTED_WAIT = 2500;
  *
  * @param {Element} element
  * @returns {number|null} Null when nothing around it animates.
- * @private
  */
 function ancestorLead(element) {
   // The element itself first: a text block that is one item in its wrapper's
@@ -1250,7 +1235,6 @@ function ancestorLead(element) {
  * @param {object} owner The reveal asking, whose own hold on `element` does not count.
  * @param {() => void} callback
  * @returns {() => void} Stop waiting.
- * @private
  */
 function afterWrapperPlays(element, owner, callback) {
   /** @type {Element|null} */
@@ -1314,7 +1298,6 @@ const CLIPPED_TEXT_SELECTOR = [
  *
  * @param {Element} root
  * @returns {boolean}
- * @private
  */
 function hasClippedText(root) {
   return root.matches(CLIPPED_TEXT_SELECTOR) || root.querySelector(CLIPPED_TEXT_SELECTOR) !== null;
@@ -1325,7 +1308,6 @@ function hasClippedText(root) {
  *
  * @param {Object} options
  * @returns {number}
- * @private
  */
 function loadCascadeDelay(options) {
   if (options.loadCascade === false) return 0;
@@ -1340,7 +1322,6 @@ function loadCascadeDelay(options) {
 /**
  * @param {HTMLElement} element
  * @param {HTMLElement[]} targets
- * @private
  */
 function markRevealed(element, targets) {
   element.removeAttribute('data-motion-pending');
@@ -1354,7 +1335,6 @@ function markRevealed(element, targets) {
 /**
  * @param {number} length
  * @returns {number[]} 0…length-1 in random order.
- * @private
  */
 function shuffledIndices(length) {
   const indices = Array.from({ length }, (_, index) => index);
@@ -1389,7 +1369,6 @@ const SPLIT_SKIP = 'script, style, template, noscript';
  * @param {Element} root
  * @param {(Text|HTMLElement)[]} [found]
  * @returns {(Text|HTMLElement)[]}
- * @private
  */
 function splitItems(root, found = []) {
   for (const node of root.childNodes) {
@@ -1546,17 +1525,13 @@ export function subscribeToTicker(callback) {
   };
 }
 
-/**
- * @param {boolean} [force] Run even when the scroll position has not moved.
- * @private
- */
+/** @param {boolean} [force] Run even when the scroll position has not moved. */
 function requestTick(force = false) {
   if (force) lastTickY = -1;
   if (tickerFrame !== null) return;
   tickerFrame = requestAnimationFrame(tick);
 }
 
-/** @private */
 function tick() {
   tickerFrame = null;
   const scrollY = window.scrollY;
@@ -1575,7 +1550,6 @@ function tick() {
   requestTick();
 }
 
-/** @private */
 function startTicker() {
   if (tickerListener) return;
 
@@ -1591,7 +1565,6 @@ function startTicker() {
   };
 }
 
-/** @private */
 function stopTicker() {
   tickerListener?.();
   tickerListener = null;

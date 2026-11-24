@@ -50,30 +50,22 @@ export class LocalizationForm extends BaseComponent {
 
   /* --------------------------------------------------------- public API -- ---- */
 
-  /**
-   * @returns {boolean}
-   */
+  /** @returns {boolean} */
   get isOpen() {
     return this.hasAttribute('data-open');
   }
 
-  /**
-   * @returns {'country'|'language'}
-   */
+  /** @returns {'country'|'language'} */
   get type() {
     return this.dataset.type === 'language' ? 'language' : 'country';
   }
 
-  /**
-   * @returns {HTMLElement[]} Every option button, including hidden ones.
-   */
+  /** @returns {HTMLElement[]} Every option button, including hidden ones. */
   get options() {
     return Array.from(this.querySelectorAll('[data-option]'));
   }
 
-  /**
-   * @returns {HTMLElement[]} Options currently visible.
-   */
+  /** @returns {HTMLElement[]} Options currently visible. */
   get visibleOptions() {
     return this.options.filter((option) => !option.closest('[hidden]'));
   }
@@ -147,10 +139,7 @@ export class LocalizationForm extends BaseComponent {
 
   /* ---------------------------------------------------------- internals -- ---- */
 
-  /**
-   * @returns {HTMLElement|null}
-   * @private
-   */
+  /** @returns {HTMLElement|null} */
   #selectedOption() {
     return (
       this.querySelector('[data-option][aria-selected="true"]') ||
@@ -159,10 +148,7 @@ export class LocalizationForm extends BaseComponent {
     );
   }
 
-  /**
-   * @param {KeyboardEvent} event
-   * @private
-   */
+  /** @param {KeyboardEvent} event */
   #onPanelKeydown = (event) => {
     if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
 

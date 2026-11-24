@@ -200,11 +200,7 @@ export class StickyHeader extends BaseComponent {
     this.on(document, EVENTS.SCROLL_RESTORED, () => this.#prime());
   }
 
-  /**
-   * Adopt the page's current scroll position without reacting to it as movement.
-   *
-   * @private
-   */
+  /** Adopt the page's current scroll position without reacting to it as movement. */
   #prime() {
     this.setAttribute('data-priming', '');
 
@@ -231,16 +227,13 @@ export class StickyHeader extends BaseComponent {
     this.removeAttribute('data-hidden');
   }
 
-  /**
-   * @returns {number} The header's current height in pixels.
-   */
+  /** @returns {number} The header's current height in pixels. */
   get height() {
     return this.offsetHeight;
   }
 
   /* ---------------------------------------------------------- internals -- ---- */
 
-  /** @private */
   #measure() {
     setCssVar('--header-height', `${this.offsetHeight}px`);
 
@@ -261,7 +254,6 @@ export class StickyHeader extends BaseComponent {
    * group, which in a default theme is the announcement bar.
    *
    * @returns {number}
-   * @private
    */
   #offsetAbove() {
     let offset = 0;
@@ -281,7 +273,6 @@ export class StickyHeader extends BaseComponent {
    * How far down the header should pin.
    *
    * @returns {number}
-   * @private
    */
   #stickyOffset() {
     let offset = 0;
@@ -299,10 +290,7 @@ export class StickyHeader extends BaseComponent {
     return offset;
   }
 
-  /**
-   * @param {number} scrollY
-   * @private
-   */
+  /** @param {number} scrollY */
   #onScroll(scrollY, priming = false) {
     const threshold = Number(this.dataset.threshold) || 80;
     const position = Math.max(0, scrollY);
@@ -448,13 +436,11 @@ export class MegaMenu extends BaseComponent {
 
   /* ---------------------------------------------------------- internals -- ---- */
 
-  /** @private */
   #scheduleClose() {
     this.#cancelClose();
     this.#closeTimer = window.setTimeout(() => this.close(), 180);
   }
 
-  /** @private */
   #cancelClose() {
     if (this.#closeTimer === null) return;
     window.clearTimeout(this.#closeTimer);
@@ -528,7 +514,6 @@ export class MobileNavigation extends BaseComponent {
 
   /* ---------------------------------------------------------- internals -- ---- */
 
-  /** @private */
   #applyState() {
     const active = this.#stack[this.#stack.length - 1] || null;
 
@@ -595,7 +580,6 @@ export class ResponsiveImage extends BaseComponent {
     }
   }
 
-  /** @private */
   #markLoaded() {
     this.setAttribute('data-loaded', '');
   }
@@ -663,11 +647,7 @@ defineComponent('cookie-banner', CookieBanner);
    Boot
    ========================================================================== */
 
-/**
- * Publish viewport measurements that CSS cannot compute on its own.
- *
- * @private
- */
+/** Publish viewport measurements that CSS cannot compute on its own. */
 function publishViewport() {
   setCssVar('--viewport-height', `${window.innerHeight}px`);
   setCssVar('--scrollbar-width', `${window.innerWidth - document.documentElement.clientWidth}px`);
@@ -677,7 +657,6 @@ function publishViewport() {
  * Reset the mobile navigation when its drawer closes, so it reopens at the top.
  *
  * @param {CustomEvent} event
- * @private
  */
 function onOverlayClose(event) {
   const overlay = event.target instanceof Element ? event.target : null;
@@ -686,11 +665,7 @@ function onOverlayClose(event) {
   }
 }
 
-/**
- * Wire up everything that is not an element's own responsibility.
- *
- * @private
- */
+/** Wire up everything that is not an element's own responsibility. */
 function boot() {
   document.documentElement.setAttribute('data-direction', isRTL() ? 'rtl' : 'ltr');
 
@@ -713,10 +688,7 @@ function boot() {
   document.addEventListener('click', onAnchorClick, { capture: true });
 }
 
-/**
- * @param {MouseEvent} event
- * @private
- */
+/** @param {MouseEvent} event */
 function onAnchorClick(event) {
   if (event.defaultPrevented || event.button !== 0) return;
   if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;

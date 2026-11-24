@@ -91,9 +91,7 @@ export class QuickAddSummary extends BaseComponent {
     });
   }
 
-  /**
-   * @returns {void}
-   */
+  /** @returns {void} */
   render() {
     this.#renderPlanPrices();
     this.#renderButton();
@@ -104,19 +102,13 @@ export class QuickAddSummary extends BaseComponent {
   /** @type {boolean} */
   #pending = false;
 
-  /**
-   * @returns {number|null}
-   * @private
-   */
+  /** @returns {number|null} */
   #firstVariantId() {
     const first = this.#product?.variants?.find((variant) => variant.available) || this.#product?.variants?.[0];
     return first ? Number(first.id) : null;
   }
 
-  /**
-   * @returns {Object|null}
-   * @private
-   */
+  /** @returns {Object|null} */
   get #variant() {
     if (!this.#variantId) return null;
     return this.#product?.variants?.find((variant) => Number(variant.id) === this.#variantId) || null;
@@ -127,7 +119,6 @@ export class QuickAddSummary extends BaseComponent {
    * the variant's price otherwise.
    *
    * @returns {number|null} Cents.
-   * @private
    */
   get #unitPrice() {
     const variant = this.#variant;
@@ -142,11 +133,7 @@ export class QuickAddSummary extends BaseComponent {
     return Number.isFinite(Number(variant.price)) ? Number(variant.price) : null;
   }
 
-  /**
-   * Keep each purchase-option card's price in step with the chosen variant.
-   *
-   * @private
-   */
+  /** Keep each purchase-option card's price in step with the chosen variant. */
   #renderPlanPrices() {
     const variant = this.#variant;
     if (!variant) return;
@@ -191,7 +178,6 @@ export class QuickAddSummary extends BaseComponent {
    * @param {string} scope Selector for the card's price container.
    * @param {number} compare
    * @param {number} price
-   * @private
    */
   #renderSaving(scope, compare, price) {
     const badge = this.root.querySelector(`${scope} [data-price-saving]`);
@@ -208,8 +194,6 @@ export class QuickAddSummary extends BaseComponent {
   /**
    * Append the total to whatever `product-form.js` last
    * wrote on the button.
-   *
-   * @private
    */
   #renderButton() {
     const button = this.root.querySelector('product-form [data-ref="submit"]');

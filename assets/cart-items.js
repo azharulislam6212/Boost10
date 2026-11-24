@@ -77,10 +77,7 @@ export class CartItems extends BaseComponent {
 
   /* ---------------------------------------------------------- internals -- ---- */
 
-  /**
-   * @param {CustomEvent} event
-   * @private
-   */
+  /** @param {CustomEvent} event */
   #onQuantityChange = (event) => {
     const key = event.detail?.key;
     if (!key) return;
@@ -89,10 +86,7 @@ export class CartItems extends BaseComponent {
     this.updateQuantity(key, event.detail.quantity);
   };
 
-  /**
-   * @param {MouseEvent} event
-   * @private
-   */
+  /** @param {MouseEvent} event */
   #onClick = (event) => {
     const trigger = event.target instanceof Element ? event.target.closest('[data-remove-item]') : null;
     if (!trigger) return;
@@ -106,7 +100,6 @@ export class CartItems extends BaseComponent {
   /**
    * @param {string} key
    * @returns {HTMLElement|null}
-   * @private
    */
   #lineFor(key) {
     return this.querySelector(`[data-line-item][data-key="${CSS.escape(key)}"]`);
@@ -115,7 +108,6 @@ export class CartItems extends BaseComponent {
   /**
    * @param {HTMLElement|null} line
    * @param {boolean} busy
-   * @private
    */
   #setLineBusy(line, busy) {
     if (!line) return;
@@ -126,7 +118,6 @@ export class CartItems extends BaseComponent {
   /**
    * @param {HTMLElement|null} line
    * @param {string} message
-   * @private
    */
   #setLineError(line, message) {
     const target = line?.querySelector('[data-line-error]');
@@ -175,10 +166,7 @@ export class CartNote extends BaseComponent {
   /** @type {string|null} */
   #lastSaved = null;
 
-  /**
-   * @param {string} message
-   * @private
-   */
+  /** @param {string} message */
   #status(message) {
     const target = this.refs.status;
     if (target instanceof HTMLElement) target.textContent = message;
@@ -200,10 +188,7 @@ export class GiftWrapToggle extends BaseComponent {
     this.on(this.refs.checkbox, 'change', this.#onChange);
   }
 
-  /**
-   * @param {Event} event
-   * @private
-   */
+  /** @param {Event} event */
   #onChange = async (event) => {
     const checkbox = /** @type {HTMLInputElement} */ (event.target);
     const wanted = checkbox.checked;

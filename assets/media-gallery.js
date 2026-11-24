@@ -74,23 +74,17 @@ export class MediaGallery extends BaseComponent {
 
   /* --------------------------------------------------------- public API -- ---- */
 
-  /**
-   * @returns {HTMLElement[]}
-   */
+  /** @returns {HTMLElement[]} */
   get media() {
     return Array.from(this.refs.stage.querySelectorAll('[data-media]'));
   }
 
-  /**
-   * @returns {string|null}
-   */
+  /** @returns {string|null} */
   get activeMediaId() {
     return this.#activeId;
   }
 
-  /**
-   * @returns {HTMLElement|null}
-   */
+  /** @returns {HTMLElement|null} */
   get activeMedia() {
     return this.media.find((item) => item.dataset.mediaId === this.#activeId) || null;
   }
@@ -132,11 +126,7 @@ export class MediaGallery extends BaseComponent {
 
   /* ---------------------------------------------------------- internals -- ---- */
 
-  /**
-   * Derive the active item from the scroll position.
-   *
-   * @private
-   */
+  /** Derive the active item from the scroll position. */
   #syncFromScroll() {
     const stage = this.refs.stage;
     const items = this.media;
@@ -161,10 +151,7 @@ export class MediaGallery extends BaseComponent {
     this.#setActive(closest.dataset.mediaId);
   }
 
-  /**
-   * @param {string} id
-   * @private
-   */
+  /** @param {string} id */
   #setActive(id) {
     this.#activeId = id;
     this.dataset.activeMedia = id;
@@ -197,7 +184,6 @@ export class MediaGallery extends BaseComponent {
    * Nested controls win over detached ones, same rule as the carousel.
    *
    * @returns {import('@theme/carousel-controls').ControlRefs}
-   * @private
    */
   get #controls() {
     return {
@@ -209,7 +195,6 @@ export class MediaGallery extends BaseComponent {
     };
   }
 
-  /** @private */
   #syncControls() {
     const index = this.#indexOf(this.#activeId);
     const count = this.media.length;
@@ -234,16 +219,12 @@ export class MediaGallery extends BaseComponent {
   /**
    * @param {string|null} id
    * @returns {number}
-   * @private
    */
   #indexOf(id) {
     return this.media.findIndex((item) => item.dataset.mediaId === id);
   }
 
-  /**
-   * @param {HTMLElement|null} keep
-   * @private
-   */
+  /** @param {HTMLElement|null} keep */
   #pauseAllExcept(keep) {
     for (const item of this.media) {
       if (item === keep) continue;
@@ -262,7 +243,6 @@ export class MediaGallery extends BaseComponent {
     }
   }
 
-  /** @private */
   #announce() {
     const message = themeString('mediaPosition', '', {
       index: this.#indexOf(this.#activeId) + 1,
@@ -272,10 +252,7 @@ export class MediaGallery extends BaseComponent {
     if (this.refs.status instanceof HTMLElement) this.refs.status.textContent = message;
   }
 
-  /**
-   * @param {KeyboardEvent} event
-   * @private
-   */
+  /** @param {KeyboardEvent} event */
   #onKeydown = (event) => {
     const items = this.media;
     const index = this.#indexOf(this.#activeId);
@@ -304,9 +281,7 @@ defineComponent('media-gallery', MediaGallery);
 
 /** The thumbnail strip. */
 export class MediaThumbnails extends BaseComponent {
-  /**
-   * @returns {HTMLElement[]}
-   */
+  /** @returns {HTMLElement[]} */
   get thumbnails() {
     return Array.from(this.querySelectorAll('[data-thumbnail]'));
   }

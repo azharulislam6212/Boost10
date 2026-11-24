@@ -164,11 +164,7 @@ export class TabGroup extends BaseComponent {
 
   /* ---------------------------------------------------------- internals -- ---- */
 
-  /**
-   * Mark the strip while it has more tabs than it can show.
-   *
-   * @private
-   */
+  /** Mark the strip while it has more tabs than it can show. */
   #syncOverflow() {
     const list = this.refs.list;
     if (!list) return;
@@ -185,7 +181,6 @@ export class TabGroup extends BaseComponent {
    * Drag the strip with a pointer.
    *
    * @param {PointerEvent} event
-   * @private
    */
   #onPointerDown(event) {
     this.#swallowClick = false;
@@ -237,7 +232,6 @@ export class TabGroup extends BaseComponent {
    * to go.
    *
    * @param {WheelEvent} event
-   * @private
    */
   #onWheel(event) {
     const list = this.refs.list;
@@ -258,7 +252,6 @@ export class TabGroup extends BaseComponent {
    *
    * @param {HTMLElement|undefined} tab
    * @param {boolean} animate
-   * @private
    */
   #revealTab(tab, animate) {
     if (!tab || !this.refs.list) return;
@@ -277,7 +270,6 @@ export class TabGroup extends BaseComponent {
    *
    * @param {HTMLElement} tab
    * @returns {{ x: number, y: number, width: number, height: number }}
-   * @private
    */
   #layoutBox(tab) {
     const list = this.refs.list;
@@ -331,10 +323,7 @@ export class TabGroup extends BaseComponent {
     });
   }
 
-  /**
-   * @param {boolean} animate
-   * @private
-   */
+  /** @param {boolean} animate */
   #placeMarker(animate) {
     const marker = /** @type {HTMLElement|undefined} */ (this.refs.marker);
     const tab = this.tabs[this.#index];
@@ -360,10 +349,7 @@ export class TabGroup extends BaseComponent {
     }
   }
 
-  /**
-   * @param {KeyboardEvent} event
-   * @private
-   */
+  /** @param {KeyboardEvent} event */
   #onKeydown(event) {
     const vertical = this.dataset.orientation === 'vertical';
     const previous = vertical ? 'ArrowUp' : 'ArrowLeft';

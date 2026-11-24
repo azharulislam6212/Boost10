@@ -65,9 +65,7 @@ export class QuantitySelector extends BaseComponent {
 
   /* --------------------------------------------------------- public API ---- */
 
-  /**
-   * @returns {number} The current quantity.
-   */
+  /** @returns {number} The current quantity. */
   get value() {
     const input = this.refs?.input;
 
@@ -80,9 +78,7 @@ export class QuantitySelector extends BaseComponent {
     return Number.isFinite(value) ? value : this.min;
   }
 
-  /**
-   * @param {number} next
-   */
+  /** @param {number} next */
   set value(next) {
     this.setValue(next);
   }
@@ -187,7 +183,6 @@ export class QuantitySelector extends BaseComponent {
   /**
    * @param {number} value
    * @returns {number}
-   * @private
    */
   #applyRules(value) {
     const min = this.min;
@@ -210,7 +205,6 @@ export class QuantitySelector extends BaseComponent {
     );
   }
 
-  /** @private */
   #clampToRules() {
     const input = this.refs?.input;
 
@@ -224,7 +218,6 @@ export class QuantitySelector extends BaseComponent {
     }
   }
 
-  /** @private */
   #syncButtons() {
     const input = this.refs?.input;
 
@@ -247,15 +240,12 @@ export class QuantitySelector extends BaseComponent {
   /**
    * While typing, only the buttons are updated. Correcting the value here is
    * what makes a field fight the customer as they type a two-digit number.
-   *
-   * @private
    */
   #onInput = () => {
     this.#message('');
     this.#syncButtons();
   };
 
-  /** @private */
   #onCommit = () => {
     const input = this.refs?.input;
 
@@ -279,10 +269,7 @@ export class QuantitySelector extends BaseComponent {
     }
   };
 
-  /**
-   * @param {KeyboardEvent} event
-   * @private
-   */
+  /** @param {KeyboardEvent} event */
   #onKeydown = (event) => {
     switch (event.key) {
       case 'ArrowUp':
@@ -307,7 +294,6 @@ export class QuantitySelector extends BaseComponent {
   /**
    * @param {string} text
    * @param {boolean} announceIt
-   * @private
    */
   #message(text, announceIt = false) {
     const target = this.refs?.message;
@@ -324,10 +310,7 @@ export class QuantitySelector extends BaseComponent {
     }
   }
 
-  /**
-   * @param {number} value
-   * @private
-   */
+  /** @param {number} value */
   #dispatchChange(value) {
     const previous = this.#lastNotified;
 
@@ -349,7 +332,6 @@ export class QuantitySelector extends BaseComponent {
    * only updates local state, so it responds immediately.
    *
    * @returns {number}
-   * @private
    */
   #debounceDelay() {
     const explicit = Number(this.dataset.debounce);

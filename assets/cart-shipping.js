@@ -94,8 +94,6 @@ export class ShippingCalculator extends BaseComponent {
   /**
    * Repopulate the province select for the selected country, and hide it
    * entirely for countries that have none.
-   *
-   * @private
    */
   #syncProvinces() {
     const select = this.refs.province;
@@ -128,7 +126,6 @@ export class ShippingCalculator extends BaseComponent {
   /**
    * @param {Array} rates
    * @param {string} address
-   * @private
    */
   #renderRates(rates, address) {
     const container = this.refs.results;
@@ -170,10 +167,7 @@ export class ShippingCalculator extends BaseComponent {
     announce(heading.textContent);
   }
 
-  /**
-   * @param {Object} data
-   * @private
-   */
+  /** @param {Object} data */
   #renderErrors(data) {
     const messages = Object.values(data || {})
       .flat()
@@ -186,7 +180,6 @@ export class ShippingCalculator extends BaseComponent {
   /**
    * @param {string} text
    * @param {boolean} [isError=false]
-   * @private
    */
   #renderMessage(text, isError = false) {
     const container = this.refs.results;
@@ -201,15 +194,11 @@ export class ShippingCalculator extends BaseComponent {
     container.replaceChildren(paragraph);
   }
 
-  /** @private */
   #clear() {
     if (this.refs.results instanceof HTMLElement) this.refs.results.replaceChildren();
   }
 
-  /**
-   * @param {boolean} busy
-   * @private
-   */
+  /** @param {boolean} busy */
   #busy(busy) {
     this.setAttribute('aria-busy', busy ? 'true' : 'false');
     if (this.refs.submit instanceof HTMLButtonElement) this.refs.submit.disabled = busy;

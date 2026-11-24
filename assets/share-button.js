@@ -81,10 +81,7 @@ export class ShareButton extends BaseComponent {
 
   /* ---------------------------------------------------------- internals -- ---- */
 
-  /**
-   * @param {string} message
-   * @private
-   */
+  /** @param {string} message */
   #feedback(message) {
     const target = this.refs.feedback;
     if (!(target instanceof HTMLElement)) return;
@@ -100,7 +97,6 @@ export class ShareButton extends BaseComponent {
     }, FEEDBACK_MS);
   }
 
-  /** @private */
   #selectFallback() {
     const input = this.refs.urlInput;
     if (!(input instanceof HTMLInputElement)) return;

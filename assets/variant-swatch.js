@@ -50,23 +50,17 @@ export class VariantSwatch extends BaseComponent {
 
   /* --------------------------------------------------------- public API -- ---- */
 
-  /**
-   * @returns {HTMLElement[]}
-   */
+  /** @returns {HTMLElement[]} */
   get options() {
     return Array.from(this.querySelectorAll('[data-swatch-option]'));
   }
 
-  /**
-   * @returns {HTMLElement|null} The card this belongs to.
-   */
+  /** @returns {HTMLElement|null} The card this belongs to. */
   get card() {
     return this.closest('[data-product-card]') || this.parentElement;
   }
 
-  /**
-   * @returns {Object|null}
-   */
+  /** @returns {Object|null} */
   get variant() {
     return this.#committed;
   }
@@ -110,16 +104,12 @@ export class VariantSwatch extends BaseComponent {
   /**
    * @param {string} value
    * @returns {Object|null}
-   * @private
    */
   #find(value) {
     return this.#variants.find((variant) => variant.options.includes(value)) || null;
   }
 
-  /**
-   * @param {MouseEvent} event
-   * @private
-   */
+  /** @param {MouseEvent} event */
   #onClick = (event) => {
     const option = event.target instanceof Element ? event.target.closest('[data-swatch-option]') : null;
     if (!(option instanceof HTMLElement)) return;
@@ -133,7 +123,6 @@ export class VariantSwatch extends BaseComponent {
    * responds to Tab makes a keyboard user press it once per colour.
    *
    * @param {KeyboardEvent} event
-   * @private
    */
   #onKeydown = (event) => {
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
@@ -153,10 +142,7 @@ export class VariantSwatch extends BaseComponent {
     options[next]?.focus();
   };
 
-  /**
-   * @param {Event} event
-   * @private
-   */
+  /** @param {Event} event */
   #onIntent = (event) => {
     const option = event.target instanceof Element ? event.target.closest('[data-swatch-option]') : null;
     if (!(option instanceof HTMLElement)) return;
@@ -172,7 +158,6 @@ export class VariantSwatch extends BaseComponent {
    * Fetch an image once, on first intent.
    *
    * @param {Object} variant
-   * @private
    */
   #preload(variant) {
     const src = variant.featured_image?.src;
@@ -188,7 +173,6 @@ export class VariantSwatch extends BaseComponent {
   /**
    * @param {Object} variant
    * @param {{ committed: boolean }} options
-   * @private
    */
   #paint(variant, { committed }) {
     const card = this.card;
@@ -213,11 +197,7 @@ export class VariantSwatch extends BaseComponent {
     card.toggleAttribute('data-variant-previewing', !committed);
   }
 
-  /**
-   * Put the card back to its committed variant.
-   *
-   * @private
-   */
+  /** Put the card back to its committed variant. */
   #restore() {
     const card = this.card;
     if (!card) return;
@@ -240,7 +220,6 @@ export class VariantSwatch extends BaseComponent {
     }
   }
 
-  /** @private */
   #syncPressed() {
     for (const option of this.options) {
       const active = Boolean(this.#committed?.options.includes(option.dataset.value));
@@ -254,7 +233,6 @@ export class VariantSwatch extends BaseComponent {
    * colour the customer was looking at rather than the default.
    *
    * @param {Object} variant
-   * @private
    */
   #syncLinks(variant) {
     const card = this.card;

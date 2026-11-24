@@ -94,13 +94,11 @@ export class ScrollingCards extends BaseComponent {
 
   /* ---------------------------------------------------------- internals -- ---- */
 
-  /** @private */
   #start() {
     if (this.#unsubscribe) return;
     this.#unsubscribe = subscribeToTicker((scrollY) => this.#update(scrollY));
   }
 
-  /** @private */
   #stop() {
     this.#unsubscribe?.();
     this.#unsubscribe = null;
@@ -108,11 +106,7 @@ export class ScrollingCards extends BaseComponent {
     this.#frame = null;
   }
 
-  /**
-   * Page positions, measured without the transforms this component applies.
-   *
-   * @private
-   */
+  /** Page positions, measured without the transforms this component applies. */
   #measure() {
     const scrollY = window.scrollY;
     const rect = this.getBoundingClientRect();
@@ -137,7 +131,6 @@ export class ScrollingCards extends BaseComponent {
   /**
    * @param {number} scrollY
    * @param {boolean} [jump] Place everything at its target without easing.
-   * @private
    */
   #update(scrollY, jump = false) {
     if (!this.#geometry) this.#measure();
@@ -163,7 +156,6 @@ export class ScrollingCards extends BaseComponent {
     if (this.#frame === null) this.#frame = requestAnimationFrame(this.#step);
   }
 
-  /** @private */
   #step = () => {
     this.#frame = null;
     let moving = false;
@@ -179,7 +171,6 @@ export class ScrollingCards extends BaseComponent {
     if (moving) this.#frame = requestAnimationFrame(this.#step);
   };
 
-  /** @private */
   #paint() {
     for (const card of this.#cards) {
       card.el.style.scale = card.now.toFixed(4);

@@ -68,16 +68,12 @@ export class Overlay extends BaseComponent {
 
   /* --------------------------------------------------------- public API -- ---- */
 
-  /**
-   * @returns {boolean}
-   */
+  /** @returns {boolean} */
   get isOpen() {
     return this.#open;
   }
 
-  /**
-   * @returns {string} `drawer`, `modal` or `toast`. Reported in the event detail.
-   */
+  /** @returns {string} `drawer`, `modal` or `toast`. Reported in the event detail. */
   get overlayType() {
     return this.dataset.overlayType || 'drawer';
   }
@@ -91,9 +87,7 @@ export class Overlay extends BaseComponent {
     return 320;
   }
 
-  /**
-   * @returns {number} How long the exit runs, in milliseconds.
-   */
+  /** @returns {number} How long the exit runs, in milliseconds. */
   get exitDuration() {
     return 240;
   }
@@ -192,17 +186,13 @@ export class Overlay extends BaseComponent {
    * direction. This is important when a modal is closed while its entrance
    * animation is still settling: reversing an already-running animation can
    * briefly expose the CSS transform and makes the panel appear to jump.
-   *
-   * @private
    */
   #cancelPanelAnimations() {
     if (!(this.refs.panel instanceof HTMLElement)) return;
     for (const animation of this.refs.panel.getAnimations()) animation.cancel();
   }
 
-  /**
-   * @returns {Promise<void>|undefined}
-   */
+  /** @returns {Promise<void>|undefined} */
   async animateIn() {
     if (prefersReducedMotion() || !this.refs.panel) return undefined;
 
@@ -219,9 +209,7 @@ export class Overlay extends BaseComponent {
     } catch {}
   }
 
-  /**
-   * @returns {Promise<void>|undefined}
-   */
+  /** @returns {Promise<void>|undefined} */
   async animateOut() {
     if (prefersReducedMotion() || !this.refs.panel) return undefined;
 
@@ -238,9 +226,7 @@ export class Overlay extends BaseComponent {
     } catch {}
   }
 
-  /**
-   * @returns {Keyframe[]}
-   */
+  /** @returns {Keyframe[]} */
   enterKeyframes() {
     return [
       { opacity: 0, transform: 'scale(0.98)' },
@@ -253,8 +239,6 @@ export class Overlay extends BaseComponent {
   /**
    * Release focus, scroll and trigger state. Idempotent, because a native
    * `close` event and an explicit `close()` call can both reach it.
-   *
-   * @private
    */
   #release() {
     if (!this.#open) return;
@@ -271,10 +255,7 @@ export class Overlay extends BaseComponent {
     this.#trigger = null;
   }
 
-  /**
-   * @returns {HTMLElement|undefined}
-   * @private
-   */
+  /** @returns {HTMLElement|undefined} */
   #initialFocusTarget() {
     const explicit = this.querySelector('[data-overlay-autofocus]');
     if (explicit instanceof HTMLElement) return explicit;
@@ -283,10 +264,7 @@ export class Overlay extends BaseComponent {
     return close instanceof HTMLElement ? close : undefined;
   }
 
-  /**
-   * @param {MouseEvent} event
-   * @private
-   */
+  /** @param {MouseEvent} event */
   #onDocumentClick = (event) => {
     const target = event.target instanceof Element ? event.target : null;
     if (!target) return;
@@ -309,7 +287,6 @@ export class Overlay extends BaseComponent {
    * Close buttons inside the overlay, and clicks on the backdrop.
    *
    * @param {MouseEvent} event
-   * @private
    */
   #onDialogClick = (event) => {
     const target = event.target instanceof Element ? event.target : null;
@@ -325,16 +302,12 @@ export class Overlay extends BaseComponent {
     }
   };
 
-  /**
-   * @param {Event} event
-   * @private
-   */
+  /** @param {Event} event */
   #onCancel = (event) => {
     event.preventDefault();
     this.close();
   };
 
-  /** @private */
   #onNativeClose = () => {
     this.#release();
   };
@@ -370,17 +343,13 @@ export class ModalDialog extends Overlay {
     return this.dataset.overlayType || 'modal';
   }
 
-  /**
-   * @returns {number} Entrance length in milliseconds.
-   */
+  /** @returns {number} Entrance length in milliseconds. */
   get enterDuration() {
     const value = Number(this.dataset.animationDuration);
     return Number.isFinite(value) && value >= 0 ? Math.min(value, 1200) : 320;
   }
 
-  /**
-   * @returns {number} Exit length in milliseconds.
-   */
+  /** @returns {number} Exit length in milliseconds. */
   get exitDuration() {
     return Math.round(this.enterDuration * 0.75);
   }

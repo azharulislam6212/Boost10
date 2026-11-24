@@ -40,9 +40,7 @@ export function clearSectionCache(prefix) {
   }
 }
 
-/**
- * @returns {number} Number of entries currently cached.
- */
+/** @returns {number} Number of entries currently cached. */
 export function sectionCacheSize() {
   return cache.size;
 }
@@ -50,7 +48,6 @@ export function sectionCacheSize() {
 /**
  * @param {string} key
  * @returns {string|null}
- * @private
  */
 function readCache(key) {
   const entry = cache.get(key);
@@ -70,7 +67,6 @@ function readCache(key) {
 /**
  * @param {string} key
  * @param {string} html
- * @private
  */
 function writeCache(key, html) {
   if (isDesignMode()) return; // The Theme Editor must always see fresh output.
@@ -345,7 +341,6 @@ export function extractFromHTML(html, selector) {
  *
  * @param {string|null} sectionId
  * @param {Element} element
- * @private
  */
 function notifyRendered(sectionId, element) {
   element.dispatchEvent(
@@ -363,7 +358,6 @@ function notifyRendered(sectionId, element) {
  *
  * @param {string} value
  * @returns {string}
- * @private
  */
 function cssEscape(value) {
   if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') return CSS.escape(value);

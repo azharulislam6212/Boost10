@@ -33,9 +33,7 @@ export function recordProduct(handle) {
   return items;
 }
 
-/**
- * @returns {string[]}
- */
+/** @returns {string[]} */
 export function read() {
   try {
     const raw = storage.get(KEY, null);
@@ -47,9 +45,7 @@ export function read() {
   }
 }
 
-/**
- * @param {string[]} items
- */
+/** @param {string[]} items */
 function write(items) {
   try {
     storage.set(KEY, JSON.stringify(items));
@@ -81,23 +77,17 @@ export class RecentlyViewed extends BaseComponent {
     this.load();
   }
 
-  /**
-   * @returns {number}
-   */
+  /** @returns {number} */
   get limit() {
     return Number(this.dataset.limit) || 4;
   }
 
-  /**
-   * @returns {number} Below this the section does not render at all.
-   */
+  /** @returns {number} Below this the section does not render at all. */
   get minimum() {
     return Number(this.dataset.minimum) || 2;
   }
 
-  /**
-   * @returns {string[]} Handles to show, excluding the current product.
-   */
+  /** @returns {string[]} Handles to show, excluding the current product. */
   get handles() {
     const exclude = this.dataset.exclude;
     return read()

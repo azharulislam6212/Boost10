@@ -24,17 +24,12 @@ export class BackInStockForm extends BaseComponent {
     if (!picker || picker.currentVariant !== undefined) this.#syncTo(picker?.currentVariant ?? null);
   }
 
-  /**
-   * @returns {HTMLElement|Document}
-   */
+  /** @returns {HTMLElement|Document} */
   get root() {
     return this.closest('[data-product-root]') || document;
   }
 
-  /**
-   * @param {Object|null} variant
-   * @private
-   */
+  /** @param {Object|null} variant */
   #syncTo(variant) {
     const show = Boolean(variant) && !variant.available;
     this.hidden = !show;
@@ -56,10 +51,7 @@ export class BackInStockForm extends BaseComponent {
     }
   }
 
-  /**
-   * @param {SubmitEvent} event
-   * @private
-   */
+  /** @param {SubmitEvent} event */
   #onSubmit = async (event) => {
     event.preventDefault();
 
@@ -91,7 +83,6 @@ export class BackInStockForm extends BaseComponent {
   /**
    * @param {string} text
    * @param {boolean} [isError=false]
-   * @private
    */
   #message(text, isError = false) {
     const target = this.refs.message;

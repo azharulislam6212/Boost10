@@ -54,16 +54,12 @@ class RecommendationsBase extends BaseComponent {
 
   /* --------------------------------------------------------- public API -- ---- */
 
-  /**
-   * @returns {'related'|'complementary'}
-   */
+  /** @returns {'related'|'complementary'} */
   get intent() {
     return 'related';
   }
 
-  /**
-   * @returns {number}
-   */
+  /** @returns {number} */
   get limit() {
     const value = Number(this.dataset.limit);
     return Number.isFinite(value) && value > 0 ? Math.min(value, 10) : 4;
@@ -157,9 +153,7 @@ export class ComplementaryProducts extends RecommendationsBase {
     return 'complementary';
   }
 
-  /**
-   * @returns {number}
-   */
+  /** @returns {number} */
   get limit() {
     const value = Number(this.dataset.limit);
     return Number.isFinite(value) && value > 0 ? Math.min(value, 10) : 3;
