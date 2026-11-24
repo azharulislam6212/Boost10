@@ -28,22 +28,14 @@
   endif
   assign gap_y_mobile = gap_x_mobile
 
-  assign layout_type = s.layout | default: 'carousel'
-
-  assign cs_layout = 'grid'
-  if layout_type == 'carousel'
-    assign cs_layout = 'carousel'
-  endif
-
-  assign carousel_on_mobile = s.carousel_on_mobile
-  if carousel_on_mobile == nil
-    assign carousel_on_mobile = true
-  endif
-
-  assign cs_layout_mobile = 'grid'
-  if layout_type == 'carousel' or carousel_on_mobile
-    assign cs_layout_mobile = 'carousel'
-  endif
+  capture cs_layout
+    render 'carousel-layout', settings: s, fallback: 'carousel', guard: false
+  endcapture
+  capture cs_layout_mobile
+    render 'carousel-layout', settings: s, fallback: 'carousel', mobile: true
+  endcapture
+  assign cs_layout = cs_layout | strip
+  assign cs_layout_mobile = cs_layout_mobile | strip
 
   assign cs_is_carousel = false
   if cs_layout == 'carousel' or cs_layout_mobile == 'carousel'
@@ -100,7 +92,7 @@
   --tc-gap-y: {{ gap_y }}px;
   --tc-gap-x-mobile: {{ gap_x_mobile }}px;
   --tc-gap-y-mobile: {{ gap_y_mobile }}px;
-  {%- render 'section-frame', settings: s, prefix: 'testimonials' -%}
+  {%- render 'section-frame', settings: s -%}
 {%- endcapture -%}
 
 {%- capture intro_panel -%}
@@ -181,32 +173,13 @@
 
     {%- if has_controls -%}
       <div class="{{ controls_class }}">
-        {%- if cs_pagination == 'controls' -%}
-          {% render 'carousel-controls',
-             settings: s,
-             carousel: carousel_id,
-             align: cs_pagination_align,
-             arrows: cs_nav %}
-        {%- else -%}
-          {%- capture pagination_markup -%}
-            {%- if cs_pagination != 'none' -%}
-              {% render 'carousel-pagination',
-                 style: cs_pagination,
-                 align: cs_pagination_align,
-                 carousel: carousel_id %}
-            {%- endif -%}
-          {%- endcapture -%}
-
-          {%- if cs_nav -%}
-            {% render 'carousel-nav',
-               settings: s,
-               carousel: carousel_id,
-               position: 'bottom',
-               between: pagination_markup %}
-          {%- else -%}
-            {{ pagination_markup }}
-          {%- endif -%}
-        {%- endif -%}
+        {%- render 'carousel-outside-controls',
+           settings: s,
+           carousel: carousel_id,
+           pagination: cs_pagination,
+           align: cs_pagination_align,
+           nav: cs_nav,
+           between: true -%}
       </div>
     {%- endif -%}
   </div>
