@@ -55,6 +55,16 @@ const MAX_SPLIT_SPREAD = 1200;
  */
 const MAX_ITEM_SPREAD = 1800;
 
+/**
+ * The same caps for what is already on screen when the page opens. The first
+ * view should be complete quickly; a long cascade there reads as a slow page.
+ */
+const LOAD_ITEM_SPREAD = 450;
+const LOAD_SPLIT_SPREAD = 700;
+
+/** Share of a heading cluster's hold kept for the first view. */
+const LOAD_HOLD_SCALE = 0.5;
+
 /* ==========================================================================
    Preset registry
    ========================================================================== */
@@ -865,7 +875,11 @@ export function reveal(element, options = {}) {
   const stopObserving = new Map();
 
   const play = (list, fromLoad) => {
-    const stagger = list.length > 1 ? Math.min(baseStagger, spread / (list.length - 1)) : baseStagger;
+    // What is on screen when the page opens arrives as one quick wave; the
+    // full pace is for content met while scrolling.
+    const span = fromLoad ? Math.min(spread, preset.split ? LOAD_SPLIT_SPREAD : LOAD_ITEM_SPREAD) : spread;
+    const stagger = list.length > 1 ? Math.min(baseStagger, span / (list.length - 1)) : baseStagger;
+    const hold = fromLoad ? LOAD_HOLD_SCALE : 1;
     const lead = ancestorLead(element);
     const now = performance.now();
     const ready = gate ? headerReady.get(gate) : undefined;
@@ -882,7 +896,7 @@ export function reveal(element, options = {}) {
         const start = Math.max(now + baseDelay, nextSlot);
         delay = start - now;
         if (position === 0) firstStart = start;
-        nextSlot = start + stagger + headerHold(target);
+        nextSlot = start + stagger + headerHold(target) * hold;
       }
 
       const owned = own.has(target);
