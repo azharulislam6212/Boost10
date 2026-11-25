@@ -214,16 +214,14 @@ export class MotionEffect extends BaseComponent {
 
   /**
    * The critical stylesheet holds a host at opacity 0 until this module claims
-   * it, and lets go after 12s in case a script never settles — after 0.8s
-   * inside `[data-motion-eager]`, the sections in the first view. A host it has
+   * it, and lets go after 12s in case a script never settles. A host it has
    * already let go of that sits on screen has been seen; hiding it again to
    * animate it is a flash, not an entrance.
    *
    * @returns {boolean}
    */
   #shownByFailsafe() {
-    if (this.hasAttribute('data-motion-pending')) return false;
-    if (!this.closest('[data-motion-eager]') && performance.now() < 12000) return false;
+    if (performance.now() < 12000 || this.hasAttribute('data-motion-pending')) return false;
     if (getComputedStyle(this).opacity === '0') return false;
     const box = this.getBoundingClientRect();
     return box.bottom > 0 && box.top < window.innerHeight;
