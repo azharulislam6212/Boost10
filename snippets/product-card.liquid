@@ -105,6 +105,12 @@
 
   assign card_price_display = card_variant.price | money
   assign add_to_cart_parts = 'products.product.add_to_cart_price' | t: price: '[[price]]' | split: '[[price]]'
+
+  # Card buttons name their product, so a list of them is not ten identical
+  # "Add to cart" buttons to a screen reader.
+  assign add_to_cart_named = 'products.product.add_to_cart_named' | t: product: product.title
+  assign choose_options_named = 'products.product.choose_options_named' | t: product: product.title
+  assign quantity_named = 'products.product.quantity_for' | t: product: product.title
 -%}
 
 {%- capture buy_form -%}
@@ -125,13 +131,13 @@
       <span class="product-card__buy-label product-card__buy-label--short">{{ 'products.product.add_to_cart' | t }}</span>
       <span class="product-card__buy-label product-card__buy-label--sold-out">{{ 'products.product.sold_out' | t }}</span>
     {%- endcapture -%}
-    <button type="submit" class="product-card__buy-submit"{% unless card_variant.available %} disabled{% endunless %}>
+    <button type="submit" class="product-card__buy-submit" aria-label="{{ add_to_cart_named | escape }}"{% unless card_variant.available %} disabled{% endunless %}>
       <span class="product-card__fx">
         <span class="product-card__fx-copy">{{ buy_labels }}</span>
         <span class="product-card__fx-copy" aria-hidden="true">{{ buy_labels | remove: ' data-card-price' }}</span>
       </span>
     </button>
-    <label class="visually-hidden" for="[[qty-id]]">{{ 'products.product.quantity' | t }}</label>
+    <label class="visually-hidden" for="[[qty-id]]">{{ quantity_named }}</label>
     <span class="product-card__buy-qty">
       <select id="[[qty-id]]" name="quantity">
         {%- for qty in (1..10) -%}
@@ -151,6 +157,7 @@
     data-overlay-open="QuickAdd"
     data-product-url="{{ product.url }}"
     data-section-id="quick-add"
+    aria-label="{{ choose_options_named | escape }}"
   >
     <span class="product-card__fx">
       <span class="product-card__fx-copy">{{ choose_options_label }}</span>
@@ -263,11 +270,11 @@
               <input type="hidden" name="id" value="{{ card_variant.id }}">
               <input type="hidden" name="quantity" value="1">
               {%- assign add_to_cart_label = 'products.product.add_to_cart' | t -%}
-              {% render 'button', label: add_to_cart_label, type: 'submit', variant: 'primary', size: 'small', full: false, icon_only: quick_add_icon_only, icon: 'plus' %}
+              {% render 'button', label: add_to_cart_label, aria_label: add_to_cart_named, type: 'submit', variant: 'primary', size: 'small', full: false, icon_only: quick_add_icon_only, icon: 'plus' %}
             </form>
           {%- else -%}
             {%- assign quick_add_attributes = 'data-overlay-open="QuickAdd" data-product-url="' | append: product.url | append: '" data-section-id="quick-add"' -%}
-            {% render 'button', label: choose_options_label, variant: 'primary', size: 'small', full: false, icon_only: quick_add_icon_only, icon: 'plus', attributes: quick_add_attributes %}
+            {% render 'button', label: choose_options_label, aria_label: choose_options_named, variant: 'primary', size: 'small', full: false, icon_only: quick_add_icon_only, icon: 'plus', attributes: quick_add_attributes %}
           {%- endif -%}
         </div>
       {%- endif -%}

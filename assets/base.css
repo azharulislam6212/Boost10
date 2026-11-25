@@ -3329,6 +3329,7 @@
   .collection-category__featured { margin-block: var(--space-8); }
   .collection-category__featured-title { font-size: var(--font-size-h3); margin-block-end: var(--space-5); }
 
+  .search-results__title { font-size: var(--font-size-h2); margin-block-end: var(--space-6); }
   .search-tabs { margin-block-end: var(--space-6); }
   .search-tabs__list { display: flex; flex-wrap: wrap; gap: var(--space-2); border-block-end: 1px solid var(--color-border); }
 
@@ -5801,6 +5802,49 @@
   }
 
   .announcement-bar__close:hover { opacity: 1; }
+
+  /* Pause/Play for marquees and the autoplaying announcement slider. */
+  .marquee-toggle {
+    position: absolute;
+    inset-block-end: var(--space-2);
+    inset-inline-end: var(--space-2);
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    inline-size: 2.4rem;
+    block-size: 2.4rem;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background-color: var(--color-background);
+    color: var(--color-text);
+    cursor: pointer;
+  }
+
+  .marquee-toggle[hidden] { display: none; }
+  .marquee-toggle > * { grid-area: 1 / 1; }
+  .marquee-toggle[aria-pressed='false'] .marquee-toggle__glyph--play,
+  .marquee-toggle[aria-pressed='true'] .marquee-toggle__glyph--pause { visibility: hidden; }
+
+  .marquee:has(> .marquee-toggle),
+  motion-effect:has(> .marquee-toggle) { position: relative; }
+
+  .marquee-toggle--inline {
+    position: static;
+    flex-shrink: 0;
+    background: none;
+    color: inherit;
+  }
+
+  .announcement-bar__carousel .announcement-bar__pause {
+    --carousel-pause-size: 2.4rem;
+    inset-block: 50% auto;
+    inset-inline-end: 0;
+    translate: 0 -50%;
+    background: none;
+    box-shadow: none;
+    color: inherit;
+  }
 
   /* ---- mobile visibility ---- */
 
@@ -13282,11 +13326,15 @@
     outline: none;
   }
 
+  /* A real underline, so it survives forced colors and print. The animated
+     redraw on hover is a background that takes over only while it runs. */
   .rte a:not([class]),
   :is(p, blockquote, dd, td, figcaption, address) a:not([class]) {
-    text-decoration: none;
+    text-decoration: underline;
+    text-decoration-thickness: 0.1rem;
+    text-underline-offset: 0.18em;
     background-image: linear-gradient(90deg, currentColor, currentColor);
-    background-size: 100% 0.1rem;
+    background-size: 0% 0.1rem;
     background-repeat: no-repeat;
     background-position: left bottom;
   }
@@ -13295,6 +13343,8 @@
     .rte a:not([class]):is(:hover, :focus-visible),
     :is(p, blockquote, dd, td, figcaption, address) a:not([class]):is(:hover, :focus-visible) {
       animation: link-redraw calc(var(--duration-slow, 450ms) * 2) var(--ease-out-expo);
+      text-decoration-color: transparent;
+      background-size: 100% 0.1rem;
     }
 
     [dir='rtl'] .rte a:not([class]):is(:hover, :focus-visible),

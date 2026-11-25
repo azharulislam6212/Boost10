@@ -130,7 +130,14 @@ export class QuantitySelector extends BaseComponent {
 
     this.#syncButtons();
 
-    if (!silent && applied !== this.#lastNotified) this.#notify(applied);
+    // A silent set records known state (for example the quantity the cart
+    // actually accepted), so the next real change is compared against it.
+    if (silent) {
+      this.#notify.cancel?.();
+      this.#lastNotified = applied;
+    } else if (applied !== this.#lastNotified) {
+      this.#notify(applied);
+    }
 
     return applied;
   }
@@ -236,6 +243,16 @@ export class QuantitySelector extends BaseComponent {
     if (!(input instanceof HTMLInputElement)) return;
 
     const typed = Number.parseInt(input.value, 10);
+
+    // An empty or unreadable field puts the last value back. Treating it as
+    // the minimum, or as 0, would change or remove a cart line by accident.
+    if (!Number.isFinite(typed)) {
+      const restore = this.#lastNotified ?? this.min;
+      input.value = String(restore);
+      this.#syncButtons();
+      return;
+    }
+
     const applied = this.setValue(typed);
 
     if (Number.isFinite(typed) && typed !== applied) {

@@ -131,6 +131,8 @@ export class FacetFilters extends BaseComponent {
 
       console.error('[theme] Filtering failed.', error);
       announceUrgent(themeString('networkError', ''));
+      // Load the filtered page in full rather than leave an empty or stale grid.
+      window.location.assign(target);
       return false;
     } finally {
       this.#setLoading(false);

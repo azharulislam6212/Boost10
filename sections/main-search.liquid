@@ -17,7 +17,8 @@
   data-page="{{ current_page | default: 1 }}"
   data-total="{{ search.results_count }}"
   role="region"
-  aria-label="{{ search.terms | default: 'products.facets.title' | t | escape }}"
+  {% assign t_title_fallback = 'products.facets.title' | t %}
+  aria-label="{{ search.terms | default: t_title_fallback | escape }}"
   {% render 'spacing', section: section_settings %}
 >
   <a class="skip-to-content-link visually-hidden" href="#MainContent">
@@ -25,6 +26,15 @@
   </a>
 
   <div class="{% render 'container', width: section_settings.container_width %}">
+    {%- liquid
+      if search.performed and search.terms != blank
+        assign search_heading_fallback = 'search.results_for' | t: terms: search.terms
+      else
+        assign search_heading_fallback = 'search.title' | t
+      endif
+    -%}
+    <h1 class="search-results__title">{{ search_heading_fallback }}</h1>
+
 
     {%- if section_settings.show_type_tabs and search.performed -%}
       {%- assign query = search.terms | url_encode -%}
@@ -89,7 +99,6 @@
 
       {%- liquid
         assign grid_mode = section_settings.pagination_type | default: 'paginate'
-        assign grid_total = search.results_count
         assign grid_id = 'ProductGrid-' | append: section.id
         assign grid_desktop = section_settings.columns_desktop
         assign grid_tablet = section_settings.columns_tablet
@@ -179,8 +188,24 @@
           endfor
         -%}
 
-        <div class="product-grid__empty" data-ref="empty" {% if grid_total > 0 %}hidden{% endif %}>
-          {%- if has_active_filters -%}
+        <div class="product-grid__empty" data-ref="empty" {% if search.results.size > 0 %}hidden{% endif %}>
+          {%- liquid
+            # Past the last page: say so and link back, rather than showing an
+            # impossible range or the "no matches" state.
+            assign past_last_page = false
+            if paginate.pages > 0 and paginate.current_page > paginate.pages
+              assign past_last_page = true
+              assign last_page_url = ''
+              for part in paginate.parts
+                if part.is_link and part.title == paginate.pages
+                  assign last_page_url = part.url
+                endif
+              endfor
+            endif
+          -%}
+          {%- if past_last_page -%}
+            {% render 'search-empty', context: 'page', url: last_page_url %}
+          {%- elsif has_active_filters -%}
             {% render 'search-empty', context: 'filters', url: search_reset_url %}
           {%- else -%}
             {% render 'search-empty', context: 'search', terms: search.terms, url: routes.search_url %}

@@ -108,7 +108,11 @@ export const cart = {
   state: null,
 
   /** @type {AbortController|null} */
-  _request: null,
+  /** @type {Promise<unknown>} Cart requests, in the order they were made. */
+  _queue: Promise.resolve(),
+
+  /** @type {number} */
+  _pending: 0,
 
   /**
    * Section ids that should be re-rendered with every mutation, against the
@@ -382,36 +386,58 @@ export const cart = {
    * @param {Object} body
    * @returns {Promise<Object>}
    */
-  async _post(url, body) {
-    this._request?.abort();
-    this._request = new AbortController();
+  _post(url, body) {
+    // Requests run one after another instead of aborting each other. An
+    // aborted POST may or may not have reached Shopify, so two quick Add to
+    // cart clicks or rapid +/− presses would silently lose updates.
+    const run = () => this._send(url, body);
+    const next = this._queue.then(run, run);
+    this._queue = next.catch(() => {});
+    return next;
+  },
 
+  /**
+   * @param {string} url
+   * @param {Object} body
+   * @returns {Promise<Object>}
+   */
+  async _send(url, body) {
+    this._pending += 1;
     this._dispatch(EVENTS.CART_LOADING, { loading: true });
     document.documentElement.setAttribute('data-cart-loading', '');
 
     try {
-      const response = await fetch(
-        url,
-        fetchConfig('json', { body, signal: this._request.signal })
-      );
+      let response;
+      try {
+        response = await fetch(url, fetchConfig('json', { body }));
+      } catch {
+        // Offline, DNS, CORS: the browser's own text ("Failed to fetch") is
+        // not something to show a customer.
+        throw new CartError(themeString('cartError', ''), { status: 0 });
+      }
 
-      const data = await parseResponse(response, { ErrorClass: CartError });
+      const data = await parseResponse(response, {
+        ErrorClass: CartError,
+        fallbackMessage: themeString('cartError', '')
+      });
 
       clearSectionCache();
 
       return data;
     } catch (error) {
-      if (error?.name === 'AbortError') throw error;
+      const message = (error instanceof CartError && error.status >= 400 && error.status < 500 && error.message) ||
+        themeString('cartError', '');
+      if (error instanceof CartError) error.message = message;
 
-      const message = error?.message || themeString('cartError', '');
       this._dispatch(EVENTS.CART_ERROR, cartErrorDetail(message, { status: error?.status }));
-      announceUrgent(message);
 
       throw error;
     } finally {
-      this._request = null;
-      document.documentElement.removeAttribute('data-cart-loading');
-      this._dispatch(EVENTS.CART_LOADING, { loading: false });
+      this._pending -= 1;
+      if (this._pending === 0) {
+        document.documentElement.removeAttribute('data-cart-loading');
+        this._dispatch(EVENTS.CART_LOADING, { loading: false });
+      }
     }
   },
 
@@ -570,7 +596,6 @@ export class CartDrawer extends DrawerComponent {
 
     const button = form.querySelector('[type="submit"]');
     button?.setAttribute('aria-busy', 'true');
-    button?.setAttribute('disabled', '');
 
     try {
       const data = new FormData(form);
@@ -580,7 +605,6 @@ export class CartDrawer extends DrawerComponent {
       });
     } catch {} finally {
       button?.removeAttribute('aria-busy');
-      button?.removeAttribute('disabled');
     }
   };
 

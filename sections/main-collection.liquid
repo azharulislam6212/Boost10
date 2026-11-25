@@ -19,7 +19,8 @@
   data-page="{{ current_page | default: 1 }}"
   data-total="{{ collection.products_count }}"
   role="region"
-  aria-label="{{ collection.title | default: 'products.facets.title' | t | escape }}"
+  {% assign t_title_fallback = 'products.facets.title' | t %}
+  aria-label="{{ collection.title | default: t_title_fallback | escape }}"
   {% render 'spacing', section: section_settings %}
 >
   <a class="skip-to-content-link visually-hidden" href="#MainContent">
@@ -96,7 +97,23 @@
         </ul>
 
         <div class="product-grid__empty" data-ref="empty" {% if collection.products.size > 0 %}hidden{% endif %}>
-          {%- if collection.all_products_count == 0 -%}
+          {%- liquid
+            # Past the last page: say so and link back, rather than showing an
+            # impossible range or the "no matches" state.
+            assign past_last_page = false
+            if paginate.pages > 0 and paginate.current_page > paginate.pages
+              assign past_last_page = true
+              assign last_page_url = ''
+              for part in paginate.parts
+                if part.is_link and part.title == paginate.pages
+                  assign last_page_url = part.url
+                endif
+              endfor
+            endif
+          -%}
+          {%- if past_last_page -%}
+            {% render 'search-empty', context: 'page', url: last_page_url %}
+          {%- elsif collection.all_products_count == 0 -%}
             {% render 'search-empty', context: 'collection' %}
           {%- else -%}
             {% render 'search-empty', context: 'filters', url: collection.url %}

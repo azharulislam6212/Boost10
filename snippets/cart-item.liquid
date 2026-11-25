@@ -17,9 +17,10 @@
   data-key="{{ item.key }}"
   data-line="{{ index }}"
   data-title="{{ item.product.title | escape }}"
+  data-variant-id="{{ item.variant.id }}"
   data-morph-key="line-{{ item.key }}"
 >
-  <a class="cart-item__media" href="{{ item.url }}" tabindex="-1" aria-hidden="true">
+  <a class="cart-item__media" href="{{ item.url }}" aria-label="{{ item.product.title | escape }}">
     {% render 'image', image: item.image, ratio: '1-1', sizes: '120px', class: 'cart-item__image' %}
   </a>
 
@@ -128,30 +129,40 @@
       </ul>
     {%- endif -%}
 
-    <p class="cart-item__error" data-line-error role="alert" hidden></p>
+    {%- comment -%} Announced through the toast, so not a live region itself. {%- endcomment -%}
+    <p class="cart-item__error" data-line-error hidden></p>
   </div>
 
   <div class="cart-item__quantity">
+    {%- liquid
+      # Shopify's quantity rules only. The stock limit comes from what the Cart
+      # API accepts: inventory_quantity counts every location, and untracked or
+      # "continue selling" variants have no limit at all.
+      assign qty_min = item.variant.quantity_rule.min | default: 1
+      assign qty_step = item.variant.quantity_rule.increment | default: 1
+      assign qty_max = item.variant.quantity_rule.max
+    -%}
     <quantity-selector
       data-key="{{ item.key }}"
       data-line="{{ index }}"
-      data-min="1"
-      {% if item.variant.inventory_management != blank and item.variant.inventory_policy == 'deny' %}
-        data-max="{{ item.variant.inventory_quantity }}"
-      {% endif %}
+      data-min="{{ qty_min }}"
+      data-step="{{ qty_step }}"
+      {% if qty_max %}data-max="{{ qty_max }}"{% endif %}
     >
       <button type="button" data-ref="decrease" aria-label="{{ 'products.product.quantity_decrease' | t: product: item.product.title | escape }}">
         {% render 'icon', icon: 'minus' %}
       </button>
 
-      <label class="visually-hidden" for="Quantity-{% if compact %}Drawer-{% endif %}{{ item.key }}">{{ 'cart.general.quantity' | t }}</label>
+      <label class="visually-hidden" for="Quantity-{% if compact %}Drawer-{% endif %}{{ item.key }}">{{ 'products.product.quantity_for' | t: product: item.product.title }}</label>
       <input
         id="Quantity-{% if compact %}Drawer-{% endif %}{{ item.key }}"
         data-ref="input"
         type="number"
         name="updates[]"
         value="{{ item.quantity }}"
-        min="1"
+        min="{{ qty_min }}"
+        step="{{ qty_step }}"
+        {% if qty_max %}max="{{ qty_max }}"{% endif %}
         inputmode="numeric"
         data-morph-preserve-value
       >

@@ -475,7 +475,7 @@ export class TabsElement extends BaseComponent {
     for (const [i, tab] of tabs.entries()) {
       const selected = i === index;
       tab.setAttribute('aria-selected', selected ? 'true' : 'false');
-      tab.tabIndex = selected ? 0 : -1;
+      tab.tabIndex = 0;
       panels[i]?.toggleAttribute('hidden', !selected);
     }
 

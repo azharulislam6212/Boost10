@@ -1637,6 +1637,8 @@ export function marquee(track, { speed = 60, direction = 'left', pauseOnHover = 
   /** @type {ResizeObserver|null} */
   let observer = null;
   let paused = false;
+  /** Paused with the Pause button: hover and focus no longer resume it. */
+  let held = false;
 
   const clearClones = () => {
     for (const clone of clones) clone.remove();
@@ -1711,6 +1713,7 @@ export function marquee(track, { speed = 60, direction = 'left', pauseOnHover = 
   };
 
   const onLeave = () => {
+    if (held) return;
     paused = false;
     animation?.play();
   };
@@ -1738,10 +1741,12 @@ export function marquee(track, { speed = 60, direction = 'left', pauseOnHover = 
 
   return {
     play: () => {
+      held = false;
       paused = false;
       animation?.play();
     },
     pause: () => {
+      held = true;
       paused = true;
       animation?.pause();
     },

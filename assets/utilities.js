@@ -147,7 +147,7 @@ export function getRoute(name, { json = false } = {}) {
  * @returns {string}
  */
 export function themeString(key, fallback = '', replacements = {}) {
-  let value = globalThis.Theme?.strings?.[key] ?? fallback;
+  let value = decodeEntities(globalThis.Theme?.strings?.[key] ?? fallback);
 
   for (const [token, replacement] of Object.entries(replacements)) {
     value = value.replaceAll(`[${token}]`, String(replacement));
@@ -158,6 +158,24 @@ export function themeString(key, fallback = '', replacements = {}) {
 
 /* ========================================================================== */
 /* ========================================================================== */
+
+/** @type {HTMLTextAreaElement|null} */
+let entityDecoder = null;
+
+/**
+ * Shopify HTML-escapes translations whose key does not end in `_html`, so a
+ * string such as `We couldn&#39;t…` would reach `textContent` with the entity
+ * showing. Decode before use; the result is only ever written as text.
+ *
+ * @param {string} value
+ * @returns {string}
+ */
+function decodeEntities(value) {
+  if (typeof value !== 'string' || !value.includes('&') || typeof document === 'undefined') return value;
+  entityDecoder ??= document.createElement('textarea');
+  entityDecoder.innerHTML = value;
+  return entityDecoder.value;
+}
 
 /**
  * Delays invocation until `wait` ms have passed without another call.
@@ -622,6 +640,48 @@ export function getFocusableElements(container) {
  * @param {AbortSignal} [options.signal] Releases the trap when aborted.
  * @returns {() => void} Release function that restores the previous focus.
  */
+/**
+ * Enough about an element to find its re-rendered copy later.
+ *
+ * @param {Element|null} element
+ * @returns {{ id: string, selector: string, scopeKey: string }|null}
+ */
+function describeFocusTarget(element) {
+  if (!(element instanceof HTMLElement) || element === document.body) return null;
+
+  const attributes = ['data-overlay-open', 'data-overlay-toggle', 'data-product-url', 'data-section-id', 'aria-controls', 'name', 'href'];
+  const parts = attributes
+    .filter((name) => element.hasAttribute(name))
+    .map((name) => `[${name}="${CSS.escape(element.getAttribute(name) || '')}"]`);
+
+  return {
+    id: element.id,
+    selector: parts.length ? element.localName + parts.join('') : '',
+    scopeKey: element.closest('[data-morph-key]')?.getAttribute('data-morph-key') || ''
+  };
+}
+
+/**
+ * @param {ReturnType<typeof describeFocusTarget>} opener
+ * @returns {HTMLElement|null}
+ */
+function findFocusTarget(opener) {
+  if (!opener) return null;
+
+  if (opener.id) {
+    const byId = document.getElementById(opener.id);
+    if (byId) return byId;
+  }
+
+  if (!opener.selector) return null;
+
+  const scope = opener.scopeKey
+    ? document.querySelector(`[data-morph-key="${CSS.escape(opener.scopeKey)}"]`)
+    : null;
+
+  return /** @type {HTMLElement|null} */ ((scope || document).querySelector(opener.selector));
+}
+
 export function trapFocus(container, { initialFocus = null, signal } = {}) {
   const previouslyFocused = /** @type {HTMLElement|null} */ (document.activeElement);
   const controller = new AbortController();
@@ -655,11 +715,15 @@ export function trapFocus(container, { initialFocus = null, signal } = {}) {
   if (target === container && !container.hasAttribute('tabindex')) container.setAttribute('tabindex', '-1');
   target.focus({ preventScroll: true });
 
+  const opener = describeFocusTarget(previouslyFocused);
+
   const release = () => {
     controller.abort();
-    if (previouslyFocused && typeof previouslyFocused.focus === 'function') {
-      previouslyFocused.focus({ preventScroll: true });
-    }
+    // The opener may have been re-rendered while the overlay was open (a
+    // product card after add to cart, a section after a cart update), so look
+    // for its replacement rather than focusing a detached node.
+    const target = previouslyFocused?.isConnected ? previouslyFocused : findFocusTarget(opener);
+    if (target && typeof target.focus === 'function') target.focus({ preventScroll: true });
   };
 
   signal?.addEventListener('abort', release, { once: true });

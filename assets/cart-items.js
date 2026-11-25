@@ -34,23 +34,42 @@ export class CartItems extends BaseComponent {
    * @param {number} quantity
    * @returns {Promise<void>}
    */
-  async updateQuantity(key, quantity) {
+  async updateQuantity(key, quantity, previous = null) {
     const line = this.#lineFor(key);
+    const variantId = line?.dataset.variantId || null;
     this.#setLineBusy(line, true);
     this.#setLineError(line, '');
 
     try {
-      await cart.changeItem({ key, quantity });
+      const data = await cart.changeItem({ key, quantity });
+
+      // A discount change gives the line a new key. Follow the variant to it
+      // rather than treating the old key's absence as "0 available".
+      const item =
+        data?.items?.find((entry) => entry.key === key) ||
+        (variantId ? data?.items?.find((entry) => String(entry.variant_id) === variantId) : null);
+
+      // The stock limit is whatever Shopify actually let through, never a
+      // guess from the product's inventory across every location.
+      if (item && quantity > 0 && item.quantity < quantity) {
+        const message = themeString('cartQuantityError', '', { quantity: item.quantity });
+        const current = this.#lineFor(item.key) || line;
+        this.#setLineError(current, message);
+        this.#selectorFor(current)?.setValue(item.quantity, { silent: true });
+        await this.#toast(message);
+      }
     } catch (error) {
-      const available = error?.body?.quantity;
-      const message = Number.isFinite(available)
-        ? themeString('cartQuantityError', '', { quantity: available })
-        : error?.message || themeString('cartError', '');
+      if (error?.name === 'AbortError') return;
+
+      // Shopify's description ("You can only add 3 of …") is already in the
+      // store's language; anything else falls back to the plain cart error.
+      const message = error?.message || themeString('cartError', '');
 
       this.#setLineError(line, message);
-      announceUrgent(message);
+      if (Number.isFinite(previous)) this.#selectorFor(line)?.setValue(previous, { silent: true });
+      if (!document.querySelector('cart-drawer')) await this.#toast(message);
     } finally {
-      this.#setLineBusy(line, false);
+      this.#setLineBusy(this.#lineFor(key) || line, false);
     }
   }
 
@@ -83,7 +102,7 @@ export class CartItems extends BaseComponent {
     if (!key) return;
 
     event.stopPropagation();
-    this.updateQuantity(key, event.detail.quantity);
+    this.updateQuantity(key, event.detail.quantity, event.detail.previous);
   };
 
   /** @param {MouseEvent} event */
@@ -103,6 +122,20 @@ export class CartItems extends BaseComponent {
    */
   #lineFor(key) {
     return this.querySelector(`[data-line-item][data-key="${CSS.escape(key)}"]`);
+  }
+
+  /**
+   * @param {HTMLElement|null} line
+   * @returns {import('@theme/quantity-selector').QuantitySelector|null}
+   */
+  #selectorFor(line) {
+    return /** @type {any} */ (line?.querySelector('quantity-selector')) || null;
+  }
+
+  /** @param {string} message */
+  async #toast(message) {
+    const { toast } = await import('@theme/toast');
+    toast(message, { type: 'error' });
   }
 
   /**

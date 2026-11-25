@@ -194,6 +194,7 @@ update(html, { focus = true, scroll = false } = {}) {
 
       console.error('[theme] Could not load that page.', error);
       announceUrgent(themeString('networkError', ''));
+      window.location.assign(url);
       return false;
     } finally {
       this.#setLoading(false);

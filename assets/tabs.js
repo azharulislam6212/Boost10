@@ -142,7 +142,8 @@ export class TabGroup extends BaseComponent {
     tabs.forEach((tab, position) => {
       const isSelected = position === index;
       tab.setAttribute('aria-selected', String(isSelected));
-      tab.tabIndex = isSelected ? 0 : -1;
+      // Every tab stays a Tab stop; the arrow keys still move between them.
+      tab.tabIndex = 0;
     });
 
     this.panels.forEach((panel, position) => {

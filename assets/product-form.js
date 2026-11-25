@@ -112,8 +112,8 @@ export class ProductForm extends BaseComponent {
    * @returns {Promise<Object|null>}
    */
   async submit() {
-    if (this.hasAttribute('data-loading')) return null;
-
+    // No early return while a request is running: a second quick click is a
+    // second item, and the cart queues the requests in order.
     const id = this.variantId;
     if (!id) {
       this.#error(themeString('unavailable', ''));
@@ -123,6 +123,7 @@ export class ProductForm extends BaseComponent {
     const giftCard = this.querySelector('gift-card-recipient-form');
     if (giftCard?.validate && giftCard.validate() === false) return null;
 
+    this.#inFlight += 1;
     this.setLoading(true);
     this.#error('');
 
@@ -153,9 +154,13 @@ export class ProductForm extends BaseComponent {
       this.dispatch(EVENTS.PRODUCT_FORM_ERROR, { message });
       return null;
     } finally {
-      this.setLoading(false);
+      this.#inFlight -= 1;
+      if (this.#inFlight === 0) this.setLoading(false);
     }
   }
+
+  /** Add to cart requests still running. */
+  #inFlight = 0;
 
   /* ---------------------------------------------------------- internals -- ---- */
 
