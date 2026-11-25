@@ -5,8 +5,8 @@
  */
 
 import { BaseComponent, defineComponent } from '@theme/component';
-import { EVENTS } from '@theme/events';
 import { clamp, isDesignMode, prefersReducedMotion, rafThrottle, announce, themeString } from '@theme/utilities';
+import { syncTicker } from '@theme/motion-engine';
 
 /* ==========================================================================
    <smooth-scrollbar>
@@ -200,13 +200,20 @@ export class SmoothScrollbar extends BaseComponent {
     this.#idleFrames = 0;
     if (this.#frame !== null || !this.#lenis) return;
 
-    this.#lenis.time = performance.now() - 1000 / 60;
+    let waking = true;
 
     const tick = (time) => {
       const lenis = this.#lenis;
       if (!lenis) {
         this.#frame = null;
         return;
+      }
+
+      // After a sleep, measure the first step from one frame ago, using the
+      // rAF clock itself, so the first wheel frame is neither skipped nor a jump.
+      if (waking) {
+        lenis.time = time - 1000 / 60;
+        waking = false;
       }
 
       lenis.raf(time);
@@ -232,6 +239,9 @@ export class SmoothScrollbar extends BaseComponent {
 
   /** @param {{ scroll: number, progress: number }} state */
   #onLenisScroll = (state) => {
+    // Parallax and the sticky header read scrollY in the same frame Lenis
+    // moved it. On their own rAF they run a frame behind and visibly shake.
+    syncTicker();
     this.#publishProgress(state?.progress ?? this.progress, state?.scroll ?? window.scrollY);
   };
 
@@ -351,130 +361,8 @@ export class ScrollToTop extends BaseComponent {
 
 defineComponent('scroll-to-top', ScrollToTop);
 
-/* ==========================================================================
-   Scroll restoration
-   --------------------------------------------------------------------------
-   A reload or back/forward returns to the section that was at the top of the
-   screen, not to a raw offset, and holds it while images and late sections
-   change the height above. The browser restores natively first (the entry is
-   left on `auto` at pagehide); this pass then corrects to the section. The
-   `snippets/scroll-restore.liquid` hides the page until it is placed.
-   ========================================================================== */
+/* Scroll restoration on reload and back/forward lives in
+   snippets/scroll-restore.liquid, so it runs before any module loads. */
 
-const SCROLL_KEY = 'theme:scroll';
-
-/** True when the element, or an ancestor, is sticky or fixed and so can't mark the spot. */
-function isPinned(element) {
-  for (let el = element; el && el !== document.body; el = el.parentElement) {
-    const { position } = getComputedStyle(el);
-    if (position === 'sticky' || position === 'fixed') return true;
-  }
-  return false;
-}
-
-function saveScroll(here) {
-  const entry = { url: here, y: window.scrollY, id: null, offset: 0 };
-
-  for (const section of document.querySelectorAll('.shopify-section')) {
-    const rect = section.getBoundingClientRect();
-    if (rect.bottom > 0 && rect.height > 0 && section.id && !isPinned(section)) {
-      entry.id = section.id;
-      entry.offset = rect.top;
-      break;
-    }
-  }
-
-  try {
-    sessionStorage.setItem(SCROLL_KEY, JSON.stringify(entry));
-  } catch {}
-}
-
-/** Show the page the head script hid for the restore. */
-function showRestored() {
-  const root = document.documentElement;
-  if (!root.hasAttribute('data-scroll-restoring')) return;
-  root.removeAttribute('data-scroll-restoring');
-  document.dispatchEvent(new CustomEvent(EVENTS.SCROLL_RESTORED));
-}
-
-export function restoreScroll() {
-  if (!('scrollRestoration' in history)) {
-    showRestored();
-    return;
-  }
-
-  if (isDesignMode()) {
-    history.scrollRestoration = 'auto';
-    showRestored();
-    return;
-  }
-
-  const here = location.pathname + location.search;
-
-  window.addEventListener('pagehide', () => {
-    saveScroll(here);
-    history.scrollRestoration = 'auto';
-  });
-
-  let saved = null;
-  try {
-    saved = JSON.parse(sessionStorage.getItem(SCROLL_KEY));
-  } catch {}
-
-  const type = performance.getEntriesByType?.('navigation')[0]?.type ?? '';
-
-  if (!saved || saved.url !== here || !(saved.y > 0) || location.hash || (type !== 'reload' && type !== 'back_forward')) {
-    showRestored();
-    return;
-  }
-
-  history.scrollRestoration = 'manual';
-
-  let holding = true;
-  let observer = null;
-
-  const target = () => {
-    const anchor = saved.id ? document.getElementById(saved.id) : null;
-    if (!anchor) return saved.y;
-    return anchor.getBoundingClientRect().top + window.scrollY - saved.offset;
-  };
-
-  const place = () => {
-    const top = Math.max(0, target());
-    if (Math.abs(window.scrollY - top) > 1) window.scrollTo({ top, behavior: 'instant' });
-  };
-
-  const release = () => {
-    holding = false;
-    observer?.disconnect();
-  };
-
-  place();
-  showRestored();
-
-  if (typeof ResizeObserver === 'function') {
-    observer = new ResizeObserver(() => {
-      if (holding) place();
-    });
-    observer.observe(document.body);
-  }
-
-  const settle = () => {
-    if (holding) place();
-    setTimeout(() => {
-      if (holding) place();
-      release();
-    }, 800);
-  };
-
-  if (document.readyState === 'complete') settle();
-  else window.addEventListener('load', settle, { once: true });
-
-  for (const name of ['wheel', 'touchstart', 'keydown', 'mousedown']) {
-    window.addEventListener(name, release, { once: true, passive: true, capture: true });
-  }
-}
-
-restoreScroll();
 
 export default SmoothScrollbar;

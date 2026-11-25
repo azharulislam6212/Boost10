@@ -5,6 +5,9 @@
   # --- Feature flags used by the shell --------------------------------------
   assign use_smooth_scroll = settings.enable_smooth_scroll | default: false
   assign use_page_transitions = settings.enable_page_transitions | default: false
+  if request.design_mode
+    assign use_page_transitions = false
+  endif
 
   # --- Body classes ---------------------------------------------------------
   assign body_classes = 'template-' | append: template.name
@@ -131,7 +134,7 @@
 
     {%- if use_smooth_scroll -%}
       <smooth-scrollbar
-        data-lerp="{{ settings.smooth_scroll_lerp | default: 20 | divided_by: 100.0 }}"
+        data-lerp="{{ settings.smooth_scroll_lerp | default: 10 | divided_by: 100.0 }}"
         data-wheel-multiplier="{{ settings.smooth_scroll_wheel_multiplier | default: 10 | divided_by: 10.0 }}"
         data-touch-multiplier="{{ settings.smooth_scroll_touch_multiplier | default: 15 | divided_by: 10.0 }}"
       ></smooth-scrollbar>
@@ -140,6 +143,7 @@
     {%- if use_page_transitions -%}
       <page-transition
         data-mode="{{ settings.page_transition_style | default: 'fade' }}"
+        data-state="covered"
         aria-hidden="true"
       ></page-transition>
     {%- endif -%}
@@ -163,5 +167,7 @@
     {% render 'scroll-to-top' %}
 
     {% render 'live-region' %}
+
+    {%- render 'scroll-restore', position: 'end' -%}
   </body>
 </html>

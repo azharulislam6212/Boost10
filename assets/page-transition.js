@@ -1,113 +1,132 @@
 /**
- * `<page-transition>` animates the gap between page loads.
+ * `<page-transition>`: a full-screen curtain between page loads.
+ *
+ * layout/theme.liquid renders it covering the page from the first paint
+ * (`data-state="covered"`); its styles live in snippets/critical-style.liquid.
+ *
+ *   covered → out     : once the page is ready, the curtain animates away.
+ *   out     → ready   : parked off-screen, without animating.
+ *   ready   → covered : on a same-site link click it animates back in, then navigates.
+ *
+ * On a reload or back/forward that restores the scroll position
+ * (snippets/scroll-restore.liquid) it waits for `theme:scroll-restored`, so
+ * the page is already in place under it and never moves while it shows.
  *
  * @module @theme/page-transition
  */
 
 import { BaseComponent, defineComponent } from '@theme/component';
+import { EVENTS } from '@theme/events';
 import { prefersReducedMotion, isDesignMode } from '@theme/utilities';
-import { EASING } from '@theme/motion-engine';
 
-/** How long to wait for the exit animation before navigating regardless. */
-const EXIT_TIMEOUT = 700;
+/** Fallback when `--page-transition-duration` can't be read. */
+const DEFAULT_DURATION = 600;
 
 export class PageTransition extends BaseComponent {
-  /** @type {'fade'|'curtain'|'wipe'} */
-  #mode = 'fade';
-
   /** True once a navigation has been committed, to block a second one. */
   #navigating = false;
 
-  /* ------------------------------------------------------------ lifecycle ---- */
-
   setup() {
-    this.#mode = /** @type {any} */ (this.dataset.mode) || 'fade';
     this.setAttribute('aria-hidden', 'true');
+    this.setAttribute('data-armed', '');
     this.#navigating = false;
 
-    if (!this.#enabled()) {
+    if (prefersReducedMotion() || isDesignMode()) {
+      this.#setState('ready');
       this.setAttribute('data-disabled', '');
       return;
     }
 
-    this.removeAttribute('data-disabled');
-    this.#playEntrance();
+    if (document.documentElement.hasAttribute('data-scroll-restoring')) {
+      this.on(document, EVENTS.SCROLL_RESTORED, () => this.#leaveAfterPaint(), { once: true });
+    } else {
+      this.#leaveAfterPaint();
+    }
 
-    this.on(document, 'click', this.#onDocumentClick, { capture: true });
+    this.on(document, 'click', this.#onDocumentClick);
 
+    // A back/forward cache restore brings the page back as it was left: covered.
     this.on(window, 'pageshow', (event) => {
-      if (event.persisted) {
-        this.#navigating = false;
-        this.#playEntrance();
-      }
+      if (!event.persisted) return;
+      this.#navigating = false;
+      this.#leave();
     });
   }
 
-  /* --------------------------------------------------------- public API -- ---- */
-
   /**
-   * Navigate to a URL with the configured transition.
+   * Navigate to a URL behind the curtain.
    *
    * @param {string} url
-   * @returns {Promise<void>}
    */
-  async navigateTo(url) {
+  navigateTo(url) {
     if (this.#navigating) return;
     this.#navigating = true;
 
-    if (this.#supportsViewTransitions()) {
-      window.location.assign(url);
-      return;
-    }
-
-    await this.#playExit();
-    window.location.assign(url);
+    this.#setState('ready');
+    // Commit the parked position before animating in.
+    void this.offsetWidth;
+    this.#setState('covered');
+    this.#afterTransition(() => window.location.assign(url));
   }
 
-  /* ---------------------------------------------------------- internals -- ---- */
+  /* ---------------------------------------------------------- internals -- */
 
-  /** @returns {boolean} */
-  #enabled() {
-    if (prefersReducedMotion()) return false;
-    if (isDesignMode()) return false;
-    if (this.dataset.enabled === 'false') return false;
-    return typeof Element.prototype.animate === 'function';
+  /** @param {'covered'|'out'|'ready'} state */
+  #setState(state) {
+    this.dataset.state = state;
   }
 
-  /** @returns {boolean} */
-  #supportsViewTransitions() {
-    return typeof document.startViewTransition === 'function' && CSS.supports('view-transition-name', 'none');
+  /** Let the covered frame paint first, then animate away. */
+  #leaveAfterPaint() {
+    requestAnimationFrame(() => requestAnimationFrame(() => this.#leave()));
+  }
+
+  #leave() {
+    this.#setState('out');
+    this.#afterTransition(() => {
+      if (this.dataset.state === 'out') this.#setState('ready');
+    });
+  }
+
+  /** @param {() => void} callback */
+  #afterTransition(callback) {
+    const ms = parseFloat(getComputedStyle(this).getPropertyValue('--page-transition-duration')) || DEFAULT_DURATION;
+    let done = false;
+
+    const finish = () => {
+      if (done) return;
+      done = true;
+      this.removeEventListener('transitionend', onEnd);
+      callback();
+    };
+
+    /** @param {TransitionEvent} event */
+    const onEnd = (event) => {
+      if (event.target === this) finish();
+    };
+
+    this.addEventListener('transitionend', onEnd);
+    setTimeout(finish, ms + 100);
   }
 
   /** @param {MouseEvent} event */
   #onDocumentClick = (event) => {
-    if (this.#supportsViewTransitions()) return;
     if (event.defaultPrevented) return;
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
 
-    const link = /** @type {HTMLAnchorElement|null} */ (
-      event.target instanceof Element ? event.target.closest('a[href]') : null
-    );
-
-    if (!this.#isTransitionable(link)) return;
+    const link = event.target instanceof Element ? event.target.closest('a[href]') : null;
+    if (!(link instanceof HTMLAnchorElement) || !this.#isTransitionable(link)) return;
 
     event.preventDefault();
     this.navigateTo(link.href);
   };
 
-  /**
-   * @param {HTMLAnchorElement|null} link
-   * @returns {boolean}
-   */
+  /** @param {HTMLAnchorElement} link */
   #isTransitionable(link) {
-    if (!link) return false;
     if (link.hasAttribute('download')) return false;
     if (link.target && link.target !== '_self') return false;
     if (link.closest('[data-no-transition]')) return false;
     if (link.getAttribute('rel')?.includes('external')) return false;
-
-    const href = link.getAttribute('href') || '';
-    if (href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) return false;
 
     let url;
     try {
@@ -117,95 +136,14 @@ export class PageTransition extends BaseComponent {
     }
 
     if (url.origin !== window.location.origin) return false;
+    if (!/^https?:$/.test(url.protocol)) return false;
 
+    // Same page, only a hash: let it scroll.
     const samePage = url.pathname === window.location.pathname && url.search === window.location.search;
     if (samePage && url.hash) return false;
 
     return true;
   }
-
-  /* --------------------------------------------------------- animation --- */
-
-  /** @returns {Promise<void>} */
-  async #playExit() {
-    this.setAttribute('data-state', 'exiting');
-
-    const animation = this.animate(this.#exitKeyframes(), {
-      duration: this.#duration(),
-      easing: EASING.inOutQuart,
-      fill: 'forwards'
-    });
-
-    await Promise.race([animation.finished.catch(() => {}), timeout(EXIT_TIMEOUT)]);
-  }
-
-  #playEntrance() {
-    this.setAttribute('data-state', 'entering');
-
-    const animation = this.animate(this.#entranceKeyframes(), {
-      duration: this.#duration(),
-      easing: EASING.outExpo,
-      fill: 'forwards'
-    });
-
-    animation.finished
-      .then(() => {
-        this.setAttribute('data-state', 'idle');
-      })
-      .catch(() => {
-        this.setAttribute('data-state', 'idle');
-      });
-  }
-
-  /** @returns {Keyframe[]} */
-  #exitKeyframes() {
-    switch (this.#mode) {
-      case 'curtain':
-        return [
-          { transform: 'translate3d(0, 100%, 0)' },
-          { transform: 'translate3d(0, 0, 0)' }
-        ];
-      case 'wipe':
-        return [
-          { transform: 'scaleX(0)', transformOrigin: 'left center' },
-          { transform: 'scaleX(1)', transformOrigin: 'left center' }
-        ];
-      default:
-        return [{ opacity: 0 }, { opacity: 1 }];
-    }
-  }
-
-  /** @returns {Keyframe[]} */
-  #entranceKeyframes() {
-    switch (this.#mode) {
-      case 'curtain':
-        return [
-          { transform: 'translate3d(0, 0, 0)' },
-          { transform: 'translate3d(0, -100%, 0)' }
-        ];
-      case 'wipe':
-        return [
-          { transform: 'scaleX(1)', transformOrigin: 'right center' },
-          { transform: 'scaleX(0)', transformOrigin: 'right center' }
-        ];
-      default:
-        return [{ opacity: 1 }, { opacity: 0 }];
-    }
-  }
-
-  /** @returns {number} */
-  #duration() {
-    const value = Number(this.dataset.duration);
-    return Number.isFinite(value) && value > 0 ? value : 420;
-  }
-}
-
-/**
- * @param {number} ms
- * @returns {Promise<void>}
- */
-function timeout(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 defineComponent('page-transition', PageTransition);

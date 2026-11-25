@@ -202,12 +202,18 @@
         .lenis.lenis-stopped { overflow: hidden; }
         .lenis.lenis-smooth iframe { pointer-events: none; }
 
-        html[data-scroll-restoring] body {
-          opacity: 0;
-          animation: scroll-restore-failsafe 0s 1.5s forwards;
+        /* Reload or back/forward to a saved position: content stays hidden
+           only until the markup is parsed and placed (snippets/scroll-restore,
+           end of <body>), never until scripts load. The page-transition
+           curtain stays visible. */
+        /* The thumb is hidden too: while the page grows during parsing it
+           would slide from the top down to the saved spot. The gutter stays,
+           so nothing shifts sideways when it comes back. */
+        html[data-scroll-restoring] {
+          scroll-behavior: auto !important;
+          scrollbar-color: transparent transparent;
         }
-
-        @keyframes scroll-restore-failsafe { to { opacity: 1; } }
+        html[data-scroll-restoring] body > :not(page-transition) { opacity: 0 !important; }
 
         @media (prefers-reduced-motion: reduce) {
           html { scroll-behavior: auto; }
@@ -246,6 +252,38 @@
         page-transition { display: block; }
 
         smooth-scrollbar[data-disabled] { display: none; }
+
+        /* <page-transition> (assets/page-transition.js): covers the page from
+           the first paint, so a reload never shows the top before the saved
+           position. States: covered → out → ready → covered. */
+        page-transition {
+          --page-transition-duration: 600ms;
+          position: fixed;
+          inset: 0;
+          z-index: 2147483000;
+          background-color: {{ settings.page_transition_color | default: '#0F2E2F' }};
+          pointer-events: none;
+          transition-property: opacity, transform, clip-path, visibility;
+          transition-duration: var(--page-transition-duration);
+          transition-timing-function: cubic-bezier(0.76, 0, 0.24, 1);
+        }
+        page-transition[data-state='covered'] { pointer-events: auto; }
+        page-transition[data-state='ready'] { visibility: hidden; transition: none; }
+        page-transition[data-disabled] { display: none; }
+
+        /* Failsafe: if the module never runs, get out of the way. */
+        page-transition:not([data-armed]) { animation: page-transition-failsafe 0.4s ease 2.5s forwards; }
+        @keyframes page-transition-failsafe { to { opacity: 0; visibility: hidden; pointer-events: none; } }
+
+        page-transition[data-mode='fade']:is([data-state='out'], [data-state='ready']) { opacity: 0; }
+        page-transition[data-mode='curtain'][data-state='out'] { transform: translateY(-100%); }
+        page-transition[data-mode='curtain'][data-state='ready'] { transform: translateY(100%); }
+        page-transition[data-mode='wipe'][data-state='out'] { clip-path: inset(0 0 0 100%); }
+        page-transition[data-mode='wipe'][data-state='ready'] { clip-path: inset(0 100% 0 0); }
+
+        @media (prefers-reduced-motion: reduce) {
+          page-transition { display: none; }
+        }
         motion-effect[data-effect='marquee'] { overflow: hidden; }
 
         accordion-element[data-static] summary,
@@ -384,7 +422,7 @@
 
         /* ---- the resting opacity, held from the first paint --------------- */
         @media (prefers-reduced-motion: no-preference) {
-          html[data-motion-arm] motion-effect[data-effect]:not([data-effect='none']):not([data-effect='']):not([data-effect='parallax']):not([data-effect='marquee']):not([data-motion-pending]):not([data-motion-revealed]) {
+          html[data-motion-arm] motion-effect[data-effect]:not([data-effect='none']):not([data-effect='']):not([data-effect='parallax']):not([data-effect='marquee']):not([data-motion-pending]):not([data-motion-revealed]):not([data-motion-restored]) {
             opacity: 0;
             animation: motion-arm-failsafe 0s 12s forwards;
           }

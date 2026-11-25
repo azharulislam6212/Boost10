@@ -1478,6 +1478,19 @@ export function subscribeToTicker(callback) {
   };
 }
 
+/**
+ * Run the ticker now, in the caller's frame. The smooth scroller calls this
+ * right after it moves the page, so subscribers never lag a frame behind.
+ */
+export function syncTicker() {
+  if (tickerSubscribers.size === 0) return;
+  if (tickerFrame !== null) {
+    cancelAnimationFrame(tickerFrame);
+    tickerFrame = null;
+  }
+  tick();
+}
+
 /** @param {boolean} [force] Run even when the scroll position has not moved. */
 function requestTick(force = false) {
   if (force) lastTickY = -1;

@@ -79,8 +79,15 @@ export class MotionEffect extends BaseComponent {
       return;
     }
 
+    // A reload or back/forward that reopened the page on this spot
+    // (snippets/scroll-restore.liquid) showed it from the first frame, as it
+    // was left. Hiding it again to animate it would be a blank flash.
+    const restored = this.hasAttribute('data-motion-restored');
     const changed = this.#recordSignature();
-    if ((editorReady && !this.#replaying && !changed) || (!this.#replaying && this.#shownByFailsafe())) {
+    if (
+      (editorReady && !this.#replaying && !changed) ||
+      (!this.#replaying && (restored || this.#shownByFailsafe()))
+    ) {
       this.removeAttribute('data-motion-pending');
       this.setAttribute('data-motion-revealed', '');
       return;
