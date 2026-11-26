@@ -68,24 +68,21 @@ export class MotionEffect extends BaseComponent {
   /* ------------------------------------------------------------ lifecycle ---- */
 
   /**
-   * This module loads `async`, so it can run while the document is still
-   * streaming in. A host the parser has already closed (the first view) starts
-   * now; one it is still filling, or has not reached, starts at
-   * DOMContentLoaded — the same moment as before — because its targets and its
-   * text are not all there yet.
+   * This module loads `async`, so it runs while the document is still
+   * streaming in. A host the parser has already closed starts now. One it is
+   * still filling, or has not reached, starts on the first frame after the
+   * parser closes it — not at DOMContentLoaded, which on a long page is
+   * seconds later and left a restored reload showing blank sections. Its
+   * targets and text are all there by then, so it plays the same entrance.
    */
   connectedCallback() {
     if (document.readyState === 'loading' && !(upgrading && isParsed(this))) {
       if (this.#waitingForParse) return;
       this.#waitingForParse = true;
-      document.addEventListener(
-        'DOMContentLoaded',
-        () => {
-          this.#waitingForParse = false;
-          if (this.isConnected) super.connectedCallback();
-        },
-        { once: true }
-      );
+      waitForParse(this, () => {
+        this.#waitingForParse = false;
+        if (this.isConnected) super.connectedCallback();
+      });
       return;
     }
     super.connectedCallback();
@@ -378,16 +375,90 @@ let upgrading = false;
  * @returns {boolean}
  */
 function isParsed(element) {
-  // A host inside a wrapper waits with it: the wrapper's cascade must be set
-  // up first, exactly as it was when everything started together.
+  return !outermostHost(element).contains(deepestLast());
+}
+
+/**
+ * A host inside a wrapper waits with it: the wrapper's cascade must be set up
+ * first, exactly as it was when everything started together.
+ *
+ * @param {Element} element
+ * @returns {Element}
+ */
+function outermostHost(element) {
   let outermost = element;
   for (let node = element.parentElement; node; node = node.parentElement) {
     if (node.localName === 'motion-effect') outermost = node;
   }
+  return outermost;
+}
 
+/** The node the parser is appending to. @returns {Element} */
+function deepestLast() {
   let last = document.documentElement;
   while (last.lastElementChild) last = last.lastElementChild;
-  return !outermost.contains(last);
+  return last;
+}
+
+/**
+ * Hosts the parser has not closed yet, in document order, each with the
+ * function that starts it.
+ *
+ * @type {{ host: Element, start: () => void }[]}
+ */
+const parseQueue = [];
+
+/** @type {number} */
+let parseFrame = 0;
+
+/**
+ * Start every queued host the parser has closed, in document order. The queue
+ * is in document order and the parser closes elements in that order, so the
+ * first host still open ends the run.
+ *
+ * @param {boolean} [all] Start everything (the document is complete).
+ */
+function flushParsed(all = false) {
+  const last = all ? null : deepestLast();
+  while (parseQueue.length > 0) {
+    const { host, start } = parseQueue[0];
+    if (last && host.isConnected && outermostHost(host).contains(last)) break;
+    parseQueue.shift();
+    start();
+  }
+}
+
+/**
+ * Checked once a frame while the document loads, so a section starts on the
+ * frame its markup is complete; whatever is left starts at DOMContentLoaded.
+ */
+function pollParsed() {
+  parseFrame = 0;
+  flushParsed();
+  if (parseQueue.length > 0 && document.readyState === 'loading') {
+    parseFrame = requestAnimationFrame(pollParsed);
+  }
+}
+
+/**
+ * @param {Element} host
+ * @param {() => void} start
+ */
+function waitForParse(host, start) {
+  parseQueue.push({ host, start });
+  if (!parseFrame) parseFrame = requestAnimationFrame(pollParsed);
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener(
+    'DOMContentLoaded',
+    () => {
+      if (parseFrame) cancelAnimationFrame(parseFrame);
+      parseFrame = 0;
+      flushParsed(true);
+    },
+    { once: true }
+  );
 }
 
 upgrading = true;

@@ -487,9 +487,10 @@ export function motionEnabled() {
 
 /**
  * Navigation timestamp, used to decide whether an intersection is "on load".
- * The motion module can boot while the document is still streaming in; hosts
- * further down start at DOMContentLoaded, so the first-view window opens
- * again from there and they keep their quick on-load cascade.
+ * The motion module can boot while the document is still streaming in, and
+ * hosts start as the parser closes them. The window stays open while the
+ * document loads (see withinLoadWindow) and opens again at DOMContentLoaded,
+ * so what is on screen then keeps its quick on-load cascade.
  */
 let bootedAt = performance.now();
 if (document.readyState === 'loading') {
@@ -501,6 +502,9 @@ let loadIndex = 0;
 
 /** @returns {boolean} True while the page is still in its initial paint window. */
 function withinLoadWindow() {
+  // Hosts start section by section while the document streams in; all of
+  // them still belong to the first view, as when they started together.
+  if (document.readyState === 'loading') return true;
   return performance.now() - bootedAt < DEFAULTS.loadWindow;
 }
 
