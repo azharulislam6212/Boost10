@@ -1,0 +1,568 @@
+/** Shoppable video — loaded only by the section that uses it. Layer order comes from base.css. */
+
+/* ==========================================================================
+   Shoppable video
+   ========================================================================== */
+
+@layer components {
+  .shoppable-video-section {
+    overflow: clip;
+  }
+
+  .shoppable-video {
+    /* ---- slide widths, centre outwards; heights come from each slide's ratio ---- */
+    --sv-w0: 30rem;
+    --sv-w1: 24rem;
+    --sv-w2: 18rem;
+    --sv-w3: 12rem;
+    --sv-frame: 1.25rem;
+    --sv-gap-first: 1.65rem;
+    --sv-gap: 1.6rem;
+    --sv-radius: 2.4rem;
+    --sv-speed: 600ms;
+    --sv-ease: var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+
+    /* ---- centre of each slide, measured from the centre of the stage ---- */
+    --sv-x1: calc(var(--sv-w0) / 2 + var(--sv-frame) + var(--sv-gap-first) + var(--sv-w1) / 2);
+    --sv-x2: calc(var(--sv-x1) + var(--sv-w1) / 2 + var(--sv-gap) + var(--sv-w2) / 2);
+    --sv-x3: calc(var(--sv-x2) + var(--sv-w2) / 2 + var(--sv-gap) + var(--sv-w3) / 2);
+    --sv-x4: calc(var(--sv-x3) + var(--sv-w3) + var(--sv-gap));
+
+    display: block;
+    inline-size: 100%;
+  }
+
+  @media screen and (max-width: 749px) {
+    .shoppable-video {
+      --sv-w0: 25rem;
+      --sv-w1: 24rem;
+      --sv-w2: 24rem;
+      --sv-w3: 24rem;
+    }
+  }
+
+  .shoppable-video__stage {
+    position: relative;
+    block-size: calc(var(--sv-w0) / var(--sv-stage-ratio, 0.6) + var(--sv-frame) * 2);
+    touch-action: pan-y;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .shoppable-video__stage:focus-visible {
+    outline-offset: 0.6rem;
+  }
+
+  /* ---- dragging: the slides follow the pointer, untransitioned ---- */
+  .shoppable-video__stage {
+    cursor: grab;
+  }
+
+  .shoppable-video[data-dragging] .shoppable-video__stage {
+    cursor: grabbing;
+  }
+
+  .shoppable-video[data-dragging] .shoppable-video__slide {
+    transition: none;
+  }
+
+  .shoppable-video[data-dragging] .shoppable-video__slide * {
+    pointer-events: none;
+  }
+
+  .shoppable-video__media img,
+  .shoppable-video__video {
+    -webkit-user-drag: none;
+    user-select: none;
+    pointer-events: none;
+  }
+
+  /* ---- arrows and pagination under the stage ---- */
+  .shoppable-video__controls {
+    display: flex;
+    justify-content: center;
+    margin-block-start: var(--space-6);
+  }
+
+  .shoppable-video__controls--start {
+    justify-content: flex-start;
+  }
+
+  .shoppable-video__controls--end {
+    justify-content: flex-end;
+  }
+
+  .shoppable-video__controls > [data-carousel-active] {
+    margin: 0;
+  }
+
+  /* ---- the dashed frame: it stays put while the slides move through it ---- */
+  .shoppable-video__frame {
+    position: absolute;
+    inset-block-start: 50%;
+    inset-inline-start: 50%;
+    inline-size: calc(var(--sv-w0) + var(--sv-frame) * 2);
+    block-size: calc(var(--sv-w0) / var(--sv-active-ratio, 0.6) + var(--sv-frame) * 2);
+    translate: -50% -50%;
+    z-index: 20;
+    color: var(--color-heading);
+    pointer-events: none;
+    transition: block-size var(--sv-speed) var(--sv-ease);
+  }
+
+  .shoppable-video__frame svg {
+    display: block;
+    inline-size: 100%;
+    block-size: 100%;
+    overflow: visible;
+  }
+
+  .shoppable-video__frame rect {
+    inline-size: calc(100% - 1px);
+    block-size: calc(100% - 1px);
+    width: calc(100% - 1px);
+    height: calc(100% - 1px);
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1;
+    stroke-dasharray: 3 4;
+  }
+
+  /* ---- a slide: placed by its distance from the active one ---- */
+  .shoppable-video__slide {
+    --sv-x: var(--sv-x4);
+    --sv-w: var(--sv-w3);
+
+    position: absolute;
+    inset-block-start: 50%;
+    inset-inline-start: 50%;
+    z-index: 0;
+    inline-size: var(--sv-w);
+    block-size: calc(var(--sv-w) / var(--sv-ratio, 0.6));
+    translate: calc(-50% + var(--sv-x)) -50%;
+    border-radius: var(--sv-radius);
+    overflow: hidden;
+    background: var(--color-secondary-background);
+    opacity: 0;
+    visibility: hidden;
+    cursor: pointer;
+    transition:
+      translate var(--sv-speed) var(--sv-ease),
+      inline-size var(--sv-speed) var(--sv-ease),
+      block-size var(--sv-speed) var(--sv-ease),
+      opacity var(--sv-speed) var(--sv-ease),
+      visibility 0s linear var(--sv-speed);
+  }
+
+  [dir='rtl'] .shoppable-video__slide {
+    translate: calc(50% - var(--sv-x)) -50%;
+  }
+
+  .shoppable-video__slide[data-offset]:not([data-offset='4']):not([data-offset='-4']) {
+    opacity: 1;
+    visibility: visible;
+    transition-delay: 0s;
+  }
+
+  .shoppable-video__slide[data-jump] {
+    transition: none;
+  }
+
+  .shoppable-video__slide[data-offset='0'] {
+    --sv-x: 0px;
+    --sv-w: var(--sv-w0);
+    z-index: 4;
+    cursor: auto;
+  }
+
+  .shoppable-video__slide[data-offset='0']:has([data-video-toggle]) {
+    cursor: pointer;
+  }
+
+  .shoppable-video__slide[data-offset='1'],
+  .shoppable-video__slide[data-offset='-1'] {
+    --sv-x: var(--sv-x1);
+    --sv-w: var(--sv-w1);
+    z-index: 3;
+  }
+
+  .shoppable-video__slide[data-offset='2'],
+  .shoppable-video__slide[data-offset='-2'] {
+    --sv-x: var(--sv-x2);
+    --sv-w: var(--sv-w2);
+    z-index: 2;
+  }
+
+  .shoppable-video__slide[data-offset='3'],
+  .shoppable-video__slide[data-offset='-3'] {
+    --sv-x: var(--sv-x3);
+    z-index: 1;
+  }
+
+  .shoppable-video__slide[data-offset='-1'] { --sv-x: calc(var(--sv-x1) * -1); }
+  .shoppable-video__slide[data-offset='-2'] { --sv-x: calc(var(--sv-x2) * -1); }
+  .shoppable-video__slide[data-offset='-3'] { --sv-x: calc(var(--sv-x3) * -1); }
+  .shoppable-video__slide[data-offset='-4'] { --sv-x: calc(var(--sv-x4) * -1); }
+
+  shoppable-video:not(:defined) .shoppable-video__slide:is(
+      :nth-of-type(-n + 4),
+      :nth-last-of-type(-n + 3)
+    ) {
+    opacity: 1;
+    visibility: visible;
+    transition: none;
+  }
+
+  shoppable-video:not(:defined) .shoppable-video__slide:nth-of-type(1) {
+    --sv-x: 0px;
+    --sv-w: var(--sv-w0);
+    z-index: 4;
+  }
+
+  shoppable-video:not(:defined) .shoppable-video__slide:nth-of-type(2) {
+    --sv-x: var(--sv-x1);
+    --sv-w: var(--sv-w1);
+    z-index: 3;
+  }
+
+  shoppable-video:not(:defined) .shoppable-video__slide:nth-of-type(3) {
+    --sv-x: var(--sv-x2);
+    --sv-w: var(--sv-w2);
+    z-index: 2;
+  }
+
+  shoppable-video:not(:defined) .shoppable-video__slide:nth-of-type(4) {
+    --sv-x: var(--sv-x3);
+    --sv-w: var(--sv-w3);
+    z-index: 1;
+  }
+
+  shoppable-video:not(:defined) .shoppable-video__slide:nth-last-of-type(3):nth-of-type(n + 5) {
+    --sv-x: calc(var(--sv-x3) * -1);
+    --sv-w: var(--sv-w3);
+    z-index: 1;
+  }
+
+  shoppable-video:not(:defined) .shoppable-video__slide:nth-last-of-type(2):nth-of-type(n + 4) {
+    --sv-x: calc(var(--sv-x2) * -1);
+    --sv-w: var(--sv-w2);
+    z-index: 2;
+  }
+
+  shoppable-video:not(:defined) .shoppable-video__slide:nth-last-of-type(1):nth-of-type(n + 3) {
+    --sv-x: calc(var(--sv-x1) * -1);
+    --sv-w: var(--sv-w1);
+    z-index: 3;
+  }
+
+  shoppable-video:not(:defined) .shoppable-video__slide:nth-of-type(1) .shoppable-video__product {
+    opacity: 1;
+    visibility: visible;
+    translate: 0 0;
+  }
+
+  /* ---- media ---- */
+  .shoppable-video__media,
+  .shoppable-video__still,
+  .shoppable-video__video {
+    position: absolute;
+    inset: 0;
+    inline-size: 100%;
+    block-size: 100%;
+  }
+
+  .shoppable-video__still img,
+  .shoppable-video__still svg,
+  .shoppable-video__video {
+    inline-size: 100%;
+    block-size: 100%;
+    object-fit: cover;
+  }
+
+  .shoppable-video__video {
+    opacity: 0;
+    transition: opacity var(--duration-base, 250ms) ease;
+  }
+
+  .shoppable-video__slide[data-started] .shoppable-video__video {
+    opacity: 1;
+  }
+
+  /* ---- play / pause, top right ---- */
+  .shoppable-video__toggle {
+    position: absolute;
+    inset-block-start: 1.6rem;
+    inset-inline-end: 1.6rem;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    inline-size: var(--sv-play-size, 4.4rem);
+    block-size: var(--sv-play-size, 4.4rem);
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: rgb(255 255 255 / 0.24);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    color: var(--sv-play-ink, var(--color-heading));
+    cursor: pointer;
+    transition: scale var(--transition-fast);
+  }
+
+  /* ---- where the button sits: Position setting ---- */
+  .shoppable-video--play-top-left .shoppable-video__toggle {
+    inset-inline: 1.6rem auto;
+  }
+
+  .shoppable-video--play-bottom-right .shoppable-video__toggle {
+    inset-block: auto 1.6rem;
+  }
+
+  .shoppable-video--play-bottom-left .shoppable-video__toggle {
+    inset-block: auto 1.6rem;
+    inset-inline: 1.6rem auto;
+  }
+
+  .shoppable-video--play-center .shoppable-video__toggle {
+    inset-block-start: 50%;
+    inset-inline-start: 50%;
+    inset-inline-end: auto;
+    translate: -50% -50%;
+  }
+
+  .shoppable-video--play-bottom-right .shoppable-video__slide[data-offset='0'] .shoppable-video__toggle,
+  .shoppable-video--play-bottom-left .shoppable-video__slide[data-offset='0'] .shoppable-video__toggle {
+    inset-block-end: calc(var(--sv-card-height, 8.8rem) + 2.4rem);
+  }
+
+  .shoppable-video__toggle:hover {
+    scale: 1.06;
+  }
+
+  .shoppable-video__toggle--static {
+    cursor: default;
+    pointer-events: none;
+  }
+
+  .shoppable-video__toggle:focus-visible {
+    outline: 2px solid var(--color-secondary-button-hover-outline-icon, currentColor);
+    outline-offset: 2px;
+    border-radius: 50%;
+  }
+
+  .shoppable-video__toggle-glyph {
+    display: grid;
+    place-items: center;
+    inline-size: 64%;
+    block-size: 64%;
+    border-radius: 50%;
+    background: var(--sv-play-fill, var(--color-secondary-button-hover-outline-icon, var(--color-background)));
+  }
+
+  .shoppable-video__icon {
+    display: none;
+    line-height: 0;
+  }
+
+  .shoppable-video__slide:not([data-playing]) .shoppable-video__icon--play,
+  .shoppable-video__slide[data-playing] .shoppable-video__icon--pause {
+    display: block;
+  }
+
+  .shoppable-video__icon--pause .icon {
+    stroke-width: 3;
+  }
+
+  /* ---- the product, over the foot of the active slide ---- */
+  .shoppable-video__product {
+    position: absolute;
+    inset-inline: 1.2rem;
+    inset-block-end: 1.2rem;
+    z-index: 3;
+    display: grid;
+    grid-template-columns: 5.6rem minmax(0, 1fr);
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    border-radius: 1.6rem;
+    background: color-mix(in srgb, var(--color-secondary-background) 92%, transparent);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    color: var(--color-heading);
+    opacity: 0;
+    visibility: hidden;
+    translate: 0 1.2rem;
+    transition:
+      opacity var(--duration-base, 250ms) ease,
+      translate var(--sv-speed) var(--sv-ease),
+      visibility 0s linear var(--duration-base, 250ms);
+  }
+
+  .shoppable-video__slide[data-offset='0'] .shoppable-video__product {
+    opacity: 1;
+    visibility: visible;
+    translate: 0 0;
+    transition-delay: 150ms, 150ms, 0s;
+  }
+
+  .shoppable-video__product-image {
+    overflow: hidden;
+    aspect-ratio: 1;
+    border-radius: 1rem;
+    background: var(--color-background);
+  }
+
+  .shoppable-video__product-image responsive-image,
+  .shoppable-video__product-image img,
+  .shoppable-video__product-image svg {
+    inline-size: 100%;
+    block-size: 100%;
+    object-fit: contain;
+  }
+
+  .shoppable-video__product--placeholder .shoppable-video__product-image svg {
+    fill: var(--color-muted-text);
+  }
+
+  .shoppable-video__product-body {
+    display: grid;
+    gap: 0.4rem;
+    min-inline-size: 0;
+    padding-inline-end: 3.4rem;
+  }
+
+  .shoppable-video__product-head {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    min-inline-size: 0;
+  }
+
+  .shoppable-video__product-title {
+    overflow: hidden;
+    min-inline-size: 0;
+    font-family: var(--font-heading-family);
+    font-weight: var(--font-heading-weight);
+    font-size: 1.4rem;
+    line-height: 1.3;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .shoppable-video__product-badge {
+    flex: none;
+    padding: 0.1rem 0.6rem;
+    border: 1px solid var(--color-accent, currentColor);
+    border-radius: 99rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
+  .shoppable-video__product-rating {
+    --color-rating: var(--color-accent, var(--color-heading));
+    flex-wrap: nowrap;
+    font-size: 1.1rem;
+    color: var(--color-text);
+    white-space: nowrap;
+  }
+
+  .shoppable-video__product-price.price {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.6rem;
+    font-size: 1.4rem;
+    font-weight: 600;
+    color: var(--color-heading);
+  }
+
+  .shoppable-video__product-price .price__compare {
+    order: -1;
+    font-weight: 400;
+    color: var(--color-muted-text);
+  }
+
+  .shoppable-video__product-cart {
+    position: absolute;
+    inset-block-end: 1rem;
+    inset-inline-end: 1rem;
+    display: grid;
+    place-items: center;
+    inline-size: 3.2rem;
+    block-size: 3.2rem;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--color-accent, var(--color-heading)) 22%, transparent);
+    transition: background-color var(--transition-fast);
+  }
+
+  .shoppable-video__product:hover .shoppable-video__product-cart {
+    background: var(--color-accent, var(--color-heading));
+  }
+
+  .shoppable-video__product-hit {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    padding: 0;
+    border: 0;
+    border-radius: inherit;
+    background: none;
+    cursor: pointer;
+  }
+
+  .shoppable-video__product-hit:focus-visible {
+    outline-offset: 2px;
+    border-radius: inherit;
+  }
+
+  @media screen and (max-width: 749px) {
+    .shoppable-video__product {
+      grid-template-columns: 5.2rem minmax(0, 1fr);
+    }
+
+    .shoppable-video__product-body {
+      padding-inline-end: 0;
+    }
+
+    .shoppable-video__product-price.price {
+      padding-inline-end: 3.2rem;
+    }
+
+    .shoppable-video__product-rating {
+      font-size: 1rem;
+    }
+
+    .shoppable-video__product-cart {
+      inset-block-end: 0.8rem;
+      inset-inline-end: 0.8rem;
+      inline-size: 2.6rem;
+      block-size: 2.6rem;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .shoppable-video {
+      --sv-speed: 0ms;
+    }
+  }
+}
+
+@layer overrides {
+  .shoppable-video__toggle .shoppable-video__icon .icon {
+    inline-size: calc(var(--sv-play-size, 4.4rem) * 0.28);
+    block-size: calc(var(--sv-play-size, 4.4rem) * 0.28);
+  }
+
+  .shoppable-video__product .rating .rating__star {
+    inline-size: 1.1rem;
+    block-size: 1.1rem;
+  }
+
+  @media screen and (max-width: 749px) {
+    .shoppable-video__product .rating .rating__star {
+      inline-size: 1rem;
+      block-size: 1rem;
+    }
+  }
+}
