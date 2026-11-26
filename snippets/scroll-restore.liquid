@@ -71,8 +71,31 @@
           if (Math.abs(scrollY - top) > 1) scrollTo({ top: top, left: 0, behavior: 'instant' });
         }
 
+        // The header's scrolled look (solid surface, sticky colour scheme) is
+        // written by <sticky-header> in global.js, which can arrive after the
+        // page is shown. Until then a transparent header would sit over the
+        // restored content with its over-the-hero text colour. Same attributes
+        // StickyHeader#onScroll writes, so it takes over without a change.
+        function primeHeader() {
+          var header = document.querySelector('sticky-header');
+          if (!header) return;
+          // data-priming switches the header's transitions off, so it does not
+          // fade from its over-the-hero look into place.
+          header.setAttribute('data-priming', '');
+          requestAnimationFrame(function () {
+            requestAnimationFrame(function () { header.removeAttribute('data-priming'); });
+          });
+          var scrolled = Math.max(0, scrollY) > (Number(header.dataset.threshold) || 80);
+          header.toggleAttribute('data-scrolled', scrolled);
+          if (header.classList.contains('site-header--transparent')) header.toggleAttribute('data-transparent', !scrolled);
+          var scheme = header.dataset.stickyScheme;
+          var shell = header.querySelector('.site-header__shell');
+          if (scheme && shell) shell.classList.toggle(scheme, scrolled);
+        }
+
         function show() {
           if (shown) return;
+          primeHeader();
           shown = true;
           root.removeAttribute('data-scroll-restoring');
           document.dispatchEvent(new CustomEvent('theme:scroll-restored'));

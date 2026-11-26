@@ -62,7 +62,34 @@ export class MotionEffect extends BaseComponent {
   /** True inside `replay()`, which always animates. @type {boolean} */
   #replaying = false;
 
+  /** Waiting for the parser to finish this element's content. @type {boolean} */
+  #waitingForParse = false;
+
   /* ------------------------------------------------------------ lifecycle ---- */
+
+  /**
+   * This module loads `async`, so it can run while the document is still
+   * streaming in. A host the parser has already closed (the first view) starts
+   * now; one it is still filling, or has not reached, starts at
+   * DOMContentLoaded — the same moment as before — because its targets and its
+   * text are not all there yet.
+   */
+  connectedCallback() {
+    if (document.readyState === 'loading' && !(upgrading && isParsed(this))) {
+      if (this.#waitingForParse) return;
+      this.#waitingForParse = true;
+      document.addEventListener(
+        'DOMContentLoaded',
+        () => {
+          this.#waitingForParse = false;
+          if (this.isConnected) super.connectedCallback();
+        },
+        { once: true }
+      );
+      return;
+    }
+    super.connectedCallback();
+  }
 
   setup() {
     this.#teardownEffect();
@@ -335,7 +362,40 @@ function itemsOf(nodes) {
   return items;
 }
 
-defineComponent('motion-effect', MotionEffect);
+/**
+ * True only while `customElements.define` upgrades the hosts already in the
+ * document. A host the parser creates after that connects on its opening tag,
+ * before any of its content exists.
+ */
+let upgrading = false;
+
+/**
+ * Whether the parser has closed `element`: the node it is appending to is the
+ * deepest last element of the document, so an element that contains it is
+ * still open.
+ *
+ * @param {Element} element
+ * @returns {boolean}
+ */
+function isParsed(element) {
+  // A host inside a wrapper waits with it: the wrapper's cascade must be set
+  // up first, exactly as it was when everything started together.
+  let outermost = element;
+  for (let node = element.parentElement; node; node = node.parentElement) {
+    if (node.localName === 'motion-effect') outermost = node;
+  }
+
+  let last = document.documentElement;
+  while (last.lastElementChild) last = last.lastElementChild;
+  return !outermost.contains(last);
+}
+
+upgrading = true;
+try {
+  defineComponent('motion-effect', MotionEffect);
+} finally {
+  upgrading = false;
+}
 
 /* ==========================================================================
    <parallax-media>

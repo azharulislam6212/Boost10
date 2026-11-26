@@ -485,8 +485,16 @@ export function motionEnabled() {
   return !prefersReducedMotion() && typeof Element.prototype.animate === 'function';
 }
 
-/** Navigation timestamp, used to decide whether an intersection is "on load". */
-const bootedAt = performance.now();
+/**
+ * Navigation timestamp, used to decide whether an intersection is "on load".
+ * The motion module can boot while the document is still streaming in; hosts
+ * further down start at DOMContentLoaded, so the first-view window opens
+ * again from there and they keep their quick on-load cascade.
+ */
+let bootedAt = performance.now();
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => (bootedAt = performance.now()), { once: true });
+}
 
 /** How many elements have already animated inside the load window. */
 let loadIndex = 0;
