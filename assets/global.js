@@ -23,7 +23,6 @@ import '@theme/dialog';
 import '@theme/modules';
 import '@theme/motion-effect';
 import '@theme/scrollbar';
-import '@theme/page-transition';
 
 /* ==========================================================================
    Lazy module map

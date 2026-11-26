@@ -158,6 +158,9 @@
           -webkit-text-size-adjust: 100%;
           text-size-adjust: 100%;
           scroll-behavior: smooth;
+          /* Same surface as <body>: between pages, and before <body> paints,
+             the browser shows the theme background, never white. */
+          background-color: var(--color-background);
         }
 
         body,
@@ -204,8 +207,7 @@
 
         /* Reload or back/forward to a saved position: content stays hidden
            only until the markup is parsed and placed (snippets/scroll-restore,
-           end of <body>), never until scripts load. The page-transition
-           curtain stays visible. */
+           end of <body>), never until scripts load. */
         /* The thumb is hidden too: while the page grows during parsing it
            would slide from the top down to the saved spot. The gutter stays,
            so nothing shifts sideways when it comes back. */
@@ -213,7 +215,7 @@
           scroll-behavior: auto !important;
           scrollbar-color: transparent transparent;
         }
-        html[data-scroll-restoring] body > :not(page-transition) { opacity: 0 !important; }
+        html[data-scroll-restoring] body > * { opacity: 0 !important; }
 
         @media (prefers-reduced-motion: reduce) {
           html { scroll-behavior: auto; }
@@ -248,42 +250,10 @@
           overflow-wrap: break-word;
         }
         motion-effect,
-        smooth-scrollbar,
-        page-transition { display: block; }
+        smooth-scrollbar { display: block; }
 
         smooth-scrollbar[data-disabled] { display: none; }
 
-        /* <page-transition> (assets/page-transition.js): covers the page from
-           the first paint, so a reload never shows the top before the saved
-           position. States: covered → out → ready → covered. */
-        page-transition {
-          --page-transition-duration: 600ms;
-          position: fixed;
-          inset: 0;
-          z-index: 2147483000;
-          background-color: {{ settings.page_transition_color | default: '#0F2E2F' }};
-          pointer-events: none;
-          transition-property: opacity, transform, clip-path, visibility;
-          transition-duration: var(--page-transition-duration);
-          transition-timing-function: cubic-bezier(0.76, 0, 0.24, 1);
-        }
-        page-transition[data-state='covered'] { pointer-events: auto; }
-        page-transition[data-state='ready'] { visibility: hidden; transition: none; }
-        page-transition[data-disabled] { display: none; }
-
-        /* Failsafe: if the module never runs, get out of the way. */
-        page-transition:not([data-armed]) { animation: page-transition-failsafe 0.4s ease 2.5s forwards; }
-        @keyframes page-transition-failsafe { to { opacity: 0; visibility: hidden; pointer-events: none; } }
-
-        page-transition[data-mode='fade']:is([data-state='out'], [data-state='ready']) { opacity: 0; }
-        page-transition[data-mode='curtain'][data-state='out'] { transform: translateY(-100%); }
-        page-transition[data-mode='curtain'][data-state='ready'] { transform: translateY(100%); }
-        page-transition[data-mode='wipe'][data-state='out'] { clip-path: inset(0 0 0 100%); }
-        page-transition[data-mode='wipe'][data-state='ready'] { clip-path: inset(0 100% 0 0); }
-
-        @media (prefers-reduced-motion: reduce) {
-          page-transition { display: none; }
-        }
         motion-effect[data-effect='marquee'] { overflow: hidden; }
 
         accordion-element[data-static] summary,
