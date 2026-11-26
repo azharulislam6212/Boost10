@@ -1,0 +1,195 @@
+/** Loaded only by: expert-quote.
+ * Layer order comes from base.css; rules keep their original order. */
+
+@layer components {
+  .expert-quote {
+    display: flex;
+    flex-direction: column;
+  }
+  .expert-quote:has(> .background-media) { overflow: hidden; }
+  .expert-quote__inner {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+  }
+  .expert-quote-lead__mark {
+    display: block;
+    margin-block-end: var(--eql-mark-space, 0px);
+    color: var(--eql-mark-color, var(--color-heading));
+  }
+  .expert-quote-lead__mark-icon {
+    display: block;
+  }
+  @media screen and (min-width: 750px) {
+    .expert-quote-lead__quote {
+      font-size: var(--eql-quote-size, 28px);
+    }
+  }
+  .expert-quote-lead__person {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-block-start: var(--eql-lead-space, 0px);
+  }
+  .expert-quote-lead__ring {
+    position: absolute;
+    inset: 0;
+    display: block;
+    pointer-events: none;
+  }
+  .expert-quote-lead__name {
+    display: block;
+    font-style: normal;
+    font-family: var(--font-h3-family, var(--font-heading-family));
+    font-weight: var(--font-h3-weight, var(--font-heading-weight));
+    font-size: var(--eql-name-size, 20px);
+    line-height: 1.3;
+    color: var(--color-heading);
+  }
+  .expert-quote-lead__role {
+    display: block;
+    font-size: var(--eql-role-size, 13px);
+    font-weight: 600;
+    line-height: 1.4;
+    color: var(--color-heading);
+  }
+  .expert-quote-lead--spin .expert-quote-lead__ring {
+    animation: expert-quote-spin var(--eql-spin-duration, 6000ms) linear infinite;
+  }
+  .expert-quote-lead--zoom .expert-quote-lead__avatar {
+    animation: expert-quote-breathe var(--eql-zoom-duration, 3000ms)
+      var(--ease-in-out-sine, cubic-bezier(0.37, 0, 0.63, 1)) infinite alternate;
+  }
+  @media screen and (min-width: 750px) {
+    .expert-quote__stage {
+      flex-wrap: nowrap;
+    }
+  }
+  .expert-quote-pic {
+    order: var(--eqp-order, 2);
+    display: flex;
+    justify-content: center;
+    min-inline-size: 0;
+
+    /* ---- one set of numbers, resolved once per device ---- */
+    --eqp-frame-inline: var(--eqp-width, 260px);
+    --eqp-frame-tilt: var(--eqp-tilt, 0deg);
+    --eqp-frame-block: calc(var(--eqp-frame-inline) / (var(--eqp-aspect, 1)));
+
+    /* ---- the tilt is part of the layout, not only part of the paint ---- */
+    --eqp-bleed-x: max(
+      0px,
+      calc(
+        (
+            var(--eqp-frame-block) * sin(var(--eqp-frame-tilt)) - var(--eqp-frame-inline) *
+              (1 - cos(var(--eqp-frame-tilt)))
+          ) / 2
+      )
+    );
+    --eqp-bleed-y: max(
+      0px,
+      calc(
+        (
+            var(--eqp-frame-inline) * sin(var(--eqp-frame-tilt)) - var(--eqp-frame-block) *
+              (1 - cos(var(--eqp-frame-tilt)))
+          ) / 2
+      )
+    );
+  }
+  .expert-quote-pic--feature {
+    order: 2;
+    flex: 0 0 auto;
+    margin-block-start: var(--eqp-space, 0px);
+  }
+  .expert-quote-pic--scatter {
+    flex: 1 1 calc(var(--eqp-frame-inline) + 2 * var(--eqp-bleed-x));
+    margin-block-start: var(--eqp-offset, 0px);
+  }
+  .expert-quote-pic--float .expert-quote-pic__frame,
+  .expert-quote-pic--sway .expert-quote-pic__frame,
+  .expert-quote-pic--zoom .expert-quote-pic__frame,
+  .expert-quote-pic--orbit .expert-quote-pic__frame {
+    animation-duration: var(--expert-quote-motion-duration, 4000ms);
+    animation-delay: var(--eqp-motion-delay, 0ms);
+    animation-iteration-count: infinite;
+    animation-timing-function: var(--ease-in-out-sine, cubic-bezier(0.37, 0, 0.63, 1));
+  }
+  .expert-quote-pic--float .expert-quote-pic__frame {
+    animation-name: expert-quote-float;
+    animation-direction: alternate;
+  }
+  .expert-quote-pic--sway .expert-quote-pic__frame {
+    animation-name: expert-quote-sway;
+    animation-direction: alternate;
+  }
+  .expert-quote-pic--zoom .expert-quote-pic__frame {
+    animation-name: expert-quote-zoom;
+    animation-direction: alternate;
+  }
+  .expert-quote-pic--orbit .expert-quote-pic__frame {
+    animation-name: expert-quote-orbit;
+    animation-direction: normal;
+    animation-timing-function: linear;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .expert-quote-lead__ring,
+    .expert-quote-lead__avatar,
+    .expert-quote-pic__frame {
+      animation: none;
+    }
+  }
+  @supports (animation-timeline: view()) {
+    @media screen and (min-width: 750px) and (prefers-reduced-motion: no-preference) {
+      .expert-quote__stage {
+        view-timeline-name: --expert-quote-stage;
+      }
+      .expert-quote-lead {
+        position: relative;
+        z-index: 2;
+      }
+      .expert-quote-pic--feature,
+      .expert-quote-pic--scatter {
+        position: relative;
+        animation-timing-function: var(--ease-in-out-sine, cubic-bezier(0.37, 0, 0.63, 1));
+        animation-fill-mode: both;
+        animation-timeline: --expert-quote-stage;
+        animation-range: entry 25% cover 55%;
+      }
+      .expert-quote-pic--feature {
+        z-index: 1;
+        animation-name: expert-quote-feature-in;
+      }
+      .expert-quote-pic--scatter {
+        z-index: 0;
+        --eqp-spread: calc(50% + var(--expert-quote-gap-x, 24px) + var(--expert-quote-feature-half, 116px));
+        --eqp-rise: calc(var(--expert-quote-feature-space, 28px) - var(--eqp-offset, 0px));
+        animation-name: expert-quote-scatter-in;
+      }
+    }
+  }
+  @media screen and (max-width: 749px) {
+    .expert-quote__stage {
+      gap: var(--expert-quote-gap-y-mobile, var(--expert-quote-gap-y, var(--space-6)))
+        var(--expert-quote-gap-x-mobile, var(--expert-quote-gap-x, var(--space-6)));
+    }
+    .expert-quote-pic--feature {
+      order: 0;
+      flex: 1 1 100%;
+    }
+    .expert-quote-pic {
+      --eqp-frame-inline: var(--eqp-width-mobile, var(--eqp-width, 260px));
+      --eqp-bleed-x: 0px;
+      --eqp-bleed-y: 0px;
+    }
+    .expert-quote-pic--scatter {
+      flex: 0 1 auto;
+      margin-block-start: var(--eqp-offset-mobile, 0px);
+    }
+    .expert-quote-pic__frame {
+      --radius-media: var(--eqp-radius-mobile, var(--eqp-radius, 0px));
+    }
+    .expert-quote__stage--no-scatter-mobile .expert-quote-pic--scatter {
+      display: none;
+    }
+  }
+}
