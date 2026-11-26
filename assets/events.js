@@ -51,7 +51,7 @@ export const EVENTS = {
   /* --------------------------------------------------------------- staging ---- */
   SECTION_RENDERED: 'section:rendered',
 
-  /** Fired by `scrollbar.js` once a reload is back at its saved position. */
+  /** Fired by `snippets/scroll-restore.liquid` once a reload is back at its saved position. */
   SCROLL_RESTORED: 'theme:scroll-restored',
 
   /* -------------------------------------------------------- client memory ---- */
