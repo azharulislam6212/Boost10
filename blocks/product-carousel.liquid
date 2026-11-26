@@ -29,6 +29,14 @@
   assign cs_label = 'accessibility.carousel' | t
   assign card_sizes = '(min-width: 750px) 280px, 240px'
 
+  # Only a carousel in the first two sections can hold the LCP image. Further
+  # down, an eager, high-priority first card only takes bandwidth from it.
+  # section.index is nil on a Section Rendering API re-render: lazy then.
+  assign first_view = false
+  if section.index != nil and section.index <= 2
+    assign first_view = true
+  endif
+
   assign classes = 'product-carousel'
   if s.bleed
     assign classes = classes | append: ' product-carousel--bleed'
@@ -78,12 +86,18 @@
           {%- endfor -%}
         {%- else -%}
           {%- for product in product_source limit: product_limit -%}
+            {%- liquid
+              assign card_priority = false
+              if first_view and forloop.first
+                assign card_priority = true
+              endif
+            -%}
             {% render 'product-card',
                product: product,
                index: forloop.index0,
                ratio: s.image_ratio,
                sizes: card_sizes,
-               priority: forloop.first,
+               priority: card_priority,
                block: s %}
           {%- endfor -%}
         {%- endif -%}
