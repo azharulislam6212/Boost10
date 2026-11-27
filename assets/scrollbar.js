@@ -300,7 +300,13 @@ export class ScrollToTop extends BaseComponent {
 
     this.on(this.refs.button, 'click', this.#onClick);
 
-    this.updateFromScroll(window.scrollY, 0);
+    // Watch the page itself as well: <smooth-scrollbar> only reports while it
+    // is on the page, and without it the button never hid again at the top.
+    const sync = rafThrottle(() => this.updateFromScroll(window.scrollY, this.#nativeProgress()));
+    this.on(window, 'scroll', sync, { passive: true });
+    this.on(window, 'resize', sync, { passive: true });
+
+    this.updateFromScroll(window.scrollY, this.#nativeProgress());
   }
 
   /* --------------------------------------------------------- public API -- ---- */
@@ -345,6 +351,12 @@ export class ScrollToTop extends BaseComponent {
   }
 
   /* ---------------------------------------------------------- internals -- ---- */
+
+  /** @returns {number} */
+  #nativeProgress() {
+    const limit = document.documentElement.scrollHeight - window.innerHeight;
+    return limit > 0 ? clamp(window.scrollY / limit, 0, 1) : 0;
+  }
 
   #onClick = (event) => {
     event.preventDefault();

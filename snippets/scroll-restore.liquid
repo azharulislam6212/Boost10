@@ -12,7 +12,7 @@
 
 {%- unless request.design_mode -%}
   {%- if position == 'end' -%}
-    <script>window.Theme && Theme.placeRestoredScroll && Theme.placeRestoredScroll();</script>
+    <script id="scroll-restore-end">window.Theme && Theme.placeRestoredScroll && Theme.placeRestoredScroll();</script>
   {%- else -%}
     <script>
       (function () {
@@ -54,6 +54,17 @@
 
         history.scrollRestoration = 'manual';
         root.setAttribute('data-scroll-restoring', '');
+
+        // Chromium keeps the previous page on screen until the script at the
+        // end of <body> is parsed. That script places and shows the page in the
+        // same step, so the first paint is already at the saved spot and the
+        // hidden state below is never seen: no white screen. Browsers without
+        // `rel=expect` ignore it and keep the hidden-until-placed fallback.
+        var expect = document.createElement('link');
+        expect.setAttribute('rel', 'expect');
+        expect.setAttribute('href', '#scroll-restore-end');
+        expect.setAttribute('blocking', 'render');
+        document.head.appendChild(expect);
 
         var shown = false;
         var holding = true;
