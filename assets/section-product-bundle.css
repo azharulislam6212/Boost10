@@ -1,6 +1,298 @@
 /** Loaded only by: product-bundle.
  * Layer order comes from base.css; rules keep their original order. */
 
+/* Moved from base.css, which loads first: kept ahead of the rules below. */
+
+@property --bundle-progress {
+  syntax: '<percentage>';
+  inherits: true;
+  initial-value: 0%;
+}
+
+@layer components {
+  /* ==========================================================================
+     The strip is a row in a layout, not an element
+     ========================================================================== */
+
+  /* ---- the panel, and the movement it arrives with ---- */
+
+  @keyframes bundle-panel-fade {
+    from {
+      opacity: 0;
+    }
+
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes bundle-panel-rise {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes bundle-panel-slide {
+    from {
+      opacity: 0;
+      translate: var(--bundle-panel-slide-from, 28px) 0;
+    }
+
+    to {
+      opacity: 1;
+      translate: none;
+    }
+  }
+
+  /* ---- one product card ---- */
+
+  .bundle-row__media {
+    inline-size: var(--bundle-media-size);
+    block-size: var(--bundle-media-size);
+    flex: 0 0 auto;
+    border-radius: 1.4rem;
+    background-color: color-mix(in srgb, var(--color-heading) 10%, var(--bundle-card-surface, var(--color-secondary-background)));
+    overflow: hidden;
+  }
+
+  .bundle-row__media responsive-image {
+    block-size: 100%;
+  }
+
+  .bundle-row__badges {
+    --color-badge-sale-bg: var(--product-bundle-accent, var(--color-accent, var(--color-badge-sale-bg)));
+    --color-badge-sale-text: var(--bundle-card-ink);
+
+    --badge-radius: 999px;
+
+    position: static;
+    flex: 0 0 auto;
+    flex-direction: row;
+    gap: var(--space-1);
+    pointer-events: auto;
+  }
+
+  .bundle-row__rating .rating__star--full,
+  .bundle-row__rating .rating__star--half {
+    color: var(--product-bundle-accent, var(--color-accent, var(--color-heading)));
+  }
+
+  .bundle-row__price .price {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+  }
+
+  .bundle-row__price .price__compare {
+    order: -1;
+    color: var(--bundle-card-ink);
+    font-size: 1.3rem;
+    font-weight: 400;
+    opacity: 0.8;
+  }
+
+  .bundle-row__add {
+    --icon-stroke: 1.5;
+
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    inline-size: 3.2rem;
+    block-size: 3.2rem;
+    padding: 0;
+    border: 1px dashed var(--bundle-card-ink);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--bundle-card-ink);
+    cursor: pointer;
+    transition: background-color var(--transition-fast), color var(--transition-fast),
+      border-color var(--transition-fast), transform var(--transition-fast);
+  }
+
+  /* ---- the summary panel ---- */
+
+  .bundle-summary {
+    --bundle-summary-surface: var(--bundle-summary-background, var(--color-secondary-background));
+    --bundle-summary-line: color-mix(in srgb, var(--color-heading) 30%, transparent);
+    --bundle-summary-well: color-mix(in srgb, var(--color-heading) 10%, var(--bundle-summary-surface));
+
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 var(--bundle-summary-width, 39%);
+    inline-size: var(--bundle-summary-width, 39%);
+    min-inline-size: 0;
+    border-radius: var(--bundle-summary-radius, 2.4rem);
+    background: var(--bundle-summary-surface);
+    color: var(--color-text);
+  }
+
+  @media screen and (min-width: 990px) {
+    .bundle-summary--sticky {
+      position: sticky;
+      inset-block-start: calc(var(--header-height, 0px) + var(--space-5));
+      align-self: flex-start;
+    }
+  }
+
+  .bundle-summary__mark {
+    position: relative;
+    display: grid;
+    place-items: center;
+    inline-size: 7.2rem;
+    block-size: 7.2rem;
+    margin-block-end: 1.2rem;
+    color: var(--color-background);
+  }
+
+  .bundle-summary__mark > .icon {
+    position: relative;
+  }
+
+  .bundle-summary__ring {
+    position: absolute;
+    inset: 0;
+    inline-size: 100%;
+    block-size: 100%;
+    color: var(--color-heading);
+    transition: transform 1.2s var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+  }
+
+  /* ---- progress: the border fills toward the discount ---- */
+
+  .bundle-summary__progress {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    min-block-size: 3.4rem;
+    margin: 2.4rem 0 0;
+    padding: 0.7rem 1.6rem;
+    border-radius: 1.2rem;
+    background: color-mix(in srgb, var(--color-heading) 10%, transparent);
+    color: var(--color-heading);
+    font-size: 1.4rem;
+    line-height: 1.4;
+    transition: --bundle-progress 700ms var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+  }
+
+  .bundle-summary__progress::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    padding: 1px;
+    border-radius: inherit;
+    background: linear-gradient(
+      90deg,
+      var(--color-heading) var(--bundle-progress, 0%),
+      color-mix(in srgb, var(--color-heading) 10%, transparent) var(--bundle-progress, 0%)
+    );
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  .bundle-summary__progress > * {
+    position: relative;
+  }
+
+  .bundle-summary__progress > span {
+    display: inline-block;
+    min-inline-size: 0;
+  }
+
+  /* ---- one slot: a white card holding a picture and a stepper ---- */
+
+  .bundle-slot__fill .icon {
+    --icon-stroke: 1.2;
+
+    transition: transform var(--duration-base, 300ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+  }
+
+  @media (hover: hover) {
+    .bundle-slot__fill:hover .icon {
+      transform: rotate(90deg);
+    }
+  }
+
+  .bundle-slot__image {
+    display: block;
+    inline-size: 100%;
+    block-size: 100%;
+    border-radius: inherit;
+    object-fit: cover;
+  }
+
+  .bundle-slot__remove {
+    position: absolute;
+    inset-block-end: -0.1rem;
+    inset-inline-end: -0.1rem;
+    display: grid;
+    place-items: center;
+    inline-size: 2.4rem;
+    block-size: 2.4rem;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: var(--color-heading);
+    color: var(--color-background);
+    cursor: pointer;
+    transition: transform var(--transition-fast);
+  }
+
+  .bundle-slot__step {
+    display: grid;
+    flex: 0 0 auto;
+    place-items: center;
+    inline-size: 1.6rem;
+    block-size: 1.6rem;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: var(--bundle-summary-surface);
+    color: var(--color-heading);
+    cursor: pointer;
+    transition:
+      background-color var(--transition-fast),
+      color var(--transition-fast);
+  }
+
+  /* ---- total and button ---- */
+
+  .bundle-summary .button-swap,
+  .bundle-summary__submit {
+    inline-size: 100%;
+  }
+
+  product-bundle[data-loading] .bundle-summary__submit {
+    cursor: progress;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bundle-summary__ring,
+    .bundle-summary__progress,
+    .bundle-slot__fill .icon {
+      transition: none;
+    }
+  }
+
+  @media screen and (max-width: 989px) {
+    .bundle-summary {
+      flex-basis: 100%;
+      inline-size: 100%;
+    }
+  }
+}
+
+
 /* Moved from base.css (the last of this section's rules there): they come first, in their original order. */
 
 @layer components {
@@ -152,14 +444,6 @@
 }
 
 @layer components {
-  :is(.article-title-block__link:is(:hover, :focus-visible) .article-title-block__text, :is(.search-card:is(:hover, :focus-visible), [data-selected] > .search-card) .search-card__title-text, .product-card:is(:hover, :focus-within) .product-card__title-text, :is(.mega-menu__link, .bundle-row__link, .megamenu__column-heading):is(:hover, :focus-visible)) {
-    text-decoration: none;
-    background-size: 100% 0.1rem;
-    background-position: left bottom;
-  }
-  [dir='rtl'] :is(.article-title-block__link:is(:hover, :focus-visible) .article-title-block__text, :is(.search-card:is(:hover, :focus-visible), [data-selected] > .search-card) .search-card__title-text, .product-card:is(:hover, :focus-within) .product-card__title-text, :is(.mega-menu__link, .bundle-row__link, .megamenu__column-heading):is(:hover, :focus-visible)) {
-    background-position: right bottom;
-  }
   .product-bundle__layout {
     display: flex;
     flex-wrap: wrap;

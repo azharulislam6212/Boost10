@@ -54,8 +54,6 @@
             {%- endfor -%}
           </div>
         </motion-effect>
-        {%- assign marquee_id = 'AnnouncementMarquee-' | append: section.id -%}
-        {% render 'marquee-toggle', controls: marquee_id, class: 'marquee-toggle--inline' %}
       {%- elsif mode == 'slider' and count > 1 -%}
         <carousel-slider
           class="announcement-bar__carousel carousel-shell"
@@ -106,6 +104,117 @@
     </div>
   </announcement-bar>
 {%- endif -%}
+
+{% stylesheet %}
+/* Head-loaded (styles.css): the bar is the first thing on every page. */
+@layer components {
+  .announcement-bar { text-align: center; font-size: 1.2rem; line-height: 1.5; }
+  .announcement-bar__carousel { position: relative; }
+  .announcement { display: flex; align-items: center; justify-content: center; gap: var(--space-2); }
+  .announcement__icon { flex: 0 0 auto; }
+  .announcement__text { display: block; text-decoration: none; }
+}
+
+@layer overrides {
+  announcement-bar {
+    display: block;
+    position: relative;
+  }
+
+  announcement-bar[data-dismissed] { display: none; }
+
+  .announcement-bar__inner {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .announcement-bar__carousel,
+  .announcement-bar__marquee,
+  .announcement-bar__single {
+    flex: 1;
+    min-inline-size: 0;
+  }
+
+  .announcement-bar__single {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+  }
+
+  .announcement-bar__carousel .carousel-shell__dots,
+  .announcement-bar__carousel .carousel-shell__counter,
+  .announcement-bar__carousel .carousel-shell__progress { margin-block: 0; }
+
+  .announcement-bar__close {
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    inline-size: 2.4rem;
+    block-size: 2.4rem;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 150ms ease;
+  }
+
+  .announcement-bar__close:hover { opacity: 1; }
+
+  .announcement-bar__carousel .announcement-bar__pause {
+    --carousel-pause-size: 2.4rem;
+    inset-block: 50% auto;
+    inset-inline-end: 0;
+    translate: 0 -50%;
+    background: none;
+    box-shadow: none;
+    color: inherit;
+  }
+
+  /* ---- mobile visibility ---- */
+
+  @media screen and (max-width: 749px) {
+    .announcement-bar--desktop-only { display: none; }
+  }
+
+  /* ---- marquee mode ---- */
+
+  .announcement-bar__marquee { overflow: hidden; }
+
+  .announcement-bar .marquee__track {
+    --announcement-separator-gap: 3.3rem;
+
+    display: flex;
+    align-items: center;
+    gap: 0;
+    inline-size: max-content;
+    will-change: transform;
+  }
+
+  .announcement-bar__group {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: var(--announcement-separator-gap);
+    padding-inline-end: var(--announcement-separator-gap);
+  }
+
+  .announcement-bar .marquee__track .announcement::after {
+    content: "";
+    flex: 0 0 auto;
+    inline-size: 0.3rem;
+    block-size: 0.3rem;
+    margin-inline-start: calc(var(--announcement-separator-gap) - var(--space-2));
+    border-radius: 50%;
+    background-color: currentColor;
+  }
+
+  .announcement-bar .marquee__track .announcement { flex-shrink: 0; }
+}
+{% endstylesheet %}
 
 {% schema %}
 {

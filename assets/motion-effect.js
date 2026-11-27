@@ -56,9 +56,6 @@ export class MotionEffect extends BaseComponent {
   /** @type {{ destroy: () => void, play?: () => void, pause?: () => void }|null} */
   #instance = null;
 
-  /** @type {AbortController|null} */
-  #toggleBinding = null;
-
   /** True inside `replay()`, which always animates. @type {boolean} */
   #replaying = false;
 
@@ -192,7 +189,6 @@ export class MotionEffect extends BaseComponent {
         direction: this.dataset.direction === 'right' ? 'right' : 'left',
         pauseOnHover: this.dataset.pauseOnHover !== 'false'
       });
-      this.#bindToggle();
     }
 
     this.setAttribute('data-motion-revealed', '');
@@ -291,38 +287,7 @@ export class MotionEffect extends BaseComponent {
     return Number.isFinite(value) ? value : undefined;
   }
 
-  /**
-   * A Pause/Play button for moving content, outside the marquee itself and
-   * pointing at it with `aria-controls`.
-   */
-  #bindToggle() {
-    this.#toggleBinding?.abort();
-    this.#toggleBinding = null;
-    if (!this.id) return;
-
-    const button = document.querySelector(`[data-marquee-toggle][aria-controls="${CSS.escape(this.id)}"]`);
-    if (!(button instanceof HTMLButtonElement)) return;
-
-    this.#toggleBinding = new AbortController();
-    button.hidden = !motionEnabled();
-    const held = button.getAttribute('aria-pressed') === 'true';
-    if (held) this.#instance?.pause?.();
-
-    button.addEventListener(
-      'click',
-      () => {
-        const pause = button.getAttribute('aria-pressed') !== 'true';
-        button.setAttribute('aria-pressed', String(pause));
-        if (pause) this.#instance?.pause?.();
-        else this.#instance?.play?.();
-      },
-      { signal: this.#toggleBinding.signal }
-    );
-  }
-
   #teardownEffect() {
-    this.#toggleBinding?.abort();
-    this.#toggleBinding = null;
     this.#cancelReveal?.();
     this.#cancelReveal = null;
 
