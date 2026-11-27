@@ -1263,7 +1263,7 @@ function afterWrapperPlays(element, owner, callback) {
 
 /**
  * Every class the stylesheets give `background-clip: text`. Keep in step with
- * base.css, header.css and footer.css.
+ * base.css, section-header.css and section-footer.css.
  */
 const CLIPPED_TEXT_SELECTOR = [
   '.block-text--gradient',
